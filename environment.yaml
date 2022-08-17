@@ -1,0 +1,12 @@
+name: schedview
+channels:
+ - conda-forge
+dependencies:
+ - rubin-sim
+ - bokeh
+ - pytest-flake8
+ - pytest-black
+ - selenium
+ - firefox
+ - geckodriver
+ - build
