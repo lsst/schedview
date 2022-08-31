@@ -1,3 +1,14 @@
+const gpu = new GPU();
+const foo = gpu.createKernel(function (a, b) {
+    let sum = a[this.thread.x] + b[this.thread.x]
+    return sum;
+}).setOutput([5]);
+
+let a = [1, 2, 3, 4, 5]
+let b = [10, 100, 1000, 10000, 100000]
+const c = foo(a, b);
+console.log(c)
+
 function rotateCart(ux, uy, uz, angle, x0, y0, z0) {
     // ux, uy, uz is a vector that defines the axis of rotation
     // angle is in radians
@@ -219,97 +230,125 @@ const upCart0 = eqToCart(upEq[0], upEq[1])
 const upCart3 = applyRotations(upCart0[0], upCart0[1], upCart0[2], codecl, ra, 0, npoleCoords1)
 const orient = Math.PI / 2 - Math.atan2(upCart3[1], upCart3[0])
 
-for (let i = 0; i < data['x_hp'].length; i++) {
-    let x_hp = NaN
-    let y_hp = NaN
-    let z_hp = NaN
+
+function updateData() {
     let pointEq = NaN
+
+    if (data['x_hp'].length == 0) {
+        return
+    }
 
     // Columns can contain lists of coords (eg for corners of healpixels), or individual points.
     // If they are lists, iteratate over each element. Otherwise, just apply the rotation to the point.
-    if (typeof (data['x_hp'][i]) === 'number') {
+    if (typeof (data['x_hp'][0]) === 'number') {
         if ('alt' in data) {
-            pointEq = horizonToEq(lat, data['alt'][i] * Math.PI / 180, data['az'][i] * Math.PI / 180, lst)
-            data['ra'][i] = pointEq[0] * 180 / Math.PI
-            data['decl'][i] = pointEq[1] * 180 / Math.PI
-            let cartCoords = eqToCart(pointEq[0], pointEq[1])
-            x_hp = cartCoords[0]
-            y_hp = cartCoords[1]
-            z_hp = cartCoords[2]
-        } else {
-            x_hp = data['x_hp'][i]
-            y_hp = data['y_hp'][i]
-            z_hp = data['z_hp'][i]
+            for (let i = 0; i < data['x_hp'].length; i++) {
+                pointEq = horizonToEq(lat, data['alt'][i] * Math.PI / 180, data['az'][i] * Math.PI / 180, lst)
+                data['ra'][i] = pointEq[0] * 180 / Math.PI
+                data['decl'][i] = pointEq[1] * 180 / Math.PI
+                let cartCoords = eqToCart(pointEq[0], pointEq[1])
+                data['x_hp'][i] = cartCoords[0]
+                data['y_hp'][i] = cartCoords[1]
+                data['z_hp'][i] = cartCoords[2]
+            }
         }
-        const coords = applyRotations(x_hp, y_hp, z_hp, codecl, ra, orient, npoleCoords1)
-        data['x_orth'][i] = coords[0]
-        data['y_orth'][i] = coords[1]
-        data['z_orth'][i] = coords[2]
+        for (let i = 0; i < data['x_hp'].length; i++) {
+            const coords = applyRotations(data['x_hp'][i], data['y_hp'][i], data['z_hp'][i], codecl, ra, orient, npoleCoords1)
+            data['x_orth'][i] = coords[0]
+            data['y_orth'][i] = coords[1]
+            data['z_orth'][i] = coords[2]
+        }
         if ('x_laea' in data) {
-            const laea = eqToLambertAEA(data['ra'][i] * Math.PI / 180, data['decl'][i] * Math.PI / 180, hemisphere, true)
-            data['x_laea'][i] = laea[0]
-            data['y_laea'][i] = laea[1]
+            for (let i = 0; i < data['x_hp'].length; i++) {
+                const laea = eqToLambertAEA(data['ra'][i] * Math.PI / 180, data['decl'][i] * Math.PI / 180, hemisphere, true)
+                data['x_laea'][i] = laea[0]
+                data['y_laea'][i] = laea[1]
+            }
         }
         if ('x_moll' in data) {
-            const moll = eqToMollweide(data['ra'][i] * Math.PI / 180, data['decl'][i] * Math.PI / 180, true)
-            data['x_moll'][i] = moll[0]
-            data['y_moll'][i] = moll[1]
+            for (let i = 0; i < data['x_hp'].length; i++) {
+                const moll = eqToMollweide(data['ra'][i] * Math.PI / 180, data['decl'][i] * Math.PI / 180, true)
+                data['x_moll'][i] = moll[0]
+                data['y_moll'][i] = moll[1]
+            }
         }
         if ('x_hz' in data) {
-            const horizonCart = eqToHorizonCart(data['ra'][i] * Math.PI / 180, data['decl'][i] * Math.PI / 180, lat, lst)
-            data['x_hz'][i] = horizonCart[0]
-            data['y_hz'][i] = horizonCart[1]
+            for (let i = 0; i < data['x_hp'].length; i++) {
+                const horizonCart = eqToHorizonCart(data['ra'][i] * Math.PI / 180, data['decl'][i] * Math.PI / 180, lat, lst)
+                data['x_hz'][i] = horizonCart[0]
+                data['y_hz'][i] = horizonCart[1]
+            }
         }
     } else {
-        for (let j = 0; j < data['x_hp'][i].length; j++) {
-            if ('alt' in data) {
-                pointEq = horizonToEq(lat, data['alt'][i][j] * Math.PI / 180, data['az'][i][j] * Math.PI / 180, lst)
-                data['ra'][i][j] = pointEq[0] * 180 / Math.PI
-                data['decl'][i][j] = pointEq[1] * 180 / Math.PI
-                let cartCoords = eqToCart(pointEq[0], pointEq[1])
-                x_hp = cartCoords[0]
-                y_hp = cartCoords[1]
-                z_hp = cartCoords[2]
-            } else {
-                x_hp = data['x_hp'][i][j]
-                y_hp = data['y_hp'][i][j]
-                z_hp = data['z_hp'][i][j]
+        if ('alt' in data) {
+            for (let j = 0; j < data['x_hp'][0].length; j++) {
+                for (let i = 0; i < data['x_hp'].length; i++) {
+                    pointEq = horizonToEq(lat, data['alt'][i][j] * Math.PI / 180, data['az'][i][j] * Math.PI / 180, lst)
+                    data['ra'][i][j] = pointEq[0] * 180 / Math.PI
+                    data['decl'][i][j] = pointEq[1] * 180 / Math.PI
+                    let cartCoords = eqToCart(pointEq[0], pointEq[1])
+                    data['x_hp'][i][j] = cartCoords[0]
+                    data['y_hp'][i][j] = cartCoords[1]
+                    data['z_hp'][i][j] = cartCoords[2]
+                }
             }
-            const coords = applyRotations(x_hp, y_hp, z_hp, codecl, ra, orient, npoleCoords1)
-            data['x_orth'][i][j] = coords[0]
-            data['y_orth'][i][j] = coords[1]
-            data['z_orth'][i][j] = coords[2]
-            if ('x_laea' in data) {
-                const laea = eqToLambertAEA(data['ra'][i][j] * Math.PI / 180, data['decl'][i][j] * Math.PI / 180, hemisphere, true)
-                data['x_laea'][i][j] = laea[0]
-                data['y_laea'][i][j] = laea[1]
+        }
+
+        for (let j = 0; j < data['x_hp'][0].length; j++) {
+            for (let i = 0; i < data['x_hp'].length; i++) {
+                const coords = applyRotations(data['x_hp'][i][j], data['y_hp'][i][j], data['z_hp'][i][j], codecl, ra, orient, npoleCoords1)
+                data['x_orth'][i][j] = coords[0]
+                data['y_orth'][i][j] = coords[1]
+                data['z_orth'][i][j] = coords[2]
             }
-            if ('x_moll' in data) {
-                const moll = eqToMollweide(data['ra'][i][j] * Math.PI / 180, data['decl'][i][j] * Math.PI / 180, true)
-                data['x_moll'][i][j] = moll[0]
-                data['y_moll'][i][j] = moll[1]
+        }
+
+        if ('x_laea' in data) {
+            for (let j = 0; j < data['x_hp'][0].length; j++) {
+                for (let i = 0; i < data['x_hp'].length; i++) {
+                    const laea = eqToLambertAEA(data['ra'][i][j] * Math.PI / 180, data['decl'][i][j] * Math.PI / 180, hemisphere, true)
+                    data['x_laea'][i][j] = laea[0]
+                    data['y_laea'][i][j] = laea[1]
+                }
             }
-            if ('x_hz' in data) {
-                const horizonCart = eqToHorizonCart(data['ra'][i][j] * Math.PI / 180, data['decl'][i][j] * Math.PI / 180, lat, lst)
-                data['x_hz'][i][j] = horizonCart[0]
-                data['y_hz'][i][j] = horizonCart[1]
+        }
+        if ('x_moll' in data) {
+            for (let j = 0; j < data['x_hp'][0].length; j++) {
+                for (let i = 0; i < data['x_hp'].length; i++) {
+                    const moll = eqToMollweide(data['ra'][i][j] * Math.PI / 180, data['decl'][i][j] * Math.PI / 180, true)
+                    data['x_moll'][i][j] = moll[0]
+                    data['y_moll'][i][j] = moll[1]
+                }
+            }
+        }
+        if ('x_hz' in data) {
+            for (let j = 0; j < data['x_hp'][0].length; j++) {
+                for (let i = 0; i < data['x_hp'].length; i++) {
+                    const horizonCart = eqToHorizonCart(data['ra'][i][j] * Math.PI / 180, data['decl'][i][j] * Math.PI / 180, lat, lst)
+                    data['x_hz'][i][j] = horizonCart[0]
+                    data['y_hz'][i][j] = horizonCart[1]
+                }
             }
         }
     }
 
-    if ('in_mjd_window' in data) {
-        data['in_mjd_window'][i] = 1.0
-        if ('min_mjd' in data) {
-            if (mjd < data['min_mjd'][i]) {
-                data['in_mjd_window'][i] = 0.0
+    for (let i = 0; i < data['x_hp'].length; i++) {
+        if ('in_mjd_window' in data) {
+            data['in_mjd_window'][i] = 1.0
+            if ('min_mjd' in data) {
+                if (mjd < data['min_mjd'][i]) {
+                    data['in_mjd_window'][i] = 0.0
+                }
             }
-        }
-        if ('max_mjd' in data) {
-            if (mjd > data['max_mjd'][i]) {
-                data['in_mjd_window'][i] = 0.0
+            if ('max_mjd' in data) {
+                if (mjd > data['max_mjd'][i]) {
+                    data['in_mjd_window'][i] = 0.0
+                }
             }
         }
     }
 }
+
+updateData()
 
 data_source.change.emit()
