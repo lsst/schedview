@@ -7,7 +7,7 @@ from schedview.collect.stars import load_bright_stars
 from schedview.collect import get_metric_path
 
 
-def make_metric_figure(metric_values_fname=None, nside=8, mag_limit_slider=True):
+def make_metric_figure(metric_values_fname=None, nside=32, mag_limit_slider=True):
     """Create a figure showing multiple projections of a set of a MAF metric.
 
     Parameters

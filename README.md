@@ -65,7 +65,7 @@ Activate the environment, and start the `bokeh` app. If `SCHEDVIEW_DIR` is the
 directory into which you cloned the `schedview` github repository, then:
 
     $ conda activate schedview
-    $ bokeh serve ${SCHEDVIEW_DIR}/schedview/app/metric_maps.py
+    $ bokeh serve ${SCHEDVIEW_DIR}/schedview/app/metric_maps
 
 The app will then give you the URL at which you can find the app. The data
 displayed with the above instructions will be the sample metric map in the
@@ -81,6 +81,6 @@ Activate the environment, and start the `bokeh` app. If `SCHEDVIEW_DIR` is the
 directory into which you cloned the `schedview` github repository, then:
 
     $ conda activate schedview080a2
-    $ bokeh serve ${SCHEDVIEW_DIR}/schedview/app/sched_maps.py
+    $ bokeh serve ${SCHEDVIEW_DIR}/schedview/app/sched_maps
 
 The app will then give you the URL at which you can find the app.
