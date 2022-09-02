@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <script src="https://unpkg.com/gpu.js@latest/dist/gpu-browser.min.js"></script>
+    <script>const gpu = new GPU();</script>
+    <meta charset="utf-8">
+    {{ bokeh_css }}
+    {{ bokeh_js }}
+</head>
+
+<body>
+    {{ plot_div|indent(8) }}
+    {{ plot_script|indent(8) }}
+</body>
+
+</html>
