@@ -1,3 +1,4 @@
+/* 
 const gpu = new GPU();
 const foo = gpu.createKernel(function (a, b) {
     let sum = a[this.thread.x] + b[this.thread.x]
@@ -7,7 +8,8 @@ const foo = gpu.createKernel(function (a, b) {
 let a = [1, 2, 3, 4, 5]
 let b = [10, 100, 1000, 10000, 100000]
 const c = foo(a, b);
-console.log(c)
+console.log(c) 
+*/
 
 function rotateCart(ux, uy, uz, angle, x0, y0, z0) {
     // ux, uy, uz is a vector that defines the axis of rotation
@@ -199,6 +201,82 @@ function computeLocalSiderealTime(mjd, longitude) {
     return lst
 }
 
+// const gpu = new GPU();
+const multiplyMultiMatrix = gpu.createKernel(function (coeff, data) {
+    let sum = 0;
+    let hpix = this.thread.y
+    let corner = this.thread.x
+    let out_coord = this.thread.z
+    for (let in_coord = 0; in_coord < 3; in_coord++) {
+        sum += coeff[out_coord][in_coord] * data[in_coord][hpix][corner];
+    }
+    return sum;
+})
+
+function multiplyRotationMatrix(a, b) {
+    let result = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
+    for (let x = 0; x < 3; x++) {
+        for (let y = 0; y < 3; y++) {
+            for (let i = 0; i < 3; i++) {
+                result[y][x] = result[y][x] + a[i][x] * b[y][i]
+            }
+        }
+    }
+    return result;
+}
+
+function computeRotationMatrix(ux, uy, uz, angle) {
+    const cosa = Math.cos(angle)
+    const ccosa = 1 - cosa
+    const sina = Math.sin(angle)
+    const rxx = cosa + ux * ux * ccosa
+    const rxy = ux * uy * ccosa - uz * sina
+    const rxz = ux * uz * ccosa + uy * sina
+    const ryx = uy * ux * ccosa + uz * sina
+    const ryy = cosa + uy * uy * ccosa
+    const ryz = uy * uz * ccosa - ux * sina
+    const rzx = uz * ux * ccosa - uy * sina
+    const rzy = uz * uy * ccosa + ux * sina
+    const rzz = cosa + uz * uz * ccosa
+    const matrix = [[rxx, rxy, rxz], [ryx, ryy, ryz], [rzx, rzy, rzz]]
+    return matrix
+}
+
+function applyHealpixRotations(hpx, hpy, hpz, codecl, ra, orient, npoleCoords1) {
+    // We are looking out of the sphere from the inside, so the center is 180 degrees 
+    // from the front of the sphere, hence the pi.
+    const decl_rot = Math.PI + codecl
+    const ra_rot = ra - Math.PI / 2
+
+    const matrix1 = computeRotationMatrix(1, 0, 0, decl_rot)
+    const matrix2 = computeRotationMatrix(npoleCoords1[0], npoleCoords1[1], npoleCoords1[2], ra_rot)
+    const matrix3 = computeRotationMatrix(0, 0, 1, orient)
+    const rotMatrix = multiplyRotationMatrix(multiplyRotationMatrix(matrix1, matrix2), matrix3)
+    let coords = multiplyMultiMatrix(rotMatrix, [hpx, hpy, hpz])
+
+    // In astronomy, we are looking out of the sphere from the center to the back
+    // (which naturally results in west to the right).
+    // Positive z is out of the screen behind us, and we are at the center,
+    // so to visible part is when z is negative (coords[2]<=0).
+    // So, stuff the points with positive z to NaN so they are
+    // not shown, because they are behind the observer.
+
+    // Use 5*Number.EPSILON instead of exactly 0, because the
+    // assorted trig operations result in values slightly above or below
+    // 0 when the horizon is in principle exactly 0, and this gives an
+    // irregularly dotted/dashed appearance to the horizon if 
+    // a cutoff of exactly 0 is used.
+    for (let hpix = 0; hpix < coords[0].length; hpix++) {
+        for (let corner = 0; corner < coords[0][0].length; corner++) {
+            if (coords[2][hpix][corner] > 5 * Number.EPSILON) {
+                coords[0][hpix][corner] = NaN
+                coords[1][hpix][corner] = NaN
+            }
+        }
+    }
+    return coords
+}
+
 const data = data_source.data
 
 lat = lat * Math.PI / 180
@@ -230,9 +308,10 @@ const upCart0 = eqToCart(upEq[0], upEq[1])
 const upCart3 = applyRotations(upCart0[0], upCart0[1], upCart0[2], codecl, ra, 0, npoleCoords1)
 const orient = Math.PI / 2 - Math.atan2(upCart3[1], upCart3[0])
 
-
 function updateData() {
     let pointEq = NaN
+    let eqUpdated = false
+    let hzUpdated = true
 
     if (data['x_hp'].length == 0) {
         return
@@ -242,10 +321,12 @@ function updateData() {
     // If they are lists, iteratate over each element. Otherwise, just apply the rotation to the point.
     if (typeof (data['x_hp'][0]) === 'number') {
         if ('alt' in data) {
+            hzUpdated = false
             for (let i = 0; i < data['x_hp'].length; i++) {
                 pointEq = horizonToEq(lat, data['alt'][i] * Math.PI / 180, data['az'][i] * Math.PI / 180, lst)
                 data['ra'][i] = pointEq[0] * 180 / Math.PI
                 data['decl'][i] = pointEq[1] * 180 / Math.PI
+                eqUpdated = true
                 let cartCoords = eqToCart(pointEq[0], pointEq[1])
                 data['x_hp'][i] = cartCoords[0]
                 data['y_hp'][i] = cartCoords[1]
@@ -258,21 +339,24 @@ function updateData() {
             data['y_orth'][i] = coords[1]
             data['z_orth'][i] = coords[2]
         }
-        if ('x_laea' in data) {
+
+        if (eqUpdated && ('x_laea' in data)) {
             for (let i = 0; i < data['x_hp'].length; i++) {
                 const laea = eqToLambertAEA(data['ra'][i] * Math.PI / 180, data['decl'][i] * Math.PI / 180, hemisphere, true)
                 data['x_laea'][i] = laea[0]
                 data['y_laea'][i] = laea[1]
             }
         }
-        if ('x_moll' in data) {
+
+        if (eqUpdated && ('x_moll' in data)) {
             for (let i = 0; i < data['x_hp'].length; i++) {
                 const moll = eqToMollweide(data['ra'][i] * Math.PI / 180, data['decl'][i] * Math.PI / 180, true)
                 data['x_moll'][i] = moll[0]
                 data['y_moll'][i] = moll[1]
             }
         }
-        if ('x_hz' in data) {
+
+        if (hzUpdated && ('x_hz' in data)) {
             for (let i = 0; i < data['x_hp'].length; i++) {
                 const horizonCart = eqToHorizonCart(data['ra'][i] * Math.PI / 180, data['decl'][i] * Math.PI / 180, lat, lst)
                 data['x_hz'][i] = horizonCart[0]
@@ -280,12 +364,16 @@ function updateData() {
             }
         }
     } else {
+        multiplyMultiMatrix.setOutput([data_source.data['x_hp'][0].length, data_source.data['x_hp'].length, 3]);
+
         if ('alt' in data) {
+            hzUpdated = false
             for (let j = 0; j < data['x_hp'][0].length; j++) {
                 for (let i = 0; i < data['x_hp'].length; i++) {
                     pointEq = horizonToEq(lat, data['alt'][i][j] * Math.PI / 180, data['az'][i][j] * Math.PI / 180, lst)
                     data['ra'][i][j] = pointEq[0] * 180 / Math.PI
                     data['decl'][i][j] = pointEq[1] * 180 / Math.PI
+                    eqUpdated = True
                     let cartCoords = eqToCart(pointEq[0], pointEq[1])
                     data['x_hp'][i][j] = cartCoords[0]
                     data['y_hp'][i][j] = cartCoords[1]
@@ -294,16 +382,17 @@ function updateData() {
             }
         }
 
+        const coords = applyHealpixRotations(data['x_hp'], data['y_hp'], data['z_hp'], codecl, ra, orient, npoleCoords1)
         for (let j = 0; j < data['x_hp'][0].length; j++) {
             for (let i = 0; i < data['x_hp'].length; i++) {
-                const coords = applyRotations(data['x_hp'][i][j], data['y_hp'][i][j], data['z_hp'][i][j], codecl, ra, orient, npoleCoords1)
-                data['x_orth'][i][j] = coords[0]
-                data['y_orth'][i][j] = coords[1]
-                data['z_orth'][i][j] = coords[2]
+                // const coords = applyRotations(data['x_hp'][i][j], data['y_hp'][i][j], data['z_hp'][i][j], codecl, ra, orient, npoleCoords1)
+                data['x_orth'][i][j] = coords[0][i][j]
+                data['y_orth'][i][j] = coords[1][i][j]
+                data['z_orth'][i][j] = coords[2][i][j]
             }
         }
 
-        if ('x_laea' in data) {
+        if (eqUpdated && ('x_laea' in data)) {
             for (let j = 0; j < data['x_hp'][0].length; j++) {
                 for (let i = 0; i < data['x_hp'].length; i++) {
                     const laea = eqToLambertAEA(data['ra'][i][j] * Math.PI / 180, data['decl'][i][j] * Math.PI / 180, hemisphere, true)
@@ -312,7 +401,8 @@ function updateData() {
                 }
             }
         }
-        if ('x_moll' in data) {
+
+        if (eqUpdated && ('x_moll' in data)) {
             for (let j = 0; j < data['x_hp'][0].length; j++) {
                 for (let i = 0; i < data['x_hp'].length; i++) {
                     const moll = eqToMollweide(data['ra'][i][j] * Math.PI / 180, data['decl'][i][j] * Math.PI / 180, true)
@@ -321,7 +411,8 @@ function updateData() {
                 }
             }
         }
-        if ('x_hz' in data) {
+
+        if (hzUpdated && ('x_hz' in data)) {
             for (let j = 0; j < data['x_hp'][0].length; j++) {
                 for (let i = 0; i < data['x_hp'].length; i++) {
                     const horizonCart = eqToHorizonCart(data['ra'][i][j] * Math.PI / 180, data['decl'][i][j] * Math.PI / 180, lat, lst)
@@ -332,8 +423,8 @@ function updateData() {
         }
     }
 
-    for (let i = 0; i < data['x_hp'].length; i++) {
-        if ('in_mjd_window' in data) {
+    if ('in_mjd_window' in data) {
+        for (let i = 0; i < data['x_hp'].length; i++) {
             data['in_mjd_window'][i] = 1.0
             if ('min_mjd' in data) {
                 if (mjd < data['min_mjd'][i]) {
