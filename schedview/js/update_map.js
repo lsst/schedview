@@ -201,7 +201,6 @@ function computeLocalSiderealTime(mjd, longitude) {
     return lst
 }
 
-// const gpu = new GPU();
 const multiplyMultiMatrix = gpu.createKernel(function (coeff, data) {
     let sum = 0;
     let hpix = this.thread.y
@@ -324,13 +323,20 @@ function updateData() {
             hzUpdated = false
             for (let i = 0; i < data['x_hp'].length; i++) {
                 pointEq = horizonToEq(lat, data['alt'][i] * Math.PI / 180, data['az'][i] * Math.PI / 180, lst)
-                data['ra'][i] = pointEq[0] * 180 / Math.PI
-                data['decl'][i] = pointEq[1] * 180 / Math.PI
-                eqUpdated = true
-                let cartCoords = eqToCart(pointEq[0], pointEq[1])
-                data['x_hp'][i] = cartCoords[0]
-                data['y_hp'][i] = cartCoords[1]
-                data['z_hp'][i] = cartCoords[2]
+                let new_ra = pointEq[0] * 180 / Math.PI
+                let new_decl = pointEq[1] * 180 / Math.PI
+                // If the point does not actually change, be user eqUpdated remains false
+                // so we do not call the expensive eqToMollweide below.
+                if ((data['ra'][i] != new_ra) || (data['decl'][i] != new_decl)) {
+                    data['ra'][i] = new_ra
+                    data['decl'][i] = new_decl
+                    eqUpdated = true
+
+                    let cartCoords = eqToCart(pointEq[0], pointEq[1])
+                    data['x_hp'][i] = cartCoords[0]
+                    data['y_hp'][i] = cartCoords[1]
+                    data['z_hp'][i] = cartCoords[2]
+                }
             }
         }
         for (let i = 0; i < data['x_hp'].length; i++) {
@@ -371,13 +377,18 @@ function updateData() {
             for (let j = 0; j < data['x_hp'][0].length; j++) {
                 for (let i = 0; i < data['x_hp'].length; i++) {
                     pointEq = horizonToEq(lat, data['alt'][i][j] * Math.PI / 180, data['az'][i][j] * Math.PI / 180, lst)
-                    data['ra'][i][j] = pointEq[0] * 180 / Math.PI
-                    data['decl'][i][j] = pointEq[1] * 180 / Math.PI
-                    eqUpdated = True
-                    let cartCoords = eqToCart(pointEq[0], pointEq[1])
-                    data['x_hp'][i][j] = cartCoords[0]
-                    data['y_hp'][i][j] = cartCoords[1]
-                    data['z_hp'][i][j] = cartCoords[2]
+                    const new_ra = pointEq[0] * 180 / Math.PI
+                    const new_decl = pointEq[1] * 180 / Math.PI
+                    if ((data['ra'][i][j] != new_ra) || (data['decl'][i][j] != new_decl)) {
+                        data['ra'][i][j] = pointEq[0] * 180 / Math.PI
+                        data['decl'][i][j] = pointEq[1] * 180 / Math.PI
+                        eqUpdated = True
+
+                        let cartCoords = eqToCart(pointEq[0], pointEq[1])
+                        data['x_hp'][i][j] = cartCoords[0]
+                        data['y_hp'][i][j] = cartCoords[1]
+                        data['z_hp'][i][j] = cartCoords[2]
+                    }
                 }
             }
         }

@@ -408,6 +408,7 @@ class SchedulerDisplay:
             tools=[self.bokeh_models["hover_tool"]],
             match_aspect=True,
             title=title,
+            output_backend="webgl",
         )
         sphere_map = cls(plot=plot, mjd=self.mjd)
 
