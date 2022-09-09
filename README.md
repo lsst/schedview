@@ -39,7 +39,7 @@ by the automated tests.
 
 Create a `conda` environment with the appropriate dependencies, and activate it.
 If you are running the `metric_maps` application, use the `conda` environment
-file that includes a recent version of `survey_sim`:
+file that includes a recent version of `rubin_sim`:
 
     $ # ONLY IF RUNNING metric_maps
     $ conda env create -f environment.yaml
