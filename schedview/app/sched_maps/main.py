@@ -20,6 +20,8 @@ from schedview.plot.scheduler import LOGGER, DEFAULT_NSIDE
 
 
 class SchedulerDisplayApp(SchedulerDisplay):
+    include_mollweide = False
+
     def make_pickle_entry_box(self):
         """Make the entry box for a file name from which to load state."""
         file_input_box = bokeh.models.TextInput(
@@ -356,14 +358,16 @@ class SchedulerDisplayApp(SchedulerDisplay):
             decorate=False,
             horizon_graticules=True,
         )
-        self.make_sphere_map(
-            "mollweide",
-            MollweideMap,
-            "Mollweide",
-            plot_width=512,
-            plot_height=512,
-            decorate=True,
-        )
+
+        if self.include_mollweide:
+            self.make_sphere_map(
+                "mollweide",
+                MollweideMap,
+                "Mollweide",
+                plot_width=512,
+                plot_height=512,
+                decorate=True,
+            )
 
         self.bokeh_models["key"] = bokeh.models.Div(text=self.key_markup)
 
@@ -403,9 +407,25 @@ class SchedulerDisplayApp(SchedulerDisplay):
             self.bokeh_models["value_selector"],
         ]
 
+        if self.include_mollweide:
+            map_column = bokeh.layouts.column(
+                self.bokeh_models["altaz"],
+                self.bokeh_models["planisphere"],
+                self.bokeh_models["armillary_sphere"],
+                *arm_controls,
+                self.bokeh_models["mollweide"],
+            )
+        else:
+            map_column = bokeh.layouts.column(
+                self.bokeh_models["altaz"],
+                self.bokeh_models["planisphere"],
+                self.bokeh_models["armillary_sphere"],
+                *arm_controls,
+            )
+
         figure = bokeh.layouts.row(
             bokeh.layouts.column(
-                self.bokeh_models["altaz"],
+                self.bokeh_models["key"],
                 *controls,
                 self.bokeh_models["chosen_survey"],
                 self.bokeh_models["reward_table_title"],
@@ -413,13 +433,7 @@ class SchedulerDisplayApp(SchedulerDisplay):
                 self.bokeh_models["reward_summary_table_title"],
                 self.bokeh_models["reward_summary_table"],
             ),
-            bokeh.layouts.column(
-                self.bokeh_models["planisphere"],
-                self.bokeh_models["key"],
-                self.bokeh_models["mollweide"],
-                self.bokeh_models["armillary_sphere"],
-                *arm_controls,
-            ),
+            map_column,
         )
 
         return figure
