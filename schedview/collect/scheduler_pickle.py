@@ -1,6 +1,7 @@
 import pickle
 import os
 import gzip
+import bz2
 import importlib.resources
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -36,7 +37,12 @@ def read_local_scheduler_pickle(file_name):
     if file_name is None:
         file_name = sample_pickle()
 
-    opener = gzip.open if file_name.endswith(".gz") else open
+    if file_name.endswith(".bz2"):
+        opener = bz2.open
+    elif file_name.endswith(".gz"):
+        opener = gzip.open
+    else:
+        opener = open
 
     with opener(file_name, "rb") as pio:
         scheduler, conditions = pickle.load(pio)
