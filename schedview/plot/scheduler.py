@@ -4,6 +4,7 @@ import healpy as hp
 from astropy.time import Time
 import logging
 import collections.abc
+import copy
 from collections import OrderedDict
 
 import pandas as pd
@@ -342,6 +343,18 @@ class SchedulerDisplay:
 
         LOGGER.info("Finished updating conditions")
 
+    def _unique_survey_name(self, survey_index=None):
+        if survey_index is None:
+            survey_index = copy.deepcopy(self.scheduler.survey_index)
+
+        # sliced down through as many indexes as we have
+        survey = self.scheduler.survey_lists
+        for level_index in survey_index:
+            survey = survey[level_index]
+
+        survey_name = f"{survey_index[1]} {survey.survey_name}"
+        return survey_name
+
     @property
     def tier_names(self):
         """List of names of tiers in current survey."""
@@ -358,7 +371,10 @@ class SchedulerDisplay:
     def surveys_in_tier(self):
         """List of surveys in the current tier."""
         tier = self.survey_index[0]
-        surveys_in_tier = [s.survey_name for s in self.scheduler.survey_lists[tier]]
+        surveys_in_tier = [
+            self._unique_survey_name([tier, i])
+            for i in range(len(self.scheduler.survey_lists[tier]))
+        ]
         return surveys_in_tier
 
     def select_survey(self, survey):
@@ -804,11 +820,14 @@ class SchedulerDisplay:
 
     def update_chosen_survey_bokeh_model(self):
         """Update the bokeh model for text showing the chosen survey."""
-        if "chosen_survey" in self.bokeh_models:
+        if (
+            "chosen_survey" in self.bokeh_models
+            and len(self.scheduler.survey_index) == 2
+            and self.scheduler.survey_index[0] is not None
+            and self.scheduler.survey_index[1] is not None
+        ):
             tier = f"tier {self.scheduler.survey_index[0]}"
-            survey = self.scheduler.survey_lists[self.scheduler.survey_index[0]][
-                self.scheduler.survey_index[1]
-            ].survey_name
+            survey = self._unique_survey_name()
             self.bokeh_models[
                 "chosen_survey"
             ].text = f"<p>Chosen survey: {tier}, {survey}</p>"
@@ -823,9 +842,7 @@ class SchedulerDisplay:
         """Update the bokeh model specifying what values are displayed."""
         if "displayed_value_metadata" in self.bokeh_models:
             tier = f"tier {self.survey_index[0]}"
-            survey = self.scheduler.survey_lists[self.survey_index[0]][
-                self.survey_index[1]
-            ].survey_name
+            survey = self._unique_survey_name()
             self.bokeh_models[
                 "displayed_value_metadata"
             ].text = f"<p>Displayed value: {self.map_key} from {tier}, {survey}</p>"
@@ -859,9 +876,7 @@ class SchedulerDisplay:
         summary_df["tier"] = summary_df.apply(make_tier_name, axis=1)
 
         def get_survey_name(row):
-            survey_name = self.scheduler.survey_lists[row.list_index][
-                row.survey_index
-            ].survey_name
+            survey_name = self._unique_survey_name([row.list_index, row.survey_index])
             return survey_name
 
         summary_df["survey_name"] = summary_df.apply(get_survey_name, axis=1)

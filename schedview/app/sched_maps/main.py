@@ -217,7 +217,8 @@ class SchedulerDisplayApp(SchedulerDisplay):
         """Uptade the survey selector to the current scheduler and tier."""
         if "survey_selector" in self.bokeh_models:
             options = [
-                s.survey_name for s in self.scheduler.survey_lists[self.survey_index[0]]
+                self._unique_survey_name([self.survey_index[0], s])
+                for s in range(len(self.scheduler.survey_lists[self.survey_index[0]]))
             ]
             self.bokeh_models["survey_selector"].options = options
             self.bokeh_models["survey_selector"].value = options[self.survey_index[1]]
