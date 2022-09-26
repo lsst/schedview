@@ -12,6 +12,9 @@ import bokeh.models
 import bokeh.core.properties
 
 from rubin_sim.scheduler.features.conditions import Conditions
+from rubin_sim.scheduler.schedulers.core_scheduler import (
+    Core_scheduler as CoreScheduler,
+)
 from rubin_sim.scheduler.modelObservatory import Model_observatory
 import rubin_sim.scheduler.schedulers
 import rubin_sim.scheduler.surveys
@@ -46,6 +49,14 @@ def make_logger():
 
 
 LOGGER = make_logger()
+
+
+class BadSchedulerException(Exception):
+    pass
+
+
+class BadConditionsException(Exception):
+    pass
 
 
 class SchedulerDisplay:
@@ -266,6 +277,12 @@ class SchedulerDisplay:
             The file name from which to load scheduler state.
         """
         scheduler, conditions = read_scheduler(file_name)
+        if not isinstance(scheduler, CoreScheduler):
+            raise BadSchedulerException()
+
+        if not isinstance(conditions, Conditions):
+            raise BadConditionsException()
+
         scheduler.update_conditions(conditions)
         self.scheduler = scheduler
 

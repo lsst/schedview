@@ -36,8 +36,8 @@ class SchedulerDisplayApp(SchedulerDisplay):
                     # load updates the survey & conditions, which updates
                     # bokeh models...
                     self.load(new)
-                except FileNotFoundError:
-                    LOGGER.info("File not found.")
+                except Exception as e:
+                    LOGGER.warning(f"Failed to load file {new}: {e}")
                     pass
 
                 LOGGER.debug(f"Finished loading {new}")
