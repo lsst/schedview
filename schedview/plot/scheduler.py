@@ -369,7 +369,14 @@ class SchedulerDisplay:
         for level_index in survey_index:
             survey = survey[level_index]
 
-        survey_name = f"{survey_index[1]} {survey.survey_name}"
+        survey_name = f"{survey_index[1]}: {survey.survey_name}"
+        if (
+            hasattr(survey, "survey_note")
+            and (survey.survey_name != survey.survey_note)
+            and (survey.survey_name != survey.survey_note.replace(" ", "_"))
+        ):
+            survey_name = f"{survey_name} ({survey.survey_note})"
+
         return survey_name
 
     @property
