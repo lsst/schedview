@@ -818,6 +818,7 @@ class SchedulerDisplay:
             index=range(30),
             columns=["basis_function", "feasible", "basis_reward", "accum_reward"],
         )
+
         self.bokeh_models["reward_table"] = bokeh.models.DataTable(
             source=bokeh.models.ColumnDataSource(df),
             columns=[bokeh.models.TableColumn(field=c, title=c) for c in df],
@@ -829,6 +830,13 @@ class SchedulerDisplay:
             reward_df = self.scheduler.survey_lists[self.survey_index[0]][
                 self.survey_index[1]
             ].make_reward_df(self.conditions)
+
+            def to_sigfig(x):
+                return float("{:.5g}".format(x))
+
+            for col in ["basis_reward", "accum_reward"]:
+                reward_df[col] = reward_df[col].apply(to_sigfig)
+
             self.bokeh_models["reward_table"].source = bokeh.models.ColumnDataSource(
                 reward_df
             )
@@ -941,6 +949,19 @@ class SchedulerDisplay:
         LOGGER.info("Updating reward summary table bokeh model")
         if "reward_summary_table" in self.bokeh_models:
             scheduler_summary_df = self.make_scheduler_summary_df()
+
+            def to_sigfig(x):
+                try:
+                    value = float(x)
+                except ValueError:
+                    return x
+
+                return float("{:.5g}".format(value))
+
+            scheduler_summary_df["reward"] = scheduler_summary_df["reward"].apply(
+                to_sigfig
+            )
+
             self.bokeh_models["reward_summary_table"].source.data = dict(
                 bokeh.models.ColumnDataSource(scheduler_summary_df).data
             )
