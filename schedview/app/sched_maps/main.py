@@ -325,6 +325,67 @@ class SchedulerDisplayApp(SchedulerDisplay):
             ``bokeh.io.show``) or used to create a bokeh app.
         """
         self.make_sphere_map(
+            "altaz",
+            HorizonMap,
+            "Alt Az",
+            plot_width=512,
+            plot_height=512,
+            decorate=False,
+            horizon_graticules=True,
+        )
+
+        self.bokeh_models["key"] = bokeh.models.Div(text=self.key_markup)
+
+        self.bokeh_models["reward_table_title"] = bokeh.models.Div(
+            text="<h2>Basis functions for displayed survey</h2>"
+        )
+        self.make_reward_table()
+
+        self.bokeh_models["reward_summary_table_title"] = bokeh.models.Div(
+            text="<h2>Rewards for all survey schedulers</h2>"
+        )
+        self.make_reward_summary_table()
+        self.make_chosen_survey()
+        self.make_value_selector()
+        self.make_survey_selector()
+        self.make_tier_selector()
+        self.make_pickle_entry_box()
+
+        controls = [self.bokeh_models["file_input_box"]]
+
+        if self.observatory is not None:
+            self.make_time_input_box()
+            controls.append(self.bokeh_models["time_input_box"])
+
+        controls += [
+            self.bokeh_models["tier_selector"],
+            self.bokeh_models["survey_selector"],
+            self.bokeh_models["value_selector"],
+        ]
+
+        figure = bokeh.layouts.column(
+            self.bokeh_models["key"],
+            self.bokeh_models["altaz"],
+            *controls,
+            self.bokeh_models["chosen_survey"],
+            self.bokeh_models["reward_table_title"],
+            self.bokeh_models["reward_table"],
+            self.bokeh_models["reward_summary_table_title"],
+            self.bokeh_models["reward_summary_table"],
+        )
+
+        return figure
+
+    def make_figure_with_many_projections(self):
+        """Create a bokeh figures showing sky maps for scheduler behavior.
+
+        Returns
+        -------
+        fig : `bokeh.models.layouts.LayoutDOM`
+            A bokeh figure that can be displayed in a notebook (e.g. with
+            ``bokeh.io.show``) or used to create a bokeh app.
+        """
+        self.make_sphere_map(
             "armillary_sphere",
             ArmillarySphere,
             "Armillary Sphere",
