@@ -3,7 +3,7 @@ from tempfile import TemporaryDirectory
 from pathlib import Path
 import bokeh.plotting
 import bokeh.io
-from schedview.app.sched_maps.main import SchedulerDisplayApp
+from schedview.app.sched_maps.sched_maps import SchedulerDisplayApp
 from schedview.collect import sample_pickle
 
 NSIDE = 8

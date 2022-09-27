@@ -4,7 +4,7 @@ from pathlib import Path
 import bokeh.plotting
 import bokeh.io
 import bokeh.document
-from schedview.app.metric_maps.main import make_metric_figure, add_metric_app
+from schedview.app.metric_maps.metric_maps import make_metric_figure, add_metric_app
 
 
 class test_metric_maps(unittest.TestCase):
