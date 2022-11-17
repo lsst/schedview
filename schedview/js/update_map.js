@@ -1,15 +1,10 @@
-/* 
-const gpu = new GPU();
-const foo = gpu.createKernel(function (a, b) {
-    let sum = a[this.thread.x] + b[this.thread.x]
-    return sum;
-}).setOutput([5]);
-
-let a = [1, 2, 3, 4, 5]
-let b = [10, 100, 1000, 10000, 100000]
-const c = foo(a, b);
-console.log(c) 
-*/
+function get_gpu() {
+    try {
+        return gpu;
+    } catch(e) {
+        return new GPU();
+    }
+}
 
 function rotateCart(ux, uy, uz, angle, x0, y0, z0) {
     // ux, uy, uz is a vector that defines the axis of rotation
@@ -201,7 +196,7 @@ function computeLocalSiderealTime(mjd, longitude) {
     return lst
 }
 
-const multiplyMultiMatrix = gpu.createKernel(function (coeff, data) {
+const multiplyMultiMatrix = get_gpu().createKernel(function (coeff, data) {
     let sum = 0;
     let hpix = this.thread.y
     let corner = this.thread.x
