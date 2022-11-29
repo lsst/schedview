@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 from astropy.time import Time
 from rubin_sim.site_models.almanac import Almanac
-from rubin_sim.scheduler.modelObservatory import Model_observatory
-import holoviews as hv
+from rubin_sim.scheduler.model_observatory import ModelObservatory
+
 
 def night_events(night_date=None, site=None, timezone="Chile/Continental"):
     """Creata a pandas.DataFrame with astronomical events.
@@ -16,7 +16,7 @@ def night_events(night_date=None, site=None, timezone="Chile/Continental"):
         The observatory location. Defaults to Rubin observatory.
     timezone: `str`
         The timezone name. Defaults to 'Chile/Continental'
-        
+
     Returns
     -------
     events : `holoviews.Dataset`
@@ -24,14 +24,18 @@ def night_events(night_date=None, site=None, timezone="Chile/Continental"):
     """
     if night_date is None:
         night_date = Time.now()
-        
+
     if site is None:
-        site = Model_observatory().location
+        site = ModelObservatory().location
 
     night_mjd = Time(night_date).mjd
-    all_nights_events = pd.DataFrame(Almanac().sunsets).set_index('night')
+    all_nights_events = pd.DataFrame(Almanac().sunsets).set_index("night")
     first_night = all_nights_events.index.min()
-    night = first_night + np.floor(night_mjd) - np.floor(all_nights_events.loc[first_night, 'sunset'])
+    night = (
+        first_night
+        + np.floor(night_mjd)
+        - np.floor(all_nights_events.loc[first_night, "sunset"])
+    )
     mjds = all_nights_events.loc[night]
 
     ap_times = Time(mjds, format="mjd", scale="utc", location=site)
@@ -44,6 +48,6 @@ def night_events(night_date=None, site=None, timezone="Chile/Continental"):
         index=mjds.index,
     )
     time_df[timezone] = time_df["UTC"].dt.tz_convert(timezone)
-    time_df.index.name = 'event'
-    
+    time_df.index.name = "event"
+
     return time_df

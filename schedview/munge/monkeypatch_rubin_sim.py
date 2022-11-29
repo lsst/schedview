@@ -13,7 +13,7 @@ import rubin_sim.scheduler.features.conditions
 import rubin_sim.scheduler.basis_functions
 
 
-class Core_scheduler(rubin_sim.scheduler.schedulers.core_scheduler.Core_scheduler):
+class CoreScheduler(rubin_sim.scheduler.schedulers.core_scheduler.CoreScheduler):
     def get_basis_functions(self, survey_index=None, conditions=None):
         """Get basis functions for a specific survey in provided conditions.
 
@@ -478,27 +478,27 @@ rubin_sim.scheduler.basis_functions.Base_basis_function.label = (
     Base_basis_function.label
 )
 
-rubin_sim.scheduler.schedulers.core_scheduler.Core_scheduler.get_basis_functions = (
-    Core_scheduler.get_basis_functions
+rubin_sim.scheduler.schedulers.core_scheduler.CoreScheduler.get_basis_functions = (
+    CoreScheduler.get_basis_functions
 )
-rubin_sim.scheduler.schedulers.core_scheduler.Core_scheduler.get_healpix_maps = (
-    Core_scheduler.get_healpix_maps
+rubin_sim.scheduler.schedulers.core_scheduler.CoreScheduler.get_healpix_maps = (
+    CoreScheduler.get_healpix_maps
 )
-rubin_sim.scheduler.schedulers.core_scheduler.Core_scheduler.__repr__ = (
-    Core_scheduler.__repr__
+rubin_sim.scheduler.schedulers.core_scheduler.CoreScheduler.__repr__ = (
+    CoreScheduler.__repr__
 )
-rubin_sim.scheduler.schedulers.core_scheduler.Core_scheduler.__str__ = (
-    Core_scheduler.__str__
+rubin_sim.scheduler.schedulers.core_scheduler.CoreScheduler.__str__ = (
+    CoreScheduler.__str__
 )
-rubin_sim.scheduler.schedulers.core_scheduler.Core_scheduler.surveys_df = (
-    Core_scheduler.surveys_df
+rubin_sim.scheduler.schedulers.core_scheduler.CoreScheduler.surveys_df = (
+    CoreScheduler.surveys_df
 )
-rubin_sim.scheduler.schedulers.core_scheduler.Core_scheduler.make_reward_df = (
-    Core_scheduler.make_reward_df
+rubin_sim.scheduler.schedulers.core_scheduler.CoreScheduler.make_reward_df = (
+    CoreScheduler.make_reward_df
 )
 
-rubin_sim.scheduler.schedulers.core_scheduler.Core_scheduler._repr_markdown_ = (
-    Core_scheduler._repr_markdown_
+rubin_sim.scheduler.schedulers.core_scheduler.CoreScheduler._repr_markdown_ = (
+    CoreScheduler._repr_markdown_
 )
 
 rubin_sim.scheduler.surveys.BaseSurvey.__repr__ = BaseSurvey.__repr__

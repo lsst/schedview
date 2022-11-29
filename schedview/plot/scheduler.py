@@ -6,6 +6,7 @@ import logging
 import collections.abc
 import copy
 from collections import OrderedDict
+import warnings
 
 import pandas as pd
 import bokeh.models
@@ -13,9 +14,9 @@ import bokeh.core.properties
 
 from rubin_sim.scheduler.features.conditions import Conditions
 from rubin_sim.scheduler.schedulers.core_scheduler import (
-    Core_scheduler as CoreScheduler,
+    CoreScheduler as CoreScheduler,
 )
-from rubin_sim.scheduler.modelObservatory import Model_observatory
+from rubin_sim.scheduler.model_observatory import ModelObservatory
 import rubin_sim.scheduler.schedulers
 import rubin_sim.scheduler.surveys
 import rubin_sim.scheduler.basis_functions
@@ -93,7 +94,7 @@ class SchedulerDisplay:
         self._figure = None
         mjd = Time.now().mjd if DEFAULT_MJD is None else DEFAULT_MJD
         try:
-            self.observatory = Model_observatory(mjd_start=mjd - 1)
+            self.observatory = ModelObservatory(mjd_start=mjd - 1, nside=nside)
         except ValueError:
             self.observatory = None
 
@@ -160,10 +161,10 @@ class SchedulerDisplay:
         except (ValueError, AttributeError):
             # If we do not have the right cache of sky brightness
             # values on disk, we may not be able to instantiate
-            # Model_observatory, but we should be able to run
+            # ModelObservatory, but we should be able to run
             # it anyway. Fake up a conditions object as well as
             # we can.
-            conditions = Conditions(mjd_start=value - 1)
+            conditions = Conditions(mjd_start=value - 1, nside=self.nside)
             conditions.mjd = value
             LOGGER.warning("Created dummy conditions.")
 
@@ -296,7 +297,7 @@ class SchedulerDisplay:
 
         Parameters
         ----------
-        scheduler : `rubin_sim.scheduler.schedulers.core_scheduler.Core_scheduler`  # noqa W505
+        scheduler : `rubin_sim.scheduler.schedulers.core_scheduler.CoreScheduler`  # noqa W505
             The new scheduler to visualize
         """
         # Work separated into _set_scheduler so that it can be overriden by
@@ -335,6 +336,12 @@ class SchedulerDisplay:
         conditions : `rubin_sim.scheduler.features.conditions.Conditions`
             The new conditions.
         """
+        if conditions.nside != self.nside:
+            warnings.warn("Setting conditions to an unequal nside.")
+
+        # We might get it back with a one element array,
+        # which is not what we want.
+        conditions.mjd = float(conditions.mjd)
         self._set_conditions(conditions)
 
     def _set_conditions(self, conditions):
@@ -370,9 +377,8 @@ class SchedulerDisplay:
             survey = survey[level_index]
 
         survey_name = f"{survey_index[1]}: {survey.survey_name}"
-        if (
-            hasattr(survey, "observations")
-            and (survey.survey_name != survey.observations['note'][0])
+        if hasattr(survey, "observations") and (
+            survey.survey_name != survey.observations["note"][0]
         ):
             survey_name = f"{survey.observations['note'][0]}"
 
@@ -1144,7 +1150,7 @@ def make_default_scheduler(mjd, nside=32):
 
     Returns
     -------
-    scheduler : `rubin_sim.scheduler.schedulers.Core_scheduler`
+    scheduler : `rubin_sim.scheduler.schedulers.CoreScheduler`
     """
     LOGGER.debug("Making default scheduler")
 
@@ -1154,7 +1160,7 @@ def make_default_scheduler(mjd, nside=32):
         basis_functions = []
         try:
             this_basis_function = (
-                rubin_sim.scheduler.basis_functions.Ecliptic_basis_function(nside=nside)
+                rubin_sim.scheduler.basis_functions.EclipticBasisFunction(nside=nside)
             )
             basis_functions.append(this_basis_function)
         except Exception:
@@ -1162,8 +1168,28 @@ def make_default_scheduler(mjd, nside=32):
 
         try:
             this_basis_function = (
-                rubin_sim.scheduler.basis_functions.M5_diff_basis_function(
+                rubin_sim.scheduler.basis_functions.M5DiffBasisFunction(
                     filtername=band, nside=nside
+                )
+            )
+            basis_functions.append(this_basis_function)
+        except Exception:
+            pass
+
+        try:
+            this_basis_function = (
+                rubin_sim.scheduler.basis_functions.ZenithShadowMaskBasisFunction(
+                    nside=nside, shadow_minutes=60, max_alt=76
+                )
+            )
+            basis_functions.append(this_basis_function)
+        except Exception:
+            pass
+
+        try:
+            this_basis_function = (
+                rubin_sim.scheduler.basis_functions.MoonAvoidanceBasisFunction(
+                    nside=nside, moon_distance=30
                 )
             )
             basis_functions.append(this_basis_function)
@@ -1180,20 +1206,20 @@ def make_default_scheduler(mjd, nside=32):
     visible_surveys = [band_surveys["u"], band_surveys["g"], band_surveys["r"]]
     ir_surveys = [band_surveys["i"], band_surveys["z"], band_surveys["y"]]
 
-    scheduler = rubin_sim.scheduler.schedulers.Core_scheduler(
+    scheduler = rubin_sim.scheduler.schedulers.CoreScheduler(
         [visible_surveys, ir_surveys], nside=nside
     )
     try:
-        observatory = Model_observatory(mjd_start=mjd - 1)
+        observatory = ModelObservatory(mjd_start=mjd - 1, nside=nside)
         observatory.mjd = mjd
         conditions = observatory.return_conditions()
     except ValueError:
         # If we do not have the right cache of sky brightness
         # values on disk, we may not be able to instantiate
-        # Model_observatory, but we should be able to run
+        # ModelObservatory, but we should be able to run
         # it anyway. Fake up a conditions object as well as
         # we can.
-        conditions = Conditions(mjd_start=mjd - 1)
+        conditions = Conditions(mjd_start=mjd - 1, nside=nside)
         conditions.mjd = mjd
 
     scheduler.update_conditions(conditions)

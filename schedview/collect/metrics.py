@@ -16,7 +16,7 @@ def get_metric_path():
         return environ["PICKLE_FNAME"]
 
     root_package = __package__.split(".")[0]
-    base_fname = "baseline_v2_0_10yrs_CoaddM5_r_HEAL.npz"
+    base_fname = "test_metric1.npz"
 
     try:
         fname = str(
