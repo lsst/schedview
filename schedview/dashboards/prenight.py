@@ -106,7 +106,7 @@ def prenight_panel(scheduler_fname, night, visit_fname=rubin_sim.data.get_baseli
     footprint = schedview.collect.footprint.get_greedy_footprint(scheduler)
     observatory.mjd = night_middle.mjd
     conditions = observatory.return_conditions()
-    vmap = schedview.plot.visitmap.visit_skymaps(new_visits, footprint, conditions)
+    vmap = schedview.plot.visitmap.plot_visit_skymaps(new_visits, footprint, conditions)
     
     # Combine the panes into a panel
     dashboard = pn.Column(
