@@ -91,8 +91,8 @@ def prenight_panel(
     footprint = schedview.collect.footprint.get_greedy_footprint(scheduler)
     observatory.mjd = night_middle.mjd
     conditions = observatory.return_conditions()
-    vmap = schedview.plot.visitmap.visit_skymaps(new_visits, footprint, conditions)
-
+    vmap = schedview.plot.visitmap.plot_visit_skymaps(new_visits, footprint, conditions)
+    
     # Combine the panes into a panel
     dashboard = pn.Column(
         f"<h1>Pre-night briefing for {night.iso.split()[0]}</h1>",
