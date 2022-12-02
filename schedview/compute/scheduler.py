@@ -9,10 +9,12 @@ from rubin_sim.scheduler.model_observatory import ModelObservatory
 def _make_observation_from_record(record):
     """Convert an opsim visit record to a scheduler observation
 
+
     Parameters
     ----------
     record : `dict`
         A row from an opsim output table
+
 
     Returns
     -------
@@ -66,8 +68,10 @@ def _make_observation_from_record(record):
     return observation
 
 
+
 def replay_visits(scheduler, visits):
     """Update a scheduler instances with a set of visits.
+
 
     Parameters
     ----------
@@ -135,6 +139,8 @@ def compute_basis_function_reward_at_time(scheduler, time, observatory=None):
     return survey_df
 
 
+
+
 def compute_basis_function_rewards(scheduler, sample_times=None, observatory=None):
     if observatory is None:
         observatory = ModelObservatory(nside=scheduler.nside)
@@ -153,6 +159,7 @@ def compute_basis_function_rewards(scheduler, sample_times=None, observatory=Non
 
     if isinstance(sample_times, TimeSeries):
         sample_times = sample_times.to_pandas()
+
 
     reward_list = []
     for time in sample_times:
