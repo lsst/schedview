@@ -5,6 +5,18 @@ import hvplot
 
 
 def plot_visits(visits):
+    """Instantiate an explorer to interactively examine a set of visits.
+
+    Parameters
+    ----------
+    visits : `pandas.DataFrame`
+        One row per visit, as created by `schedview.collect.opsim.read_opsim`
+
+    Returns
+    -------
+    figure : `hvplot.ui.hvDataFrameExplorer`
+        The figure itself.
+    """    
     visit_explorer = hvplot.explorer(
         visits, kind="scatter", x="start_date", y="airmass", by=["note"]
     )
@@ -14,6 +26,30 @@ def plot_visits(visits):
 def create_visit_explorer(
     visits, night_date, observatory=None, timezone="Chile/Continental"
 ):
+    """Create an explorer to interactively examine a set of visits.
+
+    Parameters
+    ----------
+    visits : `str` or `pandas.DataFrame`
+        One row per visit, as created by `schedview.collect.opsim.read_opsim`,
+        or the name of a file from which such visits should be loaded.
+    night_date : `astropy.time.Time`
+        A time during the night to plot
+    observatory : `rubin_sim.scheduler.modelObservatory.model_observatory.Model_observatory`, optional
+        Provides the location of the observatory, used to compute
+        night start and end times.
+        By default None.
+    timezone : `str`, optional
+        _description_, by default "Chile/Continental"
+
+    Returns
+    -------
+    figure : `hvplot.ui.hvDataFrameExplorer`
+        The figure itself.
+    data : `dict`
+        The arguments used to produce the figure using
+        `plot_visits`.
+    """    
     site = None if observatory is None else observatory.location
     night_events = schedview.compute.astro.night_events(
         night_date=night_date, site=site, timezone=timezone

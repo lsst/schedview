@@ -14,6 +14,33 @@ BAND_COLORS = dict(
 )
 
 def plot_visit_skymaps(visits, footprint, conditions):
+    """Plot visits on a map of the sky.
+
+    Parameters
+    ----------
+    visits : `pandas.DataFrame`
+        One row per visit, with at least the following columns:
+        
+        ``"fieldRA"``
+            The visit R.A. in degrees (`float`).
+        ``"fieldDec"``
+            The visit declination in degrees (`float`).
+        ``"observationStartMJD"``
+            The visit start MJD (`float`).
+        ``"filter"``
+            The visit filter (`str`)
+         
+    footprint : `numpy.array`
+        A healpix map of the footprint.
+    conditions : `rubin_sim.scheduler.features.conditions.Conditions`
+        The conditions for the night, which determines the start and end
+        times covered by the map.
+
+    Returns
+    -------
+    _type_
+        _description_
+    """    
 
     band_sizes = {"u": 15, "g": 13, "r": 11, "i": 9, "z": 7, "y": 5}
 
@@ -117,6 +144,44 @@ def plot_visit_skymaps(visits, footprint, conditions):
 def create_visit_skymaps(
     visits, scheduler, night_date, observatory=None, timezone="Chile/Continental"
 ):
+    """Create a map of visits on the sky.
+
+    Parameters
+    ----------
+    visits : `pandas.DataFrame` or `str`
+        If a `pandas.DataFrame`, it needs at least the following columns:
+        
+        ``"fieldRA"``
+            The visit R.A. in degrees (`float`).
+        ``"fieldDec"``
+            The visit declination in degrees (`float`).
+        ``"observationStartMJD"``
+            The visit start MJD (`float`).
+        ``"filter"``
+            The visit filter (`str`)
+         
+        If a string, the file name of the opsim database from which the
+        visits should be loaded.
+    scheduler : `rubin_sim.scheduler.schedulers.core_scheduler.Core_scheduler` or `str`
+        The scheduler from which to extract the footprint, or the name of a file
+        from which such a scheduler should be loaded.
+    night_date : `astropy.time.Time`
+        A time during the night to plot
+    observatory : rubin_sim.scheduler.modelObservatory.model_observatory.Model_observatory`, optional
+        Provides the location of the observatory, used to compute
+        night start and end times.
+        By default None.
+    timezone : `str`, optional
+        by default "Chile/Continental"
+
+    Returns
+    -------
+    figure : `bokeh.models.layouts.LayoutDOM`
+        The figure itself.
+    data : `dict`
+        The arguments used to produce the figure using
+        `plot_visit_skymaps`.
+    """    
     site = None if observatory is None else observatory.location
     night_events = schedview.compute.astro.night_events(
         night_date=night_date, site=site, timezone=timezone
