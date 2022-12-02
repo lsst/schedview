@@ -12,6 +12,25 @@ import schedview.compute.astro
 
 
 def plot_survey_rewards(rewards):
+    """Plot survey rewards as a function of time.
+
+    Parameters
+    ----------
+    rewards : `pandas.DataFrame`
+        Data with at least these columns:
+        
+        ``"survey_name"``
+            The name of the survey (`str`).
+        ``"time"``
+            The sample time for the reward (`datetime64[ns]`).
+        ``"reward"``
+            The reward (`float`).
+
+    Returns
+    -------
+    reward_plot : `bokeh.plotting.figure.Figure`
+        The figure.
+    """    
     reward_plot = (
         rewards.replace([np.inf, -np.inf], np.nan)
         .hvplot(
@@ -29,7 +48,33 @@ def create_survey_reward_plot(
     observatory=None,
     timezone="Chile/Continental",
 ):
-    """Build a plot of rewards by survey for a time period"""
+    """Build a plot of rewards by survey for a time period.
+
+    Parameters
+    ----------
+    scheduler : `rubin_sim.scheduler.schedulers.core_scheduler.Core_scheduler` or `str`
+        The scheduler with the surveys to evaluate, or the name of a file
+        from which such a scheduler should be loaded.
+    night_date : `astropy.time.Time`
+        A time during the night to plot.
+    additional_visits : `pandas.DataFrame` or `str`, optional
+        Visits to add to the scheduler before reward evaluation,
+        by default None
+    observatory : `rubin_sim.scheduler.modelObservatory.model_observatory.Model_observatory`, optional
+        Provides the location of the observatory, used to compute
+        night start and end times.
+        By default None
+    timezone : `str`, optional
+        Timezone for horizontal axis, by default "Chile/Continental"
+
+    Returns
+    -------
+    figure : `bokeh.plotting.figure.Figure`
+        The figure itself.
+    data : `dict`
+        The arguments used to produce the figure using
+        `plot_survey_rewards`.
+    """
 
     site = None if observatory is None else observatory.location
 
