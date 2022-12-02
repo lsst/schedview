@@ -370,9 +370,8 @@ class SchedulerDisplay:
             survey = survey[level_index]
 
         survey_name = f"{survey_index[1]}: {survey.survey_name}"
-        if (
-            hasattr(survey, "observations")
-            and (survey.survey_name != survey.observations['note'][0])
+        if hasattr(survey, "observations") and (
+            survey.survey_name != survey.observations["note"][0]
         ):
             survey_name = f"{survey.observations['note'][0]}"
 

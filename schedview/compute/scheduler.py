@@ -8,12 +8,12 @@ from rubin_sim.scheduler.modelObservatory import Model_observatory
 
 def _make_observation_from_record(record):
     """Convert an opsim visit record to a scheduler observation
-    
+
     Parameters
     ----------
     record : `dict`
         A row from an opsim output table
-        
+
     Returns
     -------
     observation : `numpy.ndarray`
@@ -65,9 +65,10 @@ def _make_observation_from_record(record):
     observation["scripted_id"] = record["scripted_id"]
     return observation
 
+
 def replay_visits(scheduler, visits):
     """Update a scheduler instances with a set of visits.
-    
+
     Parameters
     ----------
     scheduler : `rubin_sim.scheduler.CoreScheduler`
@@ -78,17 +79,20 @@ def replay_visits(scheduler, visits):
     for visit_id, visit_record in visits.iterrows():
         obs = _make_observation_from_record(visit_record)
         scheduler.add_observation(obs)
-        
-    scheduler.conditions.mjd = float(obs['mjd'] + (obs['slewtime']+obs['visittime'])/(24*60*60))
+
+    scheduler.conditions.mjd = float(
+        obs["mjd"] + (obs["slewtime"] + obs["visittime"]) / (24 * 60 * 60)
+    )
+
 
 def compute_basis_function_reward_at_time(scheduler, time, observatory=None):
     if observatory is None:
         observatory = Model_observatory()
-    
+
     ap_time = Time(time)
     observatory.mjd = ap_time.mjd
     conditions = observatory.return_conditions()
-        
+
     reward_df = scheduler.make_reward_df(conditions)
     summary_df = reward_df.reset_index()
 
@@ -129,30 +133,36 @@ def compute_basis_function_reward_at_time(scheduler, time, observatory=None):
 
     survey_df = summary_df.groupby(["tier", "survey_name"]).apply(make_survey_row)
     return survey_df
-    
+
+
 def compute_basis_function_rewards(scheduler, sample_times=None, observatory=None):
     if observatory is None:
         observatory = Model_observatory()
-        
+
     if sample_times is None:
         # Compute values for the current night by default.
         sample_times = pd.date_range(
-            Time(scheduler.conditions.sun_n12_setting, format="mjd", scale="utc").datetime,
-            Time(scheduler.conditions.sun_n12_rising, format="mjd", scale="utc").datetime,
-            freq='10T',
+            Time(
+                scheduler.conditions.sun_n12_setting, format="mjd", scale="utc"
+            ).datetime,
+            Time(
+                scheduler.conditions.sun_n12_rising, format="mjd", scale="utc"
+            ).datetime,
+            freq="10T",
         )
 
     if isinstance(sample_times, TimeSeries):
         sample_times = sample_times.to_pandas()
-    
+
     reward_list = []
     for time in sample_times:
-        this_time_reward = compute_basis_function_reward_at_time(scheduler, time, observatory)
+        this_time_reward = compute_basis_function_reward_at_time(
+            scheduler, time, observatory
+        )
         this_time_reward["mjd"] = Time(time).mjd
         this_time_reward["time"] = time
         reward_list.append(this_time_reward)
-        
-    rewards = pd.concat(reward_list).reset_index()
-    
-    return rewards
 
+    rewards = pd.concat(reward_list).reset_index()
+
+    return rewards
