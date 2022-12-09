@@ -14,9 +14,11 @@ from schedview.plot.SphereMap import (
 
 from schedview.collect import sample_pickle
 
+import schedview.plot.scheduler
 from schedview.plot.scheduler import SchedulerDisplay
+from rubin_sim.scheduler.model_observatory import ModelObservatory
 from schedview.collect import read_scheduler
-from schedview.plot.scheduler import LOGGER, DEFAULT_NSIDE
+from schedview.plot.scheduler import LOGGER, DEFAULT_NSIDE, DEFAULT_MJD
 
 
 class SchedulerDisplayApp(SchedulerDisplay):
@@ -25,7 +27,7 @@ class SchedulerDisplayApp(SchedulerDisplay):
     def make_pickle_entry_box(self):
         """Make the entry box for a file name from which to load state."""
         file_input_box = bokeh.models.TextInput(
-            value=sample_pickle("auxtel59628.pickle.gz") + " ",
+            value=sample_pickle("scheduler1_sample.pickle.gz") + " ",
             title="Pickle path:",
         )
 
@@ -502,8 +504,7 @@ class SchedulerDisplayApp(SchedulerDisplay):
 
 
 def make_scheduler_map_figure(
-    scheduler_pickle_fname="baseline22_start.pickle.gz",
-    init_key="AvoidDirectWind",
+    scheduler_pickle_fname="scheduler1_sample.pickle.gz",
     nside=DEFAULT_NSIDE,
 ):
     """Create a set of bekeh figures showing sky maps for scheduler behavior.
@@ -514,8 +515,6 @@ def make_scheduler_map_figure(
         File from which to load the scheduler state. If set to none, look for
         the file name in the ``SCHED_PICKLE`` environment variable.
         By default None
-    init_key : `str`, optional
-        Name of the initial map to show, by default 'AvoidDirectWind'
     nside : int, optional
         Healpix nside to use for display, by default 32
 
@@ -526,11 +525,17 @@ def make_scheduler_map_figure(
         ``bokeh.io.show``) or used to create a bokeh app.
     """
     if scheduler_pickle_fname is None:
-        scheduler_map = SchedulerDisplayApp(nside=nside)
+        scheduler = schedview.plot.scheduler.make_default_scheduler(
+            DEFAULT_MJD, nside=nside
+        )
+        observatory = ModelObservatory(mjd_start=DEFAULT_MJD - 1, nside=nside)
+        observatory.mjd = DEFAULT_MJD
+        conditions = observatory.return_conditions()
     else:
         scheduler, conditions = read_scheduler(sample_pickle(scheduler_pickle_fname))
-        scheduler.update_conditions(conditions)
-        scheduler_map = SchedulerDisplayApp(nside=nside, scheduler=scheduler)
+
+    scheduler.update_conditions(conditions)
+    scheduler_map = SchedulerDisplayApp(nside=nside, scheduler=scheduler)
 
     figure = scheduler_map.make_figure()
 
@@ -545,7 +550,7 @@ def add_scheduler_map_app(doc):
     doc : `bokeh.document.document.Document`
         The bokeh document to which to add the figure.
     """
-    figure = make_scheduler_map_figure()
+    figure = make_scheduler_map_figure(None)
     doc.add_root(figure)
 
 

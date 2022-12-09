@@ -1,48 +1,16 @@
-import gzip
-import pickle
-import itertools
 import warnings
-import copy
-from collections import namedtuple
-from functools import partial
 
 import numpy as np
-import pandas as pd
-import healpy as hp
-import sqlite3
-from astropy.time import Time
-from astropy.timeseries import TimeSeries
-from astropy.coordinates import EarthLocation
-import bokeh
-import bokeh.io
-import bokeh.models
-import bokeh.plotting
-import bokeh.transform
-import bokeh.palettes
-import pickle
-from copy import deepcopy
-import astropy.units as u
 
-from IPython.core.magic import register_cell_magic
-from IPython.core.display import display, HTML, Javascript
+from astropy.time import Time
 
 import rubin_sim
-from rubin_sim.scheduler.modelObservatory import Model_observatory
-from rubin_sim import maf
-from rubin_sim.maf.runComparison import archive
-from rubin_sim.scheduler.utils import empty_observation
+from rubin_sim.scheduler.model_observatory import ModelObservatory
 
 import hvplot.pandas
-import geoviews
-import geopandas
-import shapely
 
-import cartopy
-from cartopy import crs
-import healpy
 import panel as pn
 import holoviews as hv
-import param
 import hvplot
 import hvplot.pandas
 
@@ -69,7 +37,7 @@ def prenight_panel(
     visit_fname=rubin_sim.data.get_baseline(),
     timezone="Chile/Continental",
 ):
-    observatory = Model_observatory()
+    observatory = ModelObservatory()
 
     # Build astronomical events table
     astro_events = schedview.compute.astro.night_events(

@@ -5,7 +5,7 @@ from astropy.time import Time
 
 import schedview.collect.scheduler_pickle
 from schedview.plot.SphereMap import Planisphere, ArmillarySphere
-from rubin_sim.scheduler.modelObservatory import Model_observatory
+from rubin_sim.scheduler.model_observatory.model_observatory import ModelObservatory
 import schedview.compute.astro
 from schedview.collect.stars import load_bright_stars
 
@@ -21,7 +21,7 @@ def plot_visit_skymaps(visits, footprint, conditions):
     ----------
     visits : `pandas.DataFrame`
         One row per visit, with at least the following columns:
-        
+
         ``"fieldRA"``
             The visit R.A. in degrees (`float`).
         ``"fieldDec"``
@@ -30,7 +30,7 @@ def plot_visit_skymaps(visits, footprint, conditions):
             The visit start MJD (`float`).
         ``"filter"``
             The visit filter (`str`)
-         
+
     footprint : `numpy.array`
         A healpix map of the footprint.
     conditions : `rubin_sim.scheduler.features.conditions.Conditions`
@@ -41,7 +41,7 @@ def plot_visit_skymaps(visits, footprint, conditions):
     -------
     _type_
         _description_
-    """    
+    """
 
     band_sizes = {"u": 15, "g": 13, "r": 11, "i": 9, "z": 7, "y": 5}
 
@@ -91,8 +91,8 @@ def plot_visit_skymaps(visits, footprint, conditions):
         data_source=horizon70_ds, line_kwargs={"color": "red", "line_width": 2}
     )
     sun_ds = asphere.add_marker(
-        ra=np.degrees(conditions.sunRA),
-        decl=np.degrees(conditions.sunDec),
+        ra=np.degrees(conditions.sun_ra),
+        decl=np.degrees(conditions.sun_dec),
         name="Sun",
         glyph_size=15,
         circle_kwargs={"color": "yellow", "fill_alpha": 1},
@@ -105,8 +105,8 @@ def plot_visit_skymaps(visits, footprint, conditions):
     )
 
     moon_ds = asphere.add_marker(
-        ra=np.degrees(conditions.moonRA),
-        decl=np.degrees(conditions.moonDec),
+        ra=np.degrees(conditions.moon_ra),
+        decl=np.degrees(conditions.moon_dec),
         name="Moon",
         glyph_size=15,
         circle_kwargs={"color": "orange", "fill_alpha": 0.8},
@@ -151,7 +151,7 @@ def create_visit_skymaps(
     ----------
     visits : `pandas.DataFrame` or `str`
         If a `pandas.DataFrame`, it needs at least the following columns:
-        
+
         ``"fieldRA"``
             The visit R.A. in degrees (`float`).
         ``"fieldDec"``
@@ -160,7 +160,7 @@ def create_visit_skymaps(
             The visit start MJD (`float`).
         ``"filter"``
             The visit filter (`str`)
-         
+
         If a string, the file name of the opsim database from which the
         visits should be loaded.
     scheduler : `rubin_sim.scheduler.schedulers.core_scheduler.Core_scheduler` or `str`
@@ -182,7 +182,7 @@ def create_visit_skymaps(
     data : `dict`
         The arguments used to produce the figure using
         `plot_visit_skymaps`.
-    """    
+    """
     site = None if observatory is None else observatory.location
     night_events = schedview.compute.astro.night_events(
         night_date=night_date, site=site, timezone=timezone
@@ -205,7 +205,7 @@ def create_visit_skymaps(
         )
 
     if observatory is None:
-        observatory = Model_observatory(nside=scheduler.nside)
+        observatory = ModelObservatory(nside=scheduler.nside)
 
     footprint = schedview.collect.footprint.get_greedy_footprint(scheduler)
     observatory.mjd = visits.observationStartMJD.min()

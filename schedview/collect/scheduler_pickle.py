@@ -27,7 +27,7 @@ def read_local_scheduler_pickle(file_name):
 
     Returns
     -------
-    scheduler : `rubin_sim.scheduler.schedulers.core_scheduler.Core_scheduler`
+    scheduler : `rubin_sim.scheduler.schedulers.core_scheduler.CoreScheduler`
         An instance of a rubin_sim scheduler object.
     conditions : `rubin_sim.scheduler.features.conditions.Conditions`
         An instance of a rubin_sim conditions object.
@@ -63,7 +63,7 @@ def read_scheduler(file_name_or_url=None):
 
     Returns
     -------
-    scheduler : `rubin_sim.scheduler.schedulers.core_scheduler.Core_scheduler`
+    scheduler : `rubin_sim.scheduler.schedulers.core_scheduler.CoreScheduler`
         An instance of a rubin_sim scheduler object.
     conditions : `rubin_sim.scheduler.features.conditions.Conditions`
         An instance of a rubin_sim conditions object.
@@ -99,7 +99,7 @@ def read_scheduler(file_name_or_url=None):
     return scheduler, conditions
 
 
-def sample_pickle(base_fname="auxtel59628.pickle.gz"):
+def sample_pickle(base_fname="scheduler1_sample.pickle.gz"):
     """Return the path of the sample pickle
 
     Parameters

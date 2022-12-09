@@ -3,7 +3,7 @@ import pandas as pd
 from astropy.timeseries import TimeSeries
 from astropy.time import Time
 from rubin_sim.scheduler.utils import empty_observation
-from rubin_sim.scheduler.modelObservatory import Model_observatory
+from rubin_sim.scheduler.model_observatory import ModelObservatory
 
 
 def _make_observation_from_record(record):
@@ -87,7 +87,7 @@ def replay_visits(scheduler, visits):
 
 def compute_basis_function_reward_at_time(scheduler, time, observatory=None):
     if observatory is None:
-        observatory = Model_observatory()
+        observatory = ModelObservatory(nside=scheduler.nside)
 
     ap_time = Time(time)
     observatory.mjd = ap_time.mjd
@@ -106,6 +106,11 @@ def compute_basis_function_reward_at_time(scheduler, time, observatory=None):
         survey_name = scheduler.survey_lists[row.list_index][
             row.survey_index
         ].survey_name
+        if len(survey_name) == 0:
+            class_name = scheduler.survey_lists[row.list_index][
+                row.survey_index
+            ].__class__.__name__
+            survey_name = f"{class_name}_{row.list_index}_{row.survey_index}"
         return survey_name
 
     summary_df["survey_name"] = summary_df.apply(get_survey_name, axis=1)
@@ -121,7 +126,7 @@ def compute_basis_function_reward_at_time(scheduler, time, observatory=None):
             survey_index
         ].calc_reward_function(conditions)
         reward = survey_bfs.accum_reward.iloc[-1]
-        assert reward == np.nanmax(direct_reward)
+
         survey_row = pd.Series(
             {
                 "reward": reward,
@@ -137,16 +142,16 @@ def compute_basis_function_reward_at_time(scheduler, time, observatory=None):
 
 def compute_basis_function_rewards(scheduler, sample_times=None, observatory=None):
     if observatory is None:
-        observatory = Model_observatory()
+        observatory = ModelObservatory(nside=scheduler.nside)
 
     if sample_times is None:
         # Compute values for the current night by default.
         sample_times = pd.date_range(
             Time(
-                scheduler.conditions.sun_n12_setting, format="mjd", scale="utc"
+                float(scheduler.conditions.sun_n12_setting), format="mjd", scale="utc"
             ).datetime,
             Time(
-                scheduler.conditions.sun_n12_rising, format="mjd", scale="utc"
+                float(scheduler.conditions.sun_n12_rising), format="mjd", scale="utc"
             ).datetime,
             freq="10T",
         )

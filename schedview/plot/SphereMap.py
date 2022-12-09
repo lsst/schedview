@@ -12,10 +12,10 @@ from astropy.coordinates import SkyCoord
 from astropy.time import Time
 import astropy.visualization
 
-from rubin_sim.utils.Site import Site
-from rubin_sim.utils import calcLmstLast
-from rubin_sim.utils import altAzPaFromRaDec, raDecFromAltAz
-from rubin_sim.utils import approx_altAz2RaDec, approx_RaDec2AltAz
+from rubin_sim.utils import Site
+from rubin_sim.utils import calc_lmst_last
+from rubin_sim.utils import alt_az_pa_from_ra_dec, ra_dec_from_alt_az
+from rubin_sim.utils import approx_alt_az2_ra_dec, approx_ra_dec2_alt_az
 from rubin_sim.utils import ObservationMetaData
 
 from schedview.plot.readjs import read_javascript
@@ -87,14 +87,14 @@ class SphereMap:
     @property
     def lst(self):
         """Return the Local Sidereal Time."""
-        lst = calcLmstLast(self.mjd, self.site.longitude_rad)[1] * 360.0 / 24.0
+        lst = calc_lmst_last(self.mjd, self.site.longitude_rad)[1] * 360.0 / 24.0
         return lst
 
     @lst.setter
     def lst(self, value):
         """Modify the MJD to match the LST, keeping the same (UT) day."""
         mjd_start = np.floor(self.mjd)
-        lst_start = calcLmstLast(mjd_start, self.site.longitude_rad)[1] * 360.0 / 24.0
+        lst_start = calc_lmst_last(mjd_start, self.site.longitude_rad)[1] * 360.0 / 24.0
         self.mjd = mjd_start + ((value - lst_start) % 360) / 360.9856405809225
 
     @property
@@ -228,7 +228,7 @@ class SphereMap:
         Azimuth is east of north
         """
 
-        # Due to a bug in altAzPaFromRaDec, it won't
+        # Due to a bug in alt_az_pa_from_ra_dec, it won't
         # work on pandas Series, so convert to a numpy
         # array if necessary.
         if isinstance(ra, pd.Series):
@@ -243,11 +243,11 @@ class SphereMap:
         else:
             ra_deg, decl_deg = np.degrees(ra), np.degrees(decl)
         if APPROX_COORD_TRANSFORMS:
-            alt, az = approx_RaDec2AltAz(
+            alt, az = approx_ra_dec2_alt_az(
                 ra_deg, decl_deg, self.site.latitude, self.site.longitude, self.mjd
             )
         else:
-            alt, az, _ = altAzPaFromRaDec(ra_deg, decl_deg, observation_metadata)
+            alt, az, _ = alt_az_pa_from_ra_dec(ra_deg, decl_deg, observation_metadata)
 
         if cart:
             zd = np.pi / 2 - np.radians(alt)
@@ -770,7 +770,7 @@ class SphereMap:
         """
         observation_metadata = ObservationMetaData(mjd=self.mjd, site=self.site)
         if APPROX_COORD_TRANSFORMS:
-            center_ra_arr, center_decl_arr = approx_altAz2RaDec(
+            center_ra_arr, center_decl_arr = approx_alt_az2_ra_dec(
                 np.array([alt]),
                 np.array([az]),
                 self.site.latitude,
@@ -780,7 +780,7 @@ class SphereMap:
             center_ra = center_ra_arr[0]
             center_decl = center_decl_arr[0]
         else:
-            center_ra, center_decl = raDecFromAltAz(alt, az, observation_metadata)
+            center_ra, center_decl = ra_dec_from_alt_az(alt, az, observation_metadata)
 
         eq_circle_points = self.make_circle_points(
             center_ra, center_decl, radius, start_bear, end_bear, step

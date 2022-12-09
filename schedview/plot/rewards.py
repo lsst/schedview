@@ -18,7 +18,7 @@ def plot_survey_rewards(rewards):
     ----------
     rewards : `pandas.DataFrame`
         Data with at least these columns:
-        
+
         ``"survey_name"``
             The name of the survey (`str`).
         ``"time"``
@@ -30,7 +30,7 @@ def plot_survey_rewards(rewards):
     -------
     reward_plot : `bokeh.plotting.figure.Figure`
         The figure.
-    """    
+    """
     reward_plot = (
         rewards.replace([np.inf, -np.inf], np.nan)
         .hvplot(

@@ -37,7 +37,7 @@ def make_metric_figure(metric_values_fname=None, nside=32, mag_limit_slider=True
     if metric_values_fname is None:
         metric_values_fname = get_metric_path()
 
-    healpy_values = maf.MetricBundle.load(metric_values_fname).metricValues
+    healpy_values = maf.MetricBundle.load(metric_values_fname).metric_values
 
     star_data = load_bright_stars().loc[:, ["name", "ra", "decl", "Vmag"]]
     star_data["glyph_size"] = 15 - (15.0 / 3.5) * star_data["Vmag"]

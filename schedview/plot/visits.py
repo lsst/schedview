@@ -16,7 +16,7 @@ def plot_visits(visits):
     -------
     figure : `hvplot.ui.hvDataFrameExplorer`
         The figure itself.
-    """    
+    """
     visit_explorer = hvplot.explorer(
         visits, kind="scatter", x="start_date", y="airmass", by=["note"]
     )
@@ -49,7 +49,7 @@ def create_visit_explorer(
     data : `dict`
         The arguments used to produce the figure using
         `plot_visits`.
-    """    
+    """
     site = None if observatory is None else observatory.location
     night_events = schedview.compute.astro.night_events(
         night_date=night_date, site=site, timezone=timezone
