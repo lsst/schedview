@@ -13,6 +13,7 @@ BAND_COLORS = dict(
     u="#56b4e9", g="#008060", r="#ff4000", i="#850000", z="#6600cc", y="#000000"
 )
 
+
 def plot_visit_skymaps(visits, footprint, conditions):
     """Plot visits on a map of the sky.
 
@@ -20,7 +21,7 @@ def plot_visit_skymaps(visits, footprint, conditions):
     ----------
     visits : `pandas.DataFrame`
         One row per visit, with at least the following columns:
-        
+
         ``"fieldRA"``
             The visit R.A. in degrees (`float`).
         ``"fieldDec"``
@@ -29,7 +30,7 @@ def plot_visit_skymaps(visits, footprint, conditions):
             The visit start MJD (`float`).
         ``"filter"``
             The visit filter (`str`)
-         
+
     footprint : `numpy.array`
         A healpix map of the footprint.
     conditions : `rubin_sim.scheduler.features.conditions.Conditions`
@@ -40,7 +41,7 @@ def plot_visit_skymaps(visits, footprint, conditions):
     -------
     _type_
         _description_
-    """    
+    """
 
     band_sizes = {"u": 15, "g": 13, "r": 11, "i": 9, "z": 7, "y": 5}
 
@@ -150,7 +151,7 @@ def create_visit_skymaps(
     ----------
     visits : `pandas.DataFrame` or `str`
         If a `pandas.DataFrame`, it needs at least the following columns:
-        
+
         ``"fieldRA"``
             The visit R.A. in degrees (`float`).
         ``"fieldDec"``
@@ -159,7 +160,7 @@ def create_visit_skymaps(
             The visit start MJD (`float`).
         ``"filter"``
             The visit filter (`str`)
-         
+
         If a string, the file name of the opsim database from which the
         visits should be loaded.
     scheduler : `rubin_sim.scheduler.schedulers.core_scheduler.Core_scheduler` or `str`
@@ -181,7 +182,7 @@ def create_visit_skymaps(
     data : `dict`
         The arguments used to produce the figure using
         `plot_visit_skymaps`.
-    """    
+    """
     site = None if observatory is None else observatory.location
     night_events = schedview.compute.astro.night_events(
         night_date=night_date, site=site, timezone=timezone
@@ -205,7 +206,7 @@ def create_visit_skymaps(
 
     if observatory is None:
         observatory = ModelObservatory(nside=scheduler.nside)
-    
+
     footprint = schedview.collect.footprint.get_greedy_footprint(scheduler)
     observatory.mjd = visits.observationStartMJD.min()
     conditions = observatory.return_conditions()
