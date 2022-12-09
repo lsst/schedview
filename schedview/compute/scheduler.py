@@ -9,12 +9,10 @@ from rubin_sim.scheduler.model_observatory import ModelObservatory
 def _make_observation_from_record(record):
     """Convert an opsim visit record to a scheduler observation
 
-
     Parameters
     ----------
     record : `dict`
         A row from an opsim output table
-
 
     Returns
     -------
@@ -70,7 +68,6 @@ def _make_observation_from_record(record):
 
 def replay_visits(scheduler, visits):
     """Update a scheduler instances with a set of visits.
-
 
     Parameters
     ----------

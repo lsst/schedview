@@ -6,6 +6,7 @@ from rubin_sim.scheduler.model_observatory import ModelObservatory
 
 
 
+
 def night_events(night_date=None, site=None, timezone="Chile/Continental"):
     """Creata a pandas.DataFrame with astronomical events.
 
