@@ -90,8 +90,8 @@ def plot_visit_skymaps(visits, footprint, conditions):
         data_source=horizon70_ds, line_kwargs={"color": "red", "line_width": 2}
     )
     sun_ds = asphere.add_marker(
-        ra=np.degrees(conditions.sunRA),
-        decl=np.degrees(conditions.sunDec),
+        ra=np.degrees(conditions.sun_ra),
+        decl=np.degrees(conditions.sun_dec),
         name="Sun",
         glyph_size=15,
         circle_kwargs={"color": "yellow", "fill_alpha": 1},
@@ -104,8 +104,8 @@ def plot_visit_skymaps(visits, footprint, conditions):
     )
 
     moon_ds = asphere.add_marker(
-        ra=np.degrees(conditions.moonRA),
-        decl=np.degrees(conditions.moonDec),
+        ra=np.degrees(conditions.moon_ra),
+        decl=np.degrees(conditions.moon_dec),
         name="Moon",
         glyph_size=15,
         circle_kwargs={"color": "orange", "fill_alpha": 0.8},

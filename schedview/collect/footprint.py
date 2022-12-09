@@ -9,7 +9,7 @@ def get_greedy_footprint(scheduler):
     # basis function
     for survey_tier in scheduler.survey_lists:
         for survey in survey_tier:
-            if survey.__class__.__name__ in ["Greedy_survey"]:
+            if survey.__class__.__name__ in ["GreedySurvey"]:
                 for basis_function in survey.basis_functions:
                     bf_class = basis_function.__class__
                     if bf_class.__name__.startswith("Footprint"):
