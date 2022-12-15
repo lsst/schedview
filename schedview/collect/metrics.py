@@ -32,5 +32,3 @@ def get_metric_path():
             fname = str(root_path.joinpath("data", base_fname))
 
     return fname
-
-    return fname
