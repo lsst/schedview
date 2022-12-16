@@ -120,11 +120,6 @@ def compute_basis_function_reward_at_time(scheduler, time, observatory=None):
             survey_bfs.loc[~survey_bfs.feasible.astype(bool)].basis_function.to_list()
         )
         infeasible = ~np.all(survey_bfs.feasible.astype(bool))
-        list_index = survey_bfs.list_index.iloc[0]
-        survey_index = survey_bfs.survey_index.iloc[0]
-        direct_reward = scheduler.survey_lists[list_index][
-            survey_index
-        ].calc_reward_function(conditions)
         reward = survey_bfs.accum_reward.iloc[-1]
 
         survey_row = pd.Series(

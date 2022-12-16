@@ -31,7 +31,7 @@ def compute_night_metric_bundle(
     -------
     bundle_group: `rubin_sim.maf.metric_bundles.metric_bundle_group.MetricBundleGroup`
         The executed MAF metric bundle group.
-    """    
+    """
     site = None if observatory is None else observatory.location
     night_events = schedview.compute.astro.night_events(
         night_date=night_date, site=site
@@ -78,7 +78,7 @@ def compute_sample_metric_bundle(opsim_fname, data_dir, night_date, observatory=
     -------
     bundle_group: `rubin_sim.maf.metric_bundles.metric_bundle_group.MetricBundleGroup`
         The executed MAF metric bundle group.
-    """    
+    """
     metric = maf.CountMetric(col="observationId")
     slicer = maf.OneDSlicer(
         slice_col_name="fieldRA", bin_min=0, bin_max=360, binsize=360 / 24

@@ -821,7 +821,12 @@ class SchedulerDisplay:
         df = pd.DataFrame(
             np.nan,
             index=range(30),
-            columns=["basis_function", "feasible", "basis_reward", "accum_reward"],
+            columns=[
+                "basis_function",
+                "feasible",
+                "max_basis_reward",
+                "max_accum_reward",
+            ],
         )
 
         self.bokeh_models["reward_table"] = bokeh.models.DataTable(
@@ -839,7 +844,12 @@ class SchedulerDisplay:
             def to_sigfig(x):
                 return float("{:.5g}".format(x))
 
-            for col in ["basis_reward", "accum_reward"]:
+            for col in [
+                "max_basis_reward",
+                "basis_area",
+                "max_accum_reward",
+                "accum_area",
+            ]:
                 reward_df[col] = reward_df[col].apply(to_sigfig)
 
             self.bokeh_models["reward_table"].source = bokeh.models.ColumnDataSource(
@@ -925,7 +935,9 @@ class SchedulerDisplay:
                 ].basis_function.to_list()
             )
             infeasible = ~np.all(survey_bfs.feasible.astype(bool))
-            reward = infeasible_bf if infeasible else survey_bfs.accum_reward.iloc[-1]
+            reward = (
+                infeasible_bf if infeasible else survey_bfs.max_accum_reward.iloc[-1]
+            )
             survey_row = pd.Series({"reward": reward, "infeasible": infeasible})
             return survey_row
 
