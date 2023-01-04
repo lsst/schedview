@@ -7,6 +7,7 @@ import collections.abc
 import copy
 from collections import OrderedDict
 import warnings
+from inspect import getmembers
 
 import pandas as pd
 import bokeh.models
@@ -844,6 +845,25 @@ class SchedulerDisplay:
             def to_sigfig(x):
                 return float("{:.5g}".format(x))
 
+            def _guess_basis_function_doc_url(basis_function_name):
+                root_bf_name = basis_function_name.split()[0]
+                standard_basis_functions = dict(
+                    getmembers(rubin_sim.scheduler.basis_functions)
+                ).keys()
+                if root_bf_name in standard_basis_functions:
+                    url = f"https://rubin-sim.lsst.io/api/rubin_sim.scheduler.basis_functions.{root_bf_name}.html#rubin_sim.scheduler.basis_functions.{root_bf_name}"
+                else:
+                    url = None
+                return url
+
+            reward_df["doc_url"] = reward_df["basis_function"].map(
+                _guess_basis_function_doc_url
+            )
+
+            basis_function_formatter = bokeh.models.widgets.HTMLTemplateFormatter(
+                template='<a href="<%= doc_url %>" target="_blank"><%= value %></a>'
+            )
+
             for col in [
                 "max_basis_reward",
                 "basis_area",
@@ -855,9 +875,22 @@ class SchedulerDisplay:
             self.bokeh_models["reward_table"].source = bokeh.models.ColumnDataSource(
                 reward_df
             )
-            self.bokeh_models["reward_table"].columns = [
-                bokeh.models.TableColumn(field=c, title=c) for c in reward_df
-            ]
+
+            new_columns = []
+            for column_name in reward_df.columns:
+                if column_name == "basis_function":
+                    new_column = bokeh.models.TableColumn(
+                        field=column_name,
+                        title=column_name,
+                        formatter=basis_function_formatter,
+                    )
+                else:
+                    new_column = bokeh.models.TableColumn(
+                        field=column_name, title=column_name
+                    )
+                new_columns.append(new_column)
+
+            self.bokeh_models["reward_table"].columns = new_columns
 
     def make_chosen_survey(self):
         """Create the bokeh model for text showing the chosen survey."""
@@ -964,6 +997,18 @@ class SchedulerDisplay:
     def update_reward_summary_table_bokeh_model(self):
         """Update the bokeh model of the table of rewards."""
         LOGGER.info("Updating reward summary table bokeh model")
+
+        def _guess_survey_doc_url(survey_name):
+            root_name = survey_name.split()[0]
+            standard_basis_functions = dict(
+                getmembers(rubin_sim.scheduler.basis_functions)
+            ).keys()
+            if root_name in standard_basis_functions:
+                url = f"https://rubin-sim.lsst.io/api/rubin_sim.scheduler.surveys.{root_name}.html#rubin_sim.scheduler.surveys.{root_name}"
+            else:
+                url = None
+            return url
+
         if "reward_summary_table" in self.bokeh_models:
             scheduler_summary_df = self.make_scheduler_summary_df()
 
@@ -982,9 +1027,20 @@ class SchedulerDisplay:
             self.bokeh_models["reward_summary_table"].source.data = dict(
                 bokeh.models.ColumnDataSource(scheduler_summary_df).data
             )
-            self.bokeh_models["reward_summary_table"].columns = [
-                bokeh.models.TableColumn(field=c, title=c) for c in scheduler_summary_df
-            ]
+
+            new_columns = []
+            for column_name in scheduler_summary_df.columns:
+                if column_name == "survey_name":
+                    new_column = bokeh.models.TableColumn(
+                        field=column_name, title=column_name
+                    )
+                else:
+                    new_column = bokeh.models.TableColumn(
+                        field=column_name, title=column_name
+                    )
+                new_columns.append(new_column)
+
+            self.bokeh_models["reward_summary_table"].columns = new_columns
 
     def make_figure(self):
         """Create a bokeh figures showing sky maps for scheduler behavior.
