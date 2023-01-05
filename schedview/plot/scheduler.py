@@ -968,6 +968,7 @@ class SchedulerDisplay:
                     summary_df.loc[(list_index, survey_index), "feasible"] = (
                         np.isfinite(survey.reward) or survey.reward > 0
                     )
+                    summary_df.loc[(list_index, survey_index), "basis_function"] = "N/A"
         summary_df.reset_index(inplace=True)
 
         def make_tier_name(row):
