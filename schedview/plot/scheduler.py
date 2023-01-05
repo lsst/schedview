@@ -378,11 +378,17 @@ class SchedulerDisplay:
         for level_index in survey_index:
             survey = survey[level_index]
 
-        survey_name = f"{survey_index[1]}: {survey.survey_name}"
+        if len(survey.survey_name) > 0:
+            survey_name = f"{survey_index[1]}: {survey.survey_name}"
+        else:
+            survey_name = f"{survey_index[1]}: {str(survey)}"
         if hasattr(survey, "observations") and (
             survey.survey_name != survey.observations["note"][0]
         ):
             survey_name = f"{survey.observations['note'][0]}"
+
+        # Bekeh tables have problems with < and >
+        survey_name = survey_name.replace("<", "").replace(">", "")
 
         return survey_name
 
