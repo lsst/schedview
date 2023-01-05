@@ -884,6 +884,8 @@ class SchedulerDisplay:
                         title=column_name,
                         formatter=basis_function_formatter,
                     )
+                elif column_name == "doc_url":
+                    continue
                 else:
                     new_column = bokeh.models.TableColumn(
                         field=column_name, title=column_name
