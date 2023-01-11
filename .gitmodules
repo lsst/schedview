@@ -1,0 +1,3 @@
+[submodule "util/sims_featureScheduler_runs3.0"]
+	path = util/sims_featureScheduler_runs3.0
+	url = git@github.com:lsst-sims/sims_featureScheduler_runs3.0.git

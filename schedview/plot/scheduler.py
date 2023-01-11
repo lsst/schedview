@@ -376,7 +376,11 @@ class SchedulerDisplay:
         for level_index in survey_index:
             survey = survey[level_index]
 
-        survey_name = f"{survey_index[1]}: {survey.survey_name}"
+        try:
+            survey_name = f"{survey_index[1]}: {survey.survey_name}"
+        except AttributeError:
+            survey_name = f"{survey_index[1]}: {str(survey)}"
+
         if hasattr(survey, "observations") and (
             survey.survey_name != survey.observations["note"][0]
         ):
@@ -929,6 +933,7 @@ class SchedulerDisplay:
         summary_df["survey_name"] = summary_df.apply(get_survey_name, axis=1)
 
         def make_survey_row(survey_bfs):
+
             infeasible_bf = ", ".join(
                 survey_bfs.loc[
                     ~survey_bfs.feasible.astype(bool)
