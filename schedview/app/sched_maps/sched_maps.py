@@ -55,7 +55,7 @@ class SchedulerDisplayApp(SchedulerDisplay):
             else:
                 # disable the controls, and ask the document to do the update
                 # on the following event look tick.
-                self.disable_controls()
+                self.disable_controls("Switching pickle.")
                 file_input_box.document.add_next_tick_callback(do_switch_pickle)
 
         file_input_box.on_change("value", switch_pickle)
@@ -104,7 +104,7 @@ class SchedulerDisplayApp(SchedulerDisplay):
                     self.mjd = new
                     self.enable_controls()
 
-                self.disable_controls()
+                self.disable_controls("Updating for new time.")
                 time_selector.document.add_next_tick_callback(do_switch_time)
 
         time_selector.on_change("value_throttled", switch_time)
@@ -136,7 +136,7 @@ class SchedulerDisplayApp(SchedulerDisplay):
                     self.mjd = new
                     self.enable_controls()
 
-                self.disable_controls()
+                self.disable_controls("Updating for new MJD.")
                 mjd_slider.document.add_next_tick_callback(do_switch_time)
 
         mjd_slider.on_change("value_throttled", switch_time)
@@ -171,7 +171,7 @@ class SchedulerDisplayApp(SchedulerDisplay):
                     self.mjd = new_mjd
                     self.enable_controls()
 
-                self.disable_controls()
+                self.disable_controls("Changing time.")
                 time_input_box.document.add_next_tick_callback(do_switch_time)
 
         time_input_box.on_change("value", switch_time)
@@ -295,13 +295,28 @@ class SchedulerDisplayApp(SchedulerDisplay):
             self._select_survey_from_summary_table,
         )
 
-    def disable_controls(self):
+    def disable_controls(self, message="Busy"):
         """Disable all controls.
 
         Intended to be used while plot elements are updating, and the
         control therefore do not do what the user probably intends.
+        
+        Parameters
+        ----------
+        message : `str`
+            Message to display in status indicator.
         """
         LOGGER.info("Disabling controls")
+
+        try:
+            text = f"""<h1>Dashboard Status</h1>
+                <p style="font-weight: bold; font-size: large; background-color:red">
+                {message}
+                </p>"""
+            self.bokeh_models['status_indicator'].text = text
+        except KeyError:
+            pass
+        
         for model in self.bokeh_models.values():
             try:
                 model.disabled = True
@@ -317,6 +332,11 @@ class SchedulerDisplayApp(SchedulerDisplay):
             except AttributeError:
                 pass
 
+        try:
+            self.bokeh_models['status_indicator'].text = "<p></p>"
+        except KeyError:
+            pass
+
     def make_figure(self):
         """Create a bokeh figures showing sky maps for scheduler behavior.
 
@@ -326,6 +346,8 @@ class SchedulerDisplayApp(SchedulerDisplay):
             A bokeh figure that can be displayed in a notebook (e.g. with
             ``bokeh.io.show``) or used to create a bokeh app.
         """
+        self.make_status_indicator()
+        
         self.make_sphere_map(
             "altaz",
             HorizonMap,
@@ -366,6 +388,7 @@ class SchedulerDisplayApp(SchedulerDisplay):
         ]
 
         figure = bokeh.layouts.column(
+            self.bokeh_models["status_indicator"],
             self.bokeh_models["key"],
             self.bokeh_models["altaz"],
             *controls,
@@ -387,6 +410,7 @@ class SchedulerDisplayApp(SchedulerDisplay):
             A bokeh figure that can be displayed in a notebook (e.g. with
             ``bokeh.io.show``) or used to create a bokeh app.
         """
+        
         self.make_sphere_map(
             "armillary_sphere",
             ArmillarySphere,
