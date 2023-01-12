@@ -103,9 +103,13 @@ def compute_basis_function_reward_at_time(scheduler, time, observatory=None):
     summary_df["tier"] = summary_df.apply(make_tier_name, axis=1)
 
     def get_survey_name(row):
-        survey_name = scheduler.survey_lists[row.list_index][
-            row.survey_index
-        ].survey_name
+        try:
+            survey_name = scheduler.survey_lists[row.list_index][
+                row.survey_index
+            ].survey_name
+        except AttributeError:
+            survey_name = ''
+
         if len(survey_name) == 0:
             class_name = scheduler.survey_lists[row.list_index][
                 row.survey_index
@@ -120,7 +124,7 @@ def compute_basis_function_reward_at_time(scheduler, time, observatory=None):
             survey_bfs.loc[~survey_bfs.feasible.astype(bool)].basis_function.to_list()
         )
         infeasible = ~np.all(survey_bfs.feasible.astype(bool))
-        reward = survey_bfs.accum_reward.iloc[-1]
+        reward = survey_bfs.max_accum_reward.iloc[-1]
 
         survey_row = pd.Series(
             {
