@@ -81,7 +81,7 @@ def compute_sample_metric_bundle(opsim_fname, data_dir, night_date, observatory=
     """
     metric = maf.CountMetric(col="observationId")
     slicer = maf.OneDSlicer(
-        slice_col_name="fieldRA", bin_min=0, bin_max=360, binsize=360 / 24
+        slice_col_name="fieldRA", bin_min=0, bin_max=360, bin_size=360 / 24
     )
     constraint = "filter = 'g'"
     bundle_group = compute_night_metric_bundle(
