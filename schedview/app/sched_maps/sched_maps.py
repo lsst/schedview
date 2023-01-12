@@ -27,7 +27,7 @@ class SchedulerDisplayApp(SchedulerDisplay):
     def make_pickle_entry_box(self):
         """Make the entry box for a file name from which to load state."""
         file_input_box = bokeh.models.TextInput(
-            value=sample_pickle("scheduler1_sample.pickle.gz") + " ",
+            value=sample_pickle("baseline.pickle.gz") + " ",
             title="Pickle path:",
         )
 
@@ -71,6 +71,7 @@ class SchedulerDisplayApp(SchedulerDisplay):
         super()._set_conditions(conditions)
         self.update_healpix_bokeh_model()
         self.update_reward_table_bokeh_model()
+        self.update_reward_summary_table_bokeh_model()
         self.update_hovertool_bokeh_model()
         self.update_telescope_marker_bokeh_model()
         self.update_moon_marker_bokeh_model()
@@ -528,7 +529,7 @@ class SchedulerDisplayApp(SchedulerDisplay):
 
 
 def make_scheduler_map_figure(
-    scheduler_pickle_fname="scheduler1_sample.pickle.gz",
+    scheduler_pickle_fname="baseline.pickle.gz",
     nside=DEFAULT_NSIDE,
 ):
     """Create a set of bekeh figures showing sky maps for scheduler behavior.
