@@ -7,6 +7,8 @@ import collections.abc
 import copy
 from collections import OrderedDict
 import warnings
+import itertools
+from inspect import getmembers
 
 import pandas as pd
 import bokeh.models
@@ -376,11 +378,17 @@ class SchedulerDisplay:
         for level_index in survey_index:
             survey = survey[level_index]
 
-        survey_name = f"{survey_index[1]}: {survey.survey_name}"
+        if len(survey.survey_name) > 0:
+            survey_name = f"{survey_index[1]}: {survey.survey_name}"
+        else:
+            survey_name = f"{survey_index[1]}: {str(survey)}"
         if hasattr(survey, "observations") and (
             survey.survey_name != survey.observations["note"][0]
         ):
             survey_name = f"{survey.observations['note'][0]}"
+
+        # Bekeh tables have problems with < and >
+        survey_name = survey_name.replace("<", "").replace(">", "")
 
         return survey_name
 
@@ -844,6 +852,25 @@ class SchedulerDisplay:
             def to_sigfig(x):
                 return float("{:.5g}".format(x))
 
+            def _guess_basis_function_doc_url(basis_function_name):
+                root_bf_name = basis_function_name.split()[0]
+                standard_basis_functions = dict(
+                    getmembers(rubin_sim.scheduler.basis_functions)
+                ).keys()
+                if root_bf_name in standard_basis_functions:
+                    url = f"https://rubin-sim.lsst.io/api/rubin_sim.scheduler.basis_functions.{root_bf_name}.html#rubin_sim.scheduler.basis_functions.{root_bf_name}"
+                else:
+                    url = None
+                return url
+
+            reward_df["doc_url"] = reward_df["basis_function"].map(
+                _guess_basis_function_doc_url
+            )
+
+            basis_function_formatter = bokeh.models.widgets.HTMLTemplateFormatter(
+                template='<a href="<%= doc_url %>" target="_blank"><%= value %></a>'
+            )
+
             for col in [
                 "max_basis_reward",
                 "basis_area",
@@ -855,9 +882,24 @@ class SchedulerDisplay:
             self.bokeh_models["reward_table"].source = bokeh.models.ColumnDataSource(
                 reward_df
             )
-            self.bokeh_models["reward_table"].columns = [
-                bokeh.models.TableColumn(field=c, title=c) for c in reward_df
-            ]
+
+            new_columns = []
+            for column_name in reward_df.columns:
+                if column_name == "basis_function":
+                    new_column = bokeh.models.TableColumn(
+                        field=column_name,
+                        title=column_name,
+                        formatter=basis_function_formatter,
+                    )
+                elif column_name == "doc_url":
+                    continue
+                else:
+                    new_column = bokeh.models.TableColumn(
+                        field=column_name, title=column_name
+                    )
+                new_columns.append(new_column)
+
+            self.bokeh_models["reward_table"].columns = new_columns
 
 
     def make_status_indicator(self):
@@ -923,6 +965,25 @@ class SchedulerDisplay:
         reward_df = self.scheduler.make_reward_df(self.conditions)
         summary_df = reward_df.reset_index()
 
+        # Some oddball surveys do not have basis functions, but they still
+        # need rows, so add fake basis functions to the summary_df for them.
+        summary_df.set_index(["list_index", "survey_index"], inplace=True)
+        for list_index, survey_list in enumerate(self.scheduler.survey_lists):
+            for survey_index, survey in enumerate(survey_list):
+                if not (list_index, survey_index) in summary_df.index:
+                    survey.calc_reward_function(self.conditions)
+                    summary_df.loc[
+                        (list_index, survey_index), "max_basis_reward"
+                    ] = survey.reward
+                    summary_df.loc[
+                        (list_index, survey_index), "max_accum_reward"
+                    ] = survey.reward
+                    summary_df.loc[(list_index, survey_index), "feasible"] = (
+                        np.isfinite(survey.reward) or survey.reward > 0
+                    )
+                    summary_df.loc[(list_index, survey_index), "basis_function"] = "N/A"
+        summary_df.reset_index(inplace=True)
+
         def make_tier_name(row):
             tier_name = f"tier {row.list_index}"
             return tier_name
@@ -971,6 +1032,7 @@ class SchedulerDisplay:
     def update_reward_summary_table_bokeh_model(self):
         """Update the bokeh model of the table of rewards."""
         LOGGER.info("Updating reward summary table bokeh model")
+
         if "reward_summary_table" in self.bokeh_models:
             scheduler_summary_df = self.make_scheduler_summary_df()
 
@@ -986,12 +1048,43 @@ class SchedulerDisplay:
                 to_sigfig
             )
 
+            # Get URLs for survey documentation
+            # Flatten the list of lists of surveys into one long list
+            surveys = itertools.chain.from_iterable(self.scheduler.survey_lists)
+            survey_class_names = [
+                "rubin_sim.scheduler.surveys." + s.__class__.__name__ for s in surveys
+            ]
+            survey_doc_url = [
+                f"https://rubin-sim.lsst.io/api/{cn}.html#{cn}"
+                for cn in survey_class_names
+            ]
+            survey_name_formatter = bokeh.models.widgets.HTMLTemplateFormatter(
+                template='<a href="<%= doc_url %>" target="_blank"><%= value %></a>'
+            )
+
+            scheduler_summary_df["doc_url"] = survey_doc_url
+
             self.bokeh_models["reward_summary_table"].source.data = dict(
                 bokeh.models.ColumnDataSource(scheduler_summary_df).data
             )
-            self.bokeh_models["reward_summary_table"].columns = [
-                bokeh.models.TableColumn(field=c, title=c) for c in scheduler_summary_df
-            ]
+
+            new_columns = []
+            for column_name in scheduler_summary_df.columns:
+                if column_name == "survey_name":
+                    new_column = bokeh.models.TableColumn(
+                        field=column_name,
+                        title=column_name,
+                        formatter=survey_name_formatter,
+                    )
+                elif column_name == "doc_url":
+                    continue
+                else:
+                    new_column = bokeh.models.TableColumn(
+                        field=column_name, title=column_name
+                    )
+                new_columns.append(new_column)
+
+            self.bokeh_models["reward_summary_table"].columns = new_columns
 
     def make_figure(self):
         """Create a bokeh figures showing sky maps for scheduler behavior.
