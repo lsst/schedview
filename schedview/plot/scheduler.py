@@ -134,6 +134,17 @@ class SchedulerDisplay:
             # Nothing needs to be done
             return
 
+        if self.observatory.nside != self.scheduler.nside:
+            self.observatory = ModelObservatory(
+                nside=self.scheduler.nside,
+                mjd_start=self.observatory.mjd_start,
+                alt_min=np.degrees(self.observatory.alt_min),
+                lax_dome=self.observatory.lax_dome,
+                cloud_limit=self.observatory.cloud_limit,
+                sim_to_o=self.observatory.sim__to_o,
+                park_after=self.observatory.park_after * 60 * 24,
+            )
+
         LOGGER.info(f"Creating conditions for mjd {value}")
 
         try:
