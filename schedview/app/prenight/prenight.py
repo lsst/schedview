@@ -25,31 +25,49 @@ import schedview.plot.visits
 import schedview.plot.maf
 
 # SCHEDULER_FNAME = "/home/n/neilsen/devel/schedview/schedview/data/baseline.pickle.gz"
-SCHEDULER_FNAME = "/sdf/data/rubin/user/neilsen/devel/schedview/schedview/data/baseline.pickle.gz"
+SCHEDULER_FNAME = (
+    "/sdf/data/rubin/user/neilsen/devel/schedview/schedview/data/baseline.pickle.gz"
+)
 OPSIM_OUTPUT_FNAME = rubin_sim.data.get_baseline()
 NIGHT = Time("2023-10-04", scale="utc")
 TIMEZONE = "Chile/Continental"
 OBSERVATORY = ModelObservatory()
 SITE = OBSERVATORY.location
 
-pn.extension('tabulator', css_files=[pn.io.resources.CSS_URLS['font-awesome']])
+pn.extension("tabulator", css_files=[pn.io.resources.CSS_URLS["font-awesome"]])
 
-logging.basicConfig(format='%(asctime)s %(message)s', level=logging.DEBUG)
+logging.basicConfig(format="%(asctime)s %(message)s", level=logging.DEBUG)
+
 
 def prenight_app():
-    night = pn.widgets.DatePicker(name='Night',
-                                  value=NIGHT.datetime.date())
-    timezone = pn.widgets.Select(name='Timezone', options=['Chile/Continental', 'US/Pacific', 'US/Arizona', 'US/Mountain','US/Central', 'US/Eastern'])
-    scheduler_fname = pn.widgets.TextInput(name='Scheduler file name', value=SCHEDULER_FNAME)
-    opsim_output_fname = pn.widgets.TextInput(name='Opsim output', value=OPSIM_OUTPUT_FNAME)
-    
+    night = pn.widgets.DatePicker(name="Night", value=NIGHT.datetime.date())
+    timezone = pn.widgets.Select(
+        name="Timezone",
+        options=[
+            "Chile/Continental",
+            "US/Pacific",
+            "US/Arizona",
+            "US/Mountain",
+            "US/Central",
+            "US/Eastern",
+        ],
+    )
+    scheduler_fname = pn.widgets.TextInput(
+        name="Scheduler file name", value=SCHEDULER_FNAME
+    )
+    opsim_output_fname = pn.widgets.TextInput(
+        name="Opsim output", value=OPSIM_OUTPUT_FNAME
+    )
+
     visits_cache = {}
     scheduler_cache = {}
-    
+
     def almanac_events(night, timezone):
         logging.info("Updating almanac.")
         night_time = Time(night.isoformat())
-        almanac_events = schedview.compute.astro.night_events(night_time, SITE, timezone)
+        almanac_events = schedview.compute.astro.night_events(
+            night_time, SITE, timezone
+        )
         almanac_events[timezone] = almanac_events[timezone].dt.tz_localize(None)
         almanac_table = pn.widgets.Tabulator(almanac_events)
         logging.info("Finished updating almanac.")
@@ -58,30 +76,39 @@ def prenight_app():
     def visit_explorer(opsim_output_fname, night):
         logging.info("Updating visit explorer")
         night_time = Time(night.isoformat())
-        
-        visits_cache_key = (opsim_output_fname, night_time)
-        visits = visits_cache.get(visits_cache_key, opsim_output_fname)      
 
-        visit_explorer, visit_explorer_data = schedview.plot.visits.create_visit_explorer(
+        visits_cache_key = (opsim_output_fname, night_time)
+        visits = visits_cache.get(visits_cache_key, opsim_output_fname)
+
+        (
+            visit_explorer,
+            visit_explorer_data,
+        ) = schedview.plot.visits.create_visit_explorer(
             visits=visits,
             night_date=night_time,
         )
 
         visits_cache.clear()
-        visits_cache[visits_cache_key] = visit_explorer_data['visits']
+        visits_cache[visits_cache_key] = visit_explorer_data["visits"]
+
+        if len(visit_explorer_data["visits"]) < 1:
+            visit_explorer = "No visits on this night."
 
         logging.info("Finished updating visit explorer")
+
         return visit_explorer
-        
-    def visit_skymaps(opsim_output_fname, scheduler_fname, night, timezone='UTC'):
+
+    def visit_skymaps(opsim_output_fname, scheduler_fname, night, timezone="UTC"):
         logging.info("Updating skymaps")
         night_time = Time(night.isoformat())
 
         visits_cache_key = (opsim_output_fname, night_time)
         visits = visits_cache.get(visits_cache_key, opsim_output_fname)
-           
-        if scheduler_fname not in scheduler_cache: 
-            scheduler, conditions = schedview.collect.scheduler_pickle.read_scheduler(scheduler_fname)
+
+        if scheduler_fname not in scheduler_cache:
+            scheduler, conditions = schedview.collect.scheduler_pickle.read_scheduler(
+                scheduler_fname
+            )
             scheduler_cache.clear()
             scheduler_cache[scheduler_fname] = scheduler
         else:
@@ -96,31 +123,35 @@ def prenight_app():
         )
 
         visits_cache.clear()
-        visits_cache[visits_cache_key] = vmap_data['visits']
+        visits_cache[visits_cache_key] = vmap_data["visits"]
+
+        if len(vmap_data["visits"]) < 1:
+            vmap = "No visits on this night."
 
         logging.info("Finished updating skymaps")
+
         return vmap
 
-    def visit_table(opsim_output_fname, night, timezone='UTC'):
+    def visit_table(opsim_output_fname, night, timezone="UTC"):
         logging.info("Updating visit table")
         columns = [
-            'start_date',
-            'fieldRA',
-            'fieldDec',
-            'altitude',
-            'azimuth',
-            'filter',
-            'airmass',
-            'slewTime',
-            'moonDistance',
-            'block_id',
-            'note'
+            "start_date",
+            "fieldRA",
+            "fieldDec",
+            "altitude",
+            "azimuth",
+            "filter",
+            "airmass",
+            "slewTime",
+            "moonDistance",
+            "block_id",
+            "note",
         ]
-        
+
         night_time = Time(night.isoformat())
-        
+
         visits_cache_key = (opsim_output_fname, night_time)
-        visits = visits_cache.get(visits_cache_key, opsim_output_fname)      
+        visits = visits_cache.get(visits_cache_key, opsim_output_fname)
 
         site = SITE
         night_events = schedview.compute.astro.night_events(
@@ -139,9 +170,12 @@ def prenight_app():
         visits_cache[visits_cache_key] = visits
 
         visit_table = pn.widgets.Tabulator(visits[columns])
+
+        if len(visits) < 1:
+            visit_table = "No visits on this night"
         logging.info("Finished updating visit table")
         return visit_table
-    
+
     app = pn.Column(
         f'<script src="https://unpkg.com/gpu.js@latest/dist/gpu-browser.min.js"></script>',
         f"<h1>Pre-night briefing</h1>",
@@ -158,11 +192,12 @@ def prenight_app():
         "<h2>Simulated visits</h2>",
         pn.Row(pn.bind(visit_explorer, opsim_output_fname, night)),
         pn.Row(pn.bind(visit_table, opsim_output_fname, night)),
-        pn.Row(pn.bind(visit_skymaps, opsim_output_fname, scheduler_fname, night))
+        pn.Row(pn.bind(visit_skymaps, opsim_output_fname, scheduler_fname, night)),
     )
-    
+
     return app
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     app = prenight_app()
     app.show()

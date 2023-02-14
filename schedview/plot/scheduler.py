@@ -917,12 +917,9 @@ class SchedulerDisplay:
 
             self.bokeh_models["reward_table"].columns = new_columns
 
-
     def make_status_indicator(self):
         """Create an indicator of what the visualization app is doing."""
-        self.bokeh_models["status_indicator"] = bokeh.models.Div(
-            text="<p></p>"
-        )
+        self.bokeh_models["status_indicator"] = bokeh.models.Div(text="<p></p>")
 
     def make_chosen_survey(self):
         """Create the bokeh model for text showing the chosen survey."""

@@ -301,7 +301,7 @@ class SchedulerDisplayApp(SchedulerDisplay):
 
         Intended to be used while plot elements are updating, and the
         control therefore do not do what the user probably intends.
-        
+
         Parameters
         ----------
         message : `str`
@@ -314,10 +314,10 @@ class SchedulerDisplayApp(SchedulerDisplay):
                 <p style="font-weight: bold; font-size: large; background-color:red">
                 {message}
                 </p>"""
-            self.bokeh_models['status_indicator'].text = text
+            self.bokeh_models["status_indicator"].text = text
         except KeyError:
             pass
-        
+
         for model in self.bokeh_models.values():
             try:
                 model.disabled = True
@@ -334,7 +334,7 @@ class SchedulerDisplayApp(SchedulerDisplay):
                 pass
 
         try:
-            self.bokeh_models['status_indicator'].text = "<p></p>"
+            self.bokeh_models["status_indicator"].text = "<p></p>"
         except KeyError:
             pass
 
@@ -348,7 +348,7 @@ class SchedulerDisplayApp(SchedulerDisplay):
             ``bokeh.io.show``) or used to create a bokeh app.
         """
         self.make_status_indicator()
-        
+
         self.make_sphere_map(
             "altaz",
             HorizonMap,
@@ -411,7 +411,7 @@ class SchedulerDisplayApp(SchedulerDisplay):
             A bokeh figure that can be displayed in a notebook (e.g. with
             ``bokeh.io.show``) or used to create a bokeh app.
         """
-        
+
         self.make_sphere_map(
             "armillary_sphere",
             ArmillarySphere,

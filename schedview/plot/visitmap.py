@@ -57,6 +57,9 @@ def plot_visit_skymaps(visits, footprint, conditions):
     psphere.add_healpix(healpix_ds, nside=nside, cmap=cmap)
     for band in "ugrizy":
         band_visits = visits.query(f"filter == '{band}'")
+        if len(band_visits) < 1:
+            continue
+
         visit_ds = asphere.add_marker(
             ra=band_visits.fieldRA,
             decl=band_visits.fieldDec,
@@ -208,7 +211,7 @@ def create_visit_skymaps(
         observatory = ModelObservatory(nside=scheduler.nside)
 
     footprint = schedview.collect.footprint.get_greedy_footprint(scheduler)
-    observatory.mjd = visits.observationStartMJD.min()
+    observatory.mjd = end_time.mjd
     conditions = observatory.return_conditions()
     data = {"visits": visits, "footprint": footprint, "conditions": conditions}
     vmap = schedview.plot.visitmap.plot_visit_skymaps(**data)

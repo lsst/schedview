@@ -108,7 +108,7 @@ def compute_basis_function_reward_at_time(scheduler, time, observatory=None):
                 row.survey_index
             ].survey_name
         except AttributeError:
-            survey_name = ''
+            survey_name = ""
 
         if len(survey_name) == 0:
             class_name = scheduler.survey_lists[row.list_index][
