@@ -16,6 +16,7 @@ of a sky map.
 - `sched_maps`, a tool for examing some elements of the state of objects used by
 the scheduler, particularly those that take the form of a sky map, although some
 indications of other elements are also present.
+- `prenight`, a pre-night briefing dashboard.
 
 The project contains example data for each. At present, to use the example data,
 different versions of dependencies are required, so the installation instructions
@@ -84,3 +85,11 @@ directory into which you cloned the `schedview` github repository, then:
     $ bokeh serve ${SCHEDVIEW_DIR}/schedview/app/sched_maps
 
 The app will then give you the URL at which you can find the app.
+
+## Running `prenight`
+
+Activate the environment, and start the `bokeh` app. If `SCHEDVIEW_DIR` is the
+directory into which you cloned the `schedview` github repository, then:
+
+    $ conda activate myenvironment
+    $ python ${SCHEDVIEW_DIR}/schedview/app/prenight/prenight.py
