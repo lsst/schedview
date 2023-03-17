@@ -22,7 +22,7 @@ from rubin_sim.scheduler.model_observatory import ModelObservatory
 import rubin_sim.scheduler.schedulers
 import rubin_sim.scheduler.surveys
 import rubin_sim.scheduler.basis_functions
-
+import rubin_sim.scheduler.example
 
 from schedview.plot.SphereMap import (
     ArmillarySphere,
@@ -101,7 +101,15 @@ class SchedulerDisplay:
             self.observatory = None
 
         if scheduler is None:
-            scheduler = make_default_scheduler(mjd, nside=nside)
+            scheduler = rubin_sim.scheduler.example.example_scheduler(nside=nside)
+            if self.observatory is not None:
+                conditions = self.observatory.return_conditions()
+            else:
+                conditions = Conditions(mjd_start=mjd - 1, nside=nside)
+                conditions.mjd = mjd
+
+            scheduler.update_conditions(conditions)
+            scheduler.request_observation()
 
         self.scheduler = scheduler
 
@@ -1262,92 +1270,3 @@ class SchedulerNotebookDisplay(SchedulerDisplay):
     def show(self):
         """Show the display."""
         self.notebook_handle = bokeh.io.show(self.figure, notebook_handle=True)
-
-
-def make_default_scheduler(mjd, nside=32):
-    """Return default scheduler.
-
-    Parameters
-    ----------
-    mjd : `float`
-        The MJD.
-    nside : `int`
-        The healpix nside
-
-    Returns
-    -------
-    scheduler : `rubin_sim.scheduler.schedulers.CoreScheduler`
-    """
-    LOGGER.debug("Making default scheduler")
-
-    def make_band_survey(band):
-        # Split the creation of basis functions so that if one fails,
-        # the other(s) might still be included.
-        basis_functions = []
-        try:
-            this_basis_function = (
-                rubin_sim.scheduler.basis_functions.EclipticBasisFunction(nside=nside)
-            )
-            basis_functions.append(this_basis_function)
-        except Exception:
-            pass
-
-        try:
-            this_basis_function = (
-                rubin_sim.scheduler.basis_functions.M5DiffBasisFunction(
-                    filtername=band, nside=nside
-                )
-            )
-            basis_functions.append(this_basis_function)
-        except Exception:
-            pass
-
-        try:
-            this_basis_function = (
-                rubin_sim.scheduler.basis_functions.ZenithShadowMaskBasisFunction(
-                    nside=nside, shadow_minutes=60, max_alt=76
-                )
-            )
-            basis_functions.append(this_basis_function)
-        except Exception:
-            pass
-
-        try:
-            this_basis_function = (
-                rubin_sim.scheduler.basis_functions.MoonAvoidanceBasisFunction(
-                    nside=nside, moon_distance=30
-                )
-            )
-            basis_functions.append(this_basis_function)
-        except Exception:
-            pass
-
-        survey = rubin_sim.scheduler.surveys.BaseSurvey(
-            basis_functions,
-            survey_name=band,
-        )
-        return survey
-
-    band_surveys = {b: make_band_survey(b) for b in "ugrizy"}
-    visible_surveys = [band_surveys["u"], band_surveys["g"], band_surveys["r"]]
-    ir_surveys = [band_surveys["i"], band_surveys["z"], band_surveys["y"]]
-
-    scheduler = rubin_sim.scheduler.schedulers.CoreScheduler(
-        [visible_surveys, ir_surveys], nside=nside
-    )
-    try:
-        observatory = ModelObservatory(mjd_start=mjd - 1, nside=nside)
-        observatory.mjd = mjd
-        conditions = observatory.return_conditions()
-    except ValueError:
-        # If we do not have the right cache of sky brightness
-        # values on disk, we may not be able to instantiate
-        # ModelObservatory, but we should be able to run
-        # it anyway. Fake up a conditions object as well as
-        # we can.
-        conditions = Conditions(mjd_start=mjd - 1, nside=nside)
-        conditions.mjd = mjd
-
-    scheduler.update_conditions(conditions)
-    scheduler.request_observation()
-    return scheduler

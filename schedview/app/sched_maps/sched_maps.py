@@ -14,11 +14,11 @@ from schedview.plot.SphereMap import (
 
 from schedview.collect import sample_pickle
 
-import schedview.plot.scheduler
 from schedview.plot.scheduler import SchedulerDisplay
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 from schedview.collect import read_scheduler
 from schedview.plot.scheduler import LOGGER, DEFAULT_NSIDE, DEFAULT_MJD
+import rubin_sim.scheduler.example
 
 
 class SchedulerDisplayApp(SchedulerDisplay):
@@ -550,12 +550,15 @@ def make_scheduler_map_figure(
         ``bokeh.io.show``) or used to create a bokeh app.
     """
     if scheduler_pickle_fname is None:
-        scheduler = schedview.plot.scheduler.make_default_scheduler(
-            DEFAULT_MJD, nside=nside
-        )
-        observatory = ModelObservatory(mjd_start=DEFAULT_MJD - 1, nside=nside)
+        start_mjd = DEFAULT_MJD - 1
+        observatory = ModelObservatory(mjd_start=start_mjd, nside=nside)
         observatory.mjd = DEFAULT_MJD
         conditions = observatory.return_conditions()
+        scheduler = rubin_sim.scheduler.example.example_scheduler(
+            mjd_start=start_mjd, nside=nside
+        )
+        scheduler.update_conditions(conditions)
+        scheduler.request_observation()
     else:
         scheduler, conditions = read_scheduler(sample_pickle(scheduler_pickle_fname))
 

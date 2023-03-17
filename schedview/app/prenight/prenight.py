@@ -15,6 +15,7 @@ from astropy.time import Time
 
 import rubin_sim
 from rubin_sim.scheduler.model_observatory import ModelObservatory
+import rubin_sim.scheduler.example
 
 from schedview.collect import sample_pickle
 import schedview.compute.astro
@@ -26,12 +27,13 @@ import schedview.plot.rewards
 import schedview.plot.visits
 import schedview.plot.maf
 
-SCHEDULER_FNAME = "baseline.pickle.gz"
+SCHEDULER_FNAME = None
 OPSIM_OUTPUT_FNAME = rubin_sim.data.get_baseline()
 NIGHT = Time("2023-10-04", scale="utc")
 TIMEZONE = "Chile/Continental"
 OBSERVATORY = ModelObservatory()
 SITE = OBSERVATORY.location
+NSIDE = 32
 
 pn.extension("tabulator", css_files=[pn.io.resources.CSS_URLS["font-awesome"]])
 
@@ -52,14 +54,8 @@ def prenight_app():
         ],
     )
 
-    default_scheduler_fname = (
-        SCHEDULER_FNAME
-        if os.path.isfile(SCHEDULER_FNAME)
-        else sample_pickle(SCHEDULER_FNAME)
-    )
-
     scheduler_fname = pn.widgets.TextInput(
-        name="Scheduler file name", value=default_scheduler_fname
+        name="Scheduler file name", value=SCHEDULER_FNAME
     )
     opsim_output_fname = pn.widgets.TextInput(
         name="Opsim output", value=OPSIM_OUTPUT_FNAME
@@ -112,9 +108,14 @@ def prenight_app():
         visits = visits_cache.get(visits_cache_key, opsim_output_fname)
 
         if scheduler_fname not in scheduler_cache:
-            scheduler, conditions = schedview.collect.scheduler_pickle.read_scheduler(
-                scheduler_fname
-            )
+            if scheduler_fname is None:
+                scheduler = rubin_sim.scheduler.example.example_scheduler(nside=NSIDE)
+            else:
+                (
+                    scheduler,
+                    conditions,
+                ) = schedview.collect.scheduler_pickle.read_scheduler(scheduler_fname)
+
             scheduler_cache.clear()
             scheduler_cache[scheduler_fname] = scheduler
         else:

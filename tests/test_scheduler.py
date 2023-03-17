@@ -4,18 +4,40 @@ from astropy.time import TimeDelta
 from schedview.plot.scheduler import (
     SchedulerDisplay,
     DEFAULT_MJD,
-    make_default_scheduler,
 )
 from schedview.collect import sample_pickle
+import rubin_sim.scheduler.example
+from rubin_sim.scheduler.model_observatory import ModelObservatory
+from rubin_sim.scheduler.features.conditions import Conditions
 
 NSIDE = 8
 
 
 class test_SchedulerDisplay(unittest.TestCase):
     def test_scheduler_display(self):
-        default_scheduler = make_default_scheduler(DEFAULT_MJD, nside=NSIDE)
-        sched_display = SchedulerDisplay(nside=NSIDE, scheduler=default_scheduler)
-        self.assertTrue(sched_display.scheduler is default_scheduler)
+        mjd = DEFAULT_MJD
+        nside = NSIDE
+
+        scheduler = rubin_sim.scheduler.example.example_scheduler(nside=nside)
+
+        try:
+            observatory = ModelObservatory(mjd_start=mjd - 1, nside=nside)
+            observatory.mjd = mjd
+            conditions = observatory.return_conditions()
+        except ValueError:
+            # If we do not have the right cache of sky brightness
+            # values on disk, we may not be able to instantiate
+            # ModelObservatory, but we should be able to run
+            # it anyway. Fake up a conditions object as well as
+            # we can.
+            conditions = Conditions(mjd_start=mjd - 1, nside=nside)
+            conditions.mjd = mjd
+
+        scheduler.update_conditions(conditions)
+        scheduler.request_observation()
+
+        sched_display = SchedulerDisplay(nside=NSIDE, scheduler=scheduler)
+        self.assertTrue(sched_display.scheduler is scheduler)
 
         # Drives the creation of many bokeh models
         sched_display.make_figure()

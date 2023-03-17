@@ -128,5 +128,10 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Scratch notebooks
+# Scratch notebooks and data
 notebooks/202?-??-*.ipynb
+notebooks/scratch
+schedview/data/local
+
+# Externally supplied data
+schedview/data/bsc5.dat
