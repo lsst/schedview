@@ -31,16 +31,32 @@ class SchedulerDisplayApp(SchedulerDisplay):
             title="Pickle path:",
         )
 
+        # Need a bokeh model we can use to send a callback to to get the
+        # browser to show an error. See
+        # https://discourse.bokeh.org/t/send-user-warning-messages-on-python-error/6750
+        file_read_status = bokeh.models.Div(
+            name="file read status", text="Initial", visible=False
+        )
+        code = 'if (file_read_status.text.startsWith("Could not read")) {alert(file_read_status.text); }'
+        file_read_status.js_on_change(
+            "text",
+            bokeh.models.callbacks.CustomJS(
+                args={"file_read_status": file_read_status}, code=code
+            ),
+        )
+
         def switch_pickle(attrname, old, new):
             def do_switch_pickle():
                 LOGGER.info(f"Loading {new}.")
+                file_read_status.text = f"Read of {new} in progress."
                 try:
                     # load updates the survey & conditions, which updates
                     # bokeh models...
                     self.load(new)
+                    file_read_status.text = "Read {new} successfully."
                 except Exception as e:
                     LOGGER.warning(f"Failed to load file {new}: {e}")
-                    pass
+                    file_read_status.text = f"Could not read {new}: {e}"
 
                 LOGGER.debug(f"Finished loading {new}")
 
@@ -60,6 +76,8 @@ class SchedulerDisplayApp(SchedulerDisplay):
 
         file_input_box.on_change("value", switch_pickle)
         self.bokeh_models["file_input_box"] = file_input_box
+
+        self.bokeh_models["file_read_status"] = file_read_status
 
     def _set_scheduler(self, scheduler):
         LOGGER.info("Setting scheduler")
@@ -376,7 +394,10 @@ class SchedulerDisplayApp(SchedulerDisplay):
         self.make_tier_selector()
         self.make_pickle_entry_box()
 
-        controls = [self.bokeh_models["file_input_box"]]
+        controls = [
+            self.bokeh_models["file_input_box"],
+            self.bokeh_models["file_read_status"],
+        ]
 
         if self.observatory is not None:
             self.make_time_input_box()
