@@ -8,6 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import urllib
 import urllib.request
+from rubin_sim.scheduler.model_observatory import ModelObservatory
 
 __all__ = ["read_scheduler", "sample_pickle"]
 
@@ -47,8 +48,18 @@ def read_local_scheduler_pickle(file_name):
     else:
         opener = open
 
-    with opener(file_name, "rb") as pio:
-        scheduler, conditions = pickle.load(pio)
+    try:
+        with opener(file_name, "rb") as pio:
+            scheduler, conditions = pickle.load(pio)
+
+    except TypeError:
+        with opener(file_name, "rb") as pio:
+            scheduler = pickle.load(pio)
+
+        try:
+            conditions = scheduler.conditions
+        except AttributeError:
+            conditions = ModelObservatory().return_conditions()
 
     return [scheduler, conditions]
 
