@@ -9,6 +9,10 @@ from rubin_sim.scheduler.model_observatory.model_observatory import ModelObserva
 import schedview.compute.astro
 from schedview.collect.stars import load_bright_stars
 
+# Imported to help sphinx make the link
+from rubin_sim.scheduler.model_observatory import ModelObservatory  # noqa F401
+from rubin_sim.scheduler.schedulers import CoreScheduler  # noqa F401
+
 BAND_COLORS = dict(
     u="#56b4e9", g="#008060", r="#ff4000", i="#850000", z="#6600cc", y="#000000"
 )
@@ -166,12 +170,12 @@ def create_visit_skymaps(
 
         If a string, the file name of the opsim database from which the
         visits should be loaded.
-    scheduler : `rubin_sim.scheduler.schedulers.core_scheduler.Core_scheduler` or `str`
-        The scheduler from which to extract the footprint, or the name of a file
-        from which such a scheduler should be loaded.
+    scheduler : `CoreScheduler` or `str`
+        The scheduler from which to extract the footprint, or the name of
+        a file from which such a scheduler should be loaded.
     night_date : `astropy.time.Time`
         A time during the night to plot
-    observatory : rubin_sim.scheduler.modelObservatory.model_observatory.Model_observatory`, optional
+    observatory : `ModelObservatory`, optional
         Provides the location of the observatory, used to compute
         night start and end times.
         By default None.

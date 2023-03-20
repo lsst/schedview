@@ -1,6 +1,5 @@
 import warnings
 
-import hvplot.pandas
 import holoviews as hv
 import numpy as np
 from astropy.time import Time
@@ -9,6 +8,9 @@ import schedview.collect.scheduler_pickle
 import schedview.collect.opsim
 import schedview.compute.scheduler
 import schedview.compute.astro
+
+# Imported to help sphinx make the link
+from rubin_sim.scheduler.model_observatory import ModelObservatory  # noqa F401
 
 
 def plot_survey_rewards(rewards):
@@ -52,7 +54,7 @@ def create_survey_reward_plot(
 
     Parameters
     ----------
-    scheduler : `rubin_sim.scheduler.schedulers.core_scheduler.Core_scheduler` or `str`
+    scheduler : `rubin_sim.scheduler.schedulers.Core_scheduler` or `str`
         The scheduler with the surveys to evaluate, or the name of a file
         from which such a scheduler should be loaded.
     night_date : `astropy.time.Time`
@@ -60,7 +62,7 @@ def create_survey_reward_plot(
     additional_visits : `pandas.DataFrame` or `str`, optional
         Visits to add to the scheduler before reward evaluation,
         by default None
-    observatory : `rubin_sim.scheduler.modelObservatory.model_observatory.Model_observatory`, optional
+    observatory : `ModelObservatory`, optional
         Provides the location of the observatory, used to compute
         night start and end times.
         By default None

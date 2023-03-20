@@ -3,6 +3,9 @@ import schedview.collect.opsim
 import schedview.compute.astro
 import hvplot
 
+# Imported to help sphinx make the link
+from rubin_sim.scheduler.model_observatory import ModelObservatory  # noqa F401
+
 
 def plot_visits(visits):
     """Instantiate an explorer to interactively examine a set of visits.
@@ -35,7 +38,7 @@ def create_visit_explorer(
         or the name of a file from which such visits should be loaded.
     night_date : `astropy.time.Time`
         A time during the night to plot
-    observatory : `rubin_sim.scheduler.modelObservatory.model_observatory.Model_observatory`, optional
+    observatory : `ModelObservatory`, optional
         Provides the location of the observatory, used to compute
         night start and end times.
         By default None.

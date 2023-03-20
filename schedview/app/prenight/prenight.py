@@ -1,14 +1,5 @@
-import warnings
-from tempfile import TemporaryDirectory
-
-import numpy as np
 import panel as pn
-import holoviews as hv
-import hvplot
-import hvplot.pandas
-import bokeh.models.layouts
 import logging
-import os.path
 from copy import deepcopy
 
 from astropy.time import Time
@@ -17,7 +8,6 @@ import rubin_sim
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 import rubin_sim.scheduler.example
 
-from schedview.collect import sample_pickle
 import schedview.compute.astro
 import schedview.collect.opsim
 import schedview.compute.scheduler
@@ -184,8 +174,8 @@ def prenight_app():
         return visit_table
 
     app = pn.Column(
-        f'<script src="https://unpkg.com/gpu.js@latest/dist/gpu-browser.min.js"></script>',
-        f"<h1>Pre-night briefing</h1>",
+        '<script src="https://unpkg.com/gpu.js@latest/dist/gpu-browser.min.js"></script>',
+        "<h1>Pre-night briefing</h1>",
         pn.pane.PNG(
             "https://project.lsst.org/sites/default/files/Rubin-O-Logo_0.png", height=50
         ),

@@ -3,13 +3,16 @@ import matplotlib.pyplot as plt
 from rubin_sim import maf
 import schedview.compute.maf_metrics
 
+# Imported to help sphinx make the link
+from rubin_sim.scheduler.model_observatory import ModelObservatory  # noqa F401
+
 
 def plot_maf_metric_bundle(bundle_group):
     """Plot a MAF metric bundle
 
     Parameters
     ----------
-    bundle_group : `rubin_sim.maf.metric_bundles.metric_bundle_group.MetricBundleGroup`
+    bundle_group : `maf.MetricBundleGroup`
         The MAF bundle group from which to make the plot.
 
     Returns
@@ -40,7 +43,7 @@ def create_sample_maf_metric_plot(opsim_fname, data_dir, night, observatory=None
 
     Returns
     -------
-    observatory : `rubin_sim.scheduler.model_observatory.model_observatory.ModelObservatory`, optional
+    observatory : `ModelObservatory`, optional
         The observatory to use, by default None
     """
     bundle_group = schedview.compute.maf_metrics.compute_sample_metric_bundle(

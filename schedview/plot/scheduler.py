@@ -318,7 +318,7 @@ class SchedulerDisplay:
 
         Parameters
         ----------
-        scheduler : `rubin_sim.scheduler.schedulers.core_scheduler.CoreScheduler`  # noqa W505
+        scheduler : `rubin_sim.scheduler.schedulers.CoreScheduler`
             The new scheduler to visualize
         """
         # Work separated into _set_scheduler so that it can be overriden by
@@ -882,7 +882,7 @@ class SchedulerDisplay:
                     getmembers(rubin_sim.scheduler.basis_functions)
                 ).keys()
                 if root_bf_name in standard_basis_functions:
-                    url = f"https://rubin-sim.lsst.io/api/rubin_sim.scheduler.basis_functions.{root_bf_name}.html#rubin_sim.scheduler.basis_functions.{root_bf_name}"
+                    url = f"https://rubin-sim.lsst.io/api/rubin_sim.scheduler.basis_functions.{root_bf_name}.html#rubin_sim.scheduler.basis_functions.{root_bf_name}"  # noqa E501
                 else:
                     url = None
                 return url

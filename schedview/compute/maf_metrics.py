@@ -4,6 +4,10 @@ from rubin_sim import maf
 import schedview
 import schedview.compute.astro
 
+# Imported to help sphinx make the link
+from rubin_sim.scheduler.model_observatory import ModelObservatory  # noqa F401
+from rubin_sim.maf import MetricBundleGroup  # noqa F401
+
 
 def compute_night_metric_bundle(
     opsim_fname, data_dir, night_date, metric, slicer, constraint, observatory=None
@@ -24,12 +28,12 @@ def compute_night_metric_bundle(
         The MAF slicer to apply.
     constraint : `str`
         The SQL constraint on visits to include.
-    observatory : `rubin_sim.scheduler.model_observatory.model_observatory.ModelObservatory`, optional
+    observatory : `ModelObservatory`, optional
         The observatory to use, by default None
 
     Returns
     -------
-    bundle_group: `rubin_sim.maf.metric_bundles.metric_bundle_group.MetricBundleGroup`
+    bundle_group: `MetricBundleGroup`
         The executed MAF metric bundle group.
     """
     site = None if observatory is None else observatory.location
@@ -71,12 +75,12 @@ def compute_sample_metric_bundle(opsim_fname, data_dir, night_date, observatory=
         MAF output directory
     night_date : `astropy.time.Time`
         Night to make the metric bundle for.
-    observatory : `rubin_sim.scheduler.model_observatory.model_observatory.ModelObservatory`, optional
+    observatory : `ModelObservatory`, optional
         The observatory to use, by default None
 
     Returns
     -------
-    bundle_group: `rubin_sim.maf.metric_bundles.metric_bundle_group.MetricBundleGroup`
+    bundle_group: `rubin_sim.maf.MetricBundleGroup`
         The executed MAF metric bundle group.
     """
     metric = maf.CountMetric(col="observationId")
