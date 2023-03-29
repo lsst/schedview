@@ -1,12 +1,18 @@
 import panel as pn
 import logging
 from copy import deepcopy
+import pickle
+import lzma
+from tempfile import TemporaryDirectory, NamedTemporaryFile
+from pathlib import Path
 
+import numpy as np
 from astropy.time import Time
 
 import rubin_sim
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 import rubin_sim.scheduler.example
+from rubin_sim.scheduler.utils import run_info_table, SchemaConverter
 
 import schedview.compute.astro
 import schedview.collect.opsim
@@ -17,21 +23,90 @@ import schedview.plot.rewards
 import schedview.plot.visits
 import schedview.plot.maf
 
-SCHEDULER_FNAME = None
-OPSIM_OUTPUT_FNAME = rubin_sim.data.get_baseline()
-NIGHT = Time("2023-10-04", scale="utc")
-TIMEZONE = "Chile/Continental"
-OBSERVATORY = ModelObservatory()
-SITE = OBSERVATORY.location
-NSIDE = 32
+TEMP_DIR = TemporaryDirectory()
+DEFAULT_TIMEZONE = "Chile/Continental"
 
 pn.extension("tabulator", css_files=[pn.io.resources.CSS_URLS["font-awesome"]])
 
 logging.basicConfig(format="%(asctime)s %(message)s", level=logging.DEBUG)
 
 
-def prenight_app():
-    night = pn.widgets.DatePicker(name="Night", value=NIGHT.datetime.date())
+def prenight_app(
+    observatory=ModelObservatory(),
+    scheduler=None,
+    observations=rubin_sim.data.get_baseline(),
+    obs_night=None,
+    timezone=DEFAULT_TIMEZONE,
+    nside=None,
+):
+    """Create the pre-night dashboard.
+
+    Parameters
+    ----------
+    """
+
+    if nside is None:
+        try:
+            nside = scheduler.nside
+        except AttributeError:
+            nside = observatory.nside
+
+    if isinstance(observations, str):
+        opsim_output_fname = observations
+    else:
+        # If we are passed an array of observations, write them to a file.
+        converter = SchemaConverter()
+
+        # Get a unique temp file name
+        with NamedTemporaryFile(
+            prefix="opsim-", suffix=".db", dir=TEMP_DIR.name
+        ) as temp_file:
+            opsim_output_fname = temp_file.name
+
+        converter.obs2opsim(observations, filename=opsim_output_fname)
+
+    if isinstance(scheduler, str) or scheduler is None:
+        scheduler_fname = scheduler
+    else:
+        # Get a unique temp file name
+        with NamedTemporaryFile(
+            prefix="scheduler-", suffix=".pickle.xz", dir=TEMP_DIR.name
+        ) as temp_file:
+            scheduler_fname = temp_file.name
+
+        with lzma.open(scheduler_fname, "wb", format=lzma.FORMAT_XZ) as pio:
+            pickle.dump(scheduler, pio)
+
+    site = observatory.location
+
+    if obs_night is None:
+        if isinstance(observations, str):
+            # We were provided a database filename, not actual observations
+            converter = SchemaConverter()
+            observations = converter.opsim2obs(opsim_output_fname)
+
+        end_mjd = observations["mjd"].max()
+        end_mjd_almanac = observatory.almanac.get_sunset_info(end_mjd)
+
+        # If the last observation is in the first half (pm) of the night,
+        # guess that we want to look at the night before. If the simulator
+        # is configured to end on an integer mjd, it can happen that that
+        # the start of a night is just after the mjd rollover, so we can
+        # get just a few observations on the last night, and this last
+        # night is probably not the one we want to look at.
+        end_mjd_night_middle = 0.5 * (
+            end_mjd_almanac["sunset"] + end_mjd_almanac["sunrise"]
+        )
+        if end_mjd < end_mjd_night_middle:
+            end_mjd_almanac = observatory.almanac.get_sunset_info(end_mjd - 1)
+
+        # Get the night MJD based on local noon of sunset.
+        sunset_mjd_ut = end_mjd_almanac["sunset"]
+        sunset_mjd_local = sunset_mjd_ut + site.lon.deg / 360
+        sunset_night_mjd = np.floor(sunset_mjd_local)
+        obs_night = Time(sunset_night_mjd, format="mjd", scale="utc")
+
+    night = pn.widgets.DatePicker(name="Night", value=obs_night.datetime.date())
     timezone = pn.widgets.Select(
         name="Timezone",
         options=[
@@ -45,10 +120,10 @@ def prenight_app():
     )
 
     scheduler_fname = pn.widgets.TextInput(
-        name="Scheduler file name", value=SCHEDULER_FNAME
+        name="Scheduler file name", value=scheduler_fname
     )
     opsim_output_fname = pn.widgets.TextInput(
-        name="Opsim output", value=OPSIM_OUTPUT_FNAME
+        name="Opsim output", value=opsim_output_fname
     )
 
     visits_cache = {}
@@ -58,7 +133,7 @@ def prenight_app():
         logging.info("Updating almanac.")
         night_time = Time(night.isoformat())
         almanac_events = schedview.compute.astro.night_events(
-            night_time, SITE, timezone
+            night_time, site, timezone
         )
         almanac_events[timezone] = almanac_events[timezone].dt.tz_localize(None)
         almanac_table = pn.widgets.Tabulator(almanac_events)
@@ -99,7 +174,7 @@ def prenight_app():
 
         if scheduler_fname not in scheduler_cache:
             if scheduler_fname is None:
-                scheduler = rubin_sim.scheduler.example.example_scheduler(nside=NSIDE)
+                scheduler = rubin_sim.scheduler.example.example_scheduler(nside=nside)
             else:
                 (
                     scheduler,
@@ -116,7 +191,7 @@ def prenight_app():
             scheduler=scheduler,
             night_date=night_time,
             timezone=timezone,
-            observatory=OBSERVATORY,
+            observatory=observatory,
         )
 
         visits_cache.clear()
@@ -150,7 +225,6 @@ def prenight_app():
         visits_cache_key = (opsim_output_fname, night_time)
         visits = visits_cache.get(visits_cache_key, opsim_output_fname)
 
-        site = SITE
         night_events = schedview.compute.astro.night_events(
             night_date=night_time, site=site, timezone=timezone
         )
