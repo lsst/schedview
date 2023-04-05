@@ -4,7 +4,6 @@ from copy import deepcopy
 import pickle
 import lzma
 from tempfile import TemporaryDirectory, NamedTemporaryFile
-from pathlib import Path
 
 import numpy as np
 from astropy.time import Time
@@ -12,7 +11,7 @@ from astropy.time import Time
 import rubin_sim
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 import rubin_sim.scheduler.example
-from rubin_sim.scheduler.utils import run_info_table, SchemaConverter
+from rubin_sim.scheduler.utils import SchemaConverter
 
 import schedview.compute.astro
 import schedview.collect.opsim
@@ -86,6 +85,11 @@ def prenight_app(
             observations = converter.opsim2obs(opsim_output_fname)
 
         end_mjd = observations["mjd"].max()
+        if end_mjd > observatory.sky_model.mjd_right.max():
+            # If we cannot look at the last night of the observations,
+            # look at the first.
+            end_mjd = observations["mjd"].min() + 1
+
         end_mjd_almanac = observatory.almanac.get_sunset_info(end_mjd)
 
         # If the last observation is in the first half (pm) of the night,
