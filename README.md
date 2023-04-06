@@ -46,11 +46,9 @@ file that includes a recent version of `rubin_sim`:
     $ conda env create -f environment.yaml
     $ conda activate schedview
 
-If you are running `sched_maps`, get the one with the older version:
-
-    $ # ONLY IF RUNNING sched_maps
-    $ conda env create -f environment_080a2.yaml
-    $ conda activate schedview080a2
+If you are running `sched_maps`, you may need to modify the environment to
+one compatible with whatever instance of the scheduler you will be
+viewing.
 
 Install the (development) `schedview` in your new environment:
 
@@ -81,7 +79,7 @@ solution, and will be replaced soon.
 Activate the environment, and start the `bokeh` app. If `SCHEDVIEW_DIR` is the
 directory into which you cloned the `schedview` github repository, then:
 
-    $ conda activate schedview080a2
+    $ conda activate schedview
     $ bokeh serve ${SCHEDVIEW_DIR}/schedview/app/sched_maps
 
 The app will then give you the URL at which you can find the app.
@@ -91,5 +89,5 @@ The app will then give you the URL at which you can find the app.
 Activate the environment, and start the `bokeh` app. If `SCHEDVIEW_DIR` is the
 directory into which you cloned the `schedview` github repository, then:
 
-    $ conda activate myenvironment
+    $ conda activate schedview
     $ python ${SCHEDVIEW_DIR}/schedview/app/prenight/prenight.py
