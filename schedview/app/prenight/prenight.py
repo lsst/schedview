@@ -21,6 +21,7 @@ import schedview.plot.visitmap
 import schedview.plot.rewards
 import schedview.plot.visits
 import schedview.plot.maf
+import schedview.plot.nightbf
 
 TEMP_DIR = TemporaryDirectory()
 DEFAULT_TIMEZONE = "Chile/Continental"
@@ -35,6 +36,8 @@ def prenight_app(
     scheduler=None,
     observations=rubin_sim.data.get_baseline(),
     obs_night=None,
+    reward_df=None,
+    obs_rewards=None,
     timezone=DEFAULT_TIMEZONE,
     nside=None,
 ):
@@ -251,7 +254,93 @@ def prenight_app(
         logging.info("Finished updating visit table")
         return visit_table
 
-    app = pn.Column(
+    # ##########################
+    # Basis function examination
+    # ##########################
+
+    if reward_df is not None:
+        tier = pn.widgets.Select(
+            name="Tier",
+            options=reward_df.tier_label.unique().tolist(),
+            value="tier 2",
+            width_policy="fit",
+        )
+
+        # Survey selection
+        surveys = pn.widgets.MultiSelect(
+            name="Displayed surveys", options=["foo"], value=["foo"], width_policy="fit"
+        )
+
+        def configure_survey_selector(survey_selector, reward_df, tier):
+            surveys = (
+                reward_df.set_index("tier_label")
+                .loc[tier, "survey_label"]
+                .unique()
+                .tolist()
+            )
+            survey_selector.options = surveys
+            survey_selector.value = surveys[:10] if len(surveys) > 10 else surveys
+
+        configure_survey_selector(surveys, reward_df, tier.value)
+
+        def survey_selector_update_callback(surveys, event):
+            new_tier = event.new
+            configure_survey_selector(surveys, reward_df, new_tier)
+
+        tier.link(surveys, {"value": survey_selector_update_callback})
+
+        # Basis function selection
+
+        basis_function = pn.widgets.Select(
+            name="Reward (Total or basis function maximum)",
+            options=["Total"],
+            value="Total",
+            width_policy="fit",
+        )
+
+        def configure_basis_function_selector(basis_function_selector, reward_df, tier):
+            basis_functions = (
+                reward_df.set_index("tier_label")
+                .loc[tier, "basis_function"]
+                .unique()
+                .tolist()
+            )
+            basis_function_selector.options = ["Total"] + basis_functions
+            basis_function_selector.value = "Total"
+
+        configure_basis_function_selector(basis_function, reward_df, tier.value)
+
+        def basis_function_selector_update_callback(basis_function, event):
+            new_tier = event.new
+            configure_basis_function_selector(basis_function, reward_df, new_tier)
+
+        tier.link(basis_function, {"value": basis_function_selector_update_callback})
+
+        reward_plot = pn.bind(
+            schedview.plot.nightbf.plot_rewards,
+            reward_df,
+            tier,
+            night,
+            None,
+            obs_rewards,
+            surveys,
+            basis_function,
+            plot_kwargs={"width": 1024},
+        )
+
+        infeasible_plot = pn.bind(
+            schedview.plot.nightbf.plot_infeasible,
+            reward_df,
+            tier,
+            night,
+            None,
+            surveys,
+            plot_kwargs={"width": 1024},
+        )
+
+    # Top level layout
+
+    basic_app = pn.Column(
         '<script src="https://unpkg.com/gpu.js@latest/dist/gpu-browser.min.js"></script>',
         "<h1>Pre-night briefing</h1>",
         pn.pane.PNG(
@@ -269,6 +358,17 @@ def prenight_app(
         pn.Row(pn.bind(visit_table, opsim_output_fname, night)),
         pn.Row(pn.bind(visit_skymaps, opsim_output_fname, scheduler_fname, night)),
     )
+
+    if reward_df is not None:
+        reward_rows = pn.Column(
+            "<h2>Reward values through the night</h2>",
+            pn.Row(tier, surveys, basis_function),
+            reward_plot,
+            infeasible_plot,
+        )
+        app = pn.Column(basic_app, reward_rows)
+    else:
+        app = basic_app
 
     return app
 
