@@ -41,10 +41,40 @@ def prenight_app(
     timezone=DEFAULT_TIMEZONE,
     nside=None,
 ):
-    """Create the pre-night dashboard.
+    """Create the prenight briefing app instance.
 
     Parameters
     ----------
+    observatory : `ModelObservatory` or `None`
+        The model observatory to use.
+        By default, None.
+    scheduler : `rubin_sim.scheduler.schedulers.core_scheduler.CoreScheduler`
+        The scheduler instance to use.
+    observations : `str`
+        The name of the sqlite3 file with the simulation results.
+        Defaults to the baseline as specified by the `rubin_sim` dependency.
+    obs_night : `astropy.time.Time`
+        The night for which to display data. Defaults to the last full night
+        in observations.
+    reward_df : `pandas.DataFrame` or `None`
+        The rewards by survey, as recorded by the `scheduler` instance
+        when running the simulation.
+        Defaults to None.
+    obs_rewards : `pandas.DataFrame` or `None`
+        The mapping between scheduler calls and simulated observations,
+        as recorded by the `scheduler` instance.
+        Defaults to None.
+    timezone : `str` or `None`
+        The timezone to use for localtime.
+    nside : `int` or `None`
+        The nside to use for healpix maps to be shown.
+    timezone : `str`, optional
+        Timezone for horizontal axis, by default "Chile/Continental"
+
+    Returns
+    -------
+    app : `panel.viewable.Viewable`
+        The dashboard app.
     """
 
     if nside is None:

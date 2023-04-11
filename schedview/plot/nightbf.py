@@ -33,8 +33,38 @@ def plot_rewards(
     obs_rewards=None,
     surveys=None,
     basis_function="Total",
-    plot_kwargs={}
+    plot_kwargs={},
 ):
+    """Create the plot showing reward values by survey.
+
+    Parameters
+    ----------
+    reward_df : `pandas.DataFrame`
+        The rewards by survey, as recorded by the `scheduler` instance
+        when running the simulation.
+    tier_label : `str`
+        The label for the tier to plot.
+    night : `astropy.time.Time`
+        The night to plot.
+    observatory : `ModelObservatory`
+        The model observatory to use.
+    obs_rewards : `pandas.DataFrame`
+        The mapping between scheduler calls and simulated observations,
+        as recorded by the `scheduler` instance.
+    surveys : `list` [`str`], optional
+        A list of the survey names to plot. Default to all surveys in the tier.
+    basis_funtions : `list` [`str`], optional
+        A list of names of basis function to plot. Defaults to all
+        basis functions in the tier.
+    plot_kwards : `dict`
+        A dictionary of keyword parameters passed to
+        `bokeh.plotting.Figure`.
+
+    Returns
+    -------
+    app : `bokeh.plotting.Figure`
+        The figure itself.
+    """
 
     tier_reward_df = (
         reward_df.set_index("tier_label").loc[tier_label, :].set_index("survey_label")
@@ -56,7 +86,7 @@ def plot_rewards(
             x_axis_label="MJD",
             y_axis_label="Reward",
             x_range=mjd_limits,
-            **plot_kwargs
+            **plot_kwargs,
         )
         message = bokeh.models.Label(
             x=10,
@@ -90,7 +120,7 @@ def plot_rewards(
                 x_axis_label="MJD",
                 y_axis_label=y_axis_label,
                 x_range=mjd_limits,
-                **plot_kwargs
+                **plot_kwargs,
             )
             message = bokeh.models.Label(
                 x=10,
@@ -104,8 +134,8 @@ def plot_rewards(
 
     if basis_function == "Total":
         y_column = "survey_reward"
-        plot_title = f"Total reward"
-        y_axis_label = f"Total reward returned for survey"
+        plot_title = "Total reward"
+        y_axis_label = "Total reward returned for survey"
         tier_value_df = tier_reward_df.loc[
             :, ["queue_start_mjd", "queue_fill_mjd_ns", y_column]
         ].drop_duplicates()
@@ -115,7 +145,7 @@ def plot_rewards(
         x_axis_label="MJD",
         y_axis_label=y_axis_label,
         x_range=mjd_limits,
-        **plot_kwargs
+        **plot_kwargs,
     )
 
     for survey_label, color in zip(tier_value_df.index.unique(), colors):
@@ -165,21 +195,46 @@ def plot_rewards(
     return plot
 
 
-def plot_infeasible(reward_df, tier_label, night, observatory=None, surveys=None, plot_kwargs={}):
+def plot_infeasible(
+    reward_df, tier_label, night, observatory=None, surveys=None, plot_kwargs={}
+):
+    """Create a plot showing infeasible basis functions.
 
+    Parameters
+    ----------
+    reward_df : `pandas.DataFrame`
+        The rewards by survey, as recorded by the `scheduler` instance
+        when running the simulation.
+    tier_label : `str`
+        The label for the tier to plot.
+    night : `astropy.time.Time`
+        The night to plot.
+    observatory : `ModelObservatory`
+        The model observatory to use.
+    surveys : `list` [`str`], optional
+        A list of the survey names to plot. Default to all surveys in the tier.
+    plot_kwards : `dict`
+        A dictionary of keyword parameters passed to
+        `bokeh.plotting.Figure`.
+
+    Returns
+    -------
+    app : `bokeh.plotting.Figure`
+        The figure itself.
+    """
     tier_df = (
         reward_df.reset_index().set_index("tier_label").loc[tier_label, :]
     ).query("not feasible")
 
     if surveys is not None:
         available_surveys = [s for s in surveys if s in tier_df.survey_label.unique()]
-        if len(available_surveys)==0:
+        if len(available_surveys) == 0:
             # None of the selected surveys have infeasible basis functions
             plot = bokeh.plotting.Figure(
                 title="Infeasible",
                 x_axis_label="MJD",
                 y_axis_label="Basis function",
-                **plot_kwargs
+                **plot_kwargs,
             )
             message = bokeh.models.Label(
                 x=10,
@@ -190,8 +245,12 @@ def plot_infeasible(reward_df, tier_label, night, observatory=None, surveys=None
             )
             plot.add_layout(message)
             return plot
-        else:                
-            tier_df = tier_df.set_index("survey_label").loc[available_surveys, :].reset_index()
+        else:
+            tier_df = (
+                tier_df.set_index("survey_label")
+                .loc[available_surveys, :]
+                .reset_index()
+            )
 
     tier_df, mjd_limits = _extract_night(tier_df, "queue_start_mjd", night, observatory)
 
@@ -212,7 +271,7 @@ def plot_infeasible(reward_df, tier_label, night, observatory=None, surveys=None
         y_axis_label="Basis function",
         y_range=factor_range,
         x_range=mjd_limits,
-        **plot_kwargs
+        **plot_kwargs,
     )
 
     plot.scatter(x="queue_start_mjd", y="survey_bf", source=infeasible_ds)
