@@ -264,36 +264,56 @@ class SphereMap:
 
         return alt, az
 
-    def make_healpix_data_source(self, hpvalues, nside=32, bound_step=1):
+    def make_healpix_data_source(self, hpvalues, nside=32, bound_step=1, nest=False):
         """Make a data source of healpix values, corners, and projected coords.
 
         Parameters
         ----------
-        hpvalues : `numpy.ndarray`
-            Healpixel values (RING pixel ordering)
+        hpvalues : `numpy.ndarray` or `healsparse.HealSparseMap`
+            Healpixel values (RING pixel ordering unless
+            a HealSparseMap is provided.)
         nside : int, optional
             healpixel nside for display, by default 32
         bound_step : int, optional
             number of boundary points for each side of each healpixel,
             by default 1
+        nest : `bool`, optionol
+            Is the healpix array provided in NEST ordering? Defaults to False.
+            (if hpvalues is a HealSparseMap, nest is always True)
 
         Returns
         -------
         hpix_datasource : `bokeh.models.ColumnDataSource`
             Data source for healpixel values and bounds.
         """
-        values = np.copy(hpvalues)
-        values[np.isnan(values)] = hp.UNSEEN
-        values = hp.ud_grade(hpvalues, nside)
-        values[values == hp.UNSEEN] = np.nan
-        npix = hp.nside2npix(nside)
+        try:
+            # If this doesn't throw an exception, we
+            # were passed an instance of healsparse.
+            if nside < hpvalues.nside_sparse:
+                values = hpvalues.degrade(nside)
+            else:
+                values = hpvalues
+            hpids = values.valid_pixels
+            finite_values = values[hpids]
+            nside = values.nside_sparse
+            nest = True
+        except AttributeError:
+            order = "NEST" if nest else "RING"
+            values = np.copy(hpvalues)
+            values[np.isnan(values)] = hp.UNSEEN
+            values = hp.ud_grade(hpvalues, nside, order_in=order, order_out=order)
+            values[values == hp.UNSEEN] = np.nan
+            hpids = np.isfinite(values).nonzero()[0]
+            finite_values = values[hpids]
+
+        npix = len(hpids)
         npts = npix * 4 * bound_step
-        hpids = np.arange(npix)
-        hpix_bounds_vec = hp.boundaries(nside, hpids, bound_step)
+
+        hpix_bounds_vec = hp.boundaries(nside, hpids, bound_step, nest=nest)
         # Rearrange the axes to match what is used by hp.vec2ang
         hpix_bounds_vec_long = np.moveaxis(hpix_bounds_vec, 1, 2).reshape((npts, 3))
         ra, decl = hp.vec2ang(hpix_bounds_vec_long, lonlat=True)
-        center_ra, center_decl = hp.pix2ang(nside, hpids, lonlat=True)
+        center_ra, center_decl = hp.pix2ang(nside, hpids, nest=nest, lonlat=True)
         x_hz, y_hz = self.eq_to_horizon(ra, decl)
 
         xs, ys, zs = self.to_orth_zenith(
@@ -349,33 +369,28 @@ class SphereMap:
         hpix_data = hpix_corners.groupby("hpid").agg(lambda x: x.tolist())
         hpix_data["center_ra"] = center_ra
         hpix_data["center_decl"] = center_decl
-        hpix_data["value"] = values
-
-        values_are_finite = np.isfinite(values)
-        finite_hpix_data = hpix_data.loc[values_are_finite, :]
-        finite_hpids = hpids[values_are_finite]
-        finite_values = values[values_are_finite]
+        hpix_data["value"] = finite_values
 
         hpix = bokeh.models.ColumnDataSource(
             {
-                "hpid": finite_hpids,
+                "hpid": hpids,
                 "value": finite_values,
-                "center_ra": finite_hpix_data["center_ra"].tolist(),
-                "center_decl": finite_hpix_data["center_decl"].tolist(),
-                "ra": finite_hpix_data["ra"].tolist(),
-                "decl": finite_hpix_data["decl"].tolist(),
-                "x_hp": finite_hpix_data["x_hp"].tolist(),
-                "y_hp": finite_hpix_data["y_hp"].tolist(),
-                "z_hp": finite_hpix_data["z_hp"].tolist(),
-                "x_orth": finite_hpix_data["x_orth"].tolist(),
-                "y_orth": finite_hpix_data["y_orth"].tolist(),
-                "z_orth": finite_hpix_data["z_orth"].tolist(),
-                "x_laea": finite_hpix_data["x_laea"].tolist(),
-                "y_laea": finite_hpix_data["y_laea"].tolist(),
-                "x_moll": finite_hpix_data["x_moll"].tolist(),
-                "y_moll": finite_hpix_data["y_moll"].tolist(),
-                "x_hz": finite_hpix_data["x_hz"].tolist(),
-                "y_hz": finite_hpix_data["y_hz"].tolist(),
+                "center_ra": hpix_data["center_ra"].tolist(),
+                "center_decl": hpix_data["center_decl"].tolist(),
+                "ra": hpix_data["ra"].tolist(),
+                "decl": hpix_data["decl"].tolist(),
+                "x_hp": hpix_data["x_hp"].tolist(),
+                "y_hp": hpix_data["y_hp"].tolist(),
+                "z_hp": hpix_data["z_hp"].tolist(),
+                "x_orth": hpix_data["x_orth"].tolist(),
+                "y_orth": hpix_data["y_orth"].tolist(),
+                "z_orth": hpix_data["z_orth"].tolist(),
+                "x_laea": hpix_data["x_laea"].tolist(),
+                "y_laea": hpix_data["y_laea"].tolist(),
+                "x_moll": hpix_data["x_moll"].tolist(),
+                "y_moll": hpix_data["y_moll"].tolist(),
+                "x_hz": hpix_data["x_hz"].tolist(),
+                "y_hz": hpix_data["y_hz"].tolist(),
             }
         )
 
