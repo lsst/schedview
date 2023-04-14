@@ -4,7 +4,11 @@ import bokeh
 from astropy.time import Time
 
 import schedview.collect.scheduler_pickle
-from schedview.plot.SphereMap import Planisphere, ArmillarySphere
+from schedview.plot.SphereMap import (
+    Planisphere,
+    ArmillarySphere,
+    split_healpix_by_resolution,
+)
 from rubin_sim.scheduler.model_observatory.model_observatory import ModelObservatory
 import schedview.compute.astro
 from schedview.collect.stars import load_bright_stars
@@ -16,6 +20,8 @@ from rubin_sim.scheduler.schedulers import CoreScheduler  # noqa F401
 BAND_COLORS = dict(
     u="#56b4e9", g="#008060", r="#ff4000", i="#850000", z="#6600cc", y="#000000"
 )
+
+NSIDE_LOW = 8
 
 
 def plot_visit_skymaps(visits, footprint, conditions):
@@ -46,6 +52,7 @@ def plot_visit_skymaps(visits, footprint, conditions):
     _type_
         _description_
     """
+    nside_low = NSIDE_LOW
 
     band_sizes = {"u": 15, "g": 13, "r": 11, "i": 9, "z": 7, "y": 5}
 
@@ -56,9 +63,22 @@ def plot_visit_skymaps(visits, footprint, conditions):
     cmap = bokeh.transform.linear_cmap(
         "value", "Greys256", int(np.ceil(np.nanmax(footprint) * 2)), 0
     )
-    nside = hp.npix2nside(footprint.shape[0])
-    healpix_ds, cmap, glyph = asphere.add_healpix(footprint, nside=nside, cmap=cmap)
-    psphere.add_healpix(healpix_ds, nside=nside, cmap=cmap)
+
+    nside_high = hp.npix2nside(footprint.shape[0])
+    footprint_high, footprint_low = split_healpix_by_resolution(
+        footprint, nside_low, nside_high
+    )
+
+    healpix_high_ds, cmap, glyph = asphere.add_healpix(
+        footprint_high, nside=nside_high, cmap=cmap
+    )
+    psphere.add_healpix(healpix_high_ds, nside=nside_high, cmap=cmap)
+
+    healpix_low_ds, cmap, glyph = asphere.add_healpix(
+        footprint_low, nside=nside_low, cmap=cmap
+    )
+    psphere.add_healpix(healpix_low_ds, nside=nside_low, cmap=cmap)
+
     for band in "ugrizy":
         band_visits = visits.query(f"filter == '{band}'")
         if len(band_visits) < 1:

@@ -12,6 +12,11 @@ from astropy.coordinates import SkyCoord
 from astropy.time import Time
 import astropy.visualization
 
+try:
+    import healsparse
+except ModuleNotFoundError:
+    pass
+
 from rubin_sim.utils import Site
 from rubin_sim.utils import calc_lmst_last
 from rubin_sim.utils import alt_az_pa_from_ra_dec, ra_dec_from_alt_az
@@ -1657,3 +1662,61 @@ def make_zscale_linear_cmap(
         field_name, palette, scale_limits[0], scale_limits[1]
     )
     return cmap
+
+
+def split_healpix_by_resolution(hp_map, nside_low=8, nside_high=None):
+    """Split a healpix map into two at different resolutions.
+
+    Parameters
+    ----------
+
+    hp_map : `numpy.ndarray`
+        The original healpix map values.
+    nside_low : `int`
+        The healpix nside for the low-resolution map
+    nside_high : `int`
+        THe healpix nside for the high-resolution map
+
+    Returns
+    -------
+    hp_map_high : `numpy.ndarray` or `healsparse.HealSparseMap`
+        The high resolution healpixels. If an `ndarray`, other values
+        have a value of `healpy.UNSEEN`.
+    hp_map_low : `numpy.ndarray` or `healsparse.HealSparseMap`
+        The low resolution healpixels. If an `ndarray`, other values
+        have a value of `healpy.UNSEEN`.
+    """
+    if nside_high is None:
+        nside_high = hp.npix2nside(hp_map.shape[0])
+    else:
+        hp_map = hp.ud_grade(hp_map, nside_high)
+
+    hp_map_low = hp.ud_grade(hp_map, nside_low)
+    hp_map_rev = hp.ud_grade(hp_map_low, nside_high)
+
+    # 1 flags healpixels where the high resolution hpix value can be
+    # completely reconstructed from the low resolution one. In this case,
+    # that means all high resolution pixels within the low resolution
+    # one have the same value.
+    rev_matches_high = np.where(hp_map == hp_map_rev, 1, 0)
+    use_low_low = np.where(hp.ud_grade(rev_matches_high, nside_low) == 1, 1, 0)
+    use_low_high = np.where(hp.ud_grade(use_low_low, nside_high) == 1, 1, 0)
+
+    try:
+        hp_map_high = healsparse.HealSparseMap(
+            nside_coverage=nside_high,
+            healpix_map=hp.reorder(
+                np.where(use_low_high == 0, hp_map, hp.UNSEEN), r2n=True
+            ),
+        )
+        hp_map_low = healsparse.HealSparseMap(
+            nside_coverage=nside_low,
+            healpix_map=hp.reorder(
+                np.where(use_low_low == 1, hp_map_low, hp.UNSEEN), r2n=True
+            ),
+        )
+    except NameError:
+        hp_map_high = np.where(use_low_high == 0, hp_map, hp.UNSEEN)
+        hp_map_low = np.where(use_low_low == 1, hp_map_low, hp.UNSEEN)
+
+    return hp_map_high, hp_map_low
