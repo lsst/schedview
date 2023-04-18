@@ -818,7 +818,7 @@ class SphereMap:
         return circle
 
     def make_points(self, points_data):
-        """Create a bokes data source with locations of points on a sphere.
+        """Create a bokeh data source with locations of points on a sphere.
 
         Parameters
         ----------
@@ -1245,6 +1245,117 @@ class SphereMap:
 
         return data_source
 
+    def make_patches_data_source(self, patches_data):
+        """Create a bokeh data source with locations of points on a sphere.
+
+        All patches must have the same number of vertices.
+
+        Parameters
+        ----------
+        patches_data : `pandas.DataFrame`
+            Must contain the following columns or keys:
+
+            ``"ra"``
+                The Right Ascension in degrees.
+            ``"decl"``
+                The declination in degrees.
+
+        Returns
+        -------
+        point : `bokeh.models.ColumnDataSource`
+            A data source with point locations, including projected coords.
+        """
+
+        patches_df = pd.DataFrame(patches_data)
+        ra = np.stack(patches_data.ra.values)
+        decl = np.stack(patches_data.decl.values)
+        wide_shape = ra.shape
+
+        ra = ra.flatten()
+        decl = decl.flatten()
+
+        x0s, y0s, z0s = hp.ang2vec(ra, decl, lonlat=True).T
+        xs, ys, zs = self.to_orth_zenith(x0s, y0s, z0s)
+
+        x_laea, y_laea = self.laea_proj.ang2xy(ra, decl, lonlat=True)
+        x_moll, y_moll = self.moll_proj.ang2xy(ra, decl, lonlat=True)
+        x_hz, y_hz = self.eq_to_horizon(ra, decl, degrees=True, cart=True)
+        alt, az = self.eq_to_horizon(ra, decl, degrees=True, cart=False)
+        invisible = alt < -1 * np.finfo(float).resolution
+        x_hz[invisible] = np.nan
+        y_hz[invisible] = np.nan
+
+        data = {
+            "ra": ra.reshape(*wide_shape).tolist(),
+            "decl": decl.reshape(*wide_shape).tolist(),
+            "x_hp": x0s.reshape(*wide_shape).tolist(),
+            "y_hp": y0s.reshape(*wide_shape).tolist(),
+            "z_hp": z0s.reshape(*wide_shape).tolist(),
+            "x_orth": xs.reshape(*wide_shape).tolist(),
+            "y_orth": ys.reshape(*wide_shape).tolist(),
+            "z_orth": zs.reshape(*wide_shape).tolist(),
+            "x_laea": x_laea.reshape(*wide_shape).tolist(),
+            "y_laea": y_laea.reshape(*wide_shape).tolist(),
+            "x_moll": x_moll.reshape(*wide_shape).tolist(),
+            "y_moll": y_moll.reshape(*wide_shape).tolist(),
+            "x_hz": x_hz.reshape(*wide_shape).tolist(),
+            "y_hz": y_hz.reshape(*wide_shape).tolist(),
+        }
+
+        # Add any additional data provided
+        for column_name in patches_df.columns:
+            if column_name not in data.keys():
+                data[column_name] = patches_df[column_name].to_list()
+
+        points = bokeh.models.ColumnDataSource(data=data)
+
+        return points
+
+    def add_patches(
+        self,
+        patches_data=None,
+        name="anonymous",
+        data_source=None,
+        patches_kwargs={},
+    ):
+        """Add one or more patches to the map.
+
+        Parameters
+        ----------
+        patches_data : `pandas.DataSource`
+            Source of data.
+        name : `str` or `Iterable` , optional
+            Name for the thing marked, by default "anonymous"
+        glyph_size : `int` or `Iterable`, optional
+            Size of the marker, by default 5
+        min_mjd : `float` or `Iterable`, optional
+            Earliest time for which to show the marker.
+        max_mjd : `float` or `Iterable`, optional
+            Latest time for which to show the marker.
+        data_source : `bokeh.models.ColumnDataSource`, optional
+            Data source for the marker, None if a new one is to be generated.
+            By default, None
+        patches_kwargs : dict, optional
+            Keywords to be passed to ``bokeh.plotting.figure.Figure.circle``,
+            by default {}
+
+        Returns
+        -------
+        data_source : `bokeh.models.ColumnDataSource`
+            A data source with marker locations, including projected coords.
+        """
+        if data_source is None:
+            data_source = self.make_patches_data_source(patches_data)
+
+        self.plot.patches(
+            xs=self.x_col,
+            ys=self.y_col,
+            source=data_source,
+            **patches_kwargs,
+        )
+
+        return data_source
+
     def add_stars(
         self, points_data, data_source=None, mag_limit_slider=False, star_kwargs={}
     ):
@@ -1489,10 +1600,15 @@ class MovingSphereMap(SphereMap):
         data_source : `bokeh.models.ColumnDataSource`
             The bokeh data source with points defining star locations.
         """
+        data_source_provided = data_source is not None
+
         data_source = super().add_stars(
             points_data, data_source, mag_limit_slider, star_kwargs
         )
-        self.set_js_update_func(data_source)
+
+        if not data_source_provided:
+            self.set_js_update_func(data_source)
+
         return data_source
 
     def add_marker(
@@ -1534,6 +1650,8 @@ class MovingSphereMap(SphereMap):
         data_source : `bokeh.models.ColumnDataSource`
             A data source with marker locations, including projected coords.
         """
+        data_source_provided = data_source is not None
+
         data_source = super().add_marker(
             ra,
             decl,
@@ -1544,7 +1662,56 @@ class MovingSphereMap(SphereMap):
             data_source=data_source,
             circle_kwargs=circle_kwargs,
         )
-        self.set_js_update_func(data_source)
+
+        if not data_source_provided:
+            self.set_js_update_func(data_source)
+        return data_source
+
+    def add_patches(
+        self,
+        patches_data=None,
+        name="anonymous",
+        data_source=None,
+        patches_kwargs={},
+    ):
+        """Add one or more patches to the map.
+
+        Parameters
+        ----------
+        patches_data : `pandas.DataSource`
+            Source of data.
+        name : `str` or `Iterable` , optional
+            Name for the thing marked, by default "anonymous"
+        glyph_size : `int` or `Iterable`, optional
+            Size of the marker, by default 5
+        min_mjd : `float` or `Iterable`, optional
+            Earliest time for which to show the marker.
+        max_mjd : `float` or `Iterable`, optional
+            Latest time for which to show the marker.
+        data_source : `bokeh.models.ColumnDataSource`, optional
+            Data source for the marker, None if a new one is to be generated.
+            By default, None
+        patches_kwargs : dict, optional
+            Keywords to be passed to ``bokeh.plotting.figure.Figure.circle``,
+            by default {}
+
+        Returns
+        -------
+        data_source : `bokeh.models.ColumnDataSource`
+            A data source with marker locations, including projected coords.
+        """
+        data_source_provided = data_source is not None
+
+        data_source = super().add_patches(
+            patches_data=patches_data,
+            name=name,
+            data_source=data_source,
+            patches_kwargs=patches_kwargs,
+        )
+
+        if not data_source_provided:
+            self.set_js_update_func(data_source)
+
         return data_source
 
 

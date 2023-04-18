@@ -1,6 +1,7 @@
 import numpy as np
 import healpy as hp
 import bokeh
+import pandas as pd
 from astropy.time import Time
 
 import schedview.collect.scheduler_pickle
@@ -9,6 +10,7 @@ from schedview.plot.SphereMap import (
     ArmillarySphere,
     split_healpix_by_resolution,
 )
+from schedview.compute.camera import LsstCameraFootprintPerimeter
 from rubin_sim.scheduler.model_observatory.model_observatory import ModelObservatory
 import schedview.compute.astro
 from schedview.collect.stars import load_bright_stars
@@ -18,13 +20,30 @@ from rubin_sim.scheduler.model_observatory import ModelObservatory  # noqa F401
 from rubin_sim.scheduler.schedulers import CoreScheduler  # noqa F401
 
 BAND_COLORS = dict(
-    u="#56b4e9", g="#008060", r="#ff4000", i="#850000", z="#6600cc", y="#000000"
+    u="#56b4e9", g="#008060", r="#ff4000", i="#850000", z="#6600cc", y="#222222"
 )
+BAND_HATCH_PATTERNS = dict(
+    u="dot",
+    g="ring",
+    r="horizontal_line",
+    i="vertical_line",
+    z="right_diagonal_line",
+    y="left_diagonal_line",
+)
+BAND_HATCH_SCALES = dict(u=6, g=6, r=6, i=6, z=12, y=12)
 
 NSIDE_LOW = 8
 
 
-def plot_visit_skymaps(visits, footprint, conditions):
+def plot_visit_skymaps(
+    visits,
+    footprint,
+    conditions,
+    hatch=False,
+    fade_scale=2.0 / (24 * 60),
+    camera_perimeter="LSST",
+    nside_low=8,
+):
     """Plot visits on a map of the sky.
 
     Parameters
@@ -46,15 +65,28 @@ def plot_visit_skymaps(visits, footprint, conditions):
     conditions : `rubin_sim.scheduler.features.conditions.Conditions`
         The conditions for the night, which determines the start and end
         times covered by the map.
+    hatch : `bool`
+        Use hatches instead of filling visit polygons. (SLOW!)
+    fade_scale : `float`
+        Time (in days) over which visit outlines fade.
+    camera_perimeter : `str` or `object`
+        An function that returns the perimeter of the camera footprint,
+        or "LSST" for the LSST camera footprint.
+        Defaults to "LSST".
+    nside_low : `int`
+        The healpix nside to try to use for low resolution sections of the
+        healpix map.
 
     Returns
     -------
     _type_
         _description_
     """
-    nside_low = NSIDE_LOW
 
-    band_sizes = {"u": 15, "g": 13, "r": 11, "i": 9, "z": 7, "y": 5}
+    if camera_perimeter == "LSST":
+        camera_perimeter = LsstCameraFootprintPerimeter()
+
+    nside_low = NSIDE_LOW
 
     psphere = Planisphere(mjd=conditions.mjd)
 
@@ -84,39 +116,55 @@ def plot_visit_skymaps(visits, footprint, conditions):
         if len(band_visits) < 1:
             continue
 
-        visit_ds = asphere.add_marker(
-            ra=band_visits.fieldRA,
-            decl=band_visits.fieldDec,
-            glyph_size=band_sizes[band],
-            name=band_visits.index.values,
-            min_mjd=band_visits.observationStartMJD.values,
-            circle_kwargs={
-                "fill_alpha": "in_mjd_window",
-                "fill_color": BAND_COLORS[band],
-                "line_alpha": 0,
-            },
+        ras, decls = camera_perimeter(
+            band_visits.fieldRA, band_visits.fieldDec, band_visits.rotSkyPos
         )
-        psphere.add_marker(
-            data_source=visit_ds,
-            glyph_size=band_sizes[band],
-            name=band_visits.index.values,
-            min_mjd=band_visits.observationStartMJD.values,
-            circle_kwargs={
-                "fill_alpha": "in_mjd_window",
-                "fill_color": BAND_COLORS[band],
-                "line_alpha": 0,
-            },
+
+        mjd_start = band_visits.observationStartMJD.values
+        current_mjd = conditions.sun_n12_setting
+        perimeter_df = pd.DataFrame(
+            {
+                "ra": ras,
+                "decl": decls,
+                "min_mjd": band_visits.observationStartMJD.values,
+                "in_mjd_window": [0.3] * len(ras),
+                "fade_scale": [fade_scale] * len(ras),
+                "recent_mjd": np.clip((current_mjd - mjd_start) / fade_scale, 0, 1),
+            }
         )
+        patches_kwargs = dict(
+            line_alpha="recent_mjd", line_color="#ff00ff", line_width=2
+        )
+
+        if hatch:
+            patches_kwargs.update(
+                dict(
+                    fill_alpha=0,
+                    fill_color=None,
+                    hatch_alpha="in_mjd_window",
+                    hatch_color=BAND_COLORS[band],
+                    hatch_pattern=BAND_HATCH_PATTERNS[band],
+                    hatch_scale=BAND_HATCH_SCALES[band],
+                )
+            )
+        else:
+            patches_kwargs.update(
+                dict(
+                    fill_alpha="in_mjd_window",
+                    fill_color=BAND_COLORS[band],
+                )
+            )
+
+        visit_ds = asphere.add_patches(
+            perimeter_df,
+            patches_kwargs=patches_kwargs,
+        )
+
+        psphere.add_patches(data_source=visit_ds, patches_kwargs=patches_kwargs)
+
     asphere.decorate()
     psphere.decorate()
-    horizon_ds = asphere.add_horizon()
-    psphere.add_horizon(data_source=horizon_ds)
-    horizon70_ds = asphere.add_horizon(
-        zd=70, line_kwargs={"color": "red", "line_width": 2}
-    )
-    psphere.add_horizon(
-        data_source=horizon70_ds, line_kwargs={"color": "red", "line_width": 2}
-    )
+
     sun_ds = asphere.add_marker(
         ra=np.degrees(conditions.sun_ra),
         decl=np.degrees(conditions.sun_dec),
@@ -149,14 +197,23 @@ def plot_visit_skymaps(visits, footprint, conditions):
     star_data["glyph_size"] = 15 - (15.0 / 3.5) * star_data["Vmag"]
     star_data.query("glyph_size>0", inplace=True)
     star_ds = psphere.add_stars(
-        star_data, mag_limit_slider=True, star_kwargs={"color": "black"}
+        star_data, mag_limit_slider=True, star_kwargs={"color": "yellow"}
     )
 
     asphere.add_stars(
         star_data,
         data_source=star_ds,
         mag_limit_slider=False,
-        star_kwargs={"color": "black"},
+        star_kwargs={"color": "yellow"},
+    )
+
+    horizon_ds = asphere.add_horizon()
+    psphere.add_horizon(data_source=horizon_ds)
+    horizon70_ds = asphere.add_horizon(
+        zd=70, line_kwargs={"color": "red", "line_width": 2}
+    )
+    psphere.add_horizon(
+        data_source=horizon70_ds, line_kwargs={"color": "red", "line_width": 2}
     )
 
     asphere.sliders["mjd"].start = conditions.sun_n12_setting

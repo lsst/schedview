@@ -1,7 +1,7 @@
 function get_gpu() {
     try {
         return gpu;
-    } catch(e) {
+    } catch (e) {
         return new GPU();
     }
 }
@@ -431,7 +431,7 @@ function updateData() {
 
     if ('in_mjd_window' in data) {
         for (let i = 0; i < data['x_hp'].length; i++) {
-            data['in_mjd_window'][i] = 1.0
+            data['in_mjd_window'][i] = 0.3
             if ('min_mjd' in data) {
                 if (mjd < data['min_mjd'][i]) {
                     data['in_mjd_window'][i] = 0.0
@@ -444,6 +444,17 @@ function updateData() {
             }
         }
     }
+
+    if (('recent_mjd' in data) && ('min_mjd' in data)) {
+        for (let i = 0; i < data['x_hp'].length; i++) {
+            let recent_mjd = 1.0 - (mjd - data['min_mjd'][i]) / data['fade_scale'][i]
+            if ((recent_mjd < 0) || (recent_mjd > 1)) {
+                recent_mjd = 0.0
+            }
+            data['recent_mjd'][i] = recent_mjd
+        }
+    }
+
 }
 
 updateData()
