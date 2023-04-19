@@ -5,7 +5,7 @@ import pandas as pd
 from astropy.time import Time
 
 import schedview.collect.scheduler_pickle
-from schedview.plot.SphereMap import (
+from schedview.plot.spheremap import (
     Planisphere,
     ArmillarySphere,
     split_healpix_by_resolution,
@@ -43,6 +43,7 @@ def plot_visit_skymaps(
     fade_scale=2.0 / (24 * 60),
     camera_perimeter="LSST",
     nside_low=8,
+    show_stars=False,
 ):
     """Plot visits on a map of the sky.
 
@@ -76,6 +77,8 @@ def plot_visit_skymaps(
     nside_low : `int`
         The healpix nside to try to use for low resolution sections of the
         healpix map.
+    show_stars : `bool`
+        Show stars? (Defaults to False)
 
     Returns
     -------
@@ -193,19 +196,20 @@ def plot_visit_skymaps(
         circle_kwargs={"color": "orange", "fill_alpha": 0.8},
     )
 
-    star_data = load_bright_stars().loc[:, ["name", "ra", "decl", "Vmag"]]
-    star_data["glyph_size"] = 15 - (15.0 / 3.5) * star_data["Vmag"]
-    star_data.query("glyph_size>0", inplace=True)
-    star_ds = psphere.add_stars(
-        star_data, mag_limit_slider=True, star_kwargs={"color": "yellow"}
-    )
+    if show_stars:
+        star_data = load_bright_stars().loc[:, ["name", "ra", "decl", "Vmag"]]
+        star_data["glyph_size"] = 15 - (15.0 / 3.5) * star_data["Vmag"]
+        star_data.query("glyph_size>0", inplace=True)
+        star_ds = asphere.add_stars(
+            star_data, mag_limit_slider=False, star_kwargs={"color": "yellow"}
+        )
 
-    asphere.add_stars(
-        star_data,
-        data_source=star_ds,
-        mag_limit_slider=False,
-        star_kwargs={"color": "yellow"},
-    )
+        psphere.add_stars(
+            star_data,
+            data_source=star_ds,
+            mag_limit_slider=True,
+            star_kwargs={"color": "yellow"},
+        )
 
     horizon_ds = asphere.add_horizon()
     psphere.add_horizon(data_source=horizon_ds)
@@ -226,8 +230,184 @@ def plot_visit_skymaps(
     return fig
 
 
+def plot_visit_planisphere(
+    visits,
+    footprint,
+    conditions,
+    hatch=False,
+    fade_scale=2.0 / (24 * 60),
+    camera_perimeter="LSST",
+    nside_low=8,
+    show_stars=False,
+):
+    """Plot visits on a map of the sky.
+
+    Parameters
+    ----------
+    visits : `pandas.DataFrame`
+        One row per visit, with at least the following columns:
+
+        ``"fieldRA"``
+            The visit R.A. in degrees (`float`).
+        ``"fieldDec"``
+            The visit declination in degrees (`float`).
+        ``"observationStartMJD"``
+            The visit start MJD (`float`).
+        ``"filter"``
+            The visit filter (`str`)
+
+    footprint : `numpy.array`
+        A healpix map of the footprint.
+    conditions : `rubin_sim.scheduler.features.conditions.Conditions`
+        The conditions for the night, which determines the start and end
+        times covered by the map.
+    hatch : `bool`
+        Use hatches instead of filling visit polygons. (SLOW!)
+    fade_scale : `float`
+        Time (in days) over which visit outlines fade.
+    camera_perimeter : `str` or `object`
+        An function that returns the perimeter of the camera footprint,
+        or "LSST" for the LSST camera footprint.
+        Defaults to "LSST".
+    nside_low : `int`
+        The healpix nside to try to use for low resolution sections of the
+        healpix map.
+    show_stars : `bool`
+        Show stars? (Defaults to False)
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+
+    if camera_perimeter == "LSST":
+        camera_perimeter = LsstCameraFootprintPerimeter()
+
+    nside_low = NSIDE_LOW
+
+    plot = bokeh.plotting.figure(
+        plot_width=1024,
+        plot_height=1024,
+        match_aspect=True,
+        title="Visits",
+    )
+    psphere = Planisphere(mjd=conditions.mjd, plot=plot)
+    psphere.add_mjd_slider()
+
+    cmap = bokeh.transform.linear_cmap(
+        "value", "Greys256", int(np.ceil(np.nanmax(footprint) * 2)), 0
+    )
+
+    nside_high = hp.npix2nside(footprint.shape[0])
+    footprint_high, footprint_low = split_healpix_by_resolution(
+        footprint, nside_low, nside_high
+    )
+
+    healpix_high_ds, cmap, glyph = psphere.add_healpix(
+        footprint_high, nside=nside_high, cmap=cmap
+    )
+
+    healpix_low_ds, cmap, glyph = psphere.add_healpix(
+        footprint_low, nside=nside_low, cmap=cmap
+    )
+
+    for band in "ugrizy":
+        band_visits = visits.query(f"filter == '{band}'")
+        if len(band_visits) < 1:
+            continue
+
+        ras, decls = camera_perimeter(
+            band_visits.fieldRA, band_visits.fieldDec, band_visits.rotSkyPos
+        )
+
+        mjd_start = band_visits.observationStartMJD.values
+        current_mjd = conditions.sun_n12_setting
+        perimeter_df = pd.DataFrame(
+            {
+                "ra": ras,
+                "decl": decls,
+                "min_mjd": band_visits.observationStartMJD.values,
+                "in_mjd_window": [0.3] * len(ras),
+                "fade_scale": [fade_scale] * len(ras),
+                "recent_mjd": np.clip((current_mjd - mjd_start) / fade_scale, 0, 1),
+            }
+        )
+        patches_kwargs = dict(
+            line_alpha="recent_mjd", line_color="#ff00ff", line_width=2
+        )
+
+        if hatch:
+            patches_kwargs.update(
+                dict(
+                    fill_alpha=0,
+                    fill_color=None,
+                    hatch_alpha="in_mjd_window",
+                    hatch_color=BAND_COLORS[band],
+                    hatch_pattern=BAND_HATCH_PATTERNS[band],
+                    hatch_scale=BAND_HATCH_SCALES[band],
+                )
+            )
+        else:
+            patches_kwargs.update(
+                dict(
+                    fill_alpha="in_mjd_window",
+                    fill_color=BAND_COLORS[band],
+                )
+            )
+
+        visit_ds = psphere.add_patches(
+            perimeter_df,
+            patches_kwargs=patches_kwargs,
+        )
+
+        psphere.set_js_update_func(visit_ds)
+
+    psphere.decorate()
+
+    psphere.add_marker(
+        ra=np.degrees(conditions.sun_ra),
+        decl=np.degrees(conditions.sun_dec),
+        name="Sun",
+        glyph_size=15,
+        circle_kwargs={"color": "yellow", "fill_alpha": 1},
+    )
+
+    psphere.add_marker(
+        ra=np.degrees(conditions.moon_ra),
+        decl=np.degrees(conditions.moon_dec),
+        name="Moon",
+        glyph_size=15,
+        circle_kwargs={"color": "orange", "fill_alpha": 0.8},
+    )
+
+    if show_stars:
+        star_data = load_bright_stars().loc[:, ["name", "ra", "decl", "Vmag"]]
+        star_data["glyph_size"] = 15 - (15.0 / 3.5) * star_data["Vmag"]
+        star_data.query("glyph_size>0", inplace=True)
+        psphere.add_stars(
+            star_data, mag_limit_slider=False, star_kwargs={"color": "yellow"}
+        )
+
+    psphere.add_horizon()
+    psphere.add_horizon(zd=70, line_kwargs={"color": "red", "line_width": 2})
+
+    psphere.sliders["mjd"].start = conditions.sun_n12_setting
+    psphere.sliders["mjd"].end = conditions.sun_n12_rising
+
+    fig = bokeh.layouts.row(
+        psphere.figure,
+    )
+    return fig
+
+
 def create_visit_skymaps(
-    visits, scheduler, night_date, observatory=None, timezone="Chile/Continental"
+    visits,
+    scheduler,
+    night_date,
+    observatory=None,
+    timezone="Chile/Continental",
+    planisphere_only=False,
 ):
     """Create a map of visits on the sky.
 
@@ -258,6 +438,8 @@ def create_visit_skymaps(
         By default None.
     timezone : `str`, optional
         by default "Chile/Continental"
+    planisphere_only : `bool`
+        by default False
 
     Returns
     -------
@@ -295,5 +477,9 @@ def create_visit_skymaps(
     observatory.mjd = end_time.mjd
     conditions = observatory.return_conditions()
     data = {"visits": visits, "footprint": footprint, "conditions": conditions}
-    vmap = schedview.plot.visitmap.plot_visit_skymaps(**data)
+    if planisphere_only:
+        vmap = schedview.plot.visitmap.plot_visit_planisphere(**data)
+    else:
+        vmap = schedview.plot.visitmap.plot_visit_skymaps(**data)
+
     return vmap, data

@@ -399,6 +399,8 @@ class SphereMap:
             }
         )
 
+        self._finish_data_source(hpix)
+
         return hpix
 
     def make_graticule_points(
@@ -573,6 +575,8 @@ class SphereMap:
             graticule_list.append(stop_df)
 
         graticule_points = bokeh.models.ColumnDataSource(pd.concat(graticule_list))
+
+        self._finish_data_source(graticule_points)
         return graticule_points
 
     def make_horizon_graticule_points(
@@ -761,6 +765,7 @@ class SphereMap:
             }
         )
 
+        self._finish_data_source(circle)
         return circle
 
     def make_horizon_circle_points(
@@ -896,6 +901,7 @@ class SphereMap:
 
         points = bokeh.models.ColumnDataSource(data=data)
 
+        self._finish_data_source(points)
         return points
 
     def make_marker_data_source(
@@ -981,6 +987,7 @@ class SphereMap:
 
         data_source = self.make_points(data)
 
+        self._finish_data_source(data_source)
         return data_source
 
     def add_sliders(self):
@@ -1309,6 +1316,7 @@ class SphereMap:
 
         points = bokeh.models.ColumnDataSource(data=data)
 
+        self._finish_data_source(points)
         return points
 
     def add_patches(
@@ -1480,6 +1488,9 @@ class SphereMap:
         self.add_ecliptic()
         self.add_galactic_plane()
 
+    def _finish_data_source(self, data_source):
+        pass
+
 
 class Planisphere(SphereMap):
     x_col = "x_laea"
@@ -1494,225 +1505,8 @@ class MollweideMap(SphereMap):
 
 
 class MovingSphereMap(SphereMap):
-    def add_healpix(self, data, cmap=None, nside=16, bound_step=1):
-        """Add healpix values to the map
-
-        Parameters
-        ----------
-        data : `numpy.ndarray`
-            Healpixel values (RING pixel ordering)
-        cmap : `bokeh.core.properties.ColorSpec`, optional
-            _description_, by default None
-        nside : `int`, optional
-            Healpix nside to use for display, by default 16
-        bound_step : `int`, optional
-            number of boundary points for each side of each healpixel,
-            by default 1
-
-        Returns
-        -------
-        data_sounce : `bokeh.models.ColumnDataSource`
-            The data source with the healpix values and bounds.
-        cmap : `bokeh.core.properties.ColorSpec`
-            The color map used
-        hp_glype : `bokeh.models.glyphs.Patches`
-            The bokeh glyphs for the plotted patches.
-        """
-        data_source, cmap, hp_glyph = super().add_healpix(data, cmap, nside, bound_step)
+    def _finish_data_source(self, data_source):
         self.set_js_update_func(data_source)
-        return data_source, cmap, hp_glyph
-
-    def add_graticules(self, graticule_kwargs={}, line_kwargs={}):
-        """Add graticules to the map
-
-        Parameters
-        ----------
-        graticule_kwargs : dict, optional
-            Keywords to be passed to ``SphereMap.make_graticule_points``,
-            by default {}
-        line_kwargs : dict, optional
-            Keywords to be passed to ``bokeh.plotting.figure.Figure.line``,
-            by default {}
-
-        Returns
-        -------
-        graticules : ` `bokeh.models.ColumnDataSource`
-            The bokeh data source with points defining the graticules.
-        """
-        data_source = super().add_graticules(graticule_kwargs, line_kwargs)
-        self.set_js_update_func(data_source)
-        return data_source
-
-    def add_circle(self, center_ra, center_decl, circle_kwargs={}, line_kwargs={}):
-        """Draw a circle on the map.
-
-        Parameters
-        ----------
-        center_ra : `float`
-            R.A. of the center of the circle (deg.)
-        center_decl : `float`
-            Decl. of the center of the circle (deg.)
-        circle_kwargs : dict, optional
-            Keywords to be passed to ``SphereMap.make_circle_points``,
-            by default {}
-        line_kwargs : dict, optional
-            Keywords to be passed to ``bokeh.plotting.figure.Figure.line``,
-            by default {}
-
-        Returns
-        -------
-        circle_points : `bokeh.models.ColumnDataSource`
-            The bokeh data source with points defining the circle.
-        """
-        data_source = super().add_circle(
-            center_ra, center_decl, circle_kwargs, line_kwargs
-        )
-        self.set_js_update_func(data_source)
-        return data_source
-
-    def add_stars(
-        self, points_data, data_source=None, mag_limit_slider=False, star_kwargs={}
-    ):
-        """Add stars to the map
-
-        Parameters
-        ----------
-        points_data : `Iterable` , `dict` , or `pandas.DataFrame`
-            A source of data (anything that can be passed to
-            `pandas.DataFrame`)
-            Must contain the following columns or keys:
-
-            ``"ra"``
-                The Right Ascension in degrees.
-            ``"decl"``
-                The declination in degrees.
-        data_source : `bokeh.models.ColumnDataSource`, optional
-            The bokeh data source to use (None to generate a new one).
-            By default, None.
-        mag_limit_slider : `bool` , optional
-            Generate a slider limiting the magnitude of stars to plot,
-            by default False
-        star_kwargs : `dict` , optional
-            _description_, by default {}
-
-        Returns
-        -------
-        data_source : `bokeh.models.ColumnDataSource`
-            The bokeh data source with points defining star locations.
-        """
-        data_source_provided = data_source is not None
-
-        data_source = super().add_stars(
-            points_data, data_source, mag_limit_slider, star_kwargs
-        )
-
-        if not data_source_provided:
-            self.set_js_update_func(data_source)
-
-        return data_source
-
-    def add_marker(
-        self,
-        ra=None,
-        decl=None,
-        name="anonymous",
-        glyph_size=5,
-        min_mjd=None,
-        max_mjd=None,
-        data_source=None,
-        circle_kwargs={},
-    ):
-        """Add one or more circular marker(s) to the map.
-
-        Parameters
-        ----------
-        ra : `float` or `Iterable`, optional
-            R.A. of the marker (deg.), by default None
-        decl : `float` or `Iterable`, optional
-            Declination of the marker (deg.), by default None
-        name : `str` or `Iterable` , optional
-            Name for the thing marked, by default "anonymous"
-        glyph_size : `int` or `Iterable`, optional
-            Size of the marker, by default 5
-        min_mjd : `float` or `Iterable`, optional
-            Earliest time for which to show the marker.
-        max_mjd : `float` or `Iterable`, optional
-            Latest time for which to show the marker.
-        data_source : `bokeh.models.ColumnDataSource`, optional
-            Data source for the marker, None if a new one is to be generated.
-            By default, None
-        circle_kwargs : dict, optional
-            Keywords to be passed to ``bokeh.plotting.figure.Figure.circle``,
-            by default {}
-
-        Returns
-        -------
-        data_source : `bokeh.models.ColumnDataSource`
-            A data source with marker locations, including projected coords.
-        """
-        data_source_provided = data_source is not None
-
-        data_source = super().add_marker(
-            ra,
-            decl,
-            name,
-            glyph_size,
-            min_mjd,
-            max_mjd,
-            data_source=data_source,
-            circle_kwargs=circle_kwargs,
-        )
-
-        if not data_source_provided:
-            self.set_js_update_func(data_source)
-        return data_source
-
-    def add_patches(
-        self,
-        patches_data=None,
-        name="anonymous",
-        data_source=None,
-        patches_kwargs={},
-    ):
-        """Add one or more patches to the map.
-
-        Parameters
-        ----------
-        patches_data : `pandas.DataSource`
-            Source of data.
-        name : `str` or `Iterable` , optional
-            Name for the thing marked, by default "anonymous"
-        glyph_size : `int` or `Iterable`, optional
-            Size of the marker, by default 5
-        min_mjd : `float` or `Iterable`, optional
-            Earliest time for which to show the marker.
-        max_mjd : `float` or `Iterable`, optional
-            Latest time for which to show the marker.
-        data_source : `bokeh.models.ColumnDataSource`, optional
-            Data source for the marker, None if a new one is to be generated.
-            By default, None
-        patches_kwargs : dict, optional
-            Keywords to be passed to ``bokeh.plotting.figure.Figure.circle``,
-            by default {}
-
-        Returns
-        -------
-        data_source : `bokeh.models.ColumnDataSource`
-            A data source with marker locations, including projected coords.
-        """
-        data_source_provided = data_source is not None
-
-        data_source = super().add_patches(
-            patches_data=patches_data,
-            name=name,
-            data_source=data_source,
-            patches_kwargs=patches_kwargs,
-        )
-
-        if not data_source_provided:
-            self.set_js_update_func(data_source)
-
-        return data_source
 
 
 class HorizonMap(MovingSphereMap):

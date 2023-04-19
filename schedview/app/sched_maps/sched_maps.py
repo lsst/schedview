@@ -5,7 +5,7 @@ import pandas as pd
 import bokeh.models
 import bokeh.core.properties
 
-from schedview.plot.SphereMap import (
+from schedview.plot.spheremap import (
     ArmillarySphere,
     HorizonMap,
     Planisphere,

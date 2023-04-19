@@ -2,7 +2,7 @@ import bokeh.plotting
 
 from rubin_sim import maf
 
-from schedview.plot.SphereMap import ArmillarySphere, Planisphere, MollweideMap
+from schedview.plot.spheremap import ArmillarySphere, Planisphere, MollweideMap
 from schedview.collect.stars import load_bright_stars
 from schedview.collect import get_metric_path
 

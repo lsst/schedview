@@ -24,7 +24,7 @@ import rubin_sim.scheduler.surveys
 import rubin_sim.scheduler.basis_functions
 import rubin_sim.scheduler.example
 
-from schedview.plot.SphereMap import (
+from schedview.plot.spheremap import (
     ArmillarySphere,
     HorizonMap,
     Planisphere,
