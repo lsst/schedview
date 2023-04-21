@@ -675,6 +675,7 @@ class SphereMap:
             graticule_list.append(stop_df)
 
         graticule_points = bokeh.models.ColumnDataSource(pd.concat(graticule_list))
+        self._finish_data_source(graticule_points)
         return graticule_points
 
     def make_circle_points(
@@ -1526,6 +1527,8 @@ class HorizonMap(MovingSphereMap):
         update_func = bokeh.models.CustomJS(
             args=dict(
                 data_source=data_source,
+                center_alt_slider=90,
+                center_az_slider=0,
                 mjd_slider=self.sliders["mjd"],
                 lat=self.site.latitude,
                 lon=self.site.longitude,
