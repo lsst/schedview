@@ -473,7 +473,7 @@ def create_visit_skymaps(
     if observatory is None:
         observatory = ModelObservatory(nside=scheduler.nside)
 
-    footprint = schedview.collect.footprint.get_greedy_footprint(scheduler)
+    footprint = schedview.collect.footprint.get_footprint(scheduler)
     observatory.mjd = end_time.mjd
     conditions = observatory.return_conditions()
     data = {"visits": visits, "footprint": footprint, "conditions": conditions}

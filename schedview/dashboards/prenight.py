@@ -88,7 +88,7 @@ def prenight_panel(
     )
 
     # Visit map
-    footprint = schedview.collect.footprint.get_greedy_footprint(scheduler)
+    footprint = schedview.collect.footprint.get_footprint(scheduler)
     observatory.mjd = night_middle.mjd
     conditions = observatory.return_conditions()
     vmap = schedview.plot.visitmap.plot_visit_skymaps(new_visits, footprint, conditions)
