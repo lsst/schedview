@@ -149,7 +149,7 @@ def plot_rewards(
     )
 
     for survey_label, color in zip(tier_value_df.index.unique(), colors):
-        this_survey_reward_df = tier_value_df.loc[survey_label, :]
+        this_survey_reward_df = tier_value_df.loc[[survey_label], :]
 
         survey_reward_ds = bokeh.models.ColumnDataSource(this_survey_reward_df)
         plot.scatter(
