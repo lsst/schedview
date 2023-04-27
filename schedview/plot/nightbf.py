@@ -171,7 +171,13 @@ def plot_rewards(
             fill_mjds = set(this_survey_reward_df["queue_fill_mjd_ns"])
             fill_obs_mjds = obs_rewards.reset_index().set_index("queue_fill_mjd_ns")
             for fill_mjd in fill_mjds:
-                obs_mjds = fill_obs_mjds.loc[fill_mjd, "mjd"]
+                try:
+                    obs_mjds = fill_obs_mjds.loc[fill_mjd, "mjd"]
+                except KeyError:
+                    # The scheduler was called, but no visits chosen by the
+                    # call were observed.
+                    continue
+
                 reward = this_survey_reward_df.query(f"queue_fill_mjd_ns=={fill_mjd}")[
                     y_column
                 ][0]
