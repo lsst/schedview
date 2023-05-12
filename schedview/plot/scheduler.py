@@ -898,7 +898,7 @@ class SchedulerDisplay:
             except KeyError:
                 reward_df["doc_url"] = None
                 basis_function_formatter = bokeh.models.widgets.HTMLTemplateFormatter(
-                    template='Not a basis real function'
+                    template="Not a basis real function"
                 )
 
             for col in [
