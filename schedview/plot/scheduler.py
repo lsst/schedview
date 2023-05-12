@@ -1034,6 +1034,9 @@ class SchedulerDisplay:
             reward = (
                 infeasible_bf if infeasible else survey_bfs.max_accum_reward.iloc[-1]
             )
+            if reward in (None, "N/A", "None"):
+                reward = "Infeasible" if infeasible else "Feasible"
+
             survey_row = pd.Series({"reward": reward, "infeasible": infeasible})
             return survey_row
 
