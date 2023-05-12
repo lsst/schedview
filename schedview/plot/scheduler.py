@@ -887,13 +887,19 @@ class SchedulerDisplay:
                     url = None
                 return url
 
-            reward_df["doc_url"] = reward_df["basis_function_class"].map(
-                _guess_basis_function_doc_url
-            )
+            try:
+                reward_df["doc_url"] = reward_df["basis_function_class"].map(
+                    _guess_basis_function_doc_url
+                )
 
-            basis_function_formatter = bokeh.models.widgets.HTMLTemplateFormatter(
-                template='<a href="<%= doc_url %>" target="_blank"><%= value %></a>'
-            )
+                basis_function_formatter = bokeh.models.widgets.HTMLTemplateFormatter(
+                    template='<a href="<%= doc_url %>" target="_blank"><%= value %></a>'
+                )
+            except KeyError:
+                reward_df["doc_url"] = None
+                basis_function_formatter = bokeh.models.widgets.HTMLTemplateFormatter(
+                    template='Not a basis real function'
+                )
 
             for col in [
                 "max_basis_reward",
