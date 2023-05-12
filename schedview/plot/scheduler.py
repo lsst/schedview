@@ -887,7 +887,7 @@ class SchedulerDisplay:
                     url = None
                 return url
 
-            reward_df["doc_url"] = reward_df["basis_function"].map(
+            reward_df["doc_url"] = reward_df["basis_function_class"].map(
                 _guess_basis_function_doc_url
             )
 
