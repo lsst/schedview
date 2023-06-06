@@ -58,11 +58,11 @@ def plot_rewards(
         basis functions in the tier.
     plot_kwards : `dict`
         A dictionary of keyword parameters passed to
-        `bokeh.plotting.Figure`.
+        `bokeh.plotting.figure`.
 
     Returns
     -------
-    app : `bokeh.plotting.Figure`
+    app : `bokeh.plotting.figure`
         The figure itself.
     """
 
@@ -81,7 +81,7 @@ def plot_rewards(
     survey_labels = tier_reward_df.index.unique()
     num_surveys = len(survey_labels)
     if num_surveys < 1:
-        plot = bokeh.plotting.Figure(
+        plot = bokeh.plotting.figure(
             title="Reward",
             x_axis_label="MJD",
             y_axis_label="Reward",
@@ -115,7 +115,7 @@ def plot_rewards(
             ).drop_duplicates()
         except KeyError:
             # The basis fuction was not applicable to any selected surveys.
-            plot = bokeh.plotting.Figure(
+            plot = bokeh.plotting.figure(
                 title=plot_title,
                 x_axis_label="MJD",
                 y_axis_label=y_axis_label,
@@ -140,7 +140,7 @@ def plot_rewards(
             :, ["queue_start_mjd", "queue_fill_mjd_ns", y_column]
         ].drop_duplicates()
 
-    plot = bokeh.plotting.Figure(
+    plot = bokeh.plotting.figure(
         title=plot_title,
         x_axis_label="MJD",
         y_axis_label=y_axis_label,
@@ -221,11 +221,11 @@ def plot_infeasible(
         A list of the survey names to plot. Default to all surveys in the tier.
     plot_kwards : `dict`
         A dictionary of keyword parameters passed to
-        `bokeh.plotting.Figure`.
+        `bokeh.plotting.figure`.
 
     Returns
     -------
-    app : `bokeh.plotting.Figure`
+    app : `bokeh.plotting.figure`
         The figure itself.
     """
     tier_df = (
@@ -236,7 +236,7 @@ def plot_infeasible(
         available_surveys = [s for s in surveys if s in tier_df.survey_label.unique()]
         if len(available_surveys) == 0:
             # None of the selected surveys have infeasible basis functions
-            plot = bokeh.plotting.Figure(
+            plot = bokeh.plotting.figure(
                 title="Infeasible",
                 x_axis_label="MJD",
                 y_axis_label="Basis function",
@@ -271,7 +271,7 @@ def plot_infeasible(
 
     infeasible_ds = bokeh.models.ColumnDataSource(tier_df)
 
-    plot = bokeh.plotting.Figure(
+    plot = bokeh.plotting.figure(
         title="Infeasible",
         x_axis_label="MJD",
         y_axis_label="Basis function",

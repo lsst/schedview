@@ -5,7 +5,7 @@ import pandas as pd
 from astropy.time import Time
 
 import schedview.collect.scheduler_pickle
-from schedview.plot.spheremap import (
+from spheremap import (
     Planisphere,
     ArmillarySphere,
     split_healpix_by_resolution,
@@ -287,8 +287,8 @@ def plot_visit_planisphere(
     nside_low = NSIDE_LOW
 
     plot = bokeh.plotting.figure(
-        plot_width=1024,
-        plot_height=1024,
+        frame_width=1024,
+        frame_height=1024,
         match_aspect=True,
         title="Visits",
     )

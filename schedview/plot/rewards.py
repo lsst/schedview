@@ -30,7 +30,7 @@ def plot_survey_rewards(rewards):
 
     Returns
     -------
-    reward_plot : `bokeh.plotting.figure.Figure`
+    reward_plot : `bokeh.plotting.figure`
         The figure.
     """
     reward_plot = (
@@ -71,7 +71,7 @@ def create_survey_reward_plot(
 
     Returns
     -------
-    figure : `bokeh.plotting.figure.Figure`
+    figure : `bokeh.plotting.figure`
         The figure itself.
     data : `dict`
         The arguments used to produce the figure using

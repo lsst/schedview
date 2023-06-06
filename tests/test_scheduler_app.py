@@ -28,8 +28,6 @@ def render_figure(scheduler_app):
         saved_html_fname = out_path.joinpath("test_page.html")
         bokeh.plotting.output_file(filename=saved_html_fname, title="Test Page")
         bokeh.plotting.save(fig)
-        saved_png_fname = out_path.joinpath("test_fig.png")
-        bokeh.io.export_png(fig, filename=saved_png_fname)
 
 
 if __name__ == "__main__":

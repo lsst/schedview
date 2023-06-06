@@ -2,7 +2,7 @@ import bokeh.plotting
 
 from rubin_sim import maf
 
-from schedview.plot.spheremap import ArmillarySphere, Planisphere, MollweideMap
+from spheremap import ArmillarySphere, Planisphere, MollweideMap
 from schedview.collect.stars import load_bright_stars
 from schedview.collect import get_metric_path
 
@@ -66,7 +66,9 @@ def make_metric_figure(metric_values_fname=None, nside=32, mag_limit_slider=True
     )
     pla.decorate()
 
-    mol_plot = bokeh.plotting.figure(plot_width=512, plot_height=256, match_aspect=True)
+    mol_plot = bokeh.plotting.figure(
+        frame_width=512, frame_height=256, match_aspect=True
+    )
     mol = MollweideMap(plot=mol_plot)
     mol.add_healpix(hp_ds, cmap=cmap, nside=nside)
     mol.add_horizon(data_source=hz)

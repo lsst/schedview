@@ -24,7 +24,7 @@ import rubin_sim.scheduler.surveys
 import rubin_sim.scheduler.basis_functions
 import rubin_sim.scheduler.example
 
-from schedview.plot.spheremap import (
+from spheremap import (
     ArmillarySphere,
     HorizonMap,
     Planisphere,
@@ -468,8 +468,8 @@ class SchedulerDisplay:
         key,
         cls,
         title,
-        plot_width=512,
-        plot_height=512,
+        frame_width=512,
+        frame_height=512,
         decorate=True,
         horizon_graticules=False,
     ):
@@ -480,8 +480,8 @@ class SchedulerDisplay:
             )
 
         plot = bokeh.plotting.figure(
-            plot_width=plot_width,
-            plot_height=plot_height,
+            frame_width=frame_width,
+            frame_height=frame_height,
             tools=[self.bokeh_models["hover_tool"]],
             match_aspect=True,
             title=title,
@@ -495,10 +495,11 @@ class SchedulerDisplay:
             )
         else:
             sphere_map.add_healpix(self.healpix_values, nside=self.nside)
-            self.data_sources["healpix"] = sphere_map.healpix_data
+            self.data_sources["healpix"] = sphere_map.plot.select(name="hpix_ds")[0]
             self.healpix_cmap = sphere_map.healpix_cmap
 
-        self.bokeh_models["hover_tool"].renderers.append(sphere_map.healpix_renderer)
+        healpix_renderer = sphere_map.plot.select(name="hpix_renderer")[0]
+        self.bokeh_models["hover_tool"].renderers.append(healpix_renderer)
 
         if "horizon" in self.data_sources:
             sphere_map.add_horizon(data_source=self.data_sources["horizon"])
@@ -628,9 +629,15 @@ class SchedulerDisplay:
         elif source_units in ("degrees", "deg"):
             ra_deg = ra
             decl_deg = decl
-        data_source = sphere_map.make_marker_data_source(
-            ra=ra_deg, decl=decl_deg, name=name, glyph_size=20
-        )
+
+        data = {
+            "ra": ra_deg.tolist(),
+            "decl": decl_deg.tolist(),
+            "name": [name] * len(ra_deg),
+            "glyph_size": [20] * len(ra_deg),
+        }
+        data_source = bokeh.models.ColumnDataSource(data=data, name=name)
+        sphere_map.connect_controls(data_source)
         return data_source
 
     def make_moon_marker_data_source(self, sphere_map=None):
@@ -1130,8 +1137,8 @@ class SchedulerDisplay:
             "armillary_sphere",
             ArmillarySphere,
             "Armillary Sphere",
-            plot_width=512,
-            plot_height=512,
+            frame_width=512,
+            frame_height=512,
             decorate=True,
         )
         self.bokeh_models["alt_slider"] = self.sphere_maps["armillary_sphere"].sliders[
@@ -1148,16 +1155,16 @@ class SchedulerDisplay:
             "planisphere",
             Planisphere,
             "Planisphere",
-            plot_width=512,
-            plot_height=512,
+            frame_width=512,
+            frame_height=512,
             decorate=True,
         )
         self.make_sphere_map(
             "altaz",
             HorizonMap,
             "Alt Az",
-            plot_width=512,
-            plot_height=512,
+            frame_width=512,
+            frame_height=512,
             decorate=False,
             horizon_graticules=True,
         )
@@ -1165,8 +1172,8 @@ class SchedulerDisplay:
             "mollweide",
             MollweideMap,
             "Mollweide",
-            plot_width=512,
-            plot_height=512,
+            frame_width=512,
+            frame_height=512,
             decorate=True,
         )
 
