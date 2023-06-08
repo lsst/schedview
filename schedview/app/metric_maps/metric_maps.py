@@ -53,6 +53,7 @@ def make_metric_figure(metric_values_fname=None, nside=32, mag_limit_slider=True
     arm.decorate()
 
     pla = Planisphere()
+    pla.sliders["mjd"] = arm.sliders["mjd"]
     pla.add_healpix(hp_ds, cmap=cmap, nside=nside)
     pla.add_horizon(data_source=hz)
     pla.add_horizon(
@@ -70,6 +71,7 @@ def make_metric_figure(metric_values_fname=None, nside=32, mag_limit_slider=True
         frame_width=512, frame_height=256, match_aspect=True
     )
     mol = MollweideMap(plot=mol_plot)
+    mol.sliders["mjd"] = arm.sliders["mjd"]
     mol.add_healpix(hp_ds, cmap=cmap, nside=nside)
     mol.add_horizon(data_source=hz)
     mol.add_horizon(
