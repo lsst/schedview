@@ -5,7 +5,7 @@ import pandas as pd
 from astropy.time import Time
 
 import schedview.collect.scheduler_pickle
-from spheremap import (
+from uranography.api import (
     Planisphere,
     ArmillarySphere,
     split_healpix_by_resolution,

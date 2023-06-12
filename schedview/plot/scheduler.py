@@ -24,7 +24,7 @@ import rubin_sim.scheduler.surveys
 import rubin_sim.scheduler.basis_functions
 import rubin_sim.scheduler.example
 
-from spheremap import (
+from uranography.api import (
     ArmillarySphere,
     HorizonMap,
     Planisphere,

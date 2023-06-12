@@ -5,7 +5,7 @@ import pandas as pd
 import bokeh.models
 import bokeh.core.properties
 
-from spheremap import (
+from uranography.api import (
     ArmillarySphere,
     HorizonMap,
     Planisphere,
