@@ -371,7 +371,6 @@ def prenight_app(
     # Top level layout
 
     basic_app = pn.Column(
-        '<script src="https://unpkg.com/gpu.js@latest/dist/gpu-browser.min.js"></script>',
         "<h1>Pre-night briefing</h1>",
         pn.pane.PNG(
             "https://project.lsst.org/sites/default/files/Rubin-O-Logo_0.png", height=50
@@ -405,4 +404,15 @@ def prenight_app(
 
 if __name__ == "__main__":
     app = prenight_app()
-    app.show()
+
+    template = pn.Template(
+        """
+        {% extends base %}
+        {% block postamble %}
+        <script src="https://unpkg.com/gpu.js@latest/dist/gpu-browser.min.js"></script>
+        {% endblock %}
+    """
+    )
+    template.add_panel("main", app)
+
+    template.show()

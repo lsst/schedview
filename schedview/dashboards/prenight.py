@@ -16,7 +16,6 @@ import hvplot.pandas
 
 import schedview
 import schedview.plot
-import schedview.plot.spheremap
 import schedview.compute
 import schedview.compute.astro
 import schedview.compute.scheduler

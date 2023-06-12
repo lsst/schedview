@@ -5,7 +5,7 @@ import pandas as pd
 from astropy.time import Time
 
 import schedview.collect.scheduler_pickle
-from schedview.plot.spheremap import (
+from uranography.api import (
     Planisphere,
     ArmillarySphere,
     split_healpix_by_resolution,
@@ -91,9 +91,9 @@ def plot_visit_skymaps(
 
     nside_low = NSIDE_LOW
 
-    psphere = Planisphere(mjd=conditions.mjd)
-
     asphere = ArmillarySphere(mjd=conditions.mjd)
+    psphere = Planisphere(mjd=conditions.mjd)
+    psphere.sliders["mjd"] = asphere.sliders["mjd"]
 
     cmap = bokeh.transform.linear_cmap(
         "value", "Greys256", int(np.ceil(np.nanmax(footprint) * 2)), 0
@@ -114,6 +114,41 @@ def plot_visit_skymaps(
     )
     psphere.add_healpix(healpix_low_ds, nside=nside_low, cmap=cmap)
 
+    # Transforms for recent, past, future visits
+    past_future_js = """
+        const result = new Array(xs.length)
+        for (let i = 0; i < xs.length; i++) {
+        if (mjd_slider.value >= xs[i]) {
+            result[i] = past_value
+        } else {
+            result[i] = future_value
+        }
+        }
+        return result
+    """
+
+    past_future_transform = bokeh.models.CustomJSTransform(
+        args=dict(mjd_slider=asphere.sliders["mjd"], past_value=0.5, future_value=0.0),
+        v_func=past_future_js,
+    )
+
+    recent_js = """
+        const result = new Array(xs.length)
+        for (let i = 0; i < xs.length; i++) {
+        if (mjd_slider.value < xs[i]) {
+            result[i] = 0
+        } else {
+            result[i] = Math.max(0, max_value * (1 - (mjd_slider.value - xs[i]) / scale))
+        }
+        }
+        return result
+    """
+
+    recent_transform = bokeh.models.CustomJSTransform(
+        args=dict(mjd_slider=asphere.sliders["mjd"], max_value=1.0, scale=fade_scale),
+        v_func=recent_js,
+    )
+
     for band in "ugrizy":
         band_visits = visits.query(f"filter == '{band}'")
         if len(band_visits) < 1:
@@ -123,20 +158,18 @@ def plot_visit_skymaps(
             band_visits.fieldRA, band_visits.fieldDec, band_visits.rotSkyPos
         )
 
-        mjd_start = band_visits.observationStartMJD.values
-        current_mjd = conditions.sun_n12_setting
         perimeter_df = pd.DataFrame(
             {
                 "ra": ras,
                 "decl": decls,
-                "min_mjd": band_visits.observationStartMJD.values,
-                "in_mjd_window": [0.3] * len(ras),
-                "fade_scale": [fade_scale] * len(ras),
-                "recent_mjd": np.clip((current_mjd - mjd_start) / fade_scale, 0, 1),
+                "mjd": band_visits.observationStartMJD.values,
             }
         )
         patches_kwargs = dict(
-            line_alpha="recent_mjd", line_color="#ff00ff", line_width=2
+            fill_alpha=bokeh.transform.transform("mjd", past_future_transform),
+            line_alpha=bokeh.transform.transform("mjd", recent_transform),
+            line_color="#ff00ff",
+            line_width=2,
         )
 
         if hatch:
@@ -144,19 +177,14 @@ def plot_visit_skymaps(
                 dict(
                     fill_alpha=0,
                     fill_color=None,
-                    hatch_alpha="in_mjd_window",
+                    hatch_alpha=bokeh.transform.transform("mjd", past_future_transform),
                     hatch_color=BAND_COLORS[band],
                     hatch_pattern=BAND_HATCH_PATTERNS[band],
                     hatch_scale=BAND_HATCH_SCALES[band],
                 )
             )
         else:
-            patches_kwargs.update(
-                dict(
-                    fill_alpha="in_mjd_window",
-                    fill_color=BAND_COLORS[band],
-                )
-            )
+            patches_kwargs.update(dict(fill_color=BAND_COLORS[band]))
 
         visit_ds = asphere.add_patches(
             perimeter_df,
@@ -287,8 +315,8 @@ def plot_visit_planisphere(
     nside_low = NSIDE_LOW
 
     plot = bokeh.plotting.figure(
-        plot_width=1024,
-        plot_height=1024,
+        frame_width=1024,
+        frame_height=1024,
         match_aspect=True,
         title="Visits",
     )

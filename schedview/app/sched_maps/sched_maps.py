@@ -5,7 +5,7 @@ import pandas as pd
 import bokeh.models
 import bokeh.core.properties
 
-from schedview.plot.spheremap import (
+from uranography.api import (
     ArmillarySphere,
     HorizonMap,
     Planisphere,
@@ -371,8 +371,8 @@ class SchedulerDisplayApp(SchedulerDisplay):
             "altaz",
             HorizonMap,
             "Alt Az",
-            plot_width=512,
-            plot_height=512,
+            frame_width=512,
+            frame_height=512,
             decorate=False,
             horizon_graticules=True,
         )
@@ -437,8 +437,8 @@ class SchedulerDisplayApp(SchedulerDisplay):
             "armillary_sphere",
             ArmillarySphere,
             "Armillary Sphere",
-            plot_width=512,
-            plot_height=512,
+            frame_width=512,
+            frame_height=512,
             decorate=True,
         )
         self.bokeh_models["alt_slider"] = self.sphere_maps["armillary_sphere"].sliders[
@@ -455,16 +455,16 @@ class SchedulerDisplayApp(SchedulerDisplay):
             "planisphere",
             Planisphere,
             "Planisphere",
-            plot_width=512,
-            plot_height=512,
+            frame_width=512,
+            frame_height=512,
             decorate=True,
         )
         self.make_sphere_map(
             "altaz",
             HorizonMap,
             "Alt Az",
-            plot_width=512,
-            plot_height=512,
+            frame_width=512,
+            frame_height=512,
             decorate=False,
             horizon_graticules=True,
         )
@@ -474,8 +474,8 @@ class SchedulerDisplayApp(SchedulerDisplay):
                 "mollweide",
                 MollweideMap,
                 "Mollweide",
-                plot_width=512,
-                plot_height=512,
+                frame_width=512,
+                frame_height=512,
                 decorate=True,
             )
 

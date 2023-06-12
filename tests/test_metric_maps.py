@@ -15,8 +15,6 @@ class test_metric_maps(unittest.TestCase):
             saved_html_fname = out_path.joinpath("test_page.html")
             bokeh.plotting.output_file(filename=saved_html_fname, title="Test Page")
             bokeh.plotting.save(fig)
-            saved_png_fname = out_path.joinpath("test_fig.png")
-            bokeh.io.export_png(fig, filename=saved_png_fname)
 
     def test_add_metric_app(self):
         doc = bokeh.document.document.Document()
