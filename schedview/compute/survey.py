@@ -6,6 +6,18 @@ def make_survey_reward_df(survey, conditions, reward_df=None):
 
     if reward_df is None:
         reward_df = survey.make_reward_df(conditions)
+    else:
+        survey_reward_df_columns = [
+            "basis_function",
+            "basis_function_class",
+            "feasible",
+            "max_basis_reward",
+            "basis_area",
+            "basis_weight",
+            "max_accum_reward",
+            "accum_area",
+        ]
+        reward_df = reward_df[survey_reward_df_columns].reset_index(drop=True)
 
     def to_sigfig(x):
         return float("{:.5g}".format(x))

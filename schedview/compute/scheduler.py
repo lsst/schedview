@@ -377,6 +377,15 @@ def make_scheduler_summary_df(scheduler, conditions, reward_df=None):
 
     summary_df["survey_name"] = summary_df.apply(get_survey_name, axis=1)
 
+    def get_survey_url(row):
+        if isinstance(row.survey_class, str):
+            survey_url = f"https://rubin-sim.lsst.io/api/{row.survey_class}.html#{row.survey_class}"
+        else:
+            survey_url = ""
+        return survey_url
+
+    summary_df["survey_url"] = summary_df.apply(get_survey_url, axis=1)
+
     def make_survey_row(survey_bfs):
 
         infeasible_bf = ", ".join(
@@ -390,6 +399,8 @@ def make_scheduler_summary_df(scheduler, conditions, reward_df=None):
         survey_row = pd.Series({"reward": reward, "infeasible": infeasible})
         return survey_row
 
-    survey_df = summary_df.groupby(["tier", "survey_name"]).apply(make_survey_row)
+    survey_df = summary_df.groupby(["tier", "survey_name", "survey_url"]).apply(
+        make_survey_row
+    )
 
     return survey_df["reward"].reset_index()
