@@ -4,11 +4,9 @@ import healpy as hp
 from astropy.time import Time
 import logging
 import collections.abc
-import copy
 from collections import OrderedDict
 import warnings
 import itertools
-from inspect import getmembers
 
 import pandas as pd
 import bokeh.models
@@ -33,6 +31,11 @@ from uranography.api import (
 )
 
 from schedview.collect import read_scheduler
+from schedview.compute.scheduler import (
+    make_unique_survey_name,
+    make_scheduler_summary_df,
+)
+from schedview.compute.survey import make_survey_reward_df
 
 DEFAULT_MJD = 60200.2
 # DEFAULT_NSIDE = 16
@@ -389,31 +392,7 @@ class SchedulerDisplay:
         LOGGER.info("Finished updating conditions")
 
     def _unique_survey_name(self, survey_index=None):
-        if survey_index is None:
-            survey_index = copy.deepcopy(self.scheduler.survey_index)
-
-        # sliced down through as many indexes as we have
-        survey = self.scheduler.survey_lists
-        for level_index in survey_index:
-            survey = survey[level_index]
-
-        try:
-            survey_name = survey.survey_name
-            if len(survey_name) < 1:
-                survey_name = str(survey)
-        except AttributeError:
-            survey_name = str(survey)
-
-        if hasattr(survey, "observations") and (
-            survey.survey_name != survey.observations["note"][0]
-        ):
-            survey_name = f"{survey.observations['note'][0]}"
-
-        survey_name = f"{survey_index[1]}: {survey_name}"
-
-        # Bekeh tables have problems with < and >
-        survey_name = survey_name.replace("<", "").replace(">", "")
-
+        survey_name = make_unique_survey_name(self.scheduler, survey_index)
         return survey_name
 
     @property
@@ -876,45 +855,25 @@ class SchedulerDisplay:
     def update_reward_table_bokeh_model(self):
         """Update the bokeh model for the table of rewards."""
         if "reward_table" in self.bokeh_models:
-            reward_df = self.scheduler.survey_lists[self.survey_index[0]][
+            survey = self.scheduler.survey_lists[self.survey_index[0]][
                 self.survey_index[1]
-            ].make_reward_df(self.conditions)
+            ]
+            reward_df = make_survey_reward_df(survey, self.conditions)
 
-            def to_sigfig(x):
-                return float("{:.5g}".format(x))
+            any_bad_urls = False
+            for doc_url in reward_df["doc_url"].values:
+                if "http" not in doc_url:
+                    any_bad_urls = True
+                    break
 
-            def _guess_basis_function_doc_url(basis_function_name):
-                root_bf_name = basis_function_name.split()[0]
-                standard_basis_functions = dict(
-                    getmembers(rubin_sim.scheduler.basis_functions)
-                ).keys()
-                if root_bf_name in standard_basis_functions:
-                    url = f"https://rubin-sim.lsst.io/api/rubin_sim.scheduler.basis_functions.{root_bf_name}.html#rubin_sim.scheduler.basis_functions.{root_bf_name}"  # noqa E501
-                else:
-                    url = None
-                return url
-
-            try:
-                reward_df["doc_url"] = reward_df["basis_function_class"].map(
-                    _guess_basis_function_doc_url
-                )
-
-                basis_function_formatter = bokeh.models.widgets.HTMLTemplateFormatter(
-                    template='<a href="<%= doc_url %>" target="_blank"><%= value %></a>'
-                )
-            except KeyError:
-                reward_df["doc_url"] = None
+            if any_bad_urls:
                 basis_function_formatter = bokeh.models.widgets.HTMLTemplateFormatter(
                     template="Not a basis real function"
                 )
-
-            for col in [
-                "max_basis_reward",
-                "basis_area",
-                "max_accum_reward",
-                "accum_area",
-            ]:
-                reward_df[col] = reward_df[col].apply(to_sigfig)
+            else:
+                basis_function_formatter = bokeh.models.widgets.HTMLTemplateFormatter(
+                    template='<a href="<%= doc_url %>" target="_blank"><%= value %></a>'
+                )
 
             self.bokeh_models["reward_table"].source = bokeh.models.ColumnDataSource(
                 reward_df
@@ -996,60 +955,8 @@ class SchedulerDisplay:
             A table showing the reword for each feasible survey, and the
             basis functions that result in it being infeasible for the rest.
         """
-        reward_df = self.scheduler.make_reward_df(self.conditions)
-        summary_df = reward_df.reset_index()
-
-        # Some oddball surveys do not have basis functions, but they still
-        # need rows, so add fake basis functions to the summary_df for them.
-        summary_df.set_index(["list_index", "survey_index"], inplace=True)
-        for list_index, survey_list in enumerate(self.scheduler.survey_lists):
-            for survey_index, survey in enumerate(survey_list):
-                if not (list_index, survey_index) in summary_df.index:
-                    survey.calc_reward_function(self.conditions)
-                    summary_df.loc[
-                        (list_index, survey_index), "max_basis_reward"
-                    ] = survey.reward
-                    summary_df.loc[
-                        (list_index, survey_index), "max_accum_reward"
-                    ] = survey.reward
-                    summary_df.loc[(list_index, survey_index), "feasible"] = (
-                        np.isfinite(survey.reward) or survey.reward > 0
-                    )
-                    summary_df.loc[(list_index, survey_index), "basis_function"] = "N/A"
-        summary_df.reset_index(inplace=True)
-
-        def make_tier_name(row):
-            tier_name = f"tier {row.list_index}"
-            return tier_name
-
-        summary_df["tier"] = summary_df.apply(make_tier_name, axis=1)
-
-        def get_survey_name(row):
-            survey_name = self._unique_survey_name([row.list_index, row.survey_index])
-            return survey_name
-
-        summary_df["survey_name"] = summary_df.apply(get_survey_name, axis=1)
-
-        def make_survey_row(survey_bfs):
-
-            infeasible_bf = ", ".join(
-                survey_bfs.loc[
-                    ~survey_bfs.feasible.astype(bool)
-                ].basis_function.to_list()
-            )
-            infeasible = ~np.all(survey_bfs.feasible.astype(bool))
-            reward = (
-                infeasible_bf if infeasible else survey_bfs.max_accum_reward.iloc[-1]
-            )
-            if reward in (None, "N/A", "None"):
-                reward = "Infeasible" if infeasible else "Feasible"
-
-            survey_row = pd.Series({"reward": reward, "infeasible": infeasible})
-            return survey_row
-
-        survey_df = summary_df.groupby(["tier", "survey_name"]).apply(make_survey_row)
-
-        return survey_df["reward"].reset_index()
+        survey_df = make_scheduler_summary_df(self.scheduler, self.conditions)
+        return survey_df
 
     def make_reward_summary_table(self):
         """Create the bokeh model of the table of rewards."""
