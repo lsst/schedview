@@ -1,14 +1,17 @@
-from tempfile import TemporaryDirectory
+from tempfile import TemporaryDirectory, NamedTemporaryFile
 import param
 import logging
 from pathlib import Path
 import pandas as pd
 from zoneinfo import ZoneInfo
+import pickle
+import lzma
 
 from astropy.time import Time
 
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 import rubin_sim.scheduler.example
+from rubin_sim.scheduler.utils import SchemaConverter
 
 import schedview.compute.astro
 import schedview.collect.opsim
@@ -37,7 +40,7 @@ pn.extension(
 )
 pn.config.console_output = "disable"
 
-logging.basicConfig(format="%(asctime)s %(message)s", level=logging.DEBUG)
+logging.basicConfig(format="%(asctime)s %(message)s", level=logging.INFO)
 
 debug_info = pn.widgets.Debugger(
     name="Debugger info level", level=logging.INFO, sizing_mode="stretch_both"
@@ -110,6 +113,47 @@ class Prenight(param.Parameterized):
         except:
             self.visits = None
 
+    def set_opsim_output_from_observations(self, observations):
+        converter = SchemaConverter()
+
+        with NamedTemporaryFile(
+            prefix="opsim-", suffix=".db", dir=TEMP_DIR.name
+        ) as temp_file:
+            opsim_output_fname = temp_file.name
+
+        logging.info(f"Saving observations to {opsim_output_fname}.")
+        converter.obs2opsim(observations, filename=opsim_output_fname)
+
+        self.opsim_output_fname = opsim_output_fname
+
+    @param.depends("visits", "night_time")
+    def visit_table(self):
+        if self.visits is None:
+            return "No visits loaded."
+
+        logging.info("Updating visit table")
+        columns = [
+            "start_date",
+            "fieldRA",
+            "fieldDec",
+            "altitude",
+            "azimuth",
+            "filter",
+            "airmass",
+            "slewTime",
+            "moonDistance",
+            "block_id",
+            "note",
+        ]
+
+        visit_table = pn.widgets.DataFrame(self.visits[columns])
+
+        if len(self.visits) < 1:
+            visit_table = "No visits on this night"
+
+        logging.info("Finished updating visit table")
+        return visit_table
+
     @param.depends("visits", "night_time")
     def visit_explorer(self):
         if self.visits is None:
@@ -146,6 +190,19 @@ class Prenight(param.Parameterized):
                 nside=self._nside
             )
 
+    def set_scheduler_from_instance(self, scheduler):
+        # Get a unique temp file name
+        with NamedTemporaryFile(
+            prefix="scheduler-", suffix=".pickle.xz", dir=TEMP_DIR.name
+        ) as temp_file:
+            scheduler_fname = temp_file.name
+
+        logging.info(f"Saving scheduler to {scheduler_fname}.")
+        with lzma.open(scheduler_fname, "wb", format=lzma.FORMAT_XZ) as pio:
+            pickle.dump(scheduler, pio)
+
+        self.scheduler_fname = scheduler_fname
+
     @param.depends(
         "scheduler",
         "visits",
@@ -176,8 +233,17 @@ class Prenight(param.Parameterized):
         return vmap
 
 
-def prenight_app():
+def prenight_app(night_date=None, observations=None, scheduler=None):
     prenight = Prenight()
+
+    if night_date is not None:
+        prenight.night = night_date
+
+    if observations is not None:
+        prenight.set_opsim_output_from_observations(observations)
+
+    if scheduler is not None:
+        prenight.set_scheduler_from_instance(scheduler)
 
     pn_app = pn.Column(
         "<h1>Pre-night briefing</h1>",
@@ -193,7 +259,10 @@ def prenight_app():
             ),
         ),
         "<h2>Simulated Visits</h2>",
-        prenight.visit_explorer,
+        pn.Row(
+            prenight.visit_explorer,
+            prenight.visit_table,
+        ),
         prenight.visit_skymaps,
         debug_info,
     ).servable()
@@ -202,7 +271,10 @@ def prenight_app():
         logging.info("session cleared")
         pn_app.stop()
 
-    pn.state.on_session_destroyed(clear_caches)
+    try:
+        pn.state.on_session_destroyed(clear_caches)
+    except RuntimeError as e:
+        logging.info("RuntimeError: %s", e)
 
     return pn_app
 
