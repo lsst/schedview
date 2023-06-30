@@ -1,17 +1,11 @@
-from tempfile import TemporaryDirectory, NamedTemporaryFile
 import param
 import logging
-from pathlib import Path
 import pandas as pd
-from zoneinfo import ZoneInfo
-import pickle
-import lzma
 
 from astropy.time import Time
 
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 import rubin_sim.scheduler.example
-from rubin_sim.scheduler.utils import SchemaConverter
 
 import schedview.compute.astro
 import schedview.collect.opsim
@@ -25,7 +19,6 @@ import schedview.plot.maf
 
 import panel as pn
 
-TEMP_DIR = TemporaryDirectory()
 AVAILABLE_TIMEZONES = [
     "Chile/Continental",
     "US/Pacific",
@@ -35,12 +28,10 @@ AVAILABLE_TIMEZONES = [
     "US/Eastern",
 ]
 DEFAULT_TIMEZONE = AVAILABLE_TIMEZONES[0]
-DEFAULT_CURRENT_TIME = Time(
-    pd.Timestamp("2025-08-01 23:00:00", tzinfo=ZoneInfo(DEFAULT_TIMEZONE))
-)
-DEFAULT_OPSIM_FNAME = f"{str(Path.home())}/tmp/opsim.db"
-DEFAULT_SCHEDULER_FNAME = f"{str(Path.home())}/tmp/scheduler.pickle.xz"
-DEFAULT_REWARDS_FNAME = f"{str(Path.home())}/tmp/rewards.h5"
+DEFAULT_CURRENT_TIME = Time.now()
+DEFAULT_OPSIM_FNAME = "opsim.db"
+DEFAULT_SCHEDULER_FNAME = "scheduler.pickle.xz"
+DEFAULT_REWARDS_FNAME = "rewards.h5"
 
 
 pn.extension(
@@ -59,9 +50,9 @@ debug_info = pn.widgets.Debugger(
 
 class Prenight(param.Parameterized):
 
-    opsim_output_fname = param.String(DEFAULT_OPSIM_FNAME + " unloaded")
-    scheduler_fname = param.String(DEFAULT_SCHEDULER_FNAME + " unloaded")
-    rewards_fname = param.String(DEFAULT_REWARDS_FNAME + " unloaded")
+    opsim_output_fname = param.String(DEFAULT_OPSIM_FNAME)
+    scheduler_fname = param.String(DEFAULT_SCHEDULER_FNAME)
+    rewards_fname = param.String(DEFAULT_REWARDS_FNAME)
 
     night = param.Date(DEFAULT_CURRENT_TIME.datetime.date())
     timezone = param.ObjectSelector(
@@ -88,24 +79,24 @@ class Prenight(param.Parameterized):
     _obs_rewards = param.Parameter(None)
 
     @param.depends("night", watch=True)
-    def update_night_time(self):
+    def _update_night_time(self):
         logging.info("Updating night time.")
         self._night_time = Time(self.night.isoformat())
 
     @param.depends("_night_time", "timezone", watch=True)
-    def update_almanac_events(self):
+    def _update_almanac_events(self):
         logging.info("Updating almanac events.")
         self._almanac_events = schedview.compute.astro.night_events(
             self._night_time, self._site, self.timezone
         )
 
     @param.depends("_almanac_events", watch=True)
-    def update_sunset_time(self):
+    def _update_sunset_time(self):
         logging.info("Updating sunset time.")
         self._sunset_time = Time(self._almanac_events.loc["sunset", "UTC"])
 
     @param.depends("_almanac_events", watch=True)
-    def update_sunrise_time(self):
+    def _update_sunrise_time(self):
         logging.info("Updating sunrise time.")
         self._sunrise_time = Time(self._almanac_events.loc["sunrise", "UTC"])
 
@@ -119,9 +110,9 @@ class Prenight(param.Parameterized):
         return almanac_table
 
     @param.depends("opsim_output_fname", "_sunset_time", "_sunrise_time", watch=True)
-    def update_visits(self):
+    def _update_visits(self):
         if self._almanac_events is None:
-            self.update_almanac_events()
+            self._update_almanac_events()
 
         logging.info("Updating visits.")
         try:
@@ -135,6 +126,13 @@ class Prenight(param.Parameterized):
 
     @param.depends("_visits")
     def visit_table(self):
+        """Create a tabuler display widget with visits.
+        
+        Returns
+        -------
+        visit_table : `pn.widgets.DataFrame`
+            The table of visits.
+        """
         if self._visits is None:
             return "No visits loaded."
 
@@ -163,6 +161,13 @@ class Prenight(param.Parameterized):
 
     @param.depends("_visits")
     def visit_explorer(self):
+        """Create holoviz explorer on the visits.
+        
+        Returns
+        -------
+        visit_explorer : `hvplot.ui.hvDataFrameExplorer`
+            The holoviz plot of visits.
+        """
         if self._visits is None:
             return "No visits loaded."
 
@@ -184,7 +189,7 @@ class Prenight(param.Parameterized):
         return visit_explorer
 
     @param.depends("scheduler_fname", watch=True)
-    def update_scheduler(self):
+    def _update_scheduler(self):
         logging.info("Updating scheduler.")
         try:
             (
@@ -194,15 +199,25 @@ class Prenight(param.Parameterized):
 
             self._scheduler = scheduler
         except:
-            self._scheduler = rubin_sim.scheduler.example.example_scheduler(
-                nside=self._nside
-            )
+            logging.error(f"Could not load scheduler from {self.scheduler_fname}")
+            if False:
+                self._scheduler = rubin_sim.scheduler.example.example_scheduler(
+                    nside=self._nside
+                )
 
     @param.depends(
         "_scheduler",
         "_visits",
     )
     def visit_skymaps(self):
+        """Create an interactive skymap of the visits.
+        
+        Returns
+        -------
+        vmap : `bokeh.models.layouts.LayoutDOM`
+            The bokeh maps of visits.
+        """
+
         if self._visits is None:
             return "No visits are loaded."
 
@@ -227,7 +242,7 @@ class Prenight(param.Parameterized):
         return vmap
 
     @param.depends("rewards_fname", watch=True)
-    def update_reward_df(self):
+    def _update_reward_df(self):
         if self.rewards_fname is None:
             return None
 
@@ -241,7 +256,7 @@ class Prenight(param.Parameterized):
         self._reward_df = reward_df
 
     @param.depends("_reward_df", watch=True)
-    def update_tier_selector(self):
+    def _update_tier_selector(self):
         if self._reward_df is None:
             self.param["tier"].objects = [""]
             self.tier = ""
@@ -253,7 +268,7 @@ class Prenight(param.Parameterized):
         self.tier = tiers[0]
 
     @param.depends("_reward_df", "tier", watch=True)
-    def update_surveys_selector(self):
+    def _update_surveys_selector(self):
         init_displayed_surveys = 7
 
         if self._reward_df is None or self.tier == "":
@@ -277,7 +292,7 @@ class Prenight(param.Parameterized):
         )
 
     @param.depends("_reward_df", "tier", "surveys", watch=True)
-    def update_basis_function_selector(self):
+    def _update_basis_function_selector(self):
         if self._reward_df is None or self.tier == "" or self.surveys == "":
             self.param["basis_function"].objects = [""]
             self.basis_function = ""
@@ -297,7 +312,7 @@ class Prenight(param.Parameterized):
         self.basis_function = "Total"
 
     @param.depends("rewards_fname", watch=True)
-    def update_obs_rewards(self):
+    def _update_obs_rewards(self):
         if self.rewards_fname is None:
             return None
 
@@ -310,6 +325,12 @@ class Prenight(param.Parameterized):
 
     @param.depends("_reward_df", "tier")
     def reward_params(self):
+        """Create a param set for the reward plot.
+        
+        Returns
+        -------
+        param_set : `panel.Param`
+        """
         if self._reward_df is None:
             this_param_set = pn.Param(
                 self.param,
@@ -340,6 +361,13 @@ class Prenight(param.Parameterized):
         "basis_function",
     )
     def reward_plot(self):
+        """Create a plot of the rewards.
+        
+        Returns
+        -------
+        fig : `bokeh.plotting.Figure`
+            The figure with the reward plot.
+        """
         if self._reward_df is None:
             return "No rewards are loaded."
 
@@ -363,6 +391,13 @@ class Prenight(param.Parameterized):
         "surveys",
     )
     def infeasible_plot(self):
+        """Create a plot of infeasible basis functions.
+        
+        Returns
+        -------
+        fig : `bokeh.plotting.Figure`
+            The figure..
+        """
         if self._reward_df is None:
             return "No rewards are loaded."
 
@@ -377,6 +412,24 @@ class Prenight(param.Parameterized):
 
 
 def prenight_app(night_date=None, observations=None, scheduler=None, rewards=None):
+    """Create the pre-night briefing app.
+    
+    Parameters
+    ----------
+    night_date : `datetime.date`, optional
+        The date of the night to display.
+    observations : `str`, optional
+        Path to the opsim output databas file.
+    scheduler : `str`, optional
+        Path to the scheduler pickle file.
+    rewards : `str`, optional
+        Path to the rewards hdf5 file.
+    
+    Returns
+    -------
+    pn_app : `panel.viewable.Viewable`
+        The pre-night briefing app.
+    """
     prenight = Prenight()
 
     if night_date is not None:
