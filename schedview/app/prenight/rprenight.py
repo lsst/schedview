@@ -133,20 +133,6 @@ class Prenight(param.Parameterized):
             logging.error(e)
             self._visits = None
 
-    @param.depends()
-    def set_opsim_output_from_observations(self, observations):
-        converter = SchemaConverter()
-
-        with NamedTemporaryFile(
-            prefix="opsim-", suffix=".db", dir=TEMP_DIR.name
-        ) as temp_file:
-            opsim_output_fname = temp_file.name
-
-        logging.info(f"Saving observations to {opsim_output_fname}.")
-        converter.obs2opsim(observations, filename=opsim_output_fname)
-
-        self.opsim_output_fname = opsim_output_fname
-
     @param.depends("_visits")
     def visit_table(self):
         if self._visits is None:
@@ -211,20 +197,6 @@ class Prenight(param.Parameterized):
             self._scheduler = rubin_sim.scheduler.example.example_scheduler(
                 nside=self._nside
             )
-
-    @param.depends()
-    def set_scheduler_from_instance(self, scheduler):
-        # Get a unique temp file name
-        with NamedTemporaryFile(
-            prefix="scheduler-", suffix=".pickle.xz", dir=TEMP_DIR.name
-        ) as temp_file:
-            scheduler_fname = temp_file.name
-
-        logging.info(f"Saving scheduler to {scheduler_fname}.")
-        with lzma.open(scheduler_fname, "wb", format=lzma.FORMAT_XZ) as pio:
-            pickle.dump(scheduler, pio)
-
-        self.scheduler_fname = scheduler_fname
 
     @param.depends(
         "_scheduler",
@@ -404,17 +376,20 @@ class Prenight(param.Parameterized):
         return fig
 
 
-def prenight_app(night_date=None, observations=None, scheduler=None):
+def prenight_app(night_date=None, observations=None, scheduler=None, rewards=None):
     prenight = Prenight()
 
     if night_date is not None:
         prenight.night = night_date
 
     if observations is not None:
-        prenight.set_opsim_output_from_observations(observations)
+        prenight.opsim_output_fname = observations
 
     if scheduler is not None:
-        prenight.set_scheduler_from_instance(scheduler)
+        prenight.scheduler_fname = scheduler
+        
+    if rewards is not None:
+        prenight.rewards_fname = rewards
 
     pn_app = pn.Column(
         "<h1>Pre-night briefing</h1>",
@@ -435,16 +410,17 @@ def prenight_app(night_date=None, observations=None, scheduler=None):
                 prenight.almanac_events_table,
             ),
         ),
-        "<h2>Simulated Visits</h2>",
-        pn.Row(
-            prenight.visit_explorer,
-            prenight.visit_table,
+        pn.Tabs(
+            ("Visit explorer", prenight.visit_explorer),
+            ("Table of visits", prenight.visit_table),
+            ("Sky maps", prenight.visit_skymaps),
+            ("Reward plots", pn.Column(
+                prenight.reward_params,
+                prenight.reward_plot,
+                prenight.infeasible_plot,
+            )),
+            dynamic=False # When true, visit_table never renders. Why?
         ),
-        prenight.visit_skymaps,
-        "<h2>Rewards</h2>",
-        prenight.reward_params,
-        prenight.reward_plot,
-        prenight.infeasible_plot,
         debug_info,
     ).servable()
 
