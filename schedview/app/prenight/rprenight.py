@@ -1,6 +1,7 @@
 import param
 import logging
 import pandas as pd
+import os
 
 from astropy.time import Time
 
@@ -33,6 +34,7 @@ DEFAULT_CURRENT_TIME = Time.now()
 DEFAULT_OPSIM_FNAME = "opsim.db"
 DEFAULT_SCHEDULER_FNAME = "scheduler.pickle.xz"
 DEFAULT_REWARDS_FNAME = "rewards.h5"
+USE_EXAMPLE_SCHEDULER = False
 
 
 pn.extension(
@@ -128,7 +130,7 @@ class Prenight(param.Parameterized):
     @param.depends("_visits")
     def visit_table(self):
         """Create a tabuler display widget with visits.
-        
+
         Returns
         -------
         visit_table : `pn.widgets.DataFrame`
@@ -163,7 +165,7 @@ class Prenight(param.Parameterized):
     @param.depends("_visits")
     def visit_explorer(self):
         """Create holoviz explorer on the visits.
-        
+
         Returns
         -------
         visit_explorer : `hvplot.ui.hvDataFrameExplorer`
@@ -199,9 +201,10 @@ class Prenight(param.Parameterized):
             ) = schedview.collect.scheduler_pickle.read_scheduler(self.scheduler_fname)
 
             self._scheduler = scheduler
-        except:
-            logging.error(f"Could not load scheduler from {self.scheduler_fname}")
-            if False:
+        except Exception as e:
+            logging.error(f"Could not load scheduler from {self.scheduler_fname} {e}")
+            if USE_EXAMPLE_SCHEDULER:
+                logging.info("Loading example scheduler.")
                 self._scheduler = rubin_sim.scheduler.example.example_scheduler(
                     nside=self._nside
                 )
@@ -212,7 +215,7 @@ class Prenight(param.Parameterized):
     )
     def visit_skymaps(self):
         """Create an interactive skymap of the visits.
-        
+
         Returns
         -------
         vmap : `bokeh.models.layouts.LayoutDOM`
@@ -327,7 +330,7 @@ class Prenight(param.Parameterized):
     @param.depends("_reward_df", "tier")
     def reward_params(self):
         """Create a param set for the reward plot.
-        
+
         Returns
         -------
         param_set : `panel.Param`
@@ -363,7 +366,7 @@ class Prenight(param.Parameterized):
     )
     def reward_plot(self):
         """Create a plot of the rewards.
-        
+
         Returns
         -------
         fig : `bokeh.plotting.Figure`
@@ -393,7 +396,7 @@ class Prenight(param.Parameterized):
     )
     def infeasible_plot(self):
         """Create a plot of infeasible basis functions.
-        
+
         Returns
         -------
         fig : `bokeh.plotting.Figure`
@@ -414,7 +417,7 @@ class Prenight(param.Parameterized):
 
 def prenight_app(night_date=None, observations=None, scheduler=None, rewards=None):
     """Create the pre-night briefing app.
-    
+
     Parameters
     ----------
     night_date : `datetime.date`, optional
@@ -425,7 +428,7 @@ def prenight_app(night_date=None, observations=None, scheduler=None, rewards=Non
         Path to the scheduler pickle file.
     rewards : `str`, optional
         Path to the rewards hdf5 file.
-    
+
     Returns
     -------
     pn_app : `panel.viewable.Viewable`
@@ -441,7 +444,7 @@ def prenight_app(night_date=None, observations=None, scheduler=None, rewards=Non
 
     if scheduler is not None:
         prenight.scheduler_fname = scheduler
-        
+
     if rewards is not None:
         prenight.rewards_fname = rewards
 
@@ -461,19 +464,37 @@ def prenight_app(night_date=None, observations=None, scheduler=None, rewards=Non
             ),
             pn.Column(
                 "<h2>Astronomical Events</h2>",
-                pn.param.ParamMethod(prenight.almanac_events_table, loading_indicator=True),
+                pn.param.ParamMethod(
+                    prenight.almanac_events_table, loading_indicator=True
+                ),
             ),
         ),
         pn.Tabs(
-            ("Visit explorer", pn.param.ParamMethod(prenight.visit_explorer, loading_indicator=True)),
-            ("Table of visits", pn.param.ParamMethod(prenight.visit_table, loading_indicator=True)),
-            ("Sky maps", pn.param.ParamMethod(prenight.visit_skymaps, loading_indicator=True)),
-            ("Reward plots", pn.Column(
-                pn.param.ParamMethod(prenight.reward_params, loading_indicator=True),
-                pn.param.ParamMethod(prenight.reward_plot, loading_indicator=True),
-                pn.param.ParamMethod(prenight.infeasible_plot, loading_indicator=True),
-            )),
-            dynamic=False # When true, visit_table never renders. Why?
+            (
+                "Visit explorer",
+                pn.param.ParamMethod(prenight.visit_explorer, loading_indicator=True),
+            ),
+            (
+                "Table of visits",
+                pn.param.ParamMethod(prenight.visit_table, loading_indicator=True),
+            ),
+            (
+                "Sky maps",
+                pn.param.ParamMethod(prenight.visit_skymaps, loading_indicator=True),
+            ),
+            (
+                "Reward plots",
+                pn.Column(
+                    pn.param.ParamMethod(
+                        prenight.reward_params, loading_indicator=True
+                    ),
+                    pn.param.ParamMethod(prenight.reward_plot, loading_indicator=True),
+                    pn.param.ParamMethod(
+                        prenight.infeasible_plot, loading_indicator=True
+                    ),
+                ),
+            ),
+            dynamic=False,  # When true, visit_table never renders. Why?
         ),
         debug_info,
     ).servable()
@@ -492,9 +513,15 @@ def prenight_app(night_date=None, observations=None, scheduler=None, rewards=Non
 
 if __name__ == "__main__":
     print("Starting prenight dashboard")
+
+    if "PRENIGHT_PORT" in os.environ:
+        prenight_port = int(os.environ["PRENIGHT_PORT"])
+    else:
+        prenight_port = 8080
+
     pn.serve(
         prenight_app,
-        port=8080,
+        port=prenight_port,
         title="Prenight Dashboard",
         show=True,
         start=True,
