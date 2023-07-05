@@ -16,6 +16,7 @@ import schedview.plot.visitmap
 import schedview.plot.rewards
 import schedview.plot.visits
 import schedview.plot.maf
+import schedview.plot.nightbf
 
 import panel as pn
 
