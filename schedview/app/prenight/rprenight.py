@@ -461,17 +461,17 @@ def prenight_app(night_date=None, observations=None, scheduler=None, rewards=Non
             ),
             pn.Column(
                 "<h2>Astronomical Events</h2>",
-                prenight.almanac_events_table,
+                pn.param.ParamMethod(prenight.almanac_events_table, loading_indicator=True),
             ),
         ),
         pn.Tabs(
-            ("Visit explorer", prenight.visit_explorer),
-            ("Table of visits", prenight.visit_table),
-            ("Sky maps", prenight.visit_skymaps),
+            ("Visit explorer", pn.param.ParamMethod(prenight.visit_explorer, loading_indicator=True)),
+            ("Table of visits", pn.param.ParamMethod(prenight.visit_table, loading_indicator=True)),
+            ("Sky maps", pn.param.ParamMethod(prenight.visit_skymaps, loading_indicator=True)),
             ("Reward plots", pn.Column(
-                prenight.reward_params,
-                prenight.reward_plot,
-                prenight.infeasible_plot,
+                pn.param.ParamMethod(prenight.reward_params, loading_indicator=True),
+                pn.param.ParamMethod(prenight.reward_plot, loading_indicator=True),
+                pn.param.ParamMethod(prenight.infeasible_plot, loading_indicator=True),
             )),
             dynamic=False # When true, visit_table never renders. Why?
         ),
