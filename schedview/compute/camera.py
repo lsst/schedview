@@ -64,7 +64,8 @@ class LsstCameraFootprintPerimeter(object):
         # rotation matches the sense used by
         # rubin_sim.utils.camera_footprint.LsstCameraFootprint
         eq_vertices = center.directional_offset_by(
-            (self.vertices.angle + rotation) * u.deg, self.vertices.r * u.deg
+            (self.vertices.angle.values + rotation) * u.deg,
+            self.vertices.r.values * u.deg,
         )
         ra = eq_vertices.ra.deg
         decl = eq_vertices.dec.deg
