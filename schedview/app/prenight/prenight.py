@@ -1,5 +1,6 @@
 import param
 import logging
+import numpy as np
 import pandas as pd
 import os
 
@@ -18,6 +19,7 @@ import schedview.plot.rewards
 import schedview.plot.visits
 import schedview.plot.maf
 import schedview.plot.nightbf
+import schedview.param
 
 import panel as pn
 
@@ -42,7 +44,7 @@ pn.extension(
     css_files=[pn.io.resources.CSS_URLS["font-awesome"]],
     sizing_mode="stretch_width",
 )
-pn.config.console_output = "disable"
+pn.config.console_output = "accumulate"
 
 logging.basicConfig(format="%(asctime)s %(message)s", level=logging.INFO)
 
@@ -53,18 +55,63 @@ debug_info = pn.widgets.Debugger(
 
 class Prenight(param.Parameterized):
 
-    opsim_output_fname = param.String(DEFAULT_OPSIM_FNAME)
-    scheduler_fname = param.String(DEFAULT_SCHEDULER_FNAME)
-    rewards_fname = param.String(DEFAULT_REWARDS_FNAME)
+    opsim_output_fname = param.String(
+        default=DEFAULT_OPSIM_FNAME,
+        doc="The file name or URL of the OpSim output database.",
+        label="OpSim output database path or URL",
+    )
 
-    night = param.Date(DEFAULT_CURRENT_TIME.datetime.date())
+    scheduler_fname_doc = """URL or file name of the scheduler pickle file.
+Such a pickle file can either be of an instance of a subclass of
+rubin_sim.scheduler.schedulers.CoreScheduler, or a tuple of the form
+(scheduler, conditions), where scheduler is an instance of a subclass of
+rubin_sim.scheduler.schedulers.CoreScheduler, and conditions is an
+instance of rubin_sim.scheduler.conditions.Conditions."""
+    scheduler_fname = param.String(
+        default=DEFAULT_SCHEDULER_FNAME,
+        doc=scheduler_fname_doc,
+        label="URL or file name of scheduler pickle file",
+    )
+
+    rewards_fname = param.String(
+        default=DEFAULT_REWARDS_FNAME,
+        doc="URL or file name of the rewards HDF5 file.",
+        label="URL or file name of rewards HDF5 file",
+    )
+
+    # Express the night as an instance of datetime.date, so that it can be
+    # used with the panel.widgets.DatePicker widget.
+    night = param.Date(
+        default=DEFAULT_CURRENT_TIME.datetime.date(),
+        doc="The local calendar date of sundown for the night to view.",
+        label="Night to view (local time at sunset)",
+    )
+
     timezone = param.ObjectSelector(
         objects=AVAILABLE_TIMEZONES,
         default=DEFAULT_TIMEZONE,
+        doc='The timezone in which "local time" is to be shown.',
+        label="Timezone",
     )
-    tier = param.ObjectSelector(default="", objects=[""])
-    surveys = param.ListSelector(objects=[], default=[])
-    basis_function = param.ObjectSelector(default="", objects=[""])
+
+    tier = param.ObjectSelector(
+        default="",
+        objects=[""],
+        doc="The label for the first index into the CoreScheduler.survey_lists.",
+        label="Tier",
+    )
+    surveys = param.ListSelector(
+        objects=[],
+        default=[],
+        doc="The labels for the second index into the CoreScheduler.survey_lists.",
+        label="Surveys",
+    )
+    basis_function = param.ObjectSelector(
+        default="",
+        objects=[""],
+        doc="The label for the basis function to be shown.",
+        label="Basis function",
+    )
 
     _observatory = ModelObservatory()
     _site = _observatory.location
@@ -72,14 +119,77 @@ class Prenight(param.Parameterized):
     # be set by the user, because they are used in the @depends methods,
     # and otherwise Parametrized will assume that they depend on
     # everything.
-    _visits = param.Parameter(None)
-    _scheduler = param.Parameter(None)
-    _almanac_events = param.Parameter(None)
-    _night_time = param.Parameter(None)
-    _sunset_time = param.Parameter(None)
-    _sunrise_time = param.Parameter(None)
-    _reward_df = param.Parameter(None)
-    _obs_rewards = param.Parameter(None)
+    _visits = schedview.param.DataFrame(
+        None,
+        doc="The visits for the night.",
+        columns={
+            "fieldRA": float,
+            "fieldDec": float,
+            "observationStartMJD": float,
+            "filter": str,
+            "rotSkyPos": float,
+            "rotSkyPos_desired": float,
+        },
+    )
+    _scheduler = schedview.param.TypedParameter(
+        None, value_type=rubin_sim.scheduler.schedulers.CoreScheduler
+    )
+    _almanac_events = schedview.param.DataFrame(
+        None,
+        doc="Events from the rubin_sim alamanc",
+        columns={"MJD": float, "LST": float, "UTC": pd.Timestamp},
+    )
+
+    # To use the convenient panel widgets, we need to use a python stdlib
+    # datetime.date instance to handle the date as provided by the user,
+    # but we often need an instance of astropy.time.Time when we actually
+    # use it. Therefore, use param to convert it on one place, rather than
+    # doing the conversion independently eveywhere we need it.
+    _night_time = schedview.param.TypedParameter(
+        None,
+        value_type=Time,
+        doc="A local time of the start of the night, used to specify which"
+        "night is being examined",
+    )
+
+    # Use param to extract the sunset time from the almanac table
+    # and convert it no an astropy.time.Time instance
+    # "once and for all", rather than doing it independently everywhere
+    # we need it.
+    _sunset_time = schedview.param.TypedParameter(
+        None,
+        value_type=Time,
+        doc="The time of sunset on the night being examined.",
+    )
+
+    # Use param to extract the sunset time from the almanac table
+    # and convert it no an astropy.time.Time instance
+    # "once and for all", rather than doing it independently everywhere
+    # we need it.
+    _sunrise_time = schedview.param.TypedParameter(
+        None,
+        value_type=Time,
+        doc="The time of sunrise on the night being examined.",
+    )
+
+    _reward_df = schedview.param.DataFrame(
+        None,
+        columns={
+            "basis_function": str,
+            "feasible": np.bool_,
+            "max_basis_reward": float,
+            "basis_area": float,
+            "basis_weight": float,
+            "tier_label": str,
+            "survey_label": str,
+            "survey_class": str,
+            "survey_reward": float,
+            "basis_function_class": object,
+            "queue_start_mjd": float,
+            "queue_fill_mjd_ns": np.int64,
+        },
+    )
+    _obs_rewards = schedview.param.TypedParameter(None, value_type=pd.Series)
 
     @param.depends("night", watch=True)
     def _update_night_time(self):
@@ -415,7 +525,9 @@ class Prenight(param.Parameterized):
         return fig
 
 
-def prenight_app(night_date=None, observations=None, scheduler=None, rewards=None):
+def prenight_app(
+    night_date=None, observations=None, scheduler=None, rewards=None, return_app=False
+):
     """Create the pre-night briefing app.
 
     Parameters
@@ -428,10 +540,13 @@ def prenight_app(night_date=None, observations=None, scheduler=None, rewards=Non
         Path to the scheduler pickle file.
     rewards : `str`, optional
         Path to the rewards hdf5 file.
+    return_app : `bool`, optional
+        Return the instances of the app class itself.
 
     Returns
     -------
-    pn_app : `panel.viewable.Viewable`
+    pn_app : `panel.viewable.Viewable` or
+            `tuple` ['panel.viewable.Viewable', `schedview.prenight.Prenight`]
         The pre-night briefing app.
     """
     prenight = Prenight()
@@ -508,7 +623,10 @@ def prenight_app(night_date=None, observations=None, scheduler=None, rewards=Non
     except RuntimeError as e:
         logging.info("RuntimeError: %s", e)
 
-    return pn_app
+    if return_app:
+        return pn_app, prenight
+    else:
+        return pn_app
 
 
 if __name__ == "__main__":
