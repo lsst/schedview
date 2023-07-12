@@ -2,6 +2,7 @@ from tempfile import TemporaryDirectory
 
 from astropy.time import Time
 from matplotlib.figure import Figure
+import astropy
 
 import rubin_sim
 from rubin_sim import maf
@@ -12,6 +13,8 @@ from schedview.plot.maf import create_sample_maf_metric_plot
 OPSIM_OUTPUT_FNAME = rubin_sim.data.get_baseline()
 NIGHT = Time("2023-10-04", scale="utc")
 OBSERVATORY = ModelObservatory()
+
+astropy.utils.iers.conf.iers_degraded_accuracy = "warn"
 
 
 def test_compute_sample_metric_bundle_group():
