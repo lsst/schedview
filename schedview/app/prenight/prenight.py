@@ -5,6 +5,7 @@ import pandas as pd
 import os
 
 from astropy.time import Time
+import astropy.utils.iers
 
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 import rubin_sim.scheduler.example
@@ -38,6 +39,7 @@ DEFAULT_SCHEDULER_FNAME = "scheduler.pickle.xz"
 DEFAULT_REWARDS_FNAME = "rewards.h5"
 USE_EXAMPLE_SCHEDULER = False
 
+astropy.utils.iers.conf.iers_degraded_accuracy = "warn"
 
 pn.extension(
     "tabulator",
