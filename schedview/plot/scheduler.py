@@ -332,11 +332,6 @@ class SchedulerDisplay:
         LOGGER.debug("Setting the scheduler")
         self._scheduler = scheduler
 
-        # FIXME The pickle used for testing does not include several
-        # required methods of the Scheduler class, so add them.
-        if "get_basis_functions" not in dir(self.scheduler):
-            import schedview.munge.monkeypatch_rubin_sim  # noqa F401
-
         self.survey_index[0] = self.scheduler.survey_index[0]
         self.survey_index[1] = self.scheduler.survey_index[1]
 
