@@ -414,7 +414,6 @@ def make_scheduler_summary_df(scheduler, conditions, reward_df=None):
     summary_df["survey_url"] = summary_df.apply(get_survey_url, axis=1)
 
     def make_survey_row(survey_bfs):
-
         infeasible_bf = ", ".join(
             survey_bfs.loc[~survey_bfs.feasible.astype(bool)].basis_function.to_list()
         )

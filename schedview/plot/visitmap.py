@@ -458,8 +458,9 @@ def create_visit_skymaps(
     scheduler : `CoreScheduler` or `str`
         The scheduler from which to extract the footprint, or the name of
         a file from which such a scheduler should be loaded.
-    night_date : `astropy.time.Time`
-        A time during the night to plot
+    night_date : `datetime.date`
+        The calendar date of the evening of the night for which
+        to plot the visits.
     observatory : `ModelObservatory`, optional
         Provides the location of the observatory, used to compute
         night start and end times.

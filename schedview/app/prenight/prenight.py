@@ -56,7 +56,6 @@ debug_info = pn.widgets.Debugger(
 
 
 class Prenight(param.Parameterized):
-
     opsim_output_fname = param.String(
         default=DEFAULT_OPSIM_FNAME,
         doc="The file name or URL of the OpSim output database.",
@@ -83,6 +82,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
 
     # Express the night as an instance of datetime.date, so that it can be
     # used with the panel.widgets.DatePicker widget.
+    # It represents the local calendar date of sundown for the night to view.
     night = param.Date(
         default=DEFAULT_CURRENT_TIME.datetime.date(),
         doc="The local calendar date of sundown for the night to view.",
@@ -142,38 +142,6 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         columns={"MJD": float, "LST": float, "UTC": pd.Timestamp},
     )
 
-    # To use the convenient panel widgets, we need to use a python stdlib
-    # datetime.date instance to handle the date as provided by the user,
-    # but we often need an instance of astropy.time.Time when we actually
-    # use it. Therefore, use param to convert it on one place, rather than
-    # doing the conversion independently eveywhere we need it.
-    _night_time = schedview.param.TypedParameter(
-        None,
-        value_type=Time,
-        doc="A local time of the start of the night, used to specify which"
-        "night is being examined",
-    )
-
-    # Use param to extract the sunset time from the almanac table
-    # and convert it no an astropy.time.Time instance
-    # "once and for all", rather than doing it independently everywhere
-    # we need it.
-    _sunset_time = schedview.param.TypedParameter(
-        None,
-        value_type=Time,
-        doc="The time of sunset on the night being examined.",
-    )
-
-    # Use param to extract the sunset time from the almanac table
-    # and convert it no an astropy.time.Time instance
-    # "once and for all", rather than doing it independently everywhere
-    # we need it.
-    _sunrise_time = schedview.param.TypedParameter(
-        None,
-        value_type=Time,
-        doc="The time of sunrise on the night being examined.",
-    )
-
     _reward_df = schedview.param.DataFrame(
         None,
         columns={
@@ -193,27 +161,12 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
     )
     _obs_rewards = schedview.param.TypedParameter(None, value_type=pd.Series)
 
-    @param.depends("night", watch=True)
-    def _update_night_time(self):
-        logging.info("Updating night time.")
-        self._night_time = Time(self.night.isoformat())
-
-    @param.depends("_night_time", "timezone", watch=True)
+    @param.depends("night", "timezone", watch=True)
     def _update_almanac_events(self):
         logging.info("Updating almanac events.")
         self._almanac_events = schedview.compute.astro.night_events(
-            self._night_time, self._site, self.timezone
+            self.night, self._site, self.timezone
         )
-
-    @param.depends("_almanac_events", watch=True)
-    def _update_sunset_time(self):
-        logging.info("Updating sunset time.")
-        self._sunset_time = Time(self._almanac_events.loc["sunset", "UTC"])
-
-    @param.depends("_almanac_events", watch=True)
-    def _update_sunrise_time(self):
-        logging.info("Updating sunrise time.")
-        self._sunrise_time = Time(self._almanac_events.loc["sunrise", "UTC"])
 
     @param.depends("_almanac_events")
     def almanac_events_table(self):
@@ -224,15 +177,24 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         almanac_table = pn.widgets.DataFrame(self._almanac_events)
         return almanac_table
 
-    @param.depends("opsim_output_fname", "_sunset_time", "_sunrise_time", watch=True)
+    @param.depends("opsim_output_fname", "_almanac_events", watch=True)
     def _update_visits(self):
+        if self.opsim_output_fname is None:
+            self._visits = None
+            return
+
         if self._almanac_events is None:
             self._update_almanac_events()
 
         logging.info("Updating visits.")
         try:
+            if not os.path.exists(self.opsim_output_fname):
+                raise FileNotFoundError(f"File not found: {self.opsim_output_fname}")
+
             visits = schedview.collect.opsim.read_opsim(
-                self.opsim_output_fname, self._sunset_time.iso, self._sunrise_time.iso
+                self.opsim_output_fname,
+                Time(self._almanac_events.loc["sunset", "UTC"]),
+                Time(self._almanac_events.loc["sunrise", "UTC"]),
             )
             self._visits = visits
         except Exception as e:
@@ -293,7 +255,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             visit_explorer_data,
         ) = schedview.plot.visits.create_visit_explorer(
             visits=self._visits,
-            night_date=self._night_time,
+            night_date=self.night,
         )
 
         if len(visit_explorer_data["visits"]) < 1:
@@ -345,7 +307,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         vmap, vmap_data = schedview.plot.visitmap.create_visit_skymaps(
             visits=self._visits,
             scheduler=self._scheduler,
-            night_date=self._night_time,
+            night_date=self.night,
             timezone=self.timezone,
             observatory=self._observatory,
         )
@@ -553,17 +515,22 @@ def prenight_app(
     """
     prenight = Prenight()
 
-    if night_date is not None:
-        prenight.night = night_date
+    # Rather than set each parameter one at a time, and execute the callbacks
+    # for each as they are set, we can use the batch_call_watchers context
+    # manager to set all the parameters at once, and only execute the callbacks
+    # once.
+    with param.parameterized.batch_call_watchers(prenight):
+        if night_date is not None:
+            prenight.night = night_date
 
-    if observations is not None:
-        prenight.opsim_output_fname = observations
+        if observations is not None:
+            prenight.opsim_output_fname = observations
 
-    if scheduler is not None:
-        prenight.scheduler_fname = scheduler
+        if scheduler is not None:
+            prenight.scheduler_fname = scheduler
 
-    if rewards is not None:
-        prenight.rewards_fname = rewards
+        if rewards is not None:
+            prenight.rewards_fname = rewards
 
     pn_app = pn.Column(
         "<h1>Pre-night briefing</h1>",

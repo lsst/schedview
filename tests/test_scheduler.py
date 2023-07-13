@@ -1,5 +1,6 @@
 import unittest
 import healpy as hp
+import astropy.utils.iers
 from astropy.time import TimeDelta
 from schedview.plot.scheduler import (
     SchedulerDisplay,
@@ -11,6 +12,8 @@ from rubin_sim.scheduler.model_observatory import ModelObservatory
 from rubin_sim.scheduler.features.conditions import Conditions
 
 NSIDE = 8
+
+astropy.utils.iers.conf.iers_degraded_accuracy = "warn"
 
 
 class test_SchedulerDisplay(unittest.TestCase):

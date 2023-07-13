@@ -447,7 +447,6 @@ class SchedulerDisplay:
         decorate=True,
         horizon_graticules=False,
     ):
-
         if "hover_tool" not in self.bokeh_models:
             self.bokeh_models["hover_tool"] = bokeh.models.HoverTool(
                 renderers=[], tooltips=self.tooltips
@@ -465,7 +464,9 @@ class SchedulerDisplay:
 
         if "healpix" in self.data_sources:
             sphere_map.add_healpix(
-                self.data_sources["healpix"], cmap=self.healpix_cmap, nside=self.nside
+                # self.data_sources["healpix"], cmap=self.healpix_cmap, nside=self.nside
+                self.data_sources["healpix"],
+                nside=self.nside,
             )
         else:
             sphere_map.add_healpix(self.healpix_values, nside=self.nside)
@@ -814,7 +815,6 @@ class SchedulerDisplay:
         data = self.data_sources["healpix"].data
         for data_key in data.keys():
             if not isinstance(data[data_key][0], collections.abc.Sequence):
-
                 if data_key == "center_ra":
                     label = "RA"
                 elif data_key == "center_decl":

@@ -12,7 +12,6 @@ class LsstCameraFootprintPerimeter(object):
     footprint_width_deg = 3.5
 
     def __init__(self):
-
         raft_width_deg = self.footprint_width_deg / self.footprint_wide_rafts
 
         offsets = (
