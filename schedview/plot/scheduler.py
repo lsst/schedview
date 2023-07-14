@@ -464,8 +464,8 @@ class SchedulerDisplay:
 
         if "healpix" in self.data_sources:
             sphere_map.add_healpix(
-                # self.data_sources["healpix"], cmap=self.healpix_cmap, nside=self.nside
                 self.data_sources["healpix"],
+                cmap=self.healpix_cmap,
                 nside=self.nside,
             )
         else:
@@ -857,7 +857,7 @@ class SchedulerDisplay:
 
             any_bad_urls = False
             for doc_url in reward_df["doc_url"].values:
-                if "http" not in doc_url:
+                if doc_url is None or "http" not in doc_url:
                     any_bad_urls = True
                     break
 
