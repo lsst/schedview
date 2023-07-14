@@ -133,9 +133,10 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             "rotSkyPos_desired": float,
         },
     )
-    _scheduler = schedview.param.TypedParameter(
-        None, value_type=rubin_sim.scheduler.schedulers.CoreScheduler
-    )
+
+    # An instance of rubin_sim.scheduler.schedulers.CoreScheduler
+    _scheduler = param.Parameter()
+
     _almanac_events = schedview.param.DataFrame(
         None,
         doc="Events from the rubin_sim alamanc",
@@ -159,7 +160,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             "queue_fill_mjd_ns": np.int64,
         },
     )
-    _obs_rewards = schedview.param.TypedParameter(None, value_type=pd.Series)
+    _obs_rewards = schedview.param.Series()
 
     @param.depends("night", "timezone", watch=True)
     def _update_almanac_events(self):

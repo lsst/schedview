@@ -4,20 +4,11 @@ import param
 import pandas as pd
 
 
-class TypedParameter(param.Parameter):
-    """A parameter with a type.
+class Series(param.Parameter):
+    """A pandas.Series parameter."""
 
-    Parameters
-    ----------
-    `value_type`: `type`
-        The type the parameter must have.
-    """
-
-    __slots__ = ["value_type"]
-
-    def __init__(self, default=None, value_type=None, allow_None=False, **kwargs):
+    def __init__(self, default=None, allow_None=False, **kwargs):
         super().__init__(default=default, allow_None=allow_None, **kwargs)
-        self.value_type = value_type
         self.allow_None = default is None or allow_None
         self._validate(default)
 
@@ -25,9 +16,9 @@ class TypedParameter(param.Parameter):
         if allow_None and val is None:
             return
 
-        if not isinstance(val, self.value_type):
+        if not isinstance(val, pd.Series):
             raise ValueError(
-                f"Parameter {self.name} only takes a {self.value_type}, "
+                f"Parameter {self.name} only takes a pandas.Series, "
                 f"not value of type {type(val)}."
             )
 
