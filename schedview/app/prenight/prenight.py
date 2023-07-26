@@ -175,7 +175,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             return "No almanac events computed."
 
         logging.info("Updating almanac table.")
-        almanac_table = pn.widgets.DataFrame(self._almanac_events)
+        almanac_table = pn.widgets.Tabulator(self._almanac_events)
         return almanac_table
 
     @param.depends("opsim_output_fname", "_almanac_events", watch=True)
@@ -208,7 +208,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
 
         Returns
         -------
-        visit_table : `pn.widgets.DataFrame`
+        visit_table : `pn.widgets.Tabulator`
             The table of visits.
         """
         if self._visits is None:
@@ -229,7 +229,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             "note",
         ]
 
-        visit_table = pn.widgets.DataFrame(self._visits[columns])
+        visit_table = pn.widgets.Tabulator(self._visits[columns])
 
         if len(self._visits) < 1:
             visit_table = "No visits on this night"
