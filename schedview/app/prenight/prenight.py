@@ -165,9 +165,16 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
     @param.depends("night", "timezone", watch=True)
     def _update_almanac_events(self):
         logging.info("Updating almanac events.")
-        self._almanac_events = schedview.compute.astro.night_events(
+        night_events = schedview.compute.astro.night_events(
             self.night, self._site, self.timezone
         )
+
+        # Bokeh automatically converts all datetimes to UTC
+        # when displaying, which we do not want. So, turn the localized
+        # datetimes to naive datetimes so bokeh leaves them alone.
+        night_events[self.timezone] = night_events[self.timezone].dt.tz_localize(None)
+
+        self._almanac_events = night_events
 
     @param.depends("_almanac_events")
     def almanac_events_table(self):
