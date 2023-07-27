@@ -128,7 +128,7 @@ def compute_maps(survey, conditions, nside=None):
 
     values = survey.calc_reward_function(conditions)
     if not can_be_healpix_map(values):
-        values = np.full(np.empty(hp.nside2npix(nside)), values)
+        values = np.full(np.empty(hp.nside2npix(nside)).shape, values)
 
     survey_maps["reward"] = values
 
