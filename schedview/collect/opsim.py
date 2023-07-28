@@ -17,7 +17,7 @@ def read_opsim(filename, start_time="2000-01-01", end_time="2100-01-01"):
 
     Returns
     -------
-    visits : `holoviews.Dataset`
+    visits : `pandas.DataFrame`
         The visits and their parameters.
     """
     start_mjd = Time(start_time).mjd

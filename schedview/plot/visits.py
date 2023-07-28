@@ -36,8 +36,8 @@ def create_visit_explorer(
     visits : `str` or `pandas.DataFrame`
         One row per visit, as created by `schedview.collect.opsim.read_opsim`,
         or the name of a file from which such visits should be loaded.
-    night_date : `astropy.time.Time`
-        A time during the night to plot
+    night_date : `datetime.date`
+        The calendar date in the evening local time.
     observatory : `ModelObservatory`, optional
         Provides the location of the observatory, used to compute
         night start and end times.
