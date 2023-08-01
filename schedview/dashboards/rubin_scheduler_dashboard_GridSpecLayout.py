@@ -489,6 +489,8 @@ class Scheduler(param.Parameterized):
                                                     frozen_columns=['basis_function'],
                                                     hidden_columns=['doc_url'],
                                                     selectable=1,
+                                                    pagination='local',
+                                                    page_size=15
                                                     #height=500,
                                                     #sizing_mode='stretch_both',
                                                     )
