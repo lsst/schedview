@@ -653,9 +653,14 @@ def scheduler_app(date=None, scheduler_pickle=None):
     sched_app[11,   :]    = pn.Row(pn.Spacer(width=10),
                                    pn.Column(pn.pane.Str(' Debugging',
                                                          align='center',
-                                                         styles={'font-size':'10pt','color':'black'}),
-                                             terminal,
-                                             styles={'background':'#EDEDED'}),
+                                                         styles={'font-size':'10pt',
+                                                                'color':'black',
+                                                                'height': '30px', 
+                                                                'font-weight':'bold',
+                                                                'background': '#EDEDED',
+                                                                'padding-top': '5px'}),
+                                             terminal
+                                            ),
                                    pn.Spacer(width=10))
 
     return sched_app
