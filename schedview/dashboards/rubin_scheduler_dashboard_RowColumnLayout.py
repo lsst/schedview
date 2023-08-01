@@ -559,7 +559,8 @@ class Scheduler(param.Parameterized):
                                          #width=800,
                                          #sizing_mode='stretch_width',
                                          styles={'font-size':'9pt',
-                                                 'color':'black'})
+                                                 'color':'black',
+                                                 'overflow': 'scroll'})
         return debugging_messages
     
 
@@ -647,8 +648,8 @@ def scheduler_app(date=None, scheduler_pickle=None):
         pn.Column(pn.pane.Str(' Debugging', styles={'font-size':'10pt','font-weight':'bold','color':'black'}),
                   scheduler.debugging_messages,
                   #pn.layout.HSpacer(),
-                  sizing_mode='stretch_width',
-                  width_policy='max',
+                #   sizing_mode='stretch_width',
+                #   width_policy='max',
                   height=100,
                   styles={'background':'#EDEDED'}
                   )
