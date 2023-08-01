@@ -8,6 +8,7 @@ import os
 
 from astropy.time import Time
 from zoneinfo import ZoneInfo
+from bokeh.models.widgets.tables import HTMLTemplateFormatter
 
 import schedview
 import schedview.compute.scheduler
@@ -128,7 +129,17 @@ debug_info = pn.widgets.Debugger(name        = "Debugger information.",
 terminal = pn.widgets.Terminal(height=100, sizing_mode='stretch_width')
 
 
-
+def survey_url_formatter(row):
+    """
+    format survey name as a HTML href to survey url (if url exists)
+    otherwise return survey name as a string
+    row: a dataframe row
+    """
+    name = row['survey_name']
+    url = row['survey_url']
+    html = name if url == "" else f'<a href="{url}" target="_blank"> {name}</a>'
+    
+    return html
 
 class Scheduler(param.Parameterized):
     
@@ -264,6 +275,7 @@ class Scheduler(param.Parameterized):
             survey_rewards = schedview.compute.scheduler.make_scheduler_summary_df(self._scheduler,
                                                                                    self._conditions,
                                                                                    self._rewards)
+            survey_rewards['survey_name'] = survey_rewards.apply(survey_url_formatter, axis=1)
             self._survey_rewards = survey_rewards
         except Exception as e:
             logging.error(e)
@@ -307,10 +319,10 @@ class Scheduler(param.Parameterized):
     def survey_rewards_table(self):
         if self._tier_survey_rewards is None:
             return "No surveys available."
-        tabulator_formatter = {'survey_name': {'type': 'link',
-                                                'labelField':'survey_name',
-                                                'urlField':'survey_url',
-                                                'target':'_blank'}}
+        
+        tabulator_formatter = {
+            'survey_name': HTMLTemplateFormatter(template='<%= value %>')
+        }
         survey_rewards_table = pn.widgets.Tabulator(self._tier_survey_rewards[['tier','survey_name','reward','survey_url']],
                                                     widths={'survey_name':'60%','reward':'40%'},
                                                     show_index=False,
