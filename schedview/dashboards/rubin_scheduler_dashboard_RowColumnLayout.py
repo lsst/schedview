@@ -579,7 +579,7 @@ def scheduler_app(date=None, scheduler_pickle=None):
         # Title pane across top of dashboard.
         pn.Row(scheduler.dashboard_title,
                 pn.layout.HSpacer(),
-                pn.pane.PNG(LOGO, height=80, align='center', margin=(5,5,5,5)),
+                pn.pane.PNG(LOGO, height=80, width=150, margin=(5,5,5,5)),
                 sizing_mode='stretch_width',
                 styles={'background':'#048b8c'}),
         pn.Spacer(height=10),
