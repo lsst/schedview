@@ -107,8 +107,8 @@ DEFAULT_SCHEDULER_FNAME = "scheduler.pickle.xz"
 
 color_palettes = [s for s in bokeh.palettes.__palettes__ if "256" in s]
 
-LOGO      = "/Users/me/Documents/2023/ADACS/Panel_scheduler/Rubin_scheduler_dashboard/lsst_white_logo.png"
-key_image = "/Users/me/Documents/2023/ADACS/Panel_scheduler/Rubin_scheduler_dashboard/key_image.png"
+LOGO = "/assets/lsst_white_logo.png"
+key_image = "/assets/key_image.png"
 
 pn.extension("tabulator",
              css_files   = [pn.io.resources.CSS_URLS["font-awesome"]],
@@ -635,4 +635,5 @@ if __name__ == "__main__":
         start      = True,
         autoreload = True,
         threaded   = True,
+        static_dirs = {'assets': './assets'}
     )
