@@ -141,6 +141,21 @@ def survey_url_formatter(row):
     
     return html
 
+
+# Change styles using css variables
+title_stylesheet = """
+    :host {
+        --mono-font: Helvetica;
+    }
+    """
+
+# Change styles using css classes
+another_title_stylesheet = """
+:host(.title)  {
+    --mono-font: Helvetica;
+}
+"""
+
 class Scheduler(param.Parameterized):
     
     scheduler_fname = param.String(default="",
@@ -190,7 +205,8 @@ class Scheduler(param.Parameterized):
         title_string = 'Scheduler Dashboard' + titleT + titleS + titleBF + titleM
         dashboard_title = pn.pane.Str(title_string,styles={'font-size':'16pt',
                                                            'color':'white',
-                                                           'font-weight':'bold'})
+                                                           'font-weight':'bold'},
+                                                    stylesheets=[title_stylesheet])
         return dashboard_title
 
 
@@ -201,7 +217,8 @@ class Scheduler(param.Parameterized):
         if self._scheduler is not None and self.tier != '':
             title_string = 'Tier {} survey rewards'.format(self.tier[-1])
         survey_rewards_title = pn.pane.Str(title_string, styles={'font-size':'14pt',
-                                                                 'color':'white'})
+                                                                 'color':'white'},
+                                                        stylesheets=[title_stylesheet])
         return survey_rewards_title
 
 
@@ -212,8 +229,11 @@ class Scheduler(param.Parameterized):
             title_string = 'Basis functions for survey {}'.format(self._tier_survey_rewards.reset_index()['survey_name'][self.survey])
         else:
             title_string = ''
-        basis_function_table_title = pn.pane.Str(title_string, styles={'font-size':'14pt',
-                                                                       'color':'white'})
+        basis_function_table_title = pn.pane.Str(title_string, 
+                                                styles={'font-size':'14pt',
+                                                        'color':'white'},
+                                                stylesheets=[another_title_stylesheet], 
+                                                css_classes=['title'])
         return basis_function_table_title
 
 
@@ -233,7 +253,8 @@ class Scheduler(param.Parameterized):
         else:
             title_string = ''
         map_title = pn.pane.Str(title_string, styles={'font-size':'14pt',
-                                                      'color':'white'})
+                                                      'color':'white'},
+                                            stylesheets=[title_stylesheet])
         return map_title
 
     
