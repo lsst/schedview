@@ -332,11 +332,6 @@ class SchedulerDisplay:
         LOGGER.debug("Setting the scheduler")
         self._scheduler = scheduler
 
-        # FIXME The pickle used for testing does not include several
-        # required methods of the Scheduler class, so add them.
-        if "get_basis_functions" not in dir(self.scheduler):
-            import schedview.munge.monkeypatch_rubin_sim  # noqa F401
-
         self.survey_index[0] = self.scheduler.survey_index[0]
         self.survey_index[1] = self.scheduler.survey_index[1]
 
@@ -452,7 +447,6 @@ class SchedulerDisplay:
         decorate=True,
         horizon_graticules=False,
     ):
-
         if "hover_tool" not in self.bokeh_models:
             self.bokeh_models["hover_tool"] = bokeh.models.HoverTool(
                 renderers=[], tooltips=self.tooltips
@@ -470,7 +464,9 @@ class SchedulerDisplay:
 
         if "healpix" in self.data_sources:
             sphere_map.add_healpix(
-                self.data_sources["healpix"], cmap=self.healpix_cmap, nside=self.nside
+                self.data_sources["healpix"],
+                cmap=self.healpix_cmap,
+                nside=self.nside,
             )
         else:
             sphere_map.add_healpix(self.healpix_values, nside=self.nside)
@@ -819,7 +815,6 @@ class SchedulerDisplay:
         data = self.data_sources["healpix"].data
         for data_key in data.keys():
             if not isinstance(data[data_key][0], collections.abc.Sequence):
-
                 if data_key == "center_ra":
                     label = "RA"
                 elif data_key == "center_decl":
@@ -862,7 +857,7 @@ class SchedulerDisplay:
 
             any_bad_urls = False
             for doc_url in reward_df["doc_url"].values:
-                if "http" not in doc_url:
+                if doc_url is None or "http" not in doc_url:
                     any_bad_urls = True
                     break
 

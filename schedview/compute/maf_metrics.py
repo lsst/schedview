@@ -20,8 +20,8 @@ def compute_night_metric_bundle(
         Name of file with opsim output.
     data_dir : `str`
         MAF output directory.
-    night_date : `astropy.time.Time`
-        The night to examine.
+    night_date : `datetime.date`
+        The local calendar date of the start of the night.
     metric : `rubin_sim.maf.metrics.base_metric.BaseMetric`
         The MAF metric to compute.
     slicer : `rubin_sim.maf.slicers.base_slicer.BaseSlicer`
@@ -73,8 +73,8 @@ def compute_sample_metric_bundle(opsim_fname, data_dir, night_date, observatory=
         Name of file with opsim output
     data_dir : `str`
         MAF output directory
-    night_date : `astropy.time.Time`
-        Night to make the metric bundle for.
+    night_date : `datetime.date`
+        The local calendar date of the start of the night.
     observatory : `ModelObservatory`, optional
         The observatory to use, by default None
 

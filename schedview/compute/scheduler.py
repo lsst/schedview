@@ -202,6 +202,7 @@ def create_example(
     simulate=True,
     scheduler_pickle_fname=None,
     opsim_db_fname=None,
+    rewards_fname=None,
 ):
     """Create an example scheduler and observatory.
 
@@ -219,6 +220,14 @@ def create_example(
     nside : `int`
         The nside to use for the scheduler and observatory. If None, use the
         default nside for the example scheduler.
+    simulate : `bool`
+        Run a sample simulation from survey_start to current_time
+    scheduler_pickle_fname : `str`
+        The filename to save the scheduler to.
+    opsim_db_fname : `str`
+        The filename to save the opsim database to.
+    rewards_fname : `str`
+        The filename to save the rewards to.
 
     Returns
     -------
@@ -231,6 +240,8 @@ def create_example(
     observations : `pd.DataFrame`
         The observations from the simulation.
     """
+
+    record_rewards = rewards_fname is not None
 
     current_time = _normalize_time(current_time)
     survey_start = _normalize_time(survey_start)
@@ -245,12 +256,28 @@ def create_example(
 
     if simulate:
         sim_duration = current_time.mjd - survey_start.mjd
-        observatory, scheduler, observations = sim_runner(
-            observatory,
-            scheduler,
-            mjd_start=survey_start.mjd,
-            survey_length=sim_duration,
-        )
+        if record_rewards:
+            scheduler.keep_rewards = True
+            observatory, scheduler, observations, reward_df, obs_rewards = sim_runner(
+                observatory,
+                scheduler,
+                mjd_start=survey_start.mjd,
+                survey_length=sim_duration,
+                record_rewards=True,
+            )
+            reward_df.to_hdf(rewards_fname, "reward_df")
+            obs_rewards.to_hdf(rewards_fname, "obs_rewards")
+        else:
+            observatory, scheduler, observations = sim_runner(
+                observatory,
+                scheduler,
+                mjd_start=survey_start.mjd,
+                survey_length=sim_duration,
+            )
+
+        if opsim_db_fname is not None:
+            converter = SchemaConverter()
+            converter.obs2opsim(observations, filename=opsim_db_fname, delete_past=True)
     else:
         observations = None
 
@@ -268,11 +295,11 @@ def create_example(
             with open(scheduler_pickle_fname, "wb") as out_file:
                 pickle.dump((scheduler, scheduler.conditions), out_file)
 
-    if opsim_db_fname is not None:
-        converter = SchemaConverter()
-        converter.obs2opsim(observations, filename=opsim_db_fname, delete_past=True)
+    result = (scheduler, observatory, conditions, observations)
+    if record_rewards:
+        result += (reward_df, obs_rewards)
 
-    return scheduler, observatory, conditions, observations
+    return result
 
 
 def make_unique_survey_name(scheduler, survey_index=None):
@@ -387,7 +414,6 @@ def make_scheduler_summary_df(scheduler, conditions, reward_df=None):
     summary_df["survey_url"] = summary_df.apply(get_survey_url, axis=1)
 
     def make_survey_row(survey_bfs):
-
         infeasible_bf = ", ".join(
             survey_bfs.loc[~survey_bfs.feasible.astype(bool)].basis_function.to_list()
         )
