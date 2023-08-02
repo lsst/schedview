@@ -141,6 +141,18 @@ def survey_url_formatter(row):
     
     return html
 
+def basis_function_url_formatter(row):
+    """
+    format survey name as a HTML href to survey url (if url exists)
+    otherwise return survey name as a string
+    row: a dataframe row
+    """
+    name = row['basis_function']
+    url = row['doc_url']
+    html = name if url == "" else f'<a href="{url}" target="_blank"> {name}</a>'
+    
+    return html
+
 
 # Change styles using css variables
 title_stylesheet = """
@@ -360,6 +372,8 @@ class Scheduler(param.Parameterized):
                                                     disabled=True,
                                                     selectable=1,
                                                     hidden_columns=['tier','survey_url'],
+                                                    pagination='remote',
+                                                    page_size=4,
                                                     #height=200,
                                                     sizing_mode='stretch_width',
                                                     #sizing_mode='stretch_both',
@@ -453,6 +467,7 @@ class Scheduler(param.Parameterized):
             basis_function_df = schedview.compute.survey.make_survey_reward_df(self._listed_survey,
                                                                                self._conditions,
                                                                                self._rewards.loc[[(tier_id, survey_id)], :])
+            basis_function_df['basis_function'] = basis_function_df.apply(basis_function_url_formatter, axis=1)
             self._basis_functions = basis_function_df
         except Exception as e:
             logging.error(e)
@@ -467,11 +482,11 @@ class Scheduler(param.Parameterized):
         if self._basis_functions is None:
             return "No basis functions available."
         logging.info("Creating basis function table.")
+   
         tabulator_formatter = {
-            'basis_function': {'type': 'link',
-                                'labelField':'basis_function',
-                                'urlField':'doc_url',
-                                'target':'_blank'}}
+            'basis_function': HTMLTemplateFormatter(template='<%= value %>')
+        }
+
         columnns = ['basis_function',
                     'basis_function_class',
                     'feasible',
@@ -489,7 +504,7 @@ class Scheduler(param.Parameterized):
                                                     frozen_columns=['basis_function'],
                                                     hidden_columns=['doc_url'],
                                                     selectable=1,
-                                                    pagination='local',
+                                                    pagination='remote',
                                                     page_size=15
                                                     #height=500,
                                                     #sizing_mode='stretch_both',
