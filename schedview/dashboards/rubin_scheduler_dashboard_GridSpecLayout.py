@@ -8,6 +8,7 @@ import os
 
 from astropy.time import Time
 from zoneinfo import ZoneInfo
+from bokeh.models.widgets.tables import HTMLTemplateFormatter
 
 import schedview
 import schedview.compute.scheduler
@@ -107,8 +108,8 @@ DEFAULT_SCHEDULER_FNAME = "scheduler.pickle.xz"
 
 color_palettes = [s for s in bokeh.palettes.__palettes__ if "256" in s]
 
-LOGO      = "/Users/me/Documents/2023/ADACS/Panel_scheduler/Rubin_scheduler_dashboard/lsst_white_logo.png"
-key_image = "/Users/me/Documents/2023/ADACS/Panel_scheduler/Rubin_scheduler_dashboard/key_image.png"
+LOGO = "/assets/lsst_white_logo.png"
+key_image = "/assets/key_image.png"
 
 pn.extension("tabulator",
              css_files   = [pn.io.resources.CSS_URLS["font-awesome"]],
@@ -128,6 +129,44 @@ debug_info = pn.widgets.Debugger(name        = "Debugger information.",
 terminal = pn.widgets.Terminal(height=100, sizing_mode='stretch_width')
 
 
+def survey_url_formatter(row):
+    """
+    format survey name as a HTML href to survey url (if url exists)
+    otherwise return survey name as a string
+    row: a dataframe row
+    """
+    name = row['survey_name']
+    url = row['survey_url']
+    html = name if url == "" else f'<a href="{url}" target="_blank"> {name}</a>'
+    
+    return html
+
+def basis_function_url_formatter(row):
+    """
+    format survey name as a HTML href to survey url (if url exists)
+    otherwise return survey name as a string
+    row: a dataframe row
+    """
+    name = row['basis_function']
+    url = row['doc_url']
+    html = name if url == "" else f'<a href="{url}" target="_blank"> {name}</a>'
+    
+    return html
+
+
+# Change styles using css variables
+title_stylesheet = """
+    :host {
+        --mono-font: Helvetica;
+    }
+    """
+
+# Change styles using css classes
+another_title_stylesheet = """
+:host(.title)  {
+    --mono-font: Helvetica;
+}
+"""
 
 
 class Scheduler(param.Parameterized):
@@ -177,9 +216,11 @@ class Scheduler(param.Parameterized):
                     elif self.plot_display == 2 and self.basis_function >= 0:
                         titleBF = ' | Basis function {}'.format(self.basis_function)
         title_string = 'Scheduler Dashboard' + titleT + titleS + titleBF + titleM
-        dashboard_title = pn.pane.Str(title_string,styles={'font-size':'16pt',
-                                                           'color':'white',
-                                                           'font-weight':'bold'})
+        dashboard_title = pn.pane.Str(title_string,
+                                    styles={'font-size':'16pt',
+                                            'color':'white',
+                                            'font-weight':'bold'},
+                                    stylesheets=[title_stylesheet])
         return dashboard_title
 
 
@@ -189,8 +230,11 @@ class Scheduler(param.Parameterized):
         title_string = ''
         if self._scheduler is not None and self.tier != '':
             title_string = 'Tier {} survey rewards'.format(self.tier[-1])
-        survey_rewards_title = pn.pane.Str(title_string, styles={'font-size':'14pt',
-                                                                 'color':'white'})
+        survey_rewards_title = pn.pane.Str(title_string,
+                                        styles={
+                                            'font-size':'14pt',
+                                            'color':'white'},
+                                        stylesheets=[title_stylesheet])
         return survey_rewards_title
 
 
@@ -201,8 +245,12 @@ class Scheduler(param.Parameterized):
             title_string = 'Basis functions for survey {}'.format(self._tier_survey_rewards.reset_index()['survey_name'][self.survey])
         else:
             title_string = ''
-        basis_function_table_title = pn.pane.Str(title_string, styles={'font-size':'14pt',
-                                                                       'color':'white'})
+        basis_function_table_title = pn.pane.Str(title_string, 
+                                                styles={
+                                                    'font-size':'14pt',
+                                                    'color':'white'},
+                                                stylesheets=[another_title_stylesheet], 
+                                                css_classes=['title'])
         return basis_function_table_title
 
 
@@ -221,8 +269,11 @@ class Scheduler(param.Parameterized):
             title_string = titleA + titleB
         else:
             title_string = ''
-        map_title = pn.pane.Str(title_string, styles={'font-size':'14pt',
-                                                      'color':'white'})
+        map_title = pn.pane.Str(title_string, 
+                                styles={
+                                    'font-size':'14pt',
+                                    'color':'white'},
+                                stylesheets=[title_stylesheet])
         return map_title
 
     
@@ -264,6 +315,8 @@ class Scheduler(param.Parameterized):
             survey_rewards = schedview.compute.scheduler.make_scheduler_summary_df(self._scheduler,
                                                                                    self._conditions,
                                                                                    self._rewards)
+            
+            survey_rewards['survey_name'] = survey_rewards.apply(survey_url_formatter, axis=1)
             self._survey_rewards = survey_rewards
         except Exception as e:
             logging.error(e)
@@ -307,10 +360,11 @@ class Scheduler(param.Parameterized):
     def survey_rewards_table(self):
         if self._tier_survey_rewards is None:
             return "No surveys available."
-        tabulator_formatter = {'survey_name': {'type': 'link',
-                                                'labelField':'survey_name',
-                                                'urlField':'survey_url',
-                                                'target':'_blank'}}
+        
+        tabulator_formatter = {
+            'survey_name': HTMLTemplateFormatter(template='<%= value %>')
+        }
+
         survey_rewards_table = pn.widgets.Tabulator(self._tier_survey_rewards[['tier','survey_name','reward','survey_url']],
                                                     widths={'survey_name':'60%','reward':'40%'},
                                                     show_index=False,
@@ -318,6 +372,8 @@ class Scheduler(param.Parameterized):
                                                     disabled=True,
                                                     selectable=1,
                                                     hidden_columns=['tier','survey_url'],
+                                                    pagination='remote',
+                                                    page_size=4,
                                                     #height=200,
                                                     sizing_mode='stretch_width',
                                                     #sizing_mode='stretch_both',
@@ -411,6 +467,7 @@ class Scheduler(param.Parameterized):
             basis_function_df = schedview.compute.survey.make_survey_reward_df(self._listed_survey,
                                                                                self._conditions,
                                                                                self._rewards.loc[[(tier_id, survey_id)], :])
+            basis_function_df['basis_function'] = basis_function_df.apply(basis_function_url_formatter, axis=1)
             self._basis_functions = basis_function_df
         except Exception as e:
             logging.error(e)
@@ -425,11 +482,11 @@ class Scheduler(param.Parameterized):
         if self._basis_functions is None:
             return "No basis functions available."
         logging.info("Creating basis function table.")
+   
         tabulator_formatter = {
-            'basis_function': {'type': 'link',
-                                'labelField':'basis_function',
-                                'urlField':'doc_url',
-                                'target':'_blank'}}
+            'basis_function': HTMLTemplateFormatter(template='<%= value %>')
+        }
+
         columnns = ['basis_function',
                     'basis_function_class',
                     'feasible',
@@ -447,6 +504,8 @@ class Scheduler(param.Parameterized):
                                                     frozen_columns=['basis_function'],
                                                     hidden_columns=['doc_url'],
                                                     selectable=1,
+                                                    pagination='remote',
+                                                    page_size=15
                                                     #height=500,
                                                     #sizing_mode='stretch_both',
                                                     )
@@ -611,9 +670,14 @@ def scheduler_app(date=None, scheduler_pickle=None):
     sched_app[11,   :]    = pn.Row(pn.Spacer(width=10),
                                    pn.Column(pn.pane.Str(' Debugging',
                                                          align='center',
-                                                         styles={'font-size':'10pt','color':'black'}),
-                                             terminal,
-                                             styles={'background':'#EDEDED'}),
+                                                         styles={'font-size':'10pt',
+                                                                'color':'black',
+                                                                'height': '30px', 
+                                                                'font-weight':'bold',
+                                                                'background': '#EDEDED',
+                                                                'padding-top': '5px'}),
+                                             terminal
+                                            ),
                                    pn.Spacer(width=10))
 
     return sched_app
@@ -635,4 +699,5 @@ if __name__ == "__main__":
         start      = True,
         autoreload = True,
         threaded   = True,
+        static_dirs = {'assets': './assets'}
     )
