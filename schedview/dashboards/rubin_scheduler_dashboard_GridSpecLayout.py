@@ -28,17 +28,11 @@ Notes
 Still to implement
 ------------------
     
-    1. Display scalar maps of basis functions with scalar value.
-    2. Link color palette drop down selection to map color palette.
+    1. Link color palette drop down selection to map color palette.
+    2. Make a key from bokeh.
     3. Check if able to load pickle from a URL.
-    4. Make a key from bokeh.
-    5. Implement Eman's changes:
-        - fonts
-        - survey links
-        - debugger text wrapping
-        - logo alignment in row/column layout
-        - terminal pane (what was wrong with this?)
-        - URL image path (instead of local path)
+    4. Loading indicator when new pickle/datetime chosen.
+    5. Pop-up message if serious error?
 
 
 Current issues/quirks:
@@ -64,70 +58,44 @@ Current issues/quirks:
           the survey_map drop-down selector should change to reflect this?
         - If it does change, what happens then when a scalar basis function is
           selected? What should be shown at the survey_map drop-down?
-
-    [DONE] Logo:
-        
-        - GridSpec layout:   logo aligned correctly.
-        - Row/column layout: there is an unexplainable gap on the right side
-                             of the Rubin logo.
-    
-    [DONE] Debugger/error log options:
-        
-        a) Debugger: unsightly and the messages (all levels) are useless.
-        b) Terminal: slightly less unsightly and useful errors
-        c) Custom debugger: pretty, customisable, but text won't stay in box.
-    
-    Layout:
-        
-        - Row/column: all rows/columns are equally divided.
-        - GridSpec:   custom spacing but tables/map overrun their spaces.
     
     Updates:
         
         a) When an unloadable pickle is loaded after a loadable pickle, user
            gets a message that pickle can't be loaded, but all data of loadable
            pickle stays accessible.
-               - Is this behaviour okay?
         b) When an invalid date is chosen after a valid date, survey title,
            survey table, and basis function table disappear, but basis function
            table title, map title and map stay on screen.
-               - Should all data, no data or some data remain on screen?
+    
+    Basis function table:
+        
+        - The column headers make the table wider than can fit in space.
+        - Can we remove the sorting arrows to reduce width of each column?
+        - Javascript: {title:"Name", field:"name", sorter:"string", headerSort:false} 
 
 
 Pending questions
 -----------------
     
-    - Are users choosing a date or a datetime?
-    - Do we have a pickle at a URL we can test with?
+    - Can we remove sorting arrows in basis_function table headers to reduce
+      column widths?
 
 """
 
-DEFAULT_TIMEZONE        = "Chile/Continental"
-DEFAULT_CURRENT_TIME    = Time.now()
-DEFAULT_SCHEDULER_FNAME = "scheduler.pickle.xz"
+DEFAULT_CURRENT_TIME = Time.now()
 
 color_palettes = [s for s in bokeh.palettes.__palettes__ if "256" in s]
 
-LOGO = "/assets/lsst_white_logo.png"
+LOGO      = "/assets/lsst_white_logo.png"
 key_image = "/assets/key_image.png"
 
 pn.extension("tabulator",
              css_files   = [pn.io.resources.CSS_URLS["font-awesome"]],
              sizing_mode = "stretch_width",)
 
-#pn.widgets.Tabulator.theme = 'site'
-
-pn.config.console_output = "disable"                                           # To avoid clutter.
-
 logging.basicConfig(format = "%(asctime)s %(message)s",
                     level  = logging.INFO)
-
-debug_info = pn.widgets.Debugger(name        = "Debugger information.",
-                                 level       = logging.DEBUG,
-                                 sizing_mode = "stretch_both")
-
-terminal = pn.widgets.Terminal(height=100, sizing_mode='stretch_width')
-
 
 def survey_url_formatter(row):
     """
@@ -138,7 +106,6 @@ def survey_url_formatter(row):
     name = row['survey_name']
     url = row['survey_url']
     html = name if url == "" else f'<a href="{url}" target="_blank"> {name}</a>'
-    
     return html
 
 def basis_function_url_formatter(row):
@@ -150,7 +117,6 @@ def basis_function_url_formatter(row):
     name = row['basis_function']
     url = row['doc_url']
     html = name if url == "" else f'<a href="{url}" target="_blank"> {name}</a>'
-    
     return html
 
 
@@ -218,8 +184,8 @@ class Scheduler(param.Parameterized):
         title_string = 'Scheduler Dashboard' + titleT + titleS + titleBF + titleM
         dashboard_title = pn.pane.Str(title_string,
                                     styles={'font-size':'16pt',
-                                            'color':'white',
-                                            'font-weight':'bold'},
+                                            'font-weight':'500',
+                                            'color':'white'},
                                     stylesheets=[title_stylesheet])
         return dashboard_title
 
@@ -232,7 +198,8 @@ class Scheduler(param.Parameterized):
             title_string = 'Tier {} survey rewards'.format(self.tier[-1])
         survey_rewards_title = pn.pane.Str(title_string,
                                         styles={
-                                            'font-size':'14pt',
+                                            'font-size':'13pt',
+                                            'font-weight':'300',
                                             'color':'white'},
                                         stylesheets=[title_stylesheet])
         return survey_rewards_title
@@ -242,12 +209,13 @@ class Scheduler(param.Parameterized):
     @param.depends("survey")
     def basis_function_table_title(self):        
         if self._scheduler is not None and self.survey >= 0:
-            title_string = 'Basis functions for survey {}'.format(self._tier_survey_rewards.reset_index()['survey_name'][self.survey])
+            title_string = 'Basis functions for survey {}'.format(self._tier_survey_rewards.reset_index()['survey'][self.survey])
         else:
             title_string = ''
         basis_function_table_title = pn.pane.Str(title_string, 
                                                 styles={
-                                                    'font-size':'14pt',
+                                                    'font-size':'13pt',
+                                                    'font-weight':'300',
                                                     'color':'white'},
                                                 stylesheets=[another_title_stylesheet], 
                                                 css_classes=['title'])
@@ -258,12 +226,12 @@ class Scheduler(param.Parameterized):
     @param.depends("survey", "plot_display", "survey_map", "basis_function")
     def map_title(self):
         if self._scheduler is not None and self.survey >= 0:
-            titleA = 'Survey {}\n'.format(self._tier_survey_rewards.reset_index()['survey_name'][self.survey])
+            titleA = 'Survey {}\n'.format(self._tier_survey_rewards.reset_index()['survey'][self.survey])
             if self.plot_display == 1:
                 titleB = 'Map {}'.format(self.survey_map)
             elif self.plot_display == 2 and self.basis_function >= 0:
                 titleB = 'Basis function {}: {}'.format(self.basis_function,
-                                                        self._basis_functions['basis_function'][self.basis_function])
+                                                        self._basis_functions['basis_func'][self.basis_function])
             else:
                 titleA = ''; titleB = ''
             title_string = titleA + titleB
@@ -271,7 +239,8 @@ class Scheduler(param.Parameterized):
             title_string = ''
         map_title = pn.pane.Str(title_string, 
                                 styles={
-                                    'font-size':'14pt',
+                                    'font-size':'13pt',
+                                    'font-weight':'300',
                                     'color':'white'},
                                 stylesheets=[title_stylesheet])
         return map_title
@@ -290,7 +259,6 @@ class Scheduler(param.Parameterized):
         except Exception as e:
             logging.error(f"Could not load scheduler from {self.scheduler_fname} {e}")
             self._debugging_message = f"Could not load scheduler from {self.scheduler_fname}: {e}"
-            terminal.write(f"\n {Time.now().iso} - Could not load scheduler from {self.scheduler_fname}: {e}")
     
     
     # Update datetime if new datetime chosen.
@@ -315,14 +283,14 @@ class Scheduler(param.Parameterized):
             survey_rewards = schedview.compute.scheduler.make_scheduler_summary_df(self._scheduler,
                                                                                    self._conditions,
                                                                                    self._rewards)
-            
+            # Duplicate column and apply URL formatting to one of the columns.
+            survey_rewards['survey'] = survey_rewards.loc[:, 'survey_name']
             survey_rewards['survey_name'] = survey_rewards.apply(survey_url_formatter, axis=1)
             self._survey_rewards = survey_rewards
         except Exception as e:
             logging.error(e)
             logging.info("Survey rewards table unable to be updated. Perhaps date not in range of pickle data?")
             self._debugging_message = "Survey rewards table unable to be updated: " + str(e)
-            terminal.write(f"\n {Time.now().iso} - Survey rewards table unable to be updated: {e}")
             self._survey_rewards = None
 
 
@@ -351,7 +319,6 @@ class Scheduler(param.Parameterized):
         except Exception as e:
             logging.error(e)
             self._debugging_message = "Survey rewards unable to be updated: " + str(e)
-            terminal.write(f"\n {Time.now().iso} - Survey rewards unable to be updated: {e}")
             self._tier_survey_rewards = None
 
 
@@ -360,23 +327,17 @@ class Scheduler(param.Parameterized):
     def survey_rewards_table(self):
         if self._tier_survey_rewards is None:
             return "No surveys available."
-        
-        tabulator_formatter = {
-            'survey_name': HTMLTemplateFormatter(template='<%= value %>')
-        }
-
-        survey_rewards_table = pn.widgets.Tabulator(self._tier_survey_rewards[['tier','survey_name','reward','survey_url']],
+        tabulator_formatter = {'survey_name': HTMLTemplateFormatter(template='<%= value %>')}
+        survey_rewards_table = pn.widgets.Tabulator(self._tier_survey_rewards[['tier','survey_name','reward','survey','survey_url']],
                                                     widths={'survey_name':'60%','reward':'40%'},
                                                     show_index=False,
                                                     formatters=tabulator_formatter,
                                                     disabled=True,
                                                     selectable=1,
-                                                    hidden_columns=['tier','survey_url'],
+                                                    hidden_columns=['tier','survey','survey_url'],
                                                     pagination='remote',
                                                     page_size=4,
-                                                    #height=200,
                                                     sizing_mode='stretch_width',
-                                                    #sizing_mode='stretch_both',
                                                     )
         logging.info("Finished updating survey rewards table.")
         self._survey_df_widget = survey_rewards_table
@@ -395,7 +356,6 @@ class Scheduler(param.Parameterized):
         except Exception as e:
             logging.error(e)
             self._debugging_message = "Survey selection unable to be updated: " + str(e)
-            terminal.write(f"\n {Time.now().iso} - Survey selection unable to be updated: {e}")
             self.survey = -1                                                   # When no survey selected, survey = -1
     
     
@@ -410,11 +370,10 @@ class Scheduler(param.Parameterized):
         except Exception as e:
             logging.error(e)
             self._debugging_message = "Listed survey unable to be updated: " + str(e)
-            terminal.write(f"\n {Time.now().iso} - Listed survey unable to be updated: {e}")
             self._listed_survey = None
     
 
-    # Update available map selections if new survey chosen.                    # Add try-catch here?
+    # Update available map selections if new survey chosen.
     @param.depends("_listed_survey", watch=True)
     def _update_map_selector(self):
         if self.tier == "" or self.survey < 0:
@@ -434,7 +393,7 @@ class Scheduler(param.Parameterized):
         self.plot_display = 1
         
     
-    # Update map selections when nside changed.                                # Add try-catch here?
+    # Update map selections when nside changed.
     @param.depends("nside", watch=True)
     def _update_nside_of_maps(self):
         if self.tier == "" or self.survey < 0:
@@ -450,7 +409,6 @@ class Scheduler(param.Parameterized):
     @param.depends("survey_map", watch=True)
     def _update_plot_display(self):
         logging.info("Updating parameter for basis/map display.")
-        #self.plot_display = 1                                                  # Display map instead of basis function.
         if self.survey_map != "":
             self.plot_display = 1
 
@@ -467,12 +425,13 @@ class Scheduler(param.Parameterized):
             basis_function_df = schedview.compute.survey.make_survey_reward_df(self._listed_survey,
                                                                                self._conditions,
                                                                                self._rewards.loc[[(tier_id, survey_id)], :])
+            # Duplicate column and apply URL formatting to one of the columns.
+            basis_function_df['basis_func'] = basis_function_df.loc[:, 'basis_function']
             basis_function_df['basis_function'] = basis_function_df.apply(basis_function_url_formatter, axis=1)
             self._basis_functions = basis_function_df
         except Exception as e:
             logging.error(e)
             self._debugging_message = "Basis function dataframe unable to be updated: " + str(e)
-            terminal.write(f"\n {Time.now().iso} - Basis function dataframe unable to be updated: {e}")
             self._basis_functions = None
 
 
@@ -483,10 +442,8 @@ class Scheduler(param.Parameterized):
             return "No basis functions available."
         logging.info("Creating basis function table.")
    
-        tabulator_formatter = {
-            'basis_function': HTMLTemplateFormatter(template='<%= value %>')
-        }
-
+        tabulator_formatter = {'basis_function': HTMLTemplateFormatter(template='<%= value %>')}
+        
         columnns = ['basis_function',
                     'basis_function_class',
                     'feasible',
@@ -495,20 +452,19 @@ class Scheduler(param.Parameterized):
                     'basis_weight',
                     'max_accum_reward',
                     'accum_area',
-                    'doc_url']
+                    'doc_url',
+                    'basis_func']
+        
         basis_function_table = pn.widgets.Tabulator(self._basis_functions[columnns],
                                                     layout="fit_data",
                                                     show_index=False,
                                                     formatters=tabulator_formatter,
                                                     disabled=True,
                                                     frozen_columns=['basis_function'],
-                                                    hidden_columns=['doc_url'],
+                                                    hidden_columns=['basis_func','doc_url'],
                                                     selectable=1,
                                                     pagination='remote',
-                                                    page_size=15
-                                                    #height=500,
-                                                    #sizing_mode='stretch_both',
-                                                    )
+                                                    page_size=13)
         self._basis_function_df_widget = basis_function_table
         return basis_function_table
 
@@ -522,11 +478,10 @@ class Scheduler(param.Parameterized):
         try:
             self.plot_display = 2                                              # Display basis function instead of a map.
             self.basis_function = self._basis_function_df_widget.selection[0]
-            logging.info(f"Basis function selection: {self._basis_functions['basis_function'][self.basis_function]}")
+            logging.info(f"Basis function selection: {self._basis_functions['basis_func'][self.basis_function]}")
         except Exception as e:
             logging.error(e)
             self._debugging_message = "Basis function dataframe selection unable to be updated: " + str(e)
-            terminal.write(f"\n {Time.now().iso} - Basis function dataframe selection unable to be updated: {e}")
             self.basis_function = -1                                           # When no basis function selected, basis_function = -1.
 
 
@@ -539,53 +494,63 @@ class Scheduler(param.Parameterized):
             return "No surveys are loaded."
         try:
             # Load survey map.
-            if self.plot_display==1: #self.basis_function == -1:
+            if self.plot_display==1:
                 sky_map = schedview.plot.survey.map_survey_healpix(self._conditions.mjd,
                                                                    self._survey_maps,
                                                                    self.survey_map,
                                                                    self.nside)
             # Load a basis function map.
             elif self.basis_function!=-1 and self.plot_display==2:
-                bf = self._basis_functions['basis_function'][self.basis_function]
+                bf = self._basis_functions['basis_func'][self.basis_function]
                 # Is the basis function in the list of survey maps?
                 if any(bf in key for key in self._survey_maps.keys()):
-                    # Get key name
+                    # Get key name.
                     bf_key = list(key for key in self._survey_maps.keys() if bf in key)[0]
-                    # Generate map
+                    # Generate map.
                     sky_map = schedview.plot.survey.map_survey_healpix(self._conditions.mjd,
                                                                        self._survey_maps,
                                                                        bf_key,
                                                                        self.nside)
                 # If the basis function is not in the list of survey maps, it is scalar.
                 else:
-                    logging.info("Could not load map of scalar basis function.")
-                    self._debugging_message = "Could not load map of scalar basis function."
-                    terminal.write(f"\n {Time.now().iso} - Could not load map of scalar basis function.")
-                    return "Basis function is a scalar; scalar maps not yet implemented."
+                    try:
+                        # Create array populated with scalar values where sky brightness map is not NaN.
+                        scalar_array = self._survey_maps['u_sky']
+                        scalar_array[~np.isnan(self._survey_maps['u_sky'])] = self._basis_functions.loc[self.basis_function,:]['max_basis_reward']
+                        # Add new key-pair (basis_function: scalar array) to survey_maps dictionary.
+                        self._survey_maps[self._basis_functions['basis_func'][self.basis_function]] = scalar_array
+                        # Generate uniform map with tooltip as in non-scalar case.
+                        sky_map = schedview.plot.survey.map_survey_healpix(self._conditions.mjd,
+                                                                           self._survey_maps,
+                                                                           self._basis_functions['basis_func'][self.basis_function],
+                                                                           self.nside)
+                    except Exception as e:
+                        logging.error(e)
+                        logging.info("Could not load map of scalar basis function.")
+                        self._debugging_message = "Could not load map of scalar basis function." + str(e)
+                        return "Basis function is a scalar."
                 
             sky_map_figure = sky_map.figure
             logging.info("Map successfully created.")
         except Exception as e:
-            logging.info("Could not load map:")
             logging.error(e)
+            logging.info("Could not load map:")
             self._debugging_message = "Could not load map: " + str(e)
-            terminal.write(f"\n {Time.now().iso} - Could not load map: {e}")
             return "No map loaded."
         return sky_map_figure
     
 
-    # Panel for debugging messages
+    # Panel for debugging messages.
     @param.depends("_debugging_message")
     def debugging_messages(self):
         if self._debugging_message is None:
             return
         self.debug_string += f"\n {Time.now().iso} - {self._debugging_message}"
         debugging_messages = pn.pane.Str(self.debug_string,
-                                         height=80,
-                                         #width=800,
-                                         #sizing_mode='stretch_width',
+                                         height=70,
                                          styles={'font-size':'9pt',
-                                                 'color':'black'})
+                                                 'color':'black',
+                                                 'overflow': 'scroll'})
         return debugging_messages
     
 
@@ -599,35 +564,10 @@ def scheduler_app(date=None, scheduler_pickle=None):
     if scheduler_pickle is not None:
         scheduler.scheduler_fname = scheduler_pickle
     
-   
-        # Debugger. - (3 options)
-        
-        # OPTION 1
-        # debug_info
-        
-        # OPTION 2
-        # pn.Row(
-        #     pn.Spacer(width=10),
-        #     pn.Column(
-        #         pn.pane.Str(' Debugging', align='center', styles={'font-size':'10pt','color':'black'}),
-        #         terminal,
-        #         styles={'background':'#EDEDED'}),
-        #     pn.Spacer(width=10))
-        
-        # OPTION 3
-        # pn.Column(pn.pane.Str(' Debugging', styles={'font-size':'10pt','font-weight':'bold','color':'black'}),
-        #           scheduler.debugging_messages,
-        #           #pn.layout.HSpacer(),
-        #           sizing_mode='stretch_width',
-        #           width_policy='max',
-        #           height=100,
-        #           styles={'background':'#EDEDED'})
-
-    
     sched_app = pn.GridSpec(sizing_mode='stretch_both', max_height=1000).servable()
     
     # Dashboard title.
-    sched_app[0,    :]    = pn.Row(scheduler.dashboard_title,
+    sched_app[0:8,    :]    = pn.Row(scheduler.dashboard_title,
                                    pn.layout.HSpacer(),
                                    pn.pane.PNG(LOGO,
                                                sizing_mode='scale_height',
@@ -635,14 +575,14 @@ def scheduler_app(date=None, scheduler_pickle=None):
                                    sizing_mode='stretch_width',
                                    styles={'background':'#048b8c'})
     # Parameter inputs (pickle, date, tier)
-    sched_app[1:4,  0:3]  = pn.Param(scheduler,
+    sched_app[8:33,  0:21]  = pn.Param(scheduler,
                                      parameters=["scheduler_fname","date","tier"],
                                      widgets={'scheduler_fname':{'widget_type':pn.widgets.TextInput,
                                                                  'placeholder':'filepath or URL of pickle'},
                                               'date':pn.widgets.DatetimePicker},
                                      name="Select pickle file, date and tier.")
     # Survey rewards table and header.
-    sched_app[1:4,  3:8]  = pn.Row(pn.Spacer(width=10),
+    sched_app[8:33,  21:67]  = pn.Row(pn.Spacer(width=10),
                                    pn.Column(pn.Spacer(height=10),
                                       pn.Row(scheduler.survey_rewards_title,
                                              styles={'background':'#048b8c'}),
@@ -651,34 +591,30 @@ def scheduler_app(date=None, scheduler_pickle=None):
                                    #height=200,
                                    sizing_mode='stretch_height')
     # Basis function table and header.
-    sched_app[4:11, 0:8]  = pn.Row(pn.Spacer(width=10),
+    sched_app[33:88, 0:67]  = pn.Row(pn.Spacer(width=10),
                                    pn.Column(pn.Spacer(height=10),
                                       pn.Row(scheduler.basis_function_table_title,
                                              styles={'background':'#048b8c'}),
                                       pn.param.ParamMethod(scheduler.basis_function_table, loading_indicator=True)),
                                    pn.Spacer(width=10))
     # Map display and header.
-    sched_app[1:8,  8:12] = pn.Column(pn.Spacer(height=10),
+    sched_app[8:65,  67:100] = pn.Column(pn.Spacer(height=10),
                                       pn.Row(scheduler.map_title,styles={'background':'#048b8c'}),
                                       pn.param.ParamMethod(scheduler.sky_map, loading_indicator=True))
-    # Map display parameters (map, nside, color palette)
-    sched_app[8:11, 8:12] = pn.Row(pn.pane.PNG(key_image, height=200),
+    # Key and map display parameters (map, nside, color palette)
+    sched_app[65:88, 67:100] = pn.Row(pn.pane.PNG(key_image, height=200),
                                    pn.Column(pn.Param(scheduler,
                                                       parameters=["survey_map","nside","color_palette"],
                                                       show_name=False)))
     # Debugging pane.
-    sched_app[11,   :]    = pn.Row(pn.Spacer(width=10),
-                                   pn.Column(pn.pane.Str(' Debugging',
-                                                         align='center',
-                                                         styles={'font-size':'10pt',
-                                                                'color':'black',
-                                                                'height': '30px', 
-                                                                'font-weight':'bold',
-                                                                'background': '#EDEDED',
-                                                                'padding-top': '5px'}),
-                                             terminal
-                                            ),
-                                   pn.Spacer(width=10))
+    sched_app[88:100,   :]  = pn.Column(pn.Spacer(height=5),
+                                       pn.pane.Str(' Debugging',
+                                                   styles={'font-size':'10pt',
+                                                           'font-weight':'bold',
+                                                           'color':'black'}),
+                                       scheduler.debugging_messages,
+                                       #height=100,
+                                       styles={'background':'#EDEDED'})
 
     return sched_app
 
