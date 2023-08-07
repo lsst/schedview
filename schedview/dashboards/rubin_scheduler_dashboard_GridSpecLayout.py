@@ -27,30 +27,71 @@ Notes
 
 Still to implement
 ------------------
+
+    Key/Legend:
     
-    1. Link color palette drop down selection to map color palette.
-    2. Make a key from bokeh.
-    3. Check if able to load pickle from a URL.
-    4. Loading indicator when new pickle/datetime chosen.
-    5. Pop-up message if serious error?
+        1. Implement values of key pulled from LayoutDOM LegendItems.
+            - This isn't sensible to be updated with each map update.
+            - Will this list only hold the items currently displayed?
+            - How does Eric get key items in sched_maps.py?
+        2. [maybe] Build another key using GridSpec grids and panel objects
+            (lines, circles, strings), or using Tabulator (HTML circles and
+            lines).
+    
+    Loading indicator/floating error message:
+    
+        1. Loading indicator when new pickle/datetime chosen.
+            - https://panel.holoviz.org/reference/global/Notifications.html
+            - pn.extension(notifications=True)
+              pn.state.notifications.info('Pickle file loading.', duration=0)
+        2. Floating error message appear when bad/invalid pickle or invalid date.
+            - The pop-up should be triggered by watching the error messages
+              that are sent to debugging and checking for errors of interest.
+            - Which errors should cause a pop-up?
+                - "Invalid pickle - perhaps try another?"
+                - "Can't access the pickle - are you sure you have the right file?"
+                - "Invalid date - perhaps date out of range for this pickle?"
+                - ...
+    
+    Load big pickle/URL pickle:
+    
+        1. Check if able to load pickle from a URL.
+        2. Check how dashboard handles large pickle (many surveys).
 
 
-Current issues/quirks:
+Further potential modifications
+-------------------------------
+
+    1. Automatically load reward map of tier 0, survey 0 when date chosen.
+    2. Automatically load reward map of survey 0 when tier chosen.
+    3. Find duplicate code sections and replace with methods, where sensible.
+    4. [maybe] - Move generate_key() to outside class?
+    5. Timestamp in debugging pane isn't correct.
+    6. Heading --> heading + subheading.
+    7. Clean up sky_map().
+
+
+Current issues/quirks
 ---------------------
 
     Map display:
 
-        a) Sometimes a map gets "stuck" loading:
-            (Occurs when the current selection of survey_map != 'reward' and
-             a new survey is chosen, and when a new tier + survey is chosen.)
-        b) Survey maps with non-numeric rewards do not display a map, although
-           'reward' is shown as an option in survey_map selection.
-           RuntimeWarning: All-NaN slice encountered; np.nanmax(hpix_data[map_key])
-        c) When changing nside, and occassionally when selecting a survey or
-           basis function, a deserialisation error is thrown with no noticable
-           consequences:
-               ERROR:bokeh.server.protocol_handler:error handling message
-               error: DeserializationError("can't resolve reference 'p6667'")
+        a) Maps get "stuck" loading:
+           - Occurs when a new survey is chosen.
+           
+        b) Scalar maps that get added to survey_list are having their tooltip
+           value modified by subsequently added maps.
+           - Example: Tier 3, Survey 3: reward map + first four basis functions.
+
+        c) Tier 4, Survey 1, Basis function 8: SolarElongationMask displays
+           a blank map with no tooltip. (75% of array is NaN; 25% = 1)
+    
+    Deserialisation error:
+        
+         - A deserialisation error keeps appearing. Wonder if this is making
+           the dashboard slow down?
+         - ERROR:bokeh.server.protocol_handler:error handling message error:
+           DeserializationError("can't resolve reference 'p6667'")
     
     Survey_map selection:
         
@@ -80,6 +121,14 @@ Pending questions
     
     - Can we remove sorting arrows in basis_function table headers to reduce
       column widths?
+    - Do they still want a colour scale for the plot or is the tooltip info
+      enough?
+    - How about the latest debugging collapsable card? Can we keep it?
+    - Do they want to distinguish between -inf (infesible) vs -nan (feasible)
+          - using different colours, i.e. two different greys?
+          - or a blank map for -inf and a grey map for nan?
+    - Do any scalar maps return finite values? Should they be a different colour?
+
 
 """
 
@@ -148,7 +197,7 @@ class Scheduler(param.Parameterized):
     nside           = param.ObjectSelector(default=16,
                                            objects=[2**n for n in np.arange(1, 6)],
                                            label="Map resolution (nside)")
-    color_palette   = param.ObjectSelector(default="Magma256",
+    color_palette   = param.ObjectSelector(default="Viridis256",
                                            objects=color_palettes)
     debug_string    = param.String(default="")
 
@@ -176,11 +225,11 @@ class Scheduler(param.Parameterized):
             if self.tier != '':
                 titleT = '\nTier {}'.format(self.tier[-1])
                 if self.survey >= 0:
-                    titleS = ' | Survey {}'.format(self.survey)
+                    titleS = ' - Survey {}'.format(self.survey)
                     if self.plot_display == 1:
-                        titleM = ' | Map {}'.format(self.survey_map)
+                        titleM = ' - Map {}'.format(self.survey_map)
                     elif self.plot_display == 2 and self.basis_function >= 0:
-                        titleBF = ' | Basis function {}'.format(self.basis_function)
+                        titleBF = ' - Basis function {}'.format(self.basis_function)
         title_string = 'Scheduler Dashboard' + titleT + titleS + titleBF + titleM
         dashboard_title = pn.pane.Str(title_string,
                                     styles={'font-size':'16pt',
@@ -405,6 +454,7 @@ class Scheduler(param.Parameterized):
                                                                   self._conditions,
                                                                   self.nside)
 
+
     # Update the parameter which determines whether a basis function or a map is plotted.
     @param.depends("survey_map", watch=True)
     def _update_plot_display(self):
@@ -441,9 +491,7 @@ class Scheduler(param.Parameterized):
         if self._basis_functions is None:
             return "No basis functions available."
         logging.info("Creating basis function table.")
-   
         tabulator_formatter = {'basis_function': HTMLTemplateFormatter(template='<%= value %>')}
-        
         columnns = ['basis_function',
                     'basis_function_class',
                     'feasible',
@@ -454,7 +502,6 @@ class Scheduler(param.Parameterized):
                     'accum_area',
                     'doc_url',
                     'basis_func']
-        
         basis_function_table = pn.widgets.Tabulator(self._basis_functions[columnns],
                                                     layout="fit_data",
                                                     show_index=False,
@@ -484,39 +531,87 @@ class Scheduler(param.Parameterized):
             self._debugging_message = "Basis function dataframe selection unable to be updated: " + str(e)
             self.basis_function = -1                                           # When no basis function selected, basis_function = -1.
 
-
+    
     # Create sky_map of survey for display.
-    @param.depends("_conditions","_survey_maps","plot_display","survey_map","basis_function","nside")
+    @param.depends("_conditions","_survey_maps","plot_display","survey_map","basis_function","nside","color_palette")
     def sky_map(self):
         if self._conditions is None:
             return "No scheduler loaded."
         if self._survey_maps is None:
             return "No surveys are loaded."
-        try:
+        #self._debugging_message = "Creating sky map of survey."
+        try:            
+            logging.info(f"({self.plot_display}, {self.basis_function})")
             # Load survey map.
             if self.plot_display==1:
-                sky_map = schedview.plot.survey.map_survey_healpix(self._conditions.mjd,
-                                                                   self._survey_maps,
-                                                                   self.survey_map,
-                                                                   self.nside)
+                # Check if survey map (i.e. reward) is all NaNs.
+                if np.isnan(self._survey_maps[self.survey_map]).all():
+                    cmap = bokeh.transform.linear_cmap("value","Greys256",-2,0)
+                    # Create array populated with scalar values where sky brightness map is not NaN.
+                    scalar_array = self._survey_maps['u_sky']
+                    scalar_array[~np.isnan(self._survey_maps['u_sky'])] = -1
+                    # Replace key-pair (map: scalar array) to survey_maps dictionary.
+                    self._survey_maps[self.survey_map] = scalar_array
+                    # Generate uniform map with tooltip as in non-scalar case.
+                    sky_map = schedview.plot.survey.map_survey_healpix(self._conditions.mjd,
+                                                                       self._survey_maps,
+                                                                       self.survey_map,
+                                                                       self.nside,
+                                                                       cmap=cmap)
+                else:
+                    # Get range of values.
+                    min_good_value = np.nanmin(self._survey_maps[self.survey_map])
+                    max_good_value = np.nanmax(self._survey_maps[self.survey_map])
+                    # Set colormap (greyscale if all values equal).
+                    if min_good_value == max_good_value:
+                        cmap = bokeh.transform.linear_cmap("value","Greys256",min_good_value-1,max_good_value+1)
+                    else:
+                        cmap = bokeh.transform.linear_cmap("value",self.color_palette,min_good_value,max_good_value)
+                    # Generate map.
+                    sky_map = schedview.plot.survey.map_survey_healpix(self._conditions.mjd,
+                                                                       self._survey_maps,
+                                                                       self.survey_map,
+                                                                       self.nside,
+                                                                       cmap=cmap)
             # Load a basis function map.
             elif self.basis_function!=-1 and self.plot_display==2:
+                
                 bf = self._basis_functions['basis_func'][self.basis_function]
+                
                 # Is the basis function in the list of survey maps?
                 if any(bf in key for key in self._survey_maps.keys()):
                     # Get key name.
                     bf_key = list(key for key in self._survey_maps.keys() if bf in key)[0]
+                    # Get range of values.
+                    min_good_value = np.nanmin(self._survey_maps[bf_key])
+                    max_good_value = np.nanmax(self._survey_maps[bf_key])
+                    logging.info(f"({min_good_value}, {max_good_value})")
+                    # Set colormap (greyscale if all values equal).
+                    if min_good_value == max_good_value:
+                        cmap = bokeh.transform.linear_cmap("value","Greys256",min_good_value-1,max_good_value+1)
+                    else:
+                        cmap = bokeh.transform.linear_cmap("value",self.color_palette,min_good_value,max_good_value)
                     # Generate map.
                     sky_map = schedview.plot.survey.map_survey_healpix(self._conditions.mjd,
                                                                        self._survey_maps,
                                                                        bf_key,
-                                                                       self.nside)
+                                                                       self.nside,
+                                                                       cmap=cmap)
                 # If the basis function is not in the list of survey maps, it is scalar.
                 else:
                     try:
                         # Create array populated with scalar values where sky brightness map is not NaN.
                         scalar_array = self._survey_maps['u_sky']
-                        scalar_array[~np.isnan(self._survey_maps['u_sky'])] = self._basis_functions.loc[self.basis_function,:]['max_basis_reward']
+                        
+                        # Check max_basis_reward is not -NaN or -Inf. -----------------------------------------
+                        max_basis_reward = self._basis_functions.loc[self.basis_function,:]['max_basis_reward']
+                        logging.info(f"max_basis_reward = {max_basis_reward}")
+                        
+                        if max_basis_reward != -np.nan and max_basis_reward != -np.inf:
+                            scalar_array[~np.isnan(self._survey_maps['u_sky'])] = self._basis_functions.loc[self.basis_function,:]['max_basis_reward']
+                        else:
+                            scalar_array[~np.isnan(self._survey_maps['u_sky'])] = -1 #                         <--- Check with Eric what to set it as.
+                        # ----------------------------------------------------------------------------------------------------------------------------
                         # Add new key-pair (basis_function: scalar array) to survey_maps dictionary.
                         self._survey_maps[self._basis_functions['basis_func'][self.basis_function]] = scalar_array
                         # Generate uniform map with tooltip as in non-scalar case.
@@ -525,17 +620,17 @@ class Scheduler(param.Parameterized):
                                                                            self._basis_functions['basis_func'][self.basis_function],
                                                                            self.nside)
                     except Exception as e:
+                        logging.info("Could not load map of scalar basis function:")
                         logging.error(e)
-                        logging.info("Could not load map of scalar basis function.")
-                        self._debugging_message = "Could not load map of scalar basis function." + str(e)
+                        #self._debugging_message = "Could not load map of scalar basis function: " + str(e) + f" (max_basis_reward = {max_basis_reward})"
                         return "Basis function is a scalar."
-                
             sky_map_figure = sky_map.figure
-            logging.info("Map successfully created.")
+            #logging.info("Map successfully created.")
+            #self._debugging_message = "Sky map successfully created."
         except Exception as e:
-            logging.error(e)
             logging.info("Could not load map:")
-            self._debugging_message = "Could not load map: " + str(e)
+            logging.error(e)
+            #self._debugging_message = "Could not load map: " + str(e) + f" (max_basis_reward = {self._basis_functions.loc[self.basis_function,:]['max_basis_reward']})"
             return "No map loaded."
         return sky_map_figure
     
@@ -545,7 +640,7 @@ class Scheduler(param.Parameterized):
     def debugging_messages(self):
         if self._debugging_message is None:
             return
-        self.debug_string += f"\n {Time.now().iso} - {self._debugging_message}"
+        self.debug_string = f"\n {Time.now().iso} - {self._debugging_message}" + self.debug_string
         debugging_messages = pn.pane.Str(self.debug_string,
                                          height=70,
                                          styles={'font-size':'9pt',
@@ -553,6 +648,55 @@ class Scheduler(param.Parameterized):
                                                  'overflow': 'scroll'})
         return debugging_messages
     
+    
+    # Causes deserialization error to clog up command line.
+    def generate_key(self):
+        
+        N = 4
+
+        x_title = np.array([7])
+        y_title = np.array([5.75])
+        x_circles = np.tile(8,N)
+        x_text_1  = np.tile(2.5,N)
+        x_text_2  = np.tile(8.75,N)
+        x0_lines  = np.tile(0.75,N)
+        x1_lines  = np.tile(2,N)
+        y = np.arange(N,0,-1)
+
+        line_colours   = np.array(['black','red','#1f8f20','#110cff'])
+        circle_colours = np.array(['#ffa500','grey','red','#1f8f20'])
+        circle_sizes = np.tile(10,N)
+        
+        title_text = np.array(['Key'])
+        text_1     = np.array(['Horizon','ZD=70 degrees','Ecliptic','Galactic plane'])
+        text_2     = np.array(['Sun position','Moon position','Survey field(s)','Telescope pointing'])
+        
+        title_source  = bokeh.models.ColumnDataSource(dict(x=x_title, y=y_title, text=title_text))
+        text1_source  = bokeh.models.ColumnDataSource(dict(x=x_text_1, y=y, text=text_1))
+        text2_source  = bokeh.models.ColumnDataSource(dict(x=x_text_2, y=y, text=text_2))
+        circle_source = bokeh.models.ColumnDataSource(dict(x=x_circles, y=y, sizes=circle_sizes, colours=circle_colours))
+        line_source   = bokeh.models.ColumnDataSource(dict(x0=x0_lines, y0=y, x1=x1_lines,y1=y, colours=line_colours))
+
+        border_glyph = bokeh.models.Rect(x=7, y=3.25, width=14, height=6.5, line_color="#048b8c", fill_color=None, line_width=3)
+        header_glyph = bokeh.models.Rect(x=7, y=5.75, width=14, height=1.5, line_color=None,      fill_color="#048b8c")
+        title_glyph  = bokeh.models.Text(x='x', y='y', text='text', text_font_size='18px', text_color='white', text_baseline='middle', text_font = {'value': 'verdana'}, text_align='center')#, text_font_style='bold'
+        text1_glyph  = bokeh.models.Text(x="x", y="y", text="text", text_font_size='10px', text_color="black", text_baseline='middle', text_font = {'value': 'verdana'})
+        text2_glyph  = bokeh.models.Text(x="x", y="y", text="text", text_font_size='10px', text_color="black", text_baseline='middle', text_font = {'value': 'verdana'})
+        circle_glyph = bokeh.models.Circle(x="x", y="y", size="sizes", line_color="colours", fill_color="colours")
+        line_glyph   = bokeh.models.Segment(x0="x0", y0="y0", x1="x1", y1="y1", line_color="colours", line_width=2, line_cap='round')
+        
+        plot = bokeh.models.Plot(title=None, width=300, height=150, min_border=0, toolbar_location=None)
+
+        plot.add_glyph(border_glyph)
+        plot.add_glyph(header_glyph)
+        plot.add_glyph(title_source,  title_glyph)
+        plot.add_glyph(text1_source,  text1_glyph)
+        plot.add_glyph(text2_source,  text2_glyph)
+        plot.add_glyph(circle_source, circle_glyph)
+        plot.add_glyph(line_source,   line_glyph)
+        
+        return plot
+
 
 def scheduler_app(date=None, scheduler_pickle=None):
     
@@ -588,7 +732,6 @@ def scheduler_app(date=None, scheduler_pickle=None):
                                              styles={'background':'#048b8c'}),
                                       pn.param.ParamMethod(scheduler.survey_rewards_table, loading_indicator=True)),
                                    pn.Spacer(width=10),
-                                   #height=200,
                                    sizing_mode='stretch_height')
     # Basis function table and header.
     sched_app[33:88, 0:67]  = pn.Row(pn.Spacer(width=10),
@@ -598,23 +741,46 @@ def scheduler_app(date=None, scheduler_pickle=None):
                                       pn.param.ParamMethod(scheduler.basis_function_table, loading_indicator=True)),
                                    pn.Spacer(width=10))
     # Map display and header.
-    sched_app[8:65,  67:100] = pn.Column(pn.Spacer(height=10),
+    sched_app[8:67,  67:100] = pn.Column(pn.Spacer(height=10),
                                       pn.Row(scheduler.map_title,styles={'background':'#048b8c'}),
                                       pn.param.ParamMethod(scheduler.sky_map, loading_indicator=True))
+    
+    ### Image key -----
     # Key and map display parameters (map, nside, color palette)
-    sched_app[65:88, 67:100] = pn.Row(pn.pane.PNG(key_image, height=200),
-                                   pn.Column(pn.Param(scheduler,
-                                                      parameters=["survey_map","nside","color_palette"],
-                                                      show_name=False)))
-    # Debugging pane.
-    sched_app[88:100,   :]  = pn.Column(pn.Spacer(height=5),
-                                       pn.pane.Str(' Debugging',
-                                                   styles={'font-size':'10pt',
-                                                           'font-weight':'bold',
-                                                           'color':'black'}),
-                                       scheduler.debugging_messages,
-                                       #height=100,
-                                       styles={'background':'#EDEDED'})
+    sched_app[67:88, 67:100] = pn.Row(pn.Column(pn.Spacer(height=50),
+                                                pn.pane.PNG(key_image, height=200)),
+                                      pn.Column(pn.Param(scheduler,
+                                                         parameters=["survey_map","nside","color_palette"],
+                                                         show_name=False)))
+    ### Bokeh plot key -----
+    # # Key.
+    # sched_app[67:88, 67:87] = pn.Column(pn.Spacer(height=32),
+    #                                     pn.param.ParamMethod(scheduler.generate_key))
+    #                                      #pn.pane.PNG(key_image, height=200))
+    # # Map display parameters (map, nside, color palette).
+    # sched_app[67:88, 87:100] = pn.Param(scheduler,
+    #                                     parameters=["survey_map","nside","color_palette"],
+    #                                     show_name=False)   
+    
+    ### Debugging pane. -----
+    # sched_app[88:100,   :]  = pn.Column(pn.Spacer(height=5),
+    #                                    pn.pane.Str(' Debugging',
+    #                                                styles={'font-size':'10pt',
+    #                                                        'font-weight':'bold',
+    #                                                        'color':'black'}),
+    #                                    scheduler.debugging_messages,
+    #                                    #height=100,
+    #                                    styles={'background':'#EDEDED'})
+    # Collapsable debugging pane. -----
+    card     = pn.Card(pn.Column(#pn.Spacer(height=10),
+                                 scheduler.debugging_messages,
+                                 styles={'background':'#EDEDED'}),
+                       title='Debugging',
+                       header_background='white',
+                       styles={'background':'#048b8c'},
+                       sizing_mode='stretch_width')
+    card.collapsed = True
+    sched_app[88:100, :] = card
 
     return sched_app
 
