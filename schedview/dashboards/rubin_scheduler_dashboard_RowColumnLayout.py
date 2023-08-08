@@ -32,13 +32,8 @@ Still to implement
     2. Link color palette drop down selection to map color palette.
     3. Check if able to load pickle from a URL.
     4. Make a key from bokeh.
-    5. Implement Eman's changes:
-        - fonts
-        - survey links
-        - debugger text wrapping
-        - logo alignment in row/column layout
-        - terminal pane (what was wrong with this?)
-        - URL image path (instead of local path)
+    5. Loading indicator when new pickle/datetime chosen.
+    6. Pop-up message if serious error?
 
 
 Current issues/quirks:
@@ -64,23 +59,6 @@ Current issues/quirks:
           the survey_map drop-down selector should change to reflect this?
         - If it does change, what happens then when a scalar basis function is
           selected? What should be shown at the survey_map drop-down?
-
-    [DONE] Logo:
-        
-        - GridSpec layout:   logo aligned correctly.
-        - Row/column layout: there is an unexplainable gap on the right side
-                             of the Rubin logo.
-    
-    [DONE] Debugger/error log options:
-        
-        a) Debugger: unsightly and the messages (all levels) are useless.
-        b) Terminal: slightly less unsightly and useful errors
-        c) Custom debugger: pretty, customisable, but text won't stay in box.
-    
-    Layout:
-        
-        - Row/column: all rows/columns are equally divided.
-        - GridSpec:   custom spacing but tables/map overrun their spaces.
     
     Updates:
         
@@ -97,8 +75,7 @@ Current issues/quirks:
 Pending questions
 -----------------
     
-    - Are users choosing a date or a datetime?
-    - Do we have a pickle at a URL we can test with?
+    - ...
 
 """
 
@@ -226,7 +203,7 @@ class Scheduler(param.Parameterized):
     @param.depends("survey")
     def basis_function_table_title(self):        
         if self._scheduler is not None and self.survey >= 0:
-            title_string = 'Basis functions for survey {}'.format(self._tier_survey_rewards.reset_index()['survey_name'][self.survey])
+            title_string = 'Basis functions for survey {}'.format(self._tier_survey_rewards.reset_index()['survey'][self.survey])
         else:
             title_string = ''
         basis_function_table_title = pn.pane.Str(title_string, 
@@ -241,7 +218,7 @@ class Scheduler(param.Parameterized):
     @param.depends("survey", "plot_display", "survey_map", "basis_function")
     def map_title(self):
         if self._scheduler is not None and self.survey >= 0:
-            titleA = 'Survey {}\n'.format(self._tier_survey_rewards.reset_index()['survey_name'][self.survey])
+            titleA = 'Survey {}\n'.format(self._tier_survey_rewards.reset_index()['survey'][self.survey])
             if self.plot_display == 1:
                 titleB = 'Map {}'.format(self.survey_map)
             elif self.plot_display == 2 and self.basis_function >= 0:
@@ -296,6 +273,8 @@ class Scheduler(param.Parameterized):
             survey_rewards = schedview.compute.scheduler.make_scheduler_summary_df(self._scheduler,
                                                                                    self._conditions,
                                                                                    self._rewards)
+            # Duplicate column and apply URL formatting to one of the columns
+            survey_rewards['survey'] = survey_rewards.loc[:, 'survey_name']
             survey_rewards['survey_name'] = survey_rewards.apply(survey_url_formatter, axis=1)
             self._survey_rewards = survey_rewards
         except Exception as e:
@@ -344,13 +323,13 @@ class Scheduler(param.Parameterized):
         tabulator_formatter = {
             'survey_name': HTMLTemplateFormatter(template='<%= value %>')
         }
-        survey_rewards_table = pn.widgets.Tabulator(self._tier_survey_rewards[['tier','survey_name','reward','survey_url']],
+        survey_rewards_table = pn.widgets.Tabulator(self._tier_survey_rewards[['tier','survey_name','reward','survey','survey_url']],
                                                     widths={'survey_name':'60%','reward':'40%'},
                                                     show_index=False,
                                                     formatters=tabulator_formatter,
                                                     disabled=True,
                                                     selectable=1,
-                                                    hidden_columns=['tier','survey_url'],
+                                                    hidden_columns=['tier','survey','survey_url'],
                                                     #height=200,
                                                     sizing_mode='stretch_width',
                                                     #sizing_mode='stretch_both',
@@ -600,7 +579,9 @@ def scheduler_app(date=None, scheduler_pickle=None):
                         ),
                     pn.Column(
                         pn.Row(scheduler.survey_rewards_title,styles={'background':'#048b8c'}),
-                        pn.param.ParamMethod(scheduler.survey_rewards_table, loading_indicator=True)
+                        pn.Row(pn.param.ParamMethod(scheduler.survey_rewards_table, loading_indicator=True),
+                               height=200,
+                               scroll=True)
                         )
                     ),
                 # Bottom-left (basis function table).
@@ -634,23 +615,28 @@ def scheduler_app(date=None, scheduler_pickle=None):
         #debug_info
         
         # OPTION 2
-        # pn.Row(
-        #     pn.Spacer(width=10),
-        #     pn.Column(
-        #         pn.pane.Str(' Debugging', align='center', styles={'font-size':'10pt','color':'black'}),
-        #         terminal,
-        #         styles={'background':'#EDEDED'}
-        #         ),
-        #     pn.Spacer(width=10)
-        #     )
+        # pn.Row(pn.Spacer(width=10),
+        #        pn.Column(pn.pane.Str(' Debugging',
+        #                              align='center',
+        #                              sizing_mode='stretch_width',
+        #                              styles={'font-size':'10pt',
+        #                                      'color':'black',
+        #                                      'height': '30px',
+        #                                      'font-weight':'bold',
+        #                                      'background': '#EDEDED',
+        #                                      'padding-top': '5px'}),
+        #                  terminal
+        #                  ),
+        #        pn.Spacer(width=10))
         
         # OPTION 3
-        pn.Column(pn.pane.Str(' Debugging', styles={'font-size':'10pt','font-weight':'bold','color':'black'}),
+        pn.Column(pn.Spacer(height=5),
+                  pn.pane.Str(' Debugging', styles={'font-size':'10pt','font-weight':'bold','color':'black'}),
                   scheduler.debugging_messages,
                   #pn.layout.HSpacer(),
                 #   sizing_mode='stretch_width',
                 #   width_policy='max',
-                  height=100,
+                  height=120,
                   styles={'background':'#EDEDED'}
                   )
         
