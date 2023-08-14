@@ -20,6 +20,7 @@ import schedview.plot.rewards
 import schedview.plot.visits
 import schedview.plot.maf
 import schedview.plot.nightbf
+import schedview.plot.nightly
 import schedview.param
 
 import panel as pn
@@ -292,6 +293,31 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                 )
 
     @param.depends(
+        "_visits",
+        "_almanac_events",
+    )
+    def airmass_vs_time(self):
+        """Create a plot of airmass vs. time.
+
+        Returns
+        -------
+        fig : `bokeh.plotting.Figure`
+            The bokeh figure.
+        """
+        if self._visits is None:
+            return "No visits loaded."
+
+        if self._almanac_events is None:
+            self._update_almanac_events()
+
+        logging.info("Updating airmass vs. time plot")
+        fig = schedview.plot.nightly.plot_airmass_vs_time(
+            visits=self._visits, almanac_events=self._almanac_events
+        )
+        logging.info("Finished updating airmass vs. time plot")
+        return fig
+
+    @param.depends(
         "_scheduler",
         "_visits",
     )
@@ -562,6 +588,10 @@ def prenight_app(
             ),
         ),
         pn.Tabs(
+            (
+                "Airmass vs. time",
+                pn.param.ParamMethod(prenight.airmass_vs_time, loading_indicator=True),
+            ),
             (
                 "Visit explorer",
                 pn.param.ParamMethod(prenight.visit_explorer, loading_indicator=True),
