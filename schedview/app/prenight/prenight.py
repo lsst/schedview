@@ -4,6 +4,9 @@ import numpy as np
 import pandas as pd
 import os
 
+import panel as pn
+import bokeh
+
 from astropy.time import Time
 import astropy.utils.iers
 
@@ -22,8 +25,6 @@ import schedview.plot.maf
 import schedview.plot.nightbf
 import schedview.plot.nightly
 import schedview.param
-
-import panel as pn
 
 AVAILABLE_TIMEZONES = [
     "Chile/Continental",
@@ -135,6 +136,11 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         },
     )
 
+    # If the bokeh.models.ColumnDataSource is created once and used in
+    # multiple plots, then the plots can be more easily linked, and memory
+    # and communication overhead is reduced.
+    _visits_cds = param.Parameter()
+
     # An instance of rubin_sim.scheduler.schedulers.CoreScheduler
     _scheduler = param.Parameter()
 
@@ -206,9 +212,12 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                 Time(self._almanac_events.loc["sunrise", "UTC"]),
             )
             self._visits = visits
+            self._visits_cds = bokeh.models.ColumnDataSource(visits)
+
         except Exception as e:
             logging.error(e)
             self._visits = None
+            self._visits_cds = None
 
     @param.depends("_visits")
     def visit_table(self):
@@ -237,7 +246,9 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             "note",
         ]
 
-        visit_table = pn.widgets.Tabulator(self._visits[columns])
+        visit_table = pn.widgets.Tabulator(
+            self._visits[columns], pagination="remote", header_filters=True
+        )
 
         if len(self._visits) < 1:
             visit_table = "No visits on this night"
@@ -293,7 +304,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                 )
 
     @param.depends(
-        "_visits",
+        "_visits_cds",
         "_almanac_events",
     )
     def airmass_vs_time(self):
@@ -311,14 +322,24 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             self._update_almanac_events()
 
         logging.info("Updating airmass vs. time plot")
+
+        fig = bokeh.plotting.figure(
+            title="Airmass",
+            x_axis_label="Time (UTC)",
+            y_axis_label="Airmass",
+            frame_width=768,
+            frame_height=512,
+            tools="pan,wheel_zoom,box_zoom,box_select,save,reset,help",
+        )
+
         fig = schedview.plot.nightly.plot_airmass_vs_time(
-            visits=self._visits, almanac_events=self._almanac_events
+            visits=self._visits_cds, figure=fig, almanac_events=self._almanac_events
         )
         logging.info("Finished updating airmass vs. time plot")
         return fig
 
     @param.depends(
-        "_visits",
+        "_visits_cds",
         "_almanac_events",
     )
     def alt_vs_time(self):
@@ -329,19 +350,61 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         fig : `bokeh.plotting.Figure`
             The bokeh figure.
         """
-        if self._visits is None:
+        if self._visits_cds is None:
             return "No visits loaded."
 
         if self._almanac_events is None:
             self._update_almanac_events()
 
         logging.info("Updating altitude vs. time plot")
-        fig = schedview.plot.nightly.plot_alt_vs_time(
-            visits=self._visits, almanac_events=self._almanac_events
+
+        fig = bokeh.plotting.figure(
+            title="Altitude",
+            x_axis_label="Time (UTC)",
+            y_axis_label="Altitude",
+            frame_width=768,
+            frame_height=512,
+            tools="pan,wheel_zoom,box_zoom,box_select,save,reset,help",
         )
+
+        fig = schedview.plot.nightly.plot_alt_vs_time(
+            visits=self._visits_cds, figure=fig, almanac_events=self._almanac_events
+        )
+
         logging.info("Finished updating altitude vs. time plot")
         return fig
 
+    @param.depends(
+        "_visits_cds",
+    )
+    def horizon_map(self):
+        """Create a polar plot of altitude and azimuth
+
+        Returns
+        -------
+        fig : `bokeh.plotting.Figure`
+            The bokeh figure.
+        """
+        if self._visits_cds is None:
+            return "No visits loaded."
+
+        logging.info("Updating polar alt-az plot")
+
+        fig = bokeh.plotting.figure(
+            title="Horizon Coordinates",
+            x_axis_type=None,
+            y_axis_type=None,
+            frame_width=512,
+            frame_height=512,
+            tools="pan,wheel_zoom,box_zoom,box_select,lasso_select,save,reset,help",
+        )
+
+        fig = schedview.plot.nightly.plot_polar_alt_az(
+            visits=self._visits_cds, figure=fig, legend=False
+        )
+
+        logging.info("Finished updating polar alt-az plot")
+        return fig
 
     @param.depends(
         "_scheduler",
@@ -620,7 +683,10 @@ def prenight_app(
             ),
             (
                 "Azimuth and altitude",
-                pn.param.ParamMethod(prenight.alt_vs_time, loading_indicator=True),
+                pn.Row(
+                    pn.param.ParamMethod(prenight.alt_vs_time, loading_indicator=True),
+                    pn.param.ParamMethod(prenight.horizon_map, loading_indicator=True),
+                ),
             ),
             (
                 "Visit explorer",
