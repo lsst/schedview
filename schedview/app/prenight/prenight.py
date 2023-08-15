@@ -318,6 +318,32 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         return fig
 
     @param.depends(
+        "_visits",
+        "_almanac_events",
+    )
+    def alt_vs_time(self):
+        """Create a plot of altitude vs. time.
+
+        Returns
+        -------
+        fig : `bokeh.plotting.Figure`
+            The bokeh figure.
+        """
+        if self._visits is None:
+            return "No visits loaded."
+
+        if self._almanac_events is None:
+            self._update_almanac_events()
+
+        logging.info("Updating altitude vs. time plot")
+        fig = schedview.plot.nightly.plot_alt_vs_time(
+            visits=self._visits, almanac_events=self._almanac_events
+        )
+        logging.info("Finished updating altitude vs. time plot")
+        return fig
+
+
+    @param.depends(
         "_scheduler",
         "_visits",
     )
@@ -591,6 +617,10 @@ def prenight_app(
             (
                 "Airmass vs. time",
                 pn.param.ParamMethod(prenight.airmass_vs_time, loading_indicator=True),
+            ),
+            (
+                "Azimuth and altitude",
+                pn.param.ParamMethod(prenight.alt_vs_time, loading_indicator=True),
             ),
             (
                 "Visit explorer",

@@ -1,6 +1,7 @@
 """Plots that summarize a night's visits and other parameters."""
 
 import bokeh
+import colorcet
 import numpy as np
 from .visitmap import BAND_COLORS
 
@@ -28,6 +29,14 @@ DEFAULT_EVENT_COLORS = {
     "night_middle": None,
 }
 
+BAND_SHAPES = {
+    'y': 'circle',
+    'z': 'hex',
+    'i': 'star',
+    'r': 'square',
+    'g': 'diamond',
+    'u': 'triangle',
+}
 
 def _visits_tooltips(visits, weather=False):
     deg = "\u00b0"
@@ -201,6 +210,114 @@ def plot_airmass_vs_time(
     fig.xaxis[0].ticker = bokeh.models.DatetimeTicker()
     fig.xaxis[0].formatter = bokeh.models.DatetimeTickFormatter(hours="%H:%M")
     fig.add_layout(fig.legend[0], "left")
+
+    if almanac_events is not None:
+        _add_almanac_events(fig, almanac_events, event_labels, event_colors)
+
+    return fig
+
+def _make_airmass_tick_formatter():
+    """Make a bokeh.models.TickFormatter for airmass values"""
+    js_code = """
+        const cos_zd = Math.sin(tick * Math.PI / 180.0)
+        const a = 462.46 + 2.8121/(cos_zd**2 + 0.22*cos_zd + 0.01)
+        const airmass = Math.sqrt((a*cos_zd)**2 + 2*a + 1) - a * cos_zd
+        return airmass.toFixed(2)
+    """
+    
+    return bokeh.models.CustomJSTickFormatter(code=js_code)
+
+def plot_alt_vs_time(
+    visits,
+    almanac_events,
+    band_shapes=BAND_SHAPES,
+    event_labels=DEFAULT_EVENT_LABELS,
+    event_colors=DEFAULT_EVENT_COLORS,
+    figure=None,
+):
+    """Plot airmass vs. time for a set of visits
+
+    Parameters
+    ----------
+    visits : `pandas.DataFrame` or `bokeh.models.ColumnDataSource`
+        Dataframe or ColumnDataSource containing visit information.
+    almanac_events : `pandas.DataFrame`
+        Dataframe containing almanac events.
+    band_colors : `dict`
+        Mapping of filter names to colors.  Default is `BAND_COLORS`.
+    event_labels : `dict`
+        Mapping of almanac events to labels.  Default is `DEFAULT_EVENT_LABELS`.
+    event_colors : `dict`
+        Mapping of almanac events to colors.  Default is `DEFAULT_EVENT_COLORS`.
+    figure : `bokeh.plotting.Figure`
+        Bokeh figure object to plot on.  If None, a new figure will be created.
+
+    Returns
+    -------
+    fig : `bokeh.plotting.Figure`
+        Bokeh figure object
+    """
+
+    if figure is None:
+        fig = bokeh.plotting.figure(
+            title="Altitude",
+            x_axis_label="Time (UTC)",
+            y_axis_label="Altitude",
+            frame_width=768,
+            frame_height=512,
+        )
+    else:
+        fig = figure
+
+    if isinstance(visits, bokeh.models.ColumnDataSource):
+        visits_ds = visits
+    else:
+        visits_ds = bokeh.models.ColumnDataSource(visits)
+    
+    if "HA_hours" not in visits_ds.column_names:
+        hour_angle = (np.array(visits_ds.data["observationStartLST"]) - np.array(visits_ds.data["fieldRA"])) * 24.0/360.0
+        hour_angle = np.mod(hour_angle + 12.0, 24) - 12
+        visits_ds.add(hour_angle, 'HA_hours')
+    
+    ha_color_mapper = bokeh.models.LinearColorMapper(low=-5, high=5, palette=colorcet.palette['bkr'])
+    
+    filter_marker_mapper = bokeh.models.CategoricalMarkerMapper(
+        factors=tuple(band_shapes.keys()),
+        markers=tuple(band_shapes.values()),
+        name="filter",
+    )
+    
+    fig.line("start_date", "altitude", source=visits_ds, color="gray")
+    fig.scatter(
+        "start_date",
+        "altitude",
+        source=visits_ds,
+        color={"field": "HA_hours", "transform": ha_color_mapper},
+        marker={"field": "filter", "transform": filter_marker_mapper},
+        size=5,
+        legend_field="filter",
+        name="visit_altitude",
+    )
+
+    hover_tool = bokeh.models.HoverTool()
+    hover_tool.renderers = fig.select({"name": "visit_altitude"})
+    hover_tool.tooltips = _visits_tooltips(visits)
+    hover_tool.formatters = {"@start_date": "datetime"}
+    fig.add_tools(hover_tool)
+
+    fig.y_range = bokeh.models.Range1d(0, 90)
+    fig.xaxis[0].ticker = bokeh.models.DatetimeTicker()
+    fig.xaxis[0].formatter = bokeh.models.DatetimeTickFormatter(hours="%H:%M")
+
+    color_bar = bokeh.models.ColorBar(color_mapper=ha_color_mapper, width=8, location=(0,0), title="H.A. (hours)")
+    fig.add_layout(color_bar, 'left')
+    fig.add_layout(fig.legend[0], "left")    
+
+    fig.extra_y_ranges = {"airmass": fig.y_range}
+    fig.add_layout(bokeh.models.LinearAxis(), 'right')
+    fig.yaxis[1].formatter = _make_airmass_tick_formatter()
+    fig.yaxis[1].minor_tick_line_alpha = 0
+    fig.yaxis[1].axis_label = "Airmass"
 
     if almanac_events is not None:
         _add_almanac_events(fig, almanac_events, event_labels, event_colors)
