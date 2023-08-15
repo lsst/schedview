@@ -65,6 +65,25 @@ def _visits_tooltips(visits, weather=False):
     return tooltips
 
 
+def _add_almanac_events(fig, almanac_events, event_labels, event_colors):
+    for event, row in almanac_events.iterrows():
+        if event_labels[event] is None:
+            continue
+
+        event_marker = bokeh.models.Span(
+            location=row.UTC, dimension="height", line_color=event_colors[event]
+        )
+        fig.add_layout(event_marker)
+        event_label = bokeh.models.Label(
+            x=row.UTC,
+            y=fig.y_range.start,
+            text=" " + event_labels[event],
+            angle=90,
+            angle_units="deg",
+            text_color=event_colors[event],
+        )
+        fig.add_layout(event_label)
+
 def plot_airmass_vs_time(
     visits,
     almanac_events,
@@ -140,22 +159,6 @@ def plot_airmass_vs_time(
     fig.add_layout(fig.legend[0], "left")
 
     if almanac_events is not None:
-        for event, row in almanac_events.iterrows():
-            if event_labels[event] is None:
-                continue
-
-            event_marker = bokeh.models.Span(
-                location=row.UTC, dimension="height", line_color=event_colors[event]
-            )
-            fig.add_layout(event_marker)
-            event_label = bokeh.models.Label(
-                x=row.UTC,
-                y=plot_airmass_limit,
-                text=" " + event_labels[event],
-                angle=90,
-                angle_units="deg",
-                text_color=event_colors[event],
-            )
-            fig.add_layout(event_label)
+        _add_almanac_events(fig, almanac_events, event_labels, event_colors)
 
     return fig
