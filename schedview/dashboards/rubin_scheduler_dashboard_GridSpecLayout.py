@@ -8,7 +8,7 @@ import os
 
 from astropy.time import Time
 from zoneinfo import ZoneInfo
-from bokeh.models.widgets.tables import HTMLTemplateFormatter
+from bokeh.models.widgets.tables import HTMLTemplateFormatter, BooleanFormatter
 
 import schedview
 import schedview.compute.scheduler
@@ -505,7 +505,8 @@ class Scheduler(param.Parameterized):
         if self._basis_functions is None:
             return "No basis functions available."
         logging.info("Creating basis function table.")
-        tabulator_formatter = {'basis_function': HTMLTemplateFormatter(template='<%= value %>')}
+        tabulator_formatter = {'basis_function': HTMLTemplateFormatter(template='<%= value %>'),
+                               'feasible': BooleanFormatter()}
         columnns = ['basis_function',
                     'basis_function_class',
                     'feasible',
@@ -516,7 +517,18 @@ class Scheduler(param.Parameterized):
                     'accum_area',
                     'doc_url',
                     'basis_func']
+        titles = {
+            'basis_function': 'Basis Function',
+            'basis_function_class': 'Class',
+            'feasible': 'Feasible',
+            'max_basis_reward': 'Max Reward',
+            'basis_area': 'Area',
+            'basis_weight': 'Weight',
+            'max_accum_reward': 'Max Accumelated Reward',
+            'accum_area': 'Accumelated Area'
+        }
         basis_function_table = pn.widgets.Tabulator(self._basis_functions[columnns],
+                                                    titles=titles,
                                                     layout="fit_data",
                                                     show_index=False,
                                                     formatters=tabulator_formatter,
