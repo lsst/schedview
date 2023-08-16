@@ -389,10 +389,15 @@ class Scheduler(param.Parameterized):
         if self._tier_survey_rewards is None:
             return "No surveys available."
         tabulator_formatter = {'survey_name': HTMLTemplateFormatter(template='<%= value %>')}
+        titles = {
+            'survey_name': 'Survey Name',
+            'reward': 'Reward'
+        }
         survey_rewards_table = pn.widgets.Tabulator(self._tier_survey_rewards[['tier','survey_name','reward','survey','survey_url']],
                                                     widths={'survey_name':'60%','reward':'40%'},
                                                     show_index=False,
                                                     formatters=tabulator_formatter,
+                                                    titles=titles,
                                                     disabled=True,
                                                     selectable=1,
                                                     hidden_columns=['tier','survey','survey_url'],
