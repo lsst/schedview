@@ -317,8 +317,11 @@ def plot_alt_vs_time(
     fig.add_layout(color_bar, "left")
     fig.add_layout(fig.legend[0], "left")
 
+    fig.yaxis[0].ticker.desired_num_ticks = 10
+
     fig.extra_y_ranges = {"airmass": fig.y_range}
     fig.add_layout(bokeh.models.LinearAxis(), "right")
+    fig.yaxis[1].ticker.desired_num_ticks = fig.yaxis[0].ticker.desired_num_ticks
     fig.yaxis[1].formatter = _make_airmass_tick_formatter()
     fig.yaxis[1].minor_tick_line_alpha = 0
     fig.yaxis[1].axis_label = "Airmass"

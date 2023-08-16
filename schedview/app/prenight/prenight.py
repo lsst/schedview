@@ -327,8 +327,8 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             title="Airmass",
             x_axis_label="Time (UTC)",
             y_axis_label="Airmass",
-            frame_width=768,
             frame_height=512,
+            width_policy='max',
             tools="pan,wheel_zoom,box_zoom,box_select,save,reset,help",
         )
 
@@ -362,8 +362,8 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             title="Altitude",
             x_axis_label="Time (UTC)",
             y_axis_label="Altitude",
-            frame_width=768,
             frame_height=512,
+            width_policy='max',
             tools="pan,wheel_zoom,box_zoom,box_select,save,reset,help",
         )
 
