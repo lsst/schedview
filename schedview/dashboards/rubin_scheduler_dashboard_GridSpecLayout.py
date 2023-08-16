@@ -186,7 +186,7 @@ class Scheduler(param.Parameterized):
                                    label="Scheduler pickle file")
     date            = param.Date(Time.now().datetime.date())
     tier            = param.ObjectSelector(default="", objects=[""])
-    survey          = param.Integer(default=-1)
+    survey          = param.Integer(default=0)
     basis_function  = param.Integer(default=-1)
     survey_map      = param.ObjectSelector(default="", objects=[""])
     plot_display    = param.Integer(default=1)                                 # 1: map, 2: basis function
@@ -213,21 +213,19 @@ class Scheduler(param.Parameterized):
     _data_loaded = param.Boolean(default=False)
     
     # Dashboard headings ------------------------------------------------------# Should these functions be below others?
+
     
     # Panel for dashboard title.
     @param.depends("tier", "survey", "plot_display", "survey_map", "basis_function")
     def dashboard_title(self):
-        titleT  = ''; titleS  = ''; titleBF = ''; titleM = ''
-        if self._scheduler is not None:
-            if self.tier != '':
-                titleT = '\nTier {}'.format(self.tier[-1])
-                if self.survey >= 0:
-                    titleS = ' - Survey {}'.format(self.survey)
-                    if self.plot_display == 1:
-                        titleM = ' - Map {}'.format(self.survey_map)
-                    elif self.plot_display == 2 and self.basis_function >= 0:
-                        titleBF = ' - Basis function {}'.format(self.basis_function)
-        title_string = titleT + titleS + titleBF + titleM
+        titleTS  = ''; titleBF = ''; titleM = ''
+        if self._scheduler is not None and self.tier != '':
+            titleTS = f'\nTier {self.tier[-1]} - Survey {self.survey}'
+            if self.plot_display == 1:
+                titleM = ' - Map {}'.format(self.survey_map)
+            elif self.plot_display == 2 and self.basis_function >= 0:
+                titleBF = ' - Basis function {}'.format(self.basis_function)
+        title_string = titleTS + titleBF + titleM
         dashboard_title = pn.pane.Str(title_string,
                                       height=20,
                                       styles={'font-size':'14pt',
@@ -243,7 +241,6 @@ class Scheduler(param.Parameterized):
         title_string = 'Surveys and rewards'
         if self._data_loaded == True and self._scheduler is not None and self.tier != '':
             title_string += ' for tier {}'.format(self.tier[-1])
-        
         survey_rewards_title = pn.pane.Str(title_string,
                                            styles={'font-size':'13pt',
                                                    'font-weight':'300',
@@ -256,9 +253,8 @@ class Scheduler(param.Parameterized):
     @param.depends("_data_loaded", "survey")
     def basis_function_table_title(self):  
         title_string = 'Basis functions'
-        if self._data_loaded==True and self._scheduler is not None and self.survey >= 0:
+        if self._data_loaded==True and self._scheduler is not None:
             title_string += ' for survey {}'.format(self._tier_survey_rewards.reset_index()['survey'][self.survey])
-        
         basis_function_table_title = pn.pane.Str(title_string, 
                                                 styles={
                                                     'font-size':'13pt',
@@ -272,7 +268,7 @@ class Scheduler(param.Parameterized):
     # Panel for map title.
     @param.depends("_data_loaded", "tier", "survey", "plot_display", "survey_map", "basis_function")
     def map_title(self):
-        if self._data_loaded==True and self._scheduler is not None and self.survey >= 0:
+        if self._data_loaded==True and self._scheduler is not None:
             titleA = 'Survey {}\n'.format(self._tier_survey_rewards.reset_index()['survey'][self.survey])
             if self.plot_display == 1:
                 titleB = 'Map: {}'.format(self.survey_map)
@@ -291,7 +287,6 @@ class Scheduler(param.Parameterized):
                                     'color':'white'},
                                 stylesheets=[title_stylesheet])
         return map_title
-
     
     # Widgets and updates -----------------------------------------------------
     
@@ -312,7 +307,7 @@ class Scheduler(param.Parameterized):
             self._scheduler = None
             self._conditions = None
             self._survey_rewards = None   # -> tier=""             -> _tier_survey_rewards=None
-            self.survey = -1              # -> _listed_survey=None -> _survey_maps=None
+            self.survey = 0               # -> _listed_survey=None -> _survey_maps=None
             self._basis_functions = None
             self.basis_function = -1
             
@@ -337,7 +332,6 @@ class Scheduler(param.Parameterized):
     
     
     # Update survey reward dataframe if given new pickle file or new date.
-    # @param.depends("_scheduler", "_conditions", "_date_time", watch=True)
     @param.depends("_conditions", "_date_time", watch=True)
     def _update_survey_rewards(self):
         if self._scheduler is None:
@@ -391,7 +385,7 @@ class Scheduler(param.Parameterized):
             self._debugging_message = f"Survey rewards unable to be updated: \n{traceback.format_exc(limit=-1)}"
             logging.info(f"Survey rewards unable to be updated: \n{traceback.format_exc(limit=-1)}")
             self._tier_survey_rewards = None
-            self.survey = -1
+            self.survey = 0
 
 
     # Widget for survey reward table.
@@ -433,7 +427,7 @@ class Scheduler(param.Parameterized):
         except:
             self._debugging_message = f"Survey selection unable to be updated: \n{traceback.format_exc(limit=-1)}"
             logging.info(f"Survey selection unable to be updated: \n{traceback.format_exc(limit=-1)}")
-            self.survey = -1
+            self.survey = 0
     
     
     # Update listed_survey if tier or survey selections change.
@@ -453,7 +447,7 @@ class Scheduler(param.Parameterized):
     # Update available map selections if new survey chosen.
     @param.depends("_data_loaded","_listed_survey", watch=True)
     def _update_map_selector(self):
-        if self._data_loaded == False or self.tier == "" or self.survey < 0:
+        if self._data_loaded == False or self.tier == "":
             self.param["survey_map"].objects = [""]
             self.survey_map = ""
             return
@@ -474,7 +468,7 @@ class Scheduler(param.Parameterized):
     # Update map selections when nside changed.
     @param.depends("nside", watch=True)
     def _update_nside_of_maps(self):
-        if self.tier == "" or self.survey < 0:
+        if self.tier == "":
             self.param["survey_map"].objects = [""]
             self.survey_map = ""
             return
@@ -503,18 +497,19 @@ class Scheduler(param.Parameterized):
             survey_id = self.survey
             # Check that survey has basis functions.                           # If all surveys have basis functions, this won't be needed.
             if self._rewards.index.isin([(tier_id, survey_id)]).any():
+                # Create dataframe.
                 basis_function_df = schedview.compute.survey.make_survey_reward_df(self._listed_survey,
                                                                                    self._conditions,
                                                                                    self._rewards.loc[[(tier_id, survey_id)], :])
+                # Duplicate column and apply URL formatting to one of the columns.
+                basis_function_df['basis_func'] = basis_function_df.loc[:, 'basis_function']
+                basis_function_df['basis_function'] = basis_function_df.apply(basis_function_url_formatter, axis=1)
+                self._basis_functions = basis_function_df
             else:
                 self._debugging_message = f"Survey {self.survey} has no basis functions."
                 logging.info(f"Survey {self.survey} has no basis functions.")
-                self._basis_functions is None
+                self._basis_functions = None
                 return
-            # Duplicate column and apply URL formatting to one of the columns.
-            basis_function_df['basis_func'] = basis_function_df.loc[:, 'basis_function']
-            basis_function_df['basis_function'] = basis_function_df.apply(basis_function_url_formatter, axis=1)
-            self._basis_functions = basis_function_df
         except:
             self._debugging_message = f"Basis function dataframe unable to be updated: \n{traceback.format_exc(limit=-1)}"
             logging.info(f"Basis function dataframe unable to be updated: \n{traceback.format_exc(limit=-1)}")
@@ -526,6 +521,7 @@ class Scheduler(param.Parameterized):
     def basis_function_table(self):
         if self._basis_functions is None:
             return "No basis functions available."
+        self._debugging_message = "Creating basis function table."
         logging.info("Creating basis function table.")
         tabulator_formatter = {'basis_function': HTMLTemplateFormatter(template='<%= value %>'),
                                'feasible': BooleanFormatter()}
