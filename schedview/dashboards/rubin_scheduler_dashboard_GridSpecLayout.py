@@ -68,11 +68,11 @@ Further potential modifications
 -------------------------------
 
     1. [efficient code]  Find duplicate code sections and replace with methods, where sensible.
-    2. [clean code]  Clean up sky_map().
-    3. [product polish]     Populate with useful messages sent to debugger.
-    4. [product polish]     Bokeh key degree symbol
-        - convert all Text objects to Label objects to use LaTeX.
-    5. [code style]  Change all parameter lists to have their closing bracket on a new line.
+    2. [clean code]      Clean up sky_map().
+    3. [product polish]  Populate with useful messages sent to debugger?
+    4. [product polish]  Bokeh key degree symbol
+                           - convert all Text objects to Label objects to use LaTeX.
+    5. [code style]      Change all parameter lists to have their closing bracket on a new line.
 
 
 Current issues/quirks
@@ -80,11 +80,12 @@ Current issues/quirks
 
     Blank map:
         
-        - SolarElongationMask (tier 4 surveys) shows blank map because basis_area=0
-          (even though healpix array is not all -inf values. 25%=1)
+        - SolarElongationMask (tier 4 surveys) shows blank map even though
+          healpix array is not all -inf values (25%=1).
+          - Perhaps something to do with basis_area=0?
         - Blank map also means no tooltip.
-        - I currently send a message to debugging noting the map is empty due to
-          basis_area. Is this behaviour okay? (Blank map, no tooltip, messsage).
+        - I currently send a message to debugging noting that basis_area=0.
+          Is this behaviour okay? (Blank map, no tooltip, messsage).
         - Should we treat such a case differently?
     
     Deserialisation error:
@@ -189,13 +190,15 @@ class Scheduler(param.Parameterized):
     survey          = param.Integer(default=0)
     basis_function  = param.Integer(default=-1)
     survey_map      = param.ObjectSelector(default="", objects=[""])
-    plot_display    = param.Integer(default=1)                                 # 1: map, 2: basis function
     nside           = param.ObjectSelector(default=16,
                                            objects=[2**n for n in np.arange(1, 6)],
                                            label="Map resolution (nside)")
     color_palette   = param.ObjectSelector(default="Viridis256",
                                            objects=color_palettes)
-    debug_string    = param.String(default="")
+
+    _data_loaded  = param.Boolean(default=False)    
+    _plot_display = param.Integer(default=1)                                 # 1: map, 2: basis function
+    _debug_string = param.String(default="")
 
     _scheduler                = param.Parameter(None)
     _conditions               = param.Parameter(None)
@@ -210,20 +213,22 @@ class Scheduler(param.Parameterized):
     _basis_function_df_widget = param.Parameter(None)
     _debugging_message        = param.Parameter(None)
     
-    _data_loaded = param.Boolean(default=False)
+    # Parameters to ensure map only updates once.
+    _map_params_cache = param.List(default=[True, 0, 0, 0, 0, 0, 16, "Viridis256"])
+    _make_a_new_map   = param.Parameter(None)
     
     # Dashboard headings ------------------------------------------------------# Should these functions be below others?
 
     
     # Panel for dashboard title.
-    @param.depends("tier", "survey", "plot_display", "survey_map", "basis_function")
+    @param.depends("tier", "survey", "_plot_display", "survey_map", "basis_function")
     def dashboard_title(self):
         titleTS  = ''; titleBF = ''; titleM = ''
         if self._scheduler is not None and self.tier != '':
             titleTS = f'\nTier {self.tier[-1]} - Survey {self.survey}'
-            if self.plot_display == 1:
+            if self._plot_display == 1:
                 titleM = ' - Map {}'.format(self.survey_map)
-            elif self.plot_display == 2 and self.basis_function >= 0:
+            elif self._plot_display == 2 and self.basis_function >= 0:
                 titleBF = ' - Basis function {}'.format(self.basis_function)
         title_string = titleTS + titleBF + titleM
         dashboard_title = pn.pane.Str(title_string,
@@ -266,13 +271,13 @@ class Scheduler(param.Parameterized):
 
 
     # Panel for map title.
-    @param.depends("_data_loaded", "tier", "survey", "plot_display", "survey_map", "basis_function")
+    @param.depends("_data_loaded", "tier", "survey", "_plot_display", "survey_map", "basis_function")
     def map_title(self):
         if self._data_loaded==True and self._scheduler is not None:
             titleA = 'Survey {}\n'.format(self._tier_survey_rewards.reset_index()['survey'][self.survey])
-            if self.plot_display == 1:
+            if self._plot_display == 1:
                 titleB = 'Map: {}'.format(self.survey_map)
-            elif self.plot_display == 2 and self.basis_function >= 0:
+            elif self._plot_display == 2 and self.basis_function >= 0:
                 titleB = 'Basis function {}: {}'.format(self.basis_function,
                                                         self._basis_functions['basis_func'][self.basis_function])
             else:
@@ -296,13 +301,15 @@ class Scheduler(param.Parameterized):
     def _update_scheduler(self):
         logging.info("Updating scheduler.")
         try:
-            (scheduler, conditions) = schedview.collect.scheduler_pickle.read_scheduler(self.scheduler_fname)
-            self._data_loaded = True
-            self._scheduler = scheduler
-            self._conditions = conditions
+            (scheduler, conditions) = schedview.collect.scheduler_pickle.read_scheduler(self.scheduler_fname)            
+            self.param.update(_data_loaded = True,
+                              _scheduler = scheduler,
+                              _conditions = conditions)
         except:
             logging.error(f"Could not load scheduler from {self.scheduler_fname} \n{traceback.format_exc(limit=-1)}")
             self._debugging_message = f"Could not load scheduler from {self.scheduler_fname}: \n{traceback.format_exc(limit=-1)}"
+            
+            self._map_params_cache = [True, 0, 0, 0, 0, 0, 16, "Viridis256"]
             self._data_loaded = False
             self._scheduler = None
             self._conditions = None
@@ -311,16 +318,15 @@ class Scheduler(param.Parameterized):
             self._basis_functions = None
             self.basis_function = -1
             
-            # self.param.set_param(_data_loaded= False,
-            #                      _scheduler = None,
-            #                      _conditions = None,
-            #                      _survey_rewards = None,
-            #                      survey = -1,
-            #                      )
-            
-            # self.param.set_param(basis_function = -1,
-            #                      tier = "",
-            #                      )
+            # self.param.update(_data_loaded= False,
+            #                   _scheduler = None,
+            #                   _conditions = None,
+            #                   _survey_rewards = None,
+            #                   survey = -1,
+            #                   )
+            # self.param.update(basis_function = -1,
+            #                   tier = "",
+            #                   )
             
     
     # Update datetime if new datetime chosen.
@@ -337,6 +343,10 @@ class Scheduler(param.Parameterized):
         if self._scheduler is None:
             logging.info("Can not update survey reward table as no pickle is loaded.")
             return
+        # Code to remove one of two exceptions on initial load BUT breaks other things.
+        # if self._date_time is None:
+        #     logging.info("Can not update survey reward table as no date chosen.")
+        #     return
         try:
             logging.info("Updating survey rewards.")
             self._conditions.mjd = self._date_time
@@ -347,15 +357,16 @@ class Scheduler(param.Parameterized):
                                                                                    self._rewards)
             # Duplicate column and apply URL formatting to one of the columns.
             survey_rewards['survey'] = survey_rewards.loc[:, 'survey_name']
-            survey_rewards['survey_name'] = survey_rewards.apply(survey_url_formatter, axis=1)
-            self._survey_rewards = survey_rewards
-            self._data_loaded = True
+            survey_rewards['survey_name'] = survey_rewards.apply(survey_url_formatter, axis=1)            
+            self.param.update(_survey_rewards = survey_rewards,
+                              _data_loaded    = True)
         except:           
             logging.info(f"Survey rewards dataframe unable to be updated: \n{traceback.format_exc(limit=-1)}")
             self._debugging_message = f"Survey rewards dataframe unable to be updated: \n{traceback.format_exc(limit=-1)}"
-            self._data_loaded = False
-            self._survey_rewards = None
-            self._basis_functions = None
+            self._map_params_cache = [True, 0, 0, 0, 0, 0, 16, "Viridis256"]
+            self.param.update(_data_loaded     = False,
+                              _survey_rewards  = None,
+                              _basis_functions = None)
             
 
     # Update available tier selections if given new pickle file.
@@ -393,6 +404,7 @@ class Scheduler(param.Parameterized):
     def survey_rewards_table(self):
         if self._tier_survey_rewards is None:
             return "No surveys available."
+        logging.info("Updating survey rewards widget.")
         tabulator_formatter = {'survey_name': HTMLTemplateFormatter(template='<%= value %>')}
         survey_rewards_table = pn.widgets.Tabulator(self._tier_survey_rewards[['tier','survey_name','reward','survey','survey_url']],
                                                     widths={'survey_name':'60%','reward':'40%'},
@@ -405,7 +417,7 @@ class Scheduler(param.Parameterized):
                                                     page_size=4,
                                                     sizing_mode='stretch_width',
                                                     )
-        logging.info("Finished updating survey rewards table.")
+        # logging.info("Finished updating survey rewards widget.")
         self._survey_df_widget = survey_rewards_table
         return survey_rewards_table
 
@@ -414,7 +426,6 @@ class Scheduler(param.Parameterized):
     @param.depends("_survey_df_widget.selection", watch=True)
     def _update_survey_with_row_selection(self):
         if self._survey_df_widget.selection == []:
-            # self.survey = -1
             return
         try:
             logging.info("Updating survey row selection.")
@@ -428,6 +439,9 @@ class Scheduler(param.Parameterized):
     # Update listed_survey if tier or survey selections change.
     @param.depends("survey", "tier", watch=True)
     def _update_listed_survey(self):
+        if self.tier == "":
+            self._listed_survey = None
+            return
         logging.info("Updating listed survey.")
         try:
             tier_id = int(self.tier[-1])
@@ -440,11 +454,12 @@ class Scheduler(param.Parameterized):
     
 
     # Update available map selections if new survey chosen.
-    @param.depends("_data_loaded","_listed_survey", watch=True)
+    @param.depends("_listed_survey", watch=True)
     def _update_map_selector(self):
         if self._data_loaded == False or self.tier == "":
             self.param["survey_map"].objects = [""]
-            self.survey_map = ""
+            self.param.update(survey_map   = "",
+                              _survey_maps = None)
             return
         logging.info("Updating map selector.")
         maps = schedview.compute.survey.compute_maps(self._listed_survey,
@@ -456,8 +471,8 @@ class Scheduler(param.Parameterized):
             self.survey_map = map_keys[-1]                                     # Reward map usually (always?) listed last.
         else:
             self.survey_map = map_keys[0]
-        self._survey_maps = maps
-        self.plot_display = 1
+        self.param.update(_survey_maps  = maps,
+                          _plot_display = 1)
     
     
     # Update map selections when nside changed.
@@ -475,10 +490,10 @@ class Scheduler(param.Parameterized):
 
     # Update the parameter which determines whether a basis function or a map is plotted.
     @param.depends("survey_map", watch=True)
-    def _update_plot_display(self):
+    def _update__plot_display(self):
         logging.info("Updating parameter for basis/map display.")
         if self.survey_map != "":
-            self.plot_display = 1
+            self._plot_display = 1
 
 
     # Update basis function table if new survey chosen.
@@ -516,8 +531,8 @@ class Scheduler(param.Parameterized):
     def basis_function_table(self):
         if self._basis_functions is None:
             return "No basis functions available."
-        self._debugging_message = "Creating basis function table."
-        logging.info("Creating basis function table.")
+        self._debugging_message = "Creating basis function widget."
+        logging.info("Creating basis function widget.")
         tabulator_formatter = {'basis_function': HTMLTemplateFormatter(template='<%= value %>')}
         columnns = ['basis_function',
                     'basis_function_class',
@@ -550,32 +565,55 @@ class Scheduler(param.Parameterized):
             return
         logging.info("Updating basis function row selection.")
         try:
-            self.basis_function = self._basis_function_df_widget.selection[0]  # TODO: TEST BATCH UPDATE HERE
-            self.plot_display = 2                                              # Display basis function instead of a map.
+            self.param.update(basis_function = self._basis_function_df_widget.selection[0],
+                              _plot_display  = 2)                              # Display basis function instead of map.            
             logging.info(f"Basis function selection: {self._basis_functions['basis_func'][self.basis_function]}")
         except:
             self._debugging_message = f"Basis function table selection unable to be updated: \n{traceback.format_exc(limit=-1)}"
             logging.info(f"Basis function table selection unable to be updated: \n{traceback.format_exc(limit=-1)}")
             self.basis_function = -1
 
+
+    # Monitors whether a new sky_map should be created
+    @param.depends("_survey_maps","_plot_display","survey_map","basis_function","nside","color_palette", watch=True)
+    def _update_sky_map(self):
+        logging.info("Checking if need to create a new sky map.")
+        # If no conditions or survey_maps set, trigger sky_map() to return a message.
+        if self._conditions is None or self._survey_maps is None:
+            self.param.trigger("_make_a_new_map")
+            return
+        # Create list of parameters to compare against those in map cache.
+        new_params = [(self._survey_maps is None),
+                      self.tier,
+                      self.survey,
+                      self._plot_display,
+                      self.basis_function,
+                      self.survey_map,
+                      self.nside,
+                      self.color_palette]
+        # If params are different to those in cache, trigger sky_map().
+        if new_params != self._map_params_cache:
+            logging.info("Yes, create a new sky map.")
+            self.param.trigger("_make_a_new_map")
+        else:
+            logging.info("No, don't need to create a new sky map.")
+
     
     # Create sky_map of survey for display.
-    @param.depends("_conditions","_survey_maps","plot_display","survey_map","basis_function","nside","color_palette")
+    @param.depends("_make_a_new_map")
     def sky_map(self):
-        if self._conditions is None:
+        if self._data_loaded is False or self._conditions is None:
             return "No scheduler loaded."
         if self._survey_maps is None:
             return "No surveys are loaded."
-        
         logging.info("Creating sky map.")
-        self._debugging_message = "Creating sky map."
         try:            
-            logging.info(f"(plot_display, basis_function, survey_map): ({self.plot_display}, {self.basis_function}, {self.survey_map})")
-            self._debugging_message = f"(plot_display, basis_function, survey_map): ({self.plot_display}, {self.basis_function}, {self.survey_map})"
+            logging.info(f"(_plot_display, basis_function, survey_map): ({self._plot_display}, {self.basis_function}, {self.survey_map})")
+            self._debugging_message = f"(_plot_display, basis_function, survey_map): ({self._plot_display}, {self.basis_function}, {self.survey_map})"
             
             # -----------------------------------------------------------------
             # Load survey map.
-            if self.plot_display==1:
+            if self._plot_display==1:
                 # -------------------------------------------------------------
                 # CASE 1: If survey map is all NaNs (i.e. 'reward').
                 if np.isnan(self._survey_maps[self.survey_map]).all():
@@ -627,15 +665,15 @@ class Scheduler(param.Parameterized):
                                                                        cmap=cmap)
             # -----------------------------------------------------------------
             # Load a basis function map.
-            elif self.basis_function!=-1 and self.plot_display==2:
+            elif self.basis_function!=-1 and self._plot_display==2:
                 
                 # Get name of basis function.
                 bf = self._basis_functions['basis_func'][self.basis_function]
                 
-                # If area=0, show message in debugging (map will be blank).
+                # If area=0, show message in debugging (map *might* be blank).
                 if self._basis_functions.loc[self.basis_function, :]['basis_area'] == 0:
                     logging.info(f"Basis function {bf} has area 0: plot is empty.")
-                    self._debugging_message = f"Basis function {bf} has area 0: plot is empty."
+                    self._debugging_message = f"Basis function {bf} has area 0."
                 
                 # -------------------------------------------------------------
                 # CASE 3: If basis function IS in the list of survey maps.
@@ -728,8 +766,16 @@ class Scheduler(param.Parameterized):
                         logging.info(f"Could not load map of scalar basis function: \n{traceback.format_exc(limit=-1)}")
                         return "Basis function is a scalar."
             sky_map_figure = sky_map.figure
+            # Add map parameters to cache.
+            self._map_params_cache = [(self._survey_maps is None),
+                                      self.tier,
+                                      self.survey,
+                                      self._plot_display,
+                                      self.basis_function,
+                                      self.survey_map,
+                                      self.nside,
+                                      self.color_palette]
             logging.info("Sky map successfully created.")
-            self._debugging_message = "Sky map successfully created."
         except:
             self._debugging_message = f"Could not load map: \n{traceback.format_exc(limit=-1)}"
             logging.info(f"Could not load map: \n{traceback.format_exc(limit=-1)}")
@@ -748,8 +794,8 @@ class Scheduler(param.Parameterized):
         timestamp_option2 = datetime.now(timezone('America/Santiago')).strftime('%Y-%m-%d %H:%M:%S')
         # Requires astropy and datetime, displays Rubin time.
         # timestamp_option3 = Time(pd.Timestamp(Time.now().datetime, tzinfo=TimezoneInfo(utc_offset=4*u.hour))).strftime('%Y-%m-%d %H:%M:%S')
-        self.debug_string = f"\n {timestamp_option2} - {self._debugging_message}" + self.debug_string
-        debugging_messages = pn.pane.Str(self.debug_string,
+        self._debug_string = f"\n {timestamp_option2} - {self._debugging_message}" + self._debug_string
+        debugging_messages = pn.pane.Str(self._debug_string,
                                          height=70,
                                          styles={'font-size':'9pt',
                                                  'color':'black',
