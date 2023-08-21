@@ -110,7 +110,7 @@ def read_scheduler(file_name_or_url=None):
     return scheduler, conditions
 
 
-def sample_pickle(base_fname="baseline.pickle.gz"):
+def sample_pickle(base_fname="sample_scheduler.pickle.xz"):
     """Return the path of the sample pickle
 
     Parameters
