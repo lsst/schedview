@@ -1,8 +1,56 @@
+from functools import cache
+import datetime
 import numpy as np
 import pandas as pd
 from astropy.time import Time
+import pytz
 from rubin_sim.site_models.almanac import Almanac
 from rubin_sim.scheduler.model_observatory import ModelObservatory
+
+
+@cache
+def _compute_all_night_events():
+    # Loading the alamac takes a while, so generate it with a function
+    # that caches the result (using the functools.cache decorator).
+    almanac = Almanac()
+    all_nights_events = pd.DataFrame(almanac.sunsets)
+    all_nights_events["night_middle"] = (
+        all_nights_events["sunrise"] + all_nights_events["sunset"]
+    ) / 2
+    return all_nights_events
+
+
+@cache
+def convert_evening_date_to_night_of_survey(night_date, timezone="Chile/Continental"):
+    """Convert a calendar date in the evening to the night of survey.
+
+    Parameters
+    ----------
+    night_date : `datetime.date`
+        The calendar date in the evening local time.
+    timezone: `str`
+        The string designating the time zone. Defaults to 'Chile/Continental'
+
+    Returns
+    -------
+    night_of_survey : `int`
+        The night of survey, starting from 0.
+    """
+    sample_time = Time(
+        pytz.timezone(timezone)
+        .localize(
+            datetime.datetime(
+                night_date.year, night_date.month, night_date.day, 23, 59, 59
+            )
+        )
+        .astimezone(pytz.timezone("UTC"))
+    )
+    all_nights_events = _compute_all_night_events()
+    closest_middle_iloc = np.abs(
+        sample_time.mjd - all_nights_events["night_middle"]
+    ).argsort()[0]
+    night_of_survey = all_nights_events.iloc[closest_middle_iloc, :]["night"]
+    return night_of_survey
 
 
 def night_events(night_date=None, site=None, timezone="Chile/Continental"):
@@ -10,8 +58,8 @@ def night_events(night_date=None, site=None, timezone="Chile/Continental"):
 
     Parameters
     ----------
-    night_date : `str`, `astropy.time.Time`
-        The night for which to get events. Defaults to now.
+    night_date : `datetime.date`
+        The calendar date in the evening local time.
     site : `astropy.coordinates.earth.EarthLocation`
         The observatory location. Defaults to Rubin observatory.
     timezone: `str`
@@ -19,24 +67,20 @@ def night_events(night_date=None, site=None, timezone="Chile/Continental"):
 
     Returns
     -------
-    events : `holoviews.Dataset`
-        A Dataset of night events.
+    events : `pandas.DataFrame`
+        A DataFrame of night events.
     """
     if night_date is None:
-        night_date = Time.now()
+        night_date = datetime.date.today()
 
     if site is None:
         site = ModelObservatory().location
 
-    night_mjd = Time(night_date).mjd
-    all_nights_events = pd.DataFrame(Almanac().sunsets).set_index("night")
-    first_night = all_nights_events.index.min()
-    night = (
-        first_night
-        + np.floor(night_mjd)
-        - np.floor(all_nights_events.loc[first_night, "sunset"])
+    all_nights_events = _compute_all_night_events().set_index("night")
+    night_of_survey = convert_evening_date_to_night_of_survey(
+        night_date, timezone=timezone
     )
-    mjds = all_nights_events.loc[night]
+    mjds = all_nights_events.loc[night_of_survey]
 
     ap_times = Time(mjds, format="mjd", scale="utc", location=site)
     time_df = pd.DataFrame(

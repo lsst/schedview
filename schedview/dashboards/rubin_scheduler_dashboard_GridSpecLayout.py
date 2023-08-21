@@ -9,7 +9,7 @@ import traceback
 
 from astropy.time import Time
 from zoneinfo import ZoneInfo
-from bokeh.models.widgets.tables import HTMLTemplateFormatter
+from bokeh.models.widgets.tables import HTMLTemplateFormatter, BooleanFormatter
 
 # Packages required for debugging timestamp option 2
 from datetime import datetime
@@ -139,6 +139,7 @@ LOGO      = "/assets/lsst_white_logo.png"
 pn.extension("tabulator",
              # css_files   = [pn.io.resources.CSS_URLS["font-awesome"]],
              sizing_mode = "stretch_width",)
+pn.extension(notifications=True)
 
 logging.basicConfig(format = "%(asctime)s %(message)s",
                     level  = logging.INFO)
@@ -216,6 +217,9 @@ class Scheduler(param.Parameterized):
     # Parameters to ensure map only updates once.
     _map_params_cache = param.List(default=[True, 0, 0, 0, 0, 0, 16, "Viridis256"])
     _make_a_new_map   = param.Parameter(None)
+
+    # To indicate that data is being loaded
+    is_loading = False
     
     # Dashboard headings ------------------------------------------------------# Should these functions be below others?
 
@@ -301,13 +305,16 @@ class Scheduler(param.Parameterized):
     def _update_scheduler(self):
         logging.info("Updating scheduler.")
         try:
+            self.is_loading = True
             (scheduler, conditions) = schedview.collect.scheduler_pickle.read_scheduler(self.scheduler_fname)            
             self.param.update(_data_loaded = True,
                               _scheduler = scheduler,
                               _conditions = conditions)
+            pn.state.notifications.success("Scheduler pickle loaded successfully!")
         except:
             logging.error(f"Could not load scheduler from {self.scheduler_fname} \n{traceback.format_exc(limit=-1)}")
             self._debugging_message = f"Could not load scheduler from {self.scheduler_fname}: \n{traceback.format_exc(limit=-1)}"
+            pn.state.notifications.error(f"Could not load scheduler from {self.scheduler_fname}", 0)
             
             self._map_params_cache = [True, 0, 0, 0, 0, 0, 16, "Viridis256"]
             self._data_loaded = False
@@ -317,6 +324,8 @@ class Scheduler(param.Parameterized):
             self.survey = 0               # -> _listed_survey=None -> _survey_maps=None
             self._basis_functions = None
             self.basis_function = -1
+        finally:
+            self.is_loading = False
             
             # self.param.update(_data_loaded= False,
             #                   _scheduler = None,
@@ -342,6 +351,7 @@ class Scheduler(param.Parameterized):
     def _update_survey_rewards(self):
         if self._scheduler is None:
             logging.info("Can not update survey reward table as no pickle is loaded.")
+            pn.state.notifications.info("Can not update survey reward table as no pickle is loaded.")
             return
         # Code to remove one of two exceptions on initial load BUT breaks other things.
         # if self._date_time is None:
@@ -349,6 +359,7 @@ class Scheduler(param.Parameterized):
         #     return
         try:
             logging.info("Updating survey rewards.")
+            self.is_loading = True
             self._conditions.mjd = self._date_time
             self._scheduler.update_conditions(self._conditions)
             self._rewards  = self._scheduler.make_reward_df(self._conditions)
@@ -360,13 +371,17 @@ class Scheduler(param.Parameterized):
             survey_rewards['survey_name'] = survey_rewards.apply(survey_url_formatter, axis=1)            
             self.param.update(_survey_rewards = survey_rewards,
                               _data_loaded    = True)
+            pn.state.notifications.success("Survey rewards updated successfully")
         except:           
             logging.info(f"Survey rewards dataframe unable to be updated: \n{traceback.format_exc(limit=-1)}")
+            pn.state.notifications.error("Survey rewards dataframe unable to be updated!", 0)
             self._debugging_message = f"Survey rewards dataframe unable to be updated: \n{traceback.format_exc(limit=-1)}"
             self._map_params_cache = [True, 0, 0, 0, 0, 0, 16, "Viridis256"]
             self.param.update(_data_loaded     = False,
                               _survey_rewards  = None,
                               _basis_functions = None)
+        finally:
+            self.is_loading = False
             
 
     # Update available tier selections if given new pickle file.
@@ -395,6 +410,7 @@ class Scheduler(param.Parameterized):
         except:
             self._debugging_message = f"Survey rewards unable to be updated: \n{traceback.format_exc(limit=-1)}"
             logging.info(f"Survey rewards unable to be updated: \n{traceback.format_exc(limit=-1)}")
+            pn.state.notifications.error("Survey rewards unable to be updated!", 0)
             self._tier_survey_rewards = None
             self.survey = 0
 
@@ -406,10 +422,15 @@ class Scheduler(param.Parameterized):
             return "No surveys available."
         logging.info("Updating survey rewards widget.")
         tabulator_formatter = {'survey_name': HTMLTemplateFormatter(template='<%= value %>')}
+        titles = {
+            'survey_name': 'Survey Name',
+            'reward': 'Reward'
+        }
         survey_rewards_table = pn.widgets.Tabulator(self._tier_survey_rewards[['tier','survey_name','reward','survey','survey_url']],
                                                     widths={'survey_name':'60%','reward':'40%'},
                                                     show_index=False,
                                                     formatters=tabulator_formatter,
+                                                    titles=titles,
                                                     disabled=True,
                                                     selectable=1,
                                                     hidden_columns=['tier','survey','survey_url'],
@@ -450,6 +471,7 @@ class Scheduler(param.Parameterized):
         except:
             self._debugging_message = f"Listed survey unable to be updated: \n{traceback.format_exc(limit=-1)}"
             logging.info(f"Listed survey unable to be updated: \n{traceback.format_exc(limit=-1)}")
+            pn.state.notifications.error("Listed survey unable to be updated", 0)
             self._listed_survey = None
     
 
@@ -518,11 +540,13 @@ class Scheduler(param.Parameterized):
             else:
                 self._debugging_message = f"Survey {self.survey} has no basis functions."
                 logging.info(f"Survey {self.survey} has no basis functions.")
+                pn.state.notifications.info(f"Survey {self.survey} has no basis functions.")
                 self._basis_functions = None
                 return
         except:
             self._debugging_message = f"Basis function dataframe unable to be updated: \n{traceback.format_exc(limit=-1)}"
             logging.info(f"Basis function dataframe unable to be updated: \n{traceback.format_exc(limit=-1)}")
+            pn.state.notifications.error("Basis function dataframe unable to be updated", 0)
             self._basis_functions = None
 
 
@@ -533,7 +557,9 @@ class Scheduler(param.Parameterized):
             return "No basis functions available."
         self._debugging_message = "Creating basis function widget."
         logging.info("Creating basis function widget.")
-        tabulator_formatter = {'basis_function': HTMLTemplateFormatter(template='<%= value %>')}
+        tabulator_formatter = {
+            'basis_function': HTMLTemplateFormatter(template='<%= value %>'),
+            'feasible': BooleanFormatter()}
         columnns = ['basis_function',
                     'basis_function_class',
                     'feasible',
@@ -544,7 +570,18 @@ class Scheduler(param.Parameterized):
                     'accum_area',
                     'doc_url',
                     'basis_func']
+        titles = {
+            'basis_function': 'Basis Function',
+            'basis_function_class': 'Class',
+            'feasible': 'Feasible',
+            'max_basis_reward': 'Max Reward',
+            'basis_area': 'Area',
+            'basis_weight': 'Weight',
+            'max_accum_reward': 'Max Accumelated Reward',
+            'accum_area': 'Accumelated Area'
+        }
         basis_function_table = pn.widgets.Tabulator(self._basis_functions[columnns],
+                                                    titles=titles,
                                                     layout="fit_data",
                                                     show_index=False,
                                                     formatters=tabulator_formatter,
@@ -571,6 +608,7 @@ class Scheduler(param.Parameterized):
         except:
             self._debugging_message = f"Basis function table selection unable to be updated: \n{traceback.format_exc(limit=-1)}"
             logging.info(f"Basis function table selection unable to be updated: \n{traceback.format_exc(limit=-1)}")
+            pn.state.notifications.error("Basis function table selection unable to be updated", 0)
             self.basis_function = -1
 
 
@@ -764,6 +802,7 @@ class Scheduler(param.Parameterized):
                     except:
                         self._debugging_message = f"Could not load map of scalar basis function: \n{traceback.format_exc(limit=-1)}"
                         logging.info(f"Could not load map of scalar basis function: \n{traceback.format_exc(limit=-1)}")
+                        pn.state.notifications.error("Could not load map of scalar basis function!", 0)
                         return "Basis function is a scalar."
             sky_map_figure = sky_map.figure
             # Add map parameters to cache.
@@ -779,6 +818,7 @@ class Scheduler(param.Parameterized):
         except:
             self._debugging_message = f"Could not load map: \n{traceback.format_exc(limit=-1)}"
             logging.info(f"Could not load map: \n{traceback.format_exc(limit=-1)}")
+            pn.state.notifications.error("Could not load map!", 0)
             return "No map loaded."
         return sky_map_figure
     
@@ -802,6 +842,9 @@ class Scheduler(param.Parameterized):
                                                  'overflow': 'scroll'})
         return debugging_messages
 
+    @param.depends('is_loading', watch=True)
+    def update_loading(self):
+        sched_app.loading = self.is_loading
 # -----------------------------------------------------------------------------
 
 # Generates the key as a Bokeh plot.
@@ -861,6 +904,8 @@ def generate_key():
     return plot
 
 # -----------------------------------------------------------------------------
+# Moved app pane outside scheduler app so that it's accessible from Scheduler class
+sched_app = pn.GridSpec(sizing_mode='stretch_both', max_height=1000).servable()
 
 def scheduler_app(date=None, scheduler_pickle=None):
     
@@ -871,8 +916,6 @@ def scheduler_app(date=None, scheduler_pickle=None):
     
     if scheduler_pickle is not None:
         scheduler.scheduler_fname = scheduler_pickle
-    
-    sched_app = pn.GridSpec(sizing_mode='stretch_both', max_height=1000).servable()
     
     # Dashboard title.
     sched_app[0:8, :]        = pn.Row(pn.Column(pn.Spacer(height=4),

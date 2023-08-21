@@ -27,7 +27,7 @@ class SchedulerDisplayApp(SchedulerDisplay):
     def make_pickle_entry_box(self):
         """Make the entry box for a file name from which to load state."""
         file_input_box = bokeh.models.TextInput(
-            value=sample_pickle("baseline.pickle.gz") + " ",
+            value=sample_pickle() + " ",
             title="Pickle path:",
         )
 
