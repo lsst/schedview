@@ -216,6 +216,8 @@ class Scheduler(param.Parameterized):
     # Parameters to ensure map only updates once.
     _map_params_cache = param.List(default=[True, 0, 0, 0, 0, 0, 16, "Viridis256"])
     _make_a_new_map   = param.Parameter(None)
+
+    is_loading = False
     
     # Dashboard headings ------------------------------------------------------# Should these functions be below others?
 
@@ -301,6 +303,7 @@ class Scheduler(param.Parameterized):
     def _update_scheduler(self):
         logging.info("Updating scheduler.")
         try:
+            self.is_loading = True
             (scheduler, conditions) = schedview.collect.scheduler_pickle.read_scheduler(self.scheduler_fname)            
             self.param.update(_data_loaded = True,
                               _scheduler = scheduler,
@@ -317,6 +320,8 @@ class Scheduler(param.Parameterized):
             self.survey = 0               # -> _listed_survey=None -> _survey_maps=None
             self._basis_functions = None
             self.basis_function = -1
+        finally:
+            self.is_loading = False
             
             # self.param.update(_data_loaded= False,
             #                   _scheduler = None,
@@ -349,6 +354,7 @@ class Scheduler(param.Parameterized):
         #     return
         try:
             logging.info("Updating survey rewards.")
+            self.is_loading = True
             self._conditions.mjd = self._date_time
             self._scheduler.update_conditions(self._conditions)
             self._rewards  = self._scheduler.make_reward_df(self._conditions)
@@ -367,6 +373,8 @@ class Scheduler(param.Parameterized):
             self.param.update(_data_loaded     = False,
                               _survey_rewards  = None,
                               _basis_functions = None)
+        finally:
+            self.is_loading = False
             
 
     # Update available tier selections if given new pickle file.
@@ -820,6 +828,9 @@ class Scheduler(param.Parameterized):
                                                  'overflow': 'scroll'})
         return debugging_messages
 
+    @param.depends('is_loading', watch=True)
+    def update_loading(self):
+        sched_app.loading = self.is_loading
 # -----------------------------------------------------------------------------
 
 # Generates the key as a Bokeh plot.
@@ -879,6 +890,8 @@ def generate_key():
     return plot
 
 # -----------------------------------------------------------------------------
+# Moved app pane outside scheduler app so that it's accessible from Scheduler class
+sched_app = pn.GridSpec(sizing_mode='stretch_both', max_height=1000).servable()
 
 def scheduler_app(date=None, scheduler_pickle=None):
     
@@ -889,8 +902,6 @@ def scheduler_app(date=None, scheduler_pickle=None):
     
     if scheduler_pickle is not None:
         scheduler.scheduler_fname = scheduler_pickle
-    
-    sched_app = pn.GridSpec(sizing_mode='stretch_both', max_height=1000).servable()
     
     # Dashboard title.
     sched_app[0:8, :]        = pn.Row(pn.Column(pn.Spacer(height=4),
