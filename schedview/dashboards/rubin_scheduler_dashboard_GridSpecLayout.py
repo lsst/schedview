@@ -538,7 +538,9 @@ class Scheduler(param.Parameterized):
             return "No basis functions available."
         self._debugging_message = "Creating basis function widget."
         logging.info("Creating basis function widget.")
-        tabulator_formatter = {'basis_function': HTMLTemplateFormatter(template='<%= value %>')}
+        tabulator_formatter = {
+            'basis_function': HTMLTemplateFormatter(template='<%= value %>'),
+            'feasible': BooleanFormatter()}
         columnns = ['basis_function',
                     'basis_function_class',
                     'feasible',
