@@ -1,0 +1,26 @@
+[
+    {
+        "name": "Airmass histogram",
+        "settings": {
+            "kind": "hist",
+            "y": "airmass",
+            "bins": 15,
+            "bin_range": [1, 2.5],
+            "xticks": [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5],
+            "ylabel": "number of visits",
+            "height": 512
+        }
+    },
+    {
+        "name": "Slew time histogram",
+        "settings": {
+            "kind": "hist",
+            "y": "slewTime",
+            "bins": 15,
+            "bin_range": [1, 2.5],
+            "xticks": [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5],
+            "ylabel": "number of visits",
+            "height": 512
+        }
+    }
+]
