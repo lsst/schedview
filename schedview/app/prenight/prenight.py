@@ -391,7 +391,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         logging.info("Updating polar alt-az plot")
 
         fig = bokeh.plotting.figure(
-            title="Horizon Coordinates",
+            title="Horizon (Az/Alt) Coordinates",
             x_axis_type=None,
             y_axis_type=None,
             frame_width=512,
