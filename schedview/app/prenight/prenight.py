@@ -4,6 +4,9 @@ import numpy as np
 import pandas as pd
 import os
 
+import panel as pn
+import bokeh
+
 from astropy.time import Time
 import astropy.utils.iers
 
@@ -20,9 +23,8 @@ import schedview.plot.rewards
 import schedview.plot.visits
 import schedview.plot.maf
 import schedview.plot.nightbf
+import schedview.plot.nightly
 import schedview.param
-
-import panel as pn
 
 AVAILABLE_TIMEZONES = [
     "Chile/Continental",
@@ -134,6 +136,11 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         },
     )
 
+    # If the bokeh.models.ColumnDataSource is created once and used in
+    # multiple plots, then the plots can be more easily linked, and memory
+    # and communication overhead is reduced.
+    _visits_cds = param.Parameter()
+
     # An instance of rubin_sim.scheduler.schedulers.CoreScheduler
     _scheduler = param.Parameter()
 
@@ -205,9 +212,12 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                 Time(self._almanac_events.loc["sunrise", "UTC"]),
             )
             self._visits = visits
+            self._visits_cds = bokeh.models.ColumnDataSource(visits)
+
         except Exception as e:
             logging.error(e)
             self._visits = None
+            self._visits_cds = None
 
     @param.depends("_visits")
     def visit_table(self):
@@ -236,7 +246,9 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             "note",
         ]
 
-        visit_table = pn.widgets.Tabulator(self._visits[columns])
+        visit_table = pn.widgets.Tabulator(
+            self._visits[columns], pagination="remote", header_filters=True
+        )
 
         if len(self._visits) < 1:
             visit_table = "No visits on this night"
@@ -290,6 +302,109 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                 self._scheduler = rubin_sim.scheduler.example.example_scheduler(
                     nside=self._nside
                 )
+
+    @param.depends(
+        "_visits_cds",
+        "_almanac_events",
+    )
+    def airmass_vs_time(self):
+        """Create a plot of airmass vs. time.
+
+        Returns
+        -------
+        fig : `bokeh.plotting.Figure`
+            The bokeh figure.
+        """
+        if self._visits is None:
+            return "No visits loaded."
+
+        if self._almanac_events is None:
+            self._update_almanac_events()
+
+        logging.info("Updating airmass vs. time plot")
+
+        fig = bokeh.plotting.figure(
+            title="Airmass",
+            x_axis_label="Time (UTC)",
+            y_axis_label="Airmass",
+            frame_height=512,
+            width_policy="max",
+            tools="pan,wheel_zoom,box_zoom,box_select,save,reset,help",
+        )
+
+        fig = schedview.plot.nightly.plot_airmass_vs_time(
+            visits=self._visits_cds, figure=fig, almanac_events=self._almanac_events
+        )
+        logging.info("Finished updating airmass vs. time plot")
+        return fig
+
+    @param.depends(
+        "_visits_cds",
+        "_almanac_events",
+    )
+    def alt_vs_time(self):
+        """Create a plot of altitude vs. time.
+
+        Returns
+        -------
+        fig : `bokeh.plotting.Figure`
+            The bokeh figure.
+        """
+        if self._visits_cds is None:
+            return "No visits loaded."
+
+        if self._almanac_events is None:
+            self._update_almanac_events()
+
+        logging.info("Updating altitude vs. time plot")
+
+        fig = bokeh.plotting.figure(
+            title="Altitude",
+            x_axis_label="Time (UTC)",
+            y_axis_label="Altitude",
+            frame_height=512,
+            width_policy="max",
+            tools="pan,wheel_zoom,box_zoom,box_select,save,reset,help",
+        )
+
+        fig = schedview.plot.nightly.plot_alt_vs_time(
+            visits=self._visits_cds, figure=fig, almanac_events=self._almanac_events
+        )
+
+        logging.info("Finished updating altitude vs. time plot")
+        return fig
+
+    @param.depends(
+        "_visits_cds",
+    )
+    def horizon_map(self):
+        """Create a polar plot of altitude and azimuth
+
+        Returns
+        -------
+        fig : `bokeh.plotting.Figure`
+            The bokeh figure.
+        """
+        if self._visits_cds is None:
+            return "No visits loaded."
+
+        logging.info("Updating polar alt-az plot")
+
+        fig = bokeh.plotting.figure(
+            title="Horizon (Az/Alt) Coordinates",
+            x_axis_type=None,
+            y_axis_type=None,
+            frame_width=512,
+            frame_height=512,
+            tools="pan,wheel_zoom,box_zoom,box_select,lasso_select,save,reset,help",
+        )
+
+        fig = schedview.plot.nightly.plot_polar_alt_az(
+            visits=self._visits_cds, figure=fig, legend=False
+        )
+
+        logging.info("Finished updating polar alt-az plot")
+        return fig
 
     @param.depends(
         "_scheduler",
@@ -465,7 +580,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             obs_rewards=self._obs_rewards,
             surveys=self.surveys,
             basis_function=self.basis_function,
-            plot_kwargs={},
+            plot_kwargs={"height": 256},
         )
         return fig
 
@@ -493,12 +608,18 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             night=self.night,
             observatory=self._observatory,
             surveys=self.surveys,
+            plot_kwargs={"height": 256},
         )
         return fig
 
 
 def prenight_app(
-    night_date=None, observations=None, scheduler=None, rewards=None, return_app=False
+    night_date=None,
+    observations=None,
+    scheduler=None,
+    rewards=None,
+    return_app=False,
+    shown_tabs=None,
 ):
     """Create the pre-night briefing app.
 
@@ -514,6 +635,10 @@ def prenight_app(
         Path to the rewards hdf5 file.
     return_app : `bool`, optional
         Return the instances of the app class itself.
+    shown_tabs : `list` [`str`], optional
+        Names of the tabs to show. If None, show all tabs except the visit
+        explorer.
+        Default is None.
 
     Returns
     -------
@@ -540,6 +665,45 @@ def prenight_app(
         if rewards is not None:
             prenight.rewards_fname = rewards
 
+    tab_contents = {
+        "Azimuth and altitude": pn.Row(
+            pn.param.ParamMethod(prenight.alt_vs_time, loading_indicator=True),
+            pn.param.ParamMethod(prenight.horizon_map, loading_indicator=True),
+        ),
+        "Airmass vs. time": pn.param.ParamMethod(
+            prenight.airmass_vs_time, loading_indicator=True
+        ),
+        "Sky maps": pn.param.ParamMethod(
+            prenight.visit_skymaps, loading_indicator=True
+        ),
+        "Table of visits": pn.param.ParamMethod(
+            prenight.visit_table, loading_indicator=True
+        ),
+        "Reward plots": pn.Column(
+            pn.param.ParamMethod(prenight.reward_params, loading_indicator=True),
+            pn.param.ParamMethod(prenight.reward_plot, loading_indicator=True),
+            pn.param.ParamMethod(prenight.infeasible_plot, loading_indicator=True),
+        ),
+        "Visit explorer": pn.param.ParamMethod(
+            prenight.visit_explorer, loading_indicator=True
+        ),
+    }
+
+    if shown_tabs is None:
+        shown_tabs = list(tab_contents.keys())
+        shown_tabs.remove("Visit explorer")
+    else:
+        for tab_name in shown_tabs:
+            if tab_name not in tab_contents:
+                raise ValueError(
+                    f"{tab_name} is an unknown tab type. Must be one of {list(tab_contents.keys())}"
+                )
+
+    detail_tabs = pn.Tabs(
+        *[(tab, tab_contents[tab]) for tab in shown_tabs],
+        dynamic=False,  # When true, visit_table never renders. Why?
+    )
+
     pn_app = pn.Column(
         "<h1>Pre-night briefing</h1>",
         pn.Row(
@@ -561,33 +725,7 @@ def prenight_app(
                 ),
             ),
         ),
-        pn.Tabs(
-            (
-                "Visit explorer",
-                pn.param.ParamMethod(prenight.visit_explorer, loading_indicator=True),
-            ),
-            (
-                "Table of visits",
-                pn.param.ParamMethod(prenight.visit_table, loading_indicator=True),
-            ),
-            (
-                "Sky maps",
-                pn.param.ParamMethod(prenight.visit_skymaps, loading_indicator=True),
-            ),
-            (
-                "Reward plots",
-                pn.Column(
-                    pn.param.ParamMethod(
-                        prenight.reward_params, loading_indicator=True
-                    ),
-                    pn.param.ParamMethod(prenight.reward_plot, loading_indicator=True),
-                    pn.param.ParamMethod(
-                        prenight.infeasible_plot, loading_indicator=True
-                    ),
-                ),
-            ),
-            dynamic=False,  # When true, visit_table never renders. Why?
-        ),
+        detail_tabs,
         debug_info,
     ).servable()
 
