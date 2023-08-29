@@ -717,8 +717,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         )
         return fig
 
-    @param.depends("_custom_hvplot_tab_settings", "shown_tabs")
-    def tab_contents(self):
+    def initialize_tab_contents(self):
         tab_contents = {
             "Azimuth and altitude": pn.Row(
                 pn.param.ParamMethod(self.alt_vs_time, loading_indicator=True),
@@ -742,6 +741,11 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                 self.visit_explorer, loading_indicator=True
             ),
         }
+        return tab_contents        
+
+    @param.depends("_custom_hvplot_tab_settings", "shown_tabs")
+    def tab_contents(self):
+        tab_contents = self.initialize_tab_contents()
 
         for custom_index, custom_plot in enumerate(self._custom_hvplot_tab_settings):
             tab_contents[custom_plot["name"]] = pn.Column(
