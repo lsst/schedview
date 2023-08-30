@@ -1,6 +1,5 @@
 """Plots that summarize a night's visits and other parameters."""
 
-from collections import defaultdict
 import bokeh
 import colorcet
 import numpy as np

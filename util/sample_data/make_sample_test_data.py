@@ -1,6 +1,5 @@
 import warnings
 import numpy as np
-import datetime
 import lzma
 import pickle
 import argparse

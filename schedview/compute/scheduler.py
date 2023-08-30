@@ -376,7 +376,7 @@ def make_scheduler_summary_df(scheduler, conditions, reward_df=None):
     summary_df.set_index(["list_index", "survey_index"], inplace=True)
     for list_index, survey_list in enumerate(scheduler.survey_lists):
         for survey_index, survey in enumerate(survey_list):
-            if not (list_index, survey_index) in summary_df.index:
+            if (list_index, survey_index) not in summary_df.index:
                 survey.calc_reward_function(conditions)
                 summary_df.loc[
                     (list_index, survey_index), "max_basis_reward"
