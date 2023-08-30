@@ -16,7 +16,7 @@ NSIDE = 8
 astropy.utils.iers.conf.iers_degraded_accuracy = "warn"
 
 
-class test_SchedulerDisplay(unittest.TestCase):
+class TestSchedulerDisplay(unittest.TestCase):
     def test_scheduler_display(self):
         mjd = DEFAULT_MJD
         nside = NSIDE

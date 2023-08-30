@@ -8,7 +8,7 @@ from schedview.collect.scheduler_pickle import read_scheduler
 from rubin_sim.scheduler.example import example_scheduler
 
 
-class test_scheduler_pickle(unittest.TestCase):
+class TestSchedulerPickle(unittest.TestCase):
     def test_read_scheduler(self):
         scheduler, conditions = read_scheduler()
         self.assertIsInstance(scheduler, CoreScheduler)

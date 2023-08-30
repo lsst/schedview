@@ -2,7 +2,7 @@ import unittest
 from schedview.collect.stars import load_bright_stars
 
 
-class test_stars(unittest.TestCase):
+class TestStars(unittest.TestCase):
     def test_load_stars(self):
         stars = load_bright_stars()
         self.assertGreater(len(stars), 9000)

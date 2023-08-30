@@ -8,7 +8,7 @@ import bokeh.io
 from schedview.app.prenight.prenight import prenight_app
 
 
-class test_prenight(unittest.TestCase):
+class TestPrenight(unittest.TestCase):
     def test_prenight_app(self):
         sample_data_dir = importlib.resources.files("schedview").joinpath("data")
 

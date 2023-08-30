@@ -20,7 +20,7 @@ def _random_point_on_sphere(rng):
     return vec
 
 
-class test_sphere(unittest.TestCase):
+class TestSphere(unittest.TestCase):
     def test_offset_sep_bear(self):
         rng = default_rng(6563)
         num_test_values = 100

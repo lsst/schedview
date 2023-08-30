@@ -9,7 +9,7 @@ from schedview.collect import sample_pickle
 NSIDE = 8
 
 
-class test_sched_maps(unittest.TestCase):
+class TestSchedMaps(unittest.TestCase):
     def test_sched_maps(self):
         scheduler_app = SchedulerDisplayApp(None, nside=NSIDE)
 
