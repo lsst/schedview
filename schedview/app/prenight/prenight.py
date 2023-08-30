@@ -357,9 +357,18 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         if self._visits is None:
             return "No visits loaded."
 
-        return self._visits.hvplot(
-            **self._custom_hvplot_tab_settings[custom_plot_index]["settings"]
-        )
+        if len(self._visits) < 1:
+            return "Visits loaded, but no visits on this night."
+
+        try:
+            plot = self._visits.hvplot(
+                **self._custom_hvplot_tab_settings[custom_plot_index]["settings"]
+            )
+        except Exception as e:
+            logging.error(f"Could not create custom hvplot: {e}")
+            return f"Error creating custom hvplot: {e}"
+
+        return plot
 
     @param.depends("_visits")
     def custom_hvplot0(self):
