@@ -1,0 +1,70 @@
+[
+    {
+        "name": "Airmass histogram",
+        "settings": {
+            "by": "note",
+            "kind": "hist",
+            "y": "airmass",
+            "bins": 15,
+            "bin_range": [1, 2.5],
+            "xticks": [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5],
+            "ylabel": "number of visits",
+            "height": 512
+        }
+    },
+    {
+        "name": "Slew time histogram",
+        "settings": {
+            "by": "note",
+            "kind": "hist",
+            "y": "slewTime",
+            "bins": 15,
+            "bin_range": [1, 2.5],
+            "xticks": [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5],
+            "ylabel": "number of visits",
+            "height": 512
+        }
+    },
+    {
+        "name": "Airmass vs. H.A.",
+        "settings": {
+            "by": "note",
+            "kind": "scatter",
+            "x": "HA_hours",
+            "y": "airmass",
+            "bins": 15,
+            "bin_range": [1, 2.5],
+            "size": 10,
+            "xlabel": "H.A. (hours)",
+            "hover_cols": [
+                "start_date",
+                "filter",
+                "skyBrightness",
+                "sunAlt",
+                "moonAlt",
+                "moonDistance",
+                "moonPhase",
+                "note"
+            ],
+            "height": 512
+        }
+    },
+    {
+        "name": "sky brightness vs. moon distance",
+        "settings": {
+            "by": "filter",
+            "kind": "scatter",
+            "x": "moonDistance",
+            "y": "skyBrightness",
+            "y_label": "sky brightness (mag/sq arcsec)",
+            "hover_cols": [
+                "start_date",
+                "sunAlt",
+                "moonAlt",
+                "moonPhase",
+                "note"
+            ],
+            "height": 512
+        }
+    }
+]

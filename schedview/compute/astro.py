@@ -82,6 +82,19 @@ def night_events(night_date=None, site=None, timezone="Chile/Continental"):
     )
     mjds = all_nights_events.loc[night_of_survey]
 
+    # Not all night have both a moon rise and moon set. If a night is missing
+    # one, use the value from the following night or prior night, whichever
+    # is closer to night_middle
+    for event in mjds.index:
+        if mjds[event] <= 0:
+            next_night = night_of_survey + 1
+            prior_night = night_of_survey - 1
+            night_middle = mjds["night_middle"]
+            next_dt = np.abs(all_nights_events.loc[next_night, event] - night_middle)
+            proir_dt = np.abs(all_nights_events.loc[prior_night, event] - night_middle)
+            closest_night = next_night if next_dt < proir_dt else prior_night
+            mjds[event] = all_nights_events.loc[closest_night, event]
+
     ap_times = Time(mjds, format="mjd", scale="utc", location=site)
     time_df = pd.DataFrame(
         {

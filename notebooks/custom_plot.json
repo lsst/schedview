@@ -1,0 +1,23 @@
+[
+    {
+        "name": "Seeing",
+        "settings": {
+            "kind": "scatter",
+            "x": "start_date",
+            "y": [
+                "seeingFwhmEff",
+                "seeingFwhm500",
+                "seeingFwhmGeom"
+            ]
+        }
+    },
+    {
+        "name": "Sky brightness",
+        "settings": {
+            "kind": "hist",
+            "y": [
+                "skyBrightness"
+            ]
+        }
+    }
+]
