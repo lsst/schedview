@@ -45,30 +45,19 @@ from rubin_sim.scheduler.model_observatory import ModelObservatory
 
 """
 
-NOTES
------
-
-I have created watcher functions separated into user actions.
-I have grouped internal code based on how it is required across the possible actions.
-
-I have NOT YET added in ALL try/except blocks, error notifications and debugging messages.
-
-I have started writing pytests.
-
-nside and color palette are not reset when a new pickle is loaded. I think this is okay.
-
-CURRENT: refactoring
--------
-
-    1. Rename display_headings to display_dashboard_data.
-    2. Basis function table widths need updating when table is updated. [CASE: tier 1 > tier 3]
-
 NEXT
 ----
 
-    1. Run early code and see if it was possible to open dashboard in another tab.
-    2. pytests.
-    3. Pop-out debugger.
+    1. Rename parameters (leading underscore; display_headings -> display_dashboard_data).
+    2. Basis function table widths need updating when table is updated. [CASE: tier 1 > tier 3]
+    3. Run early code and see if it was possible to open dashboard in another tab.
+    4. pytests.
+    5. Pop-out debugger.
+    8. In dashboard title, replace self.survey with first character of survey name.
+    9. Reorder functions.
+   10. Finish docstrings
+   11. Is there a neater way to apply URL formatting to the columns so that it doesn't show in titles?
+
 
 /Users/me/Documents/2023/ADACS/Panel_scheduler/Rubin_scheduler_dashboard/example_pickle_scheduler.p.xz
 """
@@ -81,53 +70,40 @@ LOGO = '/assets/lsst_white_logo.png'
 pn.extension(
     'tabulator',
     sizing_mode='stretch_width',
-    notifications=True
+    notifications=True,
     )
+
 logging.basicConfig(
     format='%(asctime)s %(message)s',
-    level=logging.INFO
+    level=logging.INFO,
     )
 
-# TODO: format these two docstrings.
-def survey_url_formatter(row):
-    """
-    format survey name as a HTML href to survey url (if url exists)
-    otherwise return survey name as a string
-    row: a dataframe row
-    """
-    name = row['survey_name']
-    url = row['survey_url']
-    html = name if url == '' else f'<a href="{url}" target="_blank"> {name}</a>'
-    return html
-
-
-def basis_function_url_formatter(row):
-    """
-    format survey name as a HTML href to survey url (if url exists)
-    otherwise return survey name as a string
-    row: a dataframe row
-    """
-    name = row['basis_function']
-    url = row['doc_url']
-    html = name if url == '' else f'<a href="{url}" target="_blank"> {name}</a>'
-    return html
-
-
 # Change styles using CSS variables.
-title_stylesheet = """
-    :host {
-        --mono-font: Helvetica;
-    }
-    """
-# TODO: Delete this stylesheet.
-# Change styles using CSS classes.
-another_title_stylesheet = """
-:host(.title)  {
-    --mono-font: Helvetica;
+stylesheet = """
+:host {
+--mono-font: Helvetica;
 }
 """
 
-    # -------------------------------------------------------------------------
+
+def url_formatter(dataframe_row, name_column, url_column):
+    """Format survey name as a HTML href to survey URL (if URL exists).
+
+    Parameters
+    ----------
+    dataframe_row : 'pandas.core.series.Series'
+        A row of a pandas.core.frame.DataFrame.
+
+    Returns
+    -------
+    survey_name_or_url : 'str'
+        A HTML href or plain string.
+    """
+    if dataframe_row[url_column] == '':
+        return dataframe_row[name_column]
+    else:
+        return f'<a href="{dataframe_row[url_column]}" target="_blank"> {dataframe_row[name_column]}</a>'
+
 
 class Scheduler(param.Parameterized):
     """A Parametrized container for parameters, data, and panel objects for the
@@ -208,8 +184,7 @@ class Scheduler(param.Parameterized):
 
     # model_observatory = ModelObservatory()
 
-    # -------------------------------------------------------------------------
-    # ------------------------------------------------------- Dashboard titles
+    # -------------------------------------------------------------------------------------- Dashboard titles
 
     # TODO: replace self.survey with first character of survey name (surveys aren't in order in big pickle)
     # TODO: check if being out of order has consequences anywhere else
@@ -296,7 +271,7 @@ class Scheduler(param.Parameterized):
             styles={'font-size': '14pt',
                     'font-weight': '300',
                     'color': 'white'},
-            stylesheets=[title_stylesheet],
+            stylesheets=[stylesheet],
             )
 
     @param.depends('update_titles')
@@ -314,7 +289,7 @@ class Scheduler(param.Parameterized):
             styles={'font-size': '13pt',
                     'font-weight': '300',
                     'color': 'white'},
-            stylesheets=[title_stylesheet]
+            stylesheets=[stylesheet]
             )
 
     @param.depends('update_titles')
@@ -332,7 +307,7 @@ class Scheduler(param.Parameterized):
             styles={'font-size': '13pt',
                     'font-weight': '300',
                     'color': 'white'},
-            stylesheets=[another_title_stylesheet],
+            stylesheets=[stylesheet],
             css_classes=['title']
             )
 
@@ -351,13 +326,10 @@ class Scheduler(param.Parameterized):
             styles={'font-size': '13pt',
                     'font-weight': '300',
                     'color': 'white'},
-            stylesheets=[title_stylesheet]
+            stylesheets=[stylesheet]
             )
 
-    # -------------------------------------------------------------------------
-    # ----------------------------------------------------------- User actions
-
-    # TODO: Doc strings.
+    # ------------------------------------------------------------------------------------------ User actions
 
     @param.depends('scheduler_fname', watch=True)
     def _update_scheduler_fname(self):
@@ -395,7 +367,6 @@ class Scheduler(param.Parameterized):
 
         self.show_loading_indicator = False
 
-    # USER ACTION : Choose date.
     @param.depends('date', watch=True)
     def _update_date(self):
         """Update the dashboard when a user chooses a new date/time."""
@@ -548,8 +519,7 @@ class Scheduler(param.Parameterized):
             self.update_sky_map_with_survey_map()
         self.param.trigger('publish_map')
 
-    # -------------------------------------------------------------------------
-    # ------------------------------------------------------ Internal workings
+    # ------------------------------------------------------------------------------------- Internal workings
 
     def clear_dashboard(self):
         """Clear the dashboard for a new pickle or a new date."""
@@ -622,7 +592,7 @@ class Scheduler(param.Parameterized):
             pn.state.notifications.info('Making scheduler summary dataframe...', duration=0)
             logging.info('Making scheduler summary dataframe.')
 
-            # TEMPORARY BUG-FIX.
+            # TODO: Conditions setter bug-fix.
             self._conditions.mjd = self._date_time
             # self._conditions.__dict__.clear()
             # self._conditions.__dict__.update(model_observatory.return_conditions().__dict__)
@@ -641,12 +611,14 @@ class Scheduler(param.Parameterized):
                 self._rewards,
                 )
 
-            # TODO: Is there a neater way to do this? (also in bf table).
+            # TODO: Is there a neater way to apply URL formatting to columns (rather than duplicating?).
+
             # Duplicate column and apply URL formatting to one of the columns.
             survey_rewards['survey'] = survey_rewards.loc[:, 'survey_name']
             survey_rewards['survey_name'] = survey_rewards.apply(
-                survey_url_formatter,
+                url_formatter,
                 axis=1,
+                args=('survey_name', 'survey_url'),
                 )
             self._survey_rewards = survey_rewards
 
@@ -722,7 +694,7 @@ class Scheduler(param.Parameterized):
     @param.depends('publish_survey_widget')
     def publish_survey_tabulator_widget(self):
         """Publishes the survey Tabulator widget to be displayed on dashboard.
-        
+
         Returns
         -------
         panel.widgets.Tabulator
@@ -736,15 +708,12 @@ class Scheduler(param.Parameterized):
 
     def compute_survey_maps(self):
         """Compute survey maps and update drop-down selection."""
-        # TODO: Is it neccessary to have two separate error messages?
         if self._scheduler is None:
             logging.info('Cannot compute survey maps as no scheduler loaded.')
             return
-
         if self._survey_rewards is None:
             logging.info('Cannot compute survey maps as no scheduler summary made.')
             return
-
         try:
             logging.info('Computing survey maps.')
 
@@ -760,15 +729,12 @@ class Scheduler(param.Parameterized):
 
     def make_survey_reward_dataframe(self):
         """Make the survey reward dataframe."""
-        # TODO: Is it neccessary to have two separate error messages?
         if self._scheduler is None:
             logging.info('Cannot make survey reward dataframe as no scheduler loaded.')
             return
-
         if self._survey_rewards is None:
             logging.info('Cannot make survey reward dataframe as no scheduler summary made.')
             return
-
         try:
             logging.info('Making survey reward dataframe.')
 
@@ -780,12 +746,12 @@ class Scheduler(param.Parameterized):
                     self._conditions,
                     self._rewards.loc[[(int(self.tier[-1]), self.survey)], :]
                     )
-                # TODO: Can this be more efficient?
                 # Duplicate column and apply URL formatting to one of the columns.
                 basis_function_df['basis_func'] = basis_function_df.loc[:, 'basis_function']
                 basis_function_df['basis_function'] = basis_function_df.apply(
-                    basis_function_url_formatter,
+                    url_formatter,
                     axis=1,
+                    args=('basis_function', 'doc_url'),
                     )
                 self._basis_functions = basis_function_df
             else:
@@ -842,7 +808,7 @@ class Scheduler(param.Parameterized):
             )
         self._basis_function_df_widget = basis_function_table
 
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------------- <- docstring length limit
     def update_basis_function_tabulator_widget(self):
         """."""
         if self._basis_functions is None:
@@ -866,7 +832,7 @@ class Scheduler(param.Parameterized):
         self._basis_function_df_widget._update_data(self._basis_functions[columns])
         # TODO: reset column widths
 
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------------- <- docstring length limit
     @param.depends('publish_bf_widget')
     def publish_basis_function_widget(self):
         """
@@ -881,7 +847,7 @@ class Scheduler(param.Parameterized):
         else:
             return self._basis_function_df_widget
 
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------------- <- docstring length limit
     def create_sky_map_base(self):
         """."""
         if self._survey_maps is None:
@@ -904,10 +870,10 @@ class Scheduler(param.Parameterized):
         except Exception:
             logging.info(f'Cannot create sky map: \n{traceback.format_exc(limit=-1)}')
 
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------------- <- docstring length limit
     def update_sky_map_with_survey_map(self):
         """.
-        
+
         Notes
         -----
         There are three possible update cases:
@@ -982,7 +948,7 @@ class Scheduler(param.Parameterized):
         hpix_renderer.glyph.line_color = hpix_renderer.glyph.fill_color
         self.sky_map_base.update()
 
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------------- <- docstring length limit
     def update_sky_map_with_basis_function(self):
         """."""
         if self.sky_map_base is None:
@@ -1058,7 +1024,7 @@ class Scheduler(param.Parameterized):
         except Exception:
             logging.info(f'Could not load map: \n{traceback.format_exc(limit=-1)}')
 
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------------- <- docstring length limit
     @param.depends('publish_map')
     def publish_sky_map(self):
         """
@@ -1081,9 +1047,6 @@ class Scheduler(param.Parameterized):
             logging.info('Publishing sky map.')
             return self.sky_map_base.figure
 
-    # -------------------------------------------------------------------------
-    # -------------------------------------------------------- Debugging panel
-
     @param.depends('_debugging_message')
     def debugging_messages(self):
         """
@@ -1094,7 +1057,6 @@ class Scheduler(param.Parameterized):
             DESCRIPTION.
         """
         if self._debugging_message is None:
-            logging.info('SALEM SABERHAGEN - debugging test -----------------')
             return None
         timestamp = datetime.now(timezone('America/Santiago')).strftime('%Y-%m-%d %H:%M:%S')
         self._debug_string = f'\n {timestamp} - {self._debugging_message}' + self._debug_string
@@ -1107,17 +1069,15 @@ class Scheduler(param.Parameterized):
             )
         return debugging_messages
 
-    # -------------------------------------------------------------------------
-    # ------------------------------------------------- Page loading indicator
+    # TODO: Update update_loading() name to something related to the loading indicator.
 
     @param.depends('show_loading_indicator', watch=True)
     def update_loading(self):
         """."""
         sched_app.loading = self.show_loading_indicator
 
-# -----------------------------------------------------------------------------
-# ------------------------------------------------------------------------ Key
 
+# TODO: Should the key functions go before the Scheduler class?
 
 def generate_array_for_key(number_of_columns=4):
     """
@@ -1277,10 +1237,10 @@ def generate_key():
 
     return key
 
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------- <- docstring length limit
 
 
-# Moved app pane outside scheduler_app so that it is accessible from Scheduler class.
+# Initialize the dashboard layout.
 sched_app = pn.GridSpec(sizing_mode='stretch_both', max_height=1000).servable()
 
 
@@ -1307,7 +1267,6 @@ def scheduler_app(date=None, scheduler_pickle=None):
     if scheduler_pickle is not None:
         scheduler.scheduler_fname = scheduler_pickle
 
-    # TODO: clean up row/column section (remove whitespace, indents).
     # Dashboard title.
     sched_app[0:8, :] = pn.Row(
         pn.Column(pn.Spacer(height=4),
@@ -1316,7 +1275,7 @@ def scheduler_app(date=None, scheduler_pickle=None):
                               styles={'font-size': '16pt',
                                       'font-weight': '500',
                                       'color': 'white'},
-                              stylesheets=[title_stylesheet],
+                              stylesheets=[stylesheet],
                               ),
                   scheduler.dashboard_title,
                   ),
@@ -1391,8 +1350,6 @@ def scheduler_app(date=None, scheduler_pickle=None):
         )
 
     return sched_app
-
-# -----------------------------------------------------------------------------
 
 
 if __name__ == '__main__':
