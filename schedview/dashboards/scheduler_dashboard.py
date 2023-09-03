@@ -48,6 +48,7 @@ from rubin_sim.scheduler.model_observatory import ModelObservatory
 NEXT
 ----
 
+    0. Check over old GridSpec file and make sure I haven't forgotten to copy anything over.
     1. Rename parameters (leading underscore; display_headings -> display_dashboard_data).
     2. Basis function table widths need updating when table is updated. [CASE: tier 1 > tier 3]
     3. Run early code and see if it was possible to open dashboard in another tab.
@@ -57,7 +58,20 @@ NEXT
     9. Reorder functions.
    10. Finish docstrings
    11. Is there a neater way to apply URL formatting to the columns so that it doesn't show in titles?
+   12. Move the dashboard to the app folder.
 
+
+[Code ordering, from LSST DM guide]
+
+    1. Shebang line, #! /usr/bin/env python (only for executable scripts)
+    2. Module-level comments (such as the license statement)
+    3. Module-level docstring
+    4. __all__ = [...] statement, if present
+    5. Imports
+    6. Private module variables (names start with underscore)
+    7. Private module functions and classes (names start with underscore)
+    8. Public module variables
+    9. Public functions and classes
 
 /Users/me/Documents/2023/ADACS/Panel_scheduler/Rubin_scheduler_dashboard/example_pickle_scheduler.p.xz
 """
