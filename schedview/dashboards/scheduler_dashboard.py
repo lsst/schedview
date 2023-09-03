@@ -1111,7 +1111,7 @@ def generate_array_for_key(number_of_columns=4):
         # Text for title and key items.
         'title_text': np.array(['Key']),
         'text_1': np.array(['Horizon', 'ZD=70 degrees', 'Ecliptic', 'Galactic plane']),
-        'text_2': np.array(['Sun position', 'Moon position', 'Survey field(s)', 'Telescope pointing']),
+        'text_2': np.array(['Moon position', 'Sun position', 'Survey field(s)', 'Telescope pointing']),
         }
 
 
