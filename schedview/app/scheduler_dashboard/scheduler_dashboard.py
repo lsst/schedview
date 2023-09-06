@@ -52,6 +52,7 @@ from rubin_sim.scheduler.model_observatory import ModelObservatory
 NEXT
 ----
 
+    1. Change basis function/survey table names to reflect underlying tables?
     2. Basis function table widths need updating when table is updated. [CASE: tier 1 > tier 3]
     3. Run early code and see if it was possible to open dashboard in another tab.
     4. pytests.
@@ -60,7 +61,7 @@ NEXT
     9. Reorder functions.
    10. Finish docstrings
    11. Is there a neater way to apply URL formatting to the columns so that it doesn't show in titles?
-   12. Reflect basis function choice in survey map drop-down selection.  
+   12. Reflect basis function choice in survey map drop-down selection.
    13. Try param.Path() for scheduler_fname.
 
 
@@ -136,7 +137,6 @@ class Scheduler(param.Parameterized):
     """A Parametrized container for parameters, data, and panel objects for the
     scheduler dashboard.
     """
-    
     # Param parameters that are modifiable by user actions.
     scheduler_fname_doc = """URL or file name of the scheduler pickle file.
     Such a pickle file can either be of an instance of a subclass of
@@ -183,7 +183,7 @@ class Scheduler(param.Parameterized):
     basis_function_df_widget = param.Parameter(
         default=None,
         doc='')
-    
+
     # Param parameters (used in depends decoraters and trigger calls).
     _publish_survey_widget = param.Parameter(None)
     _publish_bf_widget = param.Parameter(None)
