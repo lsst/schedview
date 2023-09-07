@@ -500,7 +500,8 @@ def create_visit_skymaps(
         )
 
     if observatory is None:
-        observatory = ModelObservatory(nside=scheduler.nside)
+        observatory = ModelObservatory(nside=scheduler.nside, init_load_length=1)
+        observatory.sky_model.load_length = 1
 
     footprint = schedview.collect.footprint.get_footprint(scheduler)
     observatory.mjd = end_time.mjd

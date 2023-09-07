@@ -41,6 +41,8 @@ DEFAULT_OPSIM_FNAME = "opsim.db"
 DEFAULT_SCHEDULER_FNAME = "scheduler.pickle.xz"
 DEFAULT_REWARDS_FNAME = "rewards.h5"
 USE_EXAMPLE_SCHEDULER = False
+DEFAULT_MODEL_OBSERVATORY = ModelObservatory(init_load_length=1)
+DEFAULT_MODEL_OBSERVATORY.sky_model.load_length = 1
 
 astropy.utils.iers.conf.iers_degraded_accuracy = "warn"
 
@@ -142,7 +144,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         label="Basis function",
     )
 
-    _observatory = ModelObservatory()
+    _observatory = DEFAULT_MODEL_OBSERVATORY
     _site = _observatory.location
     # Must declare all of these as Parameters, even though they should not
     # be set by the user, because they are used in the @depends methods,
