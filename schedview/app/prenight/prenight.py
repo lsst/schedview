@@ -256,12 +256,9 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
 
     @param.depends("opsim_output_fname", "_almanac_events", watch=True)
     def _update_visits(self):
-        if self.opsim_output_fname is None:
+        if self.opsim_output_fname is None or self._almanac_events is None:
             self._visits = None
             return
-
-        if self._almanac_events is None:
-            self._update_almanac_events()
 
         logging.info("Updating visits.")
         try:
@@ -418,10 +415,10 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             The bokeh figure.
         """
         if self._visits is None:
-            return "No visits loaded."
+            return "No visits loaded"
 
         if self._almanac_events is None:
-            self._update_almanac_events()
+            return "Almanac events not computed yet."
 
         logging.info("Updating airmass vs. time plot")
 
@@ -456,7 +453,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             return "No visits loaded."
 
         if self._almanac_events is None:
-            self._update_almanac_events()
+            return "Almanac events not computed yet."
 
         logging.info("Updating altitude vs. time plot")
 
@@ -496,8 +493,9 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             title="Horizon (Az/Alt) Coordinates",
             x_axis_type=None,
             y_axis_type=None,
-            frame_width=512,
-            frame_height=512,
+            height=512,
+            aspect_ratio=1,
+            match_aspect=True,
             tools="pan,wheel_zoom,box_zoom,box_select,lasso_select,save,reset,help",
         )
 
