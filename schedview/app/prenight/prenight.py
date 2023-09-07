@@ -51,12 +51,6 @@ pn.extension(
 )
 pn.config.console_output = "accumulate"
 
-logging.basicConfig(format="%(asctime)s %(message)s", level=logging.INFO)
-
-debug_info = pn.widgets.Debugger(
-    name="Debugger info level", level=logging.DEBUG, sizing_mode="stretch_both"
-)
-
 
 class Prenight(param.Parameterized):
     custom_hvplot_tab_settings_file = param.FileSelector(
@@ -200,6 +194,34 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
     )
     _obs_rewards = schedview.param.Series()
 
+    def __init__(self, **params):
+        super().__init__(**params)
+        self.config_logger()
+
+    def config_logger(self, logger_name="prenight"):
+        """Configure the logger.
+
+        Parameters
+        ----------
+        logger_name : `str`
+            The name of the logger.
+        """
+        self.logger = logging.getLogger(logger_name)
+        self.logger.setLevel(logging.DEBUG)
+
+        log_stream_handler = None
+        if self.logger.hasHandlers():
+            for handler in self.logger.handlers:
+                if isinstance(handler, logging.StreamHandler):
+                    log_stream_handler = handler
+
+        if log_stream_handler is None:
+            log_stream_handler = logging.StreamHandler()
+
+        log_stream_formatter = logging.Formatter("%(asctime)s: %(message)s")
+        log_stream_handler.setFormatter(log_stream_formatter)
+        self.logger.addHandler(log_stream_handler)
+
     @param.depends("custom_hvplot_tab_settings_file", watch=True)
     def _update_custom_hvplot_tab_settings(self):
         if len(self.custom_hvplot_tab_settings_file) < 1:
@@ -232,7 +254,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
 
     @param.depends("night", "timezone", watch=True)
     def _update_almanac_events(self):
-        logging.info("Updating almanac events.")
+        self.logger.info("Updating almanac events.")
         night_events = schedview.compute.astro.night_events(
             self.night, self._site, self.timezone
         )
@@ -249,8 +271,9 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         if self._almanac_events is None:
             return "No almanac events computed."
 
-        logging.info("Updating almanac table.")
+        self.logger.info("Starting to update almanac table.")
         almanac_table = pn.widgets.Tabulator(self._almanac_events)
+        self.logger.info("Finished updating almanac table.")
         return almanac_table
 
     @param.depends("opsim_output_fname", "_almanac_events", watch=True)
@@ -259,7 +282,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             self._visits = None
             return
 
-        logging.info("Updating visits.")
+        self.logger.info("Starting to update visits.")
         try:
             if not os.path.exists(self.opsim_output_fname):
                 raise FileNotFoundError(f"File not found: {self.opsim_output_fname}")
@@ -270,10 +293,14 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                 Time(self._almanac_events.loc["sunrise", "UTC"]),
             )
             self._visits = visits
+            self.logger.info("Finish updating visits DataFrame.")
+            self.logger.info("Starting to update visits ColumnDataSource.")
             self._visits_cds = bokeh.models.ColumnDataSource(visits)
+            self.logger.info("Finished updating visits ColumnDataSource.")
 
         except Exception as e:
-            logging.error(e)
+            self.logger.info("Error updating visits.")
+            self.logger.error(e)
             self._visits = None
             self._visits_cds = None
 
@@ -289,7 +316,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         if self._visits is None:
             return "No visits loaded."
 
-        logging.info("Updating visit table")
+        self.logger.info("Updating visit tabulator widget")
         columns = [
             "start_date",
             "fieldRA",
@@ -311,7 +338,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         if len(self._visits) < 1:
             visit_table = "No visits on this night"
 
-        logging.info("Finished updating visit table")
+        self.logger.info("Finished updating visit tabulator widget")
         return visit_table
 
     @param.depends("_visits")
@@ -326,7 +353,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         if self._visits is None:
             return "No visits loaded."
 
-        logging.info("Updating visit explorer")
+        self.logger.info("Starting to update visit explorer")
 
         (
             visit_explorer,
@@ -339,7 +366,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         if len(visit_explorer_data["visits"]) < 1:
             visit_explorer = "No visits on this night."
 
-        logging.info("Finished updating visit explorer")
+        self.logger.info("Finished updating visit explorer")
 
         return visit_explorer
 
@@ -353,12 +380,17 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         if len(self._visits) < 1:
             return "Visits loaded, but no visits on this night."
 
+        custom_plot_name = self._custom_hvplot_tab_settings[custom_plot_index]["name"]
+        self.logger.info(
+            f"Starting to create custom hvplot {custom_plot_index} ({custom_plot_name})"
+        )
         try:
             plot = self._visits.hvplot(
                 **self._custom_hvplot_tab_settings[custom_plot_index]["settings"]
             )
+            self.logger.info(f"Finished creating custom hvplot {custom_plot_index}")
         except Exception as e:
-            logging.error(f"Could not create custom hvplot: {e}")
+            self.logger.error(f"Could not create custom hvplot: {e}")
             return f"Error creating custom hvplot: {e}"
 
         return plot
@@ -385,7 +417,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
 
     @param.depends("scheduler_fname", watch=True)
     def _update_scheduler(self):
-        logging.info("Updating scheduler.")
+        self.logger.info("Starting to update the scheduler.")
         try:
             (
                 scheduler,
@@ -393,13 +425,17 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             ) = schedview.collect.scheduler_pickle.read_scheduler(self.scheduler_fname)
 
             self._scheduler = scheduler
+            self.logger.info("Finished updating the scheduler.")
         except Exception as e:
-            logging.error(f"Could not load scheduler from {self.scheduler_fname} {e}")
+            self.logger.error(
+                f"Could not load scheduler from {self.scheduler_fname} {e}"
+            )
             if USE_EXAMPLE_SCHEDULER:
-                logging.info("Loading example scheduler.")
+                self.logger.info("Starting to load example scheduler.")
                 self._scheduler = rubin_sim.scheduler.example.example_scheduler(
                     nside=self._nside
                 )
+                self.logger.info("Finished loading example scheduler.")
 
     @param.depends(
         "_visits_cds",
@@ -419,7 +455,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         if self._almanac_events is None:
             return "Almanac events not computed yet."
 
-        logging.info("Updating airmass vs. time plot")
+        self.logger.info("Starting to update airmass vs. time plot")
 
         fig = bokeh.plotting.figure(
             title="Airmass",
@@ -433,7 +469,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         fig = schedview.plot.nightly.plot_airmass_vs_time(
             visits=self._visits_cds, figure=fig, almanac_events=self._almanac_events
         )
-        logging.info("Finished updating airmass vs. time plot")
+        self.logger.info("Finished updating airmass vs. time plot")
         return fig
 
     @param.depends(
@@ -454,7 +490,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         if self._almanac_events is None:
             return "Almanac events not computed yet."
 
-        logging.info("Updating altitude vs. time plot")
+        self.logger.info("Starting to update altitude vs. time plot")
 
         fig = bokeh.plotting.figure(
             title="Altitude",
@@ -469,7 +505,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             visits=self._visits_cds, figure=fig, almanac_events=self._almanac_events
         )
 
-        logging.info("Finished updating altitude vs. time plot")
+        self.logger.info("Finished updating altitude vs. time plot")
         return fig
 
     @param.depends(
@@ -486,7 +522,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         if self._visits_cds is None:
             return "No visits loaded."
 
-        logging.info("Updating polar alt-az plot")
+        self.logger.info("Starting to update polar alt-az plot")
 
         fig = bokeh.plotting.figure(
             title="Horizon (Az/Alt) Coordinates",
@@ -502,7 +538,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             visits=self._visits_cds, figure=fig, legend=False
         )
 
-        logging.info("Finished updating polar alt-az plot")
+        self.logger.info("Finished updating polar alt-az plot")
         return fig
 
     @param.depends(
@@ -524,7 +560,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         if self._scheduler is None:
             return "No scheduler is loaded."
 
-        logging.info("Updating skymaps")
+        self.logger.info("Starting to update visit skymaps")
 
         vmap, vmap_data = schedview.plot.visitmap.create_visit_skymaps(
             visits=self._visits,
@@ -537,7 +573,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         if len(vmap_data["visits"]) < 1:
             vmap = "No visits on this night."
 
-        logging.info("Finished updating skymaps")
+        self.logger.info("Finished updating visit skymaps")
 
         return vmap
 
@@ -546,12 +582,13 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         if self.rewards_fname is None:
             return None
 
-        logging.info("Updating reward dataframe.")
+        self.logger.info("Starting to update reward dataframe.")
 
         try:
             reward_df = pd.read_hdf(self.rewards_fname, "reward_df")
+            self.logger.info("Finished updating reward dataframe.")
         except Exception as e:
-            logging.error(e)
+            self.logger.error(e)
 
         self._reward_df = reward_df
 
@@ -562,10 +599,11 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             self.tier = ""
             return
 
-        logging.info("Updating tier selector.")
+        self.logger.info("Starting to update tier selector.")
         tiers = self._reward_df.tier_label.unique().tolist()
         self.param["tier"].objects = tiers
         self.tier = tiers[0]
+        self.logger.info("Finished updating tier selector.")
 
     @param.depends("_reward_df", "tier", watch=True)
     def _update_surveys_selector(self):
@@ -576,7 +614,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             self.surveys = ""
             return
 
-        logging.info("Updating surveys selector.")
+        self.logger.info("Starting to update surveys selector.")
 
         surveys = (
             self._reward_df.set_index("tier_label")
@@ -590,6 +628,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             if len(surveys) > init_displayed_surveys
             else surveys
         )
+        self.logger.info("Finished updating surveys selector.")
 
     @param.depends("_reward_df", "tier", "surveys", watch=True)
     def _update_basis_function_selector(self):
@@ -598,7 +637,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             self.basis_function = ""
             return
 
-        logging.info("Updating basis function selector.")
+        self.logger.info("Starting to update basis function selector.")
 
         tier_reward_df = self._reward_df.set_index("tier_label").loc[self.tier, :]
 
@@ -610,18 +649,21 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         )
         self.param["basis_function"].objects = basis_functions
         self.basis_function = "Total"
+        self.logger.info("Finished updating basis function selector.")
 
     @param.depends("rewards_fname", watch=True)
     def _update_obs_rewards(self):
         if self.rewards_fname is None:
             return None
 
+        self.logger.info("Starting to update obs_rewards.")
         try:
             obs_rewards = pd.read_hdf(self.rewards_fname, "obs_rewards")
+            self._obs_rewards = obs_rewards
+            self.logger.info("Finished updating obs_rewards.")
         except Exception as e:
-            logging.error(e)
-
-        self._obs_rewards = obs_rewards
+            self.logger.warning("Could not update obs_rewards.")
+            self.logger.error(e)
 
     @param.depends("_reward_df", "tier")
     def reward_params(self):
@@ -631,6 +673,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         -------
         param_set : `panel.Param`
         """
+        self.logger.info("Starting to update reward params.")
         if self._reward_df is None:
             this_param_set = pn.Param(
                 self.param,
@@ -650,6 +693,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             name="",
             widgets={"surveys": survey_widget},
         )
+        self.logger.info("Finished updating reward params.")
         return this_param_set
 
     @param.depends(
@@ -671,6 +715,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         if self._reward_df is None:
             return "No rewards are loaded."
 
+        self.logger.info("Starting to update reward plot.")
         fig = schedview.plot.nightbf.plot_rewards(
             reward_df=self._reward_df,
             tier_label=self.tier,
@@ -681,6 +726,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             basis_function=self.basis_function,
             plot_kwargs={"height": 256},
         )
+        self.logger.info("Finished updating reward plot.")
         return fig
 
     @param.depends(
@@ -701,6 +747,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         if self._reward_df is None:
             return "No rewards are loaded."
 
+        self.logger.info("Starting to update infeasible plot.")
         fig = schedview.plot.nightbf.plot_infeasible(
             reward_df=self._reward_df,
             tier_label=self.tier,
@@ -709,9 +756,11 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             surveys=self.surveys,
             plot_kwargs={"height": 256},
         )
+        self.logger.info("Finished updating infeasible plot.")
         return fig
 
     def initialize_tab_contents(self):
+        self.logger.info("Starting to create initial dict of tab contents.")
         tab_contents = {
             "Azimuth and altitude": pn.Row(
                 pn.param.ParamMethod(self.alt_vs_time, loading_indicator=True),
@@ -735,10 +784,12 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                 self.visit_explorer, loading_indicator=True
             ),
         }
+        self.logger.info("Finished creating initial dict of tab contents.")
         return tab_contents
 
     @param.depends("_custom_hvplot_tab_settings", "shown_tabs")
     def tab_contents(self):
+        self.logger.info("Starting to update tab contents.")
         tab_contents = self.initialize_tab_contents()
 
         for custom_index, custom_plot in enumerate(self._custom_hvplot_tab_settings):
@@ -760,6 +811,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             dynamic=False,  # When true, visit_table never renders. Why?
         )
 
+        self.logger.info("Finished updating tab contents.")
         return detail_tabs
 
     @classmethod
@@ -803,6 +855,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             The pre-night briefing app.
         """
         prenight = cls()
+        logger = prenight.logger
 
         # Rather than set each parameter one at a time, and execute the
         # callbacks for each as they are set, we can use the
@@ -851,17 +904,22 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                 ),
             ),
             pn.param.ParamMethod(prenight.tab_contents, loading_indicator=True),
-            debug_info,
+            pn.widgets.Debugger(
+                name="Debugger",
+                level=logging.DEBUG,
+                sizing_mode="stretch_both",
+                logger_names=["prenight"],
+            ),
         ).servable()
 
         def clear_caches(session_context):
-            logging.info("session cleared")
+            logger.info("session cleared")
             pn_app.stop()
 
         try:
             pn.state.on_session_destroyed(clear_caches)
         except RuntimeError as e:
-            logging.info("RuntimeError: %s", e)
+            logger.info("RuntimeError: %s", e)
 
         if return_app:
             return pn_app, prenight
@@ -984,4 +1042,6 @@ if __name__ == "__main__":
         start=True,
         autoreload=True,
         threaded=True,
+        admin=True,
+        profiler=True,
     )
