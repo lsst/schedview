@@ -6,12 +6,9 @@ import pandas as pd
 import os
 import json
 import importlib
-from functools import partial
-
 import panel as pn
 import bokeh
 import hvplot.pandas
-
 from astropy.time import Time
 import astropy.utils.iers
 
@@ -717,8 +714,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         )
         return fig
 
-    @param.depends("_custom_hvplot_tab_settings", "shown_tabs")
-    def tab_contents(self):
+    def initialize_tab_contents(self):
         tab_contents = {
             "Azimuth and altitude": pn.Row(
                 pn.param.ParamMethod(self.alt_vs_time, loading_indicator=True),
@@ -742,6 +738,11 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                 self.visit_explorer, loading_indicator=True
             ),
         }
+        return tab_contents
+
+    @param.depends("_custom_hvplot_tab_settings", "shown_tabs")
+    def tab_contents(self):
+        tab_contents = self.initialize_tab_contents()
 
         for custom_index, custom_plot in enumerate(self._custom_hvplot_tab_settings):
             tab_contents[custom_plot["name"]] = pn.Column(
@@ -800,15 +801,16 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         Returns
         -------
         pn_app : `panel.viewable.Viewable` or
-                `tuple` ['panel.viewable.Viewable', `schedview.prenight.Prenight`]
+                `tuple` ['panel.viewable.Viewable',
+                `schedview.prenight.Prenight`]
             The pre-night briefing app.
         """
         prenight = cls()
 
-        # Rather than set each parameter one at a time, and execute the callbacks
-        # for each as they are set, we can use the batch_call_watchers context
-        # manager to set all the parameters at once, and only execute the callbacks
-        # once.
+        # Rather than set each parameter one at a time, and execute the
+        # callbacks for each as they are set, we can use the
+        # batch_call_watchers context manager to set all the parameters at
+        # once, and only execute the callbacks once.
         with param.parameterized.batch_call_watchers(prenight):
             if night_date is not None:
                 prenight.night = night_date
@@ -840,8 +842,6 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                         "timezone",
                         "scheduler_fname",
                         "opsim_output_fname",
-                        #                        "custom_hvplot_tab_settings_file",
-                        #                        "shown_tabs"
                     ],
                     name="<h2>Parameters</h2>",
                     widgets={"night": pn.widgets.DatePicker},
@@ -983,7 +983,7 @@ if __name__ == "__main__":
         prenight_app_with_params,
         port=prenight_port,
         title="Prenight Dashboard",
-        show=True,
+        show=False,
         start=True,
         autoreload=True,
         threaded=True,

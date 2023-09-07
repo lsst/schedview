@@ -269,6 +269,8 @@ def plot_infeasible(
     )
     factor_range = bokeh.models.FactorRange(*[tuple(c) for c in categories])
 
+    # Keep bokeh from complaining about having to truncate the integer
+    tier_df["queue_fill_mjd_ns"] = tier_df["queue_fill_mjd_ns"].astype(np.float64)
     infeasible_ds = bokeh.models.ColumnDataSource(tier_df)
 
     plot = bokeh.plotting.figure(
