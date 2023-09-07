@@ -59,8 +59,6 @@ TO DO BEFORE PUSH
 NEXT
 ----
 
-    1. Swap basis_function and basis_func around. (Check summary df, too)
-       Is there a neater way to apply URL formatting to the columns so that it doesn't show in titles?
     2. Change debugging pane to update data rather than re-create string panel.
     3. Change title panes to update data rather than re-create string panels.
     4. Try param.Path() for scheduler_fname.
@@ -205,8 +203,7 @@ class Scheduler(param.Parameterized):
     _display_dashboard_data = False
     _do_not_trigger_update = True
     _show_loading_indicator = False
-    _model_observatory = ModelObservatory(init_load_length=1)
-    # _model_observatory = ModelObservatory()
+    # _model_observatory = ModelObservatory(init_load_length=1)
 
     # ------------------------------------------------------------------------------------------ User actions
 
@@ -371,7 +368,7 @@ class Scheduler(param.Parameterized):
             return
 
         self._reward = self.reward_widget.selection[0]
-        self._reward_name = self._survey_reward_df['basis_func'][self._reward]
+        self._reward_name = self._survey_reward_df['basis_function'][self._reward]
 
         # If reward is in survey maps, update survey maps drop-down.
         if any(self._reward_name in key for key in self._survey_maps):
@@ -402,9 +399,9 @@ class Scheduler(param.Parameterized):
         # If selection is a reward map, reflect in reward table.
         self._do_not_trigger_update = True
         self._map_name = self.survey_map.split('@')[0].strip()
-        if any(self._survey_reward_df['basis_func'].isin([self._map_name])):
-            index = self._survey_reward_df['basis_func'].index[self._survey_reward_df['basis_func']
-                                                               .tolist().index(self._map_name)]
+        if any(self._survey_reward_df['basis_function'].isin([self._map_name])):
+            index = self._survey_reward_df['basis_function'].index[self._survey_reward_df['basis_function']
+                                                                   .tolist().index(self._map_name)]
             self.reward_widget.selection = [index]
         elif self.reward_widget is not None:
             self.reward_widget.selection = []
@@ -511,14 +508,14 @@ class Scheduler(param.Parameterized):
 
             # TODO: Conditions setter bug-fix.
 
-            # self._conditions.mjd = self._date_time
-            if self._model_observatory.nside != self._scheduler.nside:
-                self._model_observatory = ModelObservatory(
-                    nside=self._scheduler.nside,
-                    init_load_length=1,
-                    )
-            self._model_observatory.mjd = self._date_time
-            self._conditions = self._model_observatory.return_conditions()
+            self._conditions.mjd = self._date_time
+            # if self._model_observatory.nside != self._scheduler.nside:
+            #     self._model_observatory = ModelObservatory(
+            #         nside=self._scheduler.nside,
+            #         init_load_length=1,
+            #         )
+            # self._model_observatory.mjd = self._date_time
+            # self._conditions = self._model_observatory.return_conditions()
 
             self._scheduler.update_conditions(self._conditions)
             self._reward_df = self._scheduler.make_reward_df(self._conditions)
@@ -527,8 +524,6 @@ class Scheduler(param.Parameterized):
                 self._conditions,
                 self._reward_df,
                 )
-
-            # TODO: Is there a neater way to apply URL formatting to columns (rather than duplicating?).
 
             # Duplicate column and apply URL formatting to one of the columns.
             scheduler_summary_df['survey'] = scheduler_summary_df.loc[:, 'survey_name']
@@ -575,7 +570,7 @@ class Scheduler(param.Parameterized):
             'survey_url',
             ]
         titles = {
-            'survey_name': 'Survey Name',
+            'survey_name': 'Survey',
             'reward': 'Reward',
             }
         summary_widget = pn.widgets.Tabulator(
@@ -657,11 +652,11 @@ class Scheduler(param.Parameterized):
                     self._reward_df.loc[[(int(self._tier[-1]), self._survey)], :]
                     )
                 # Duplicate column and apply URL formatting to one of the columns.
-                survey_reward_df['basis_func'] = survey_reward_df.loc[:, 'basis_function']
-                survey_reward_df['basis_function'] = survey_reward_df.apply(
+                survey_reward_df['basis_function_href'] = survey_reward_df.loc[:, 'basis_function']
+                survey_reward_df['basis_function_href'] = survey_reward_df.apply(
                     url_formatter,
                     axis=1,
-                    args=('basis_function', 'doc_url'),
+                    args=('basis_function_href', 'doc_url'),
                     )
                 self._survey_reward_df = survey_reward_df
             else:
@@ -677,11 +672,11 @@ class Scheduler(param.Parameterized):
             return
 
         tabulator_formatter = {
-            'basis_function': HTMLTemplateFormatter(template='<%= value %>'),
+            'basis_function_href': HTMLTemplateFormatter(template='<%= value %>'),
             'feasible': BooleanFormatter(),
             }
         columns = [
-            'basis_function',
+            'basis_function_href',
             'basis_function_class',
             'feasible',
             'max_basis_reward',
@@ -690,10 +685,10 @@ class Scheduler(param.Parameterized):
             'max_accum_reward',
             'accum_area',
             'doc_url',
-            'basis_func',
+            'basis_function',
             ]
         titles = {
-            'basis_function': 'Basis Function',
+            'basis_function_href': 'Basis Function',
             'basis_function_class': 'Class',
             'feasible': 'Feasible',
             'max_basis_reward': 'Max Reward',
@@ -709,8 +704,8 @@ class Scheduler(param.Parameterized):
             show_index=False,
             formatters=tabulator_formatter,
             disabled=True,
-            frozen_columns=['basis_function'],
-            hidden_columns=['basis_func', 'doc_url'],
+            frozen_columns=['basis_function_href'],
+            hidden_columns=['basis_function', 'doc_url'],
             selectable=1,
             pagination='remote',
             page_size=13,
@@ -724,7 +719,7 @@ class Scheduler(param.Parameterized):
 
         self.reward_widget.selection = []
         columns = [
-            'basis_function',
+            'basis_function_href',
             'basis_function_class',
             'feasible',
             'max_basis_reward',
@@ -733,7 +728,7 @@ class Scheduler(param.Parameterized):
             'max_accum_reward',
             'accum_area',
             'doc_url',
-            'basis_func',
+            'basis_function',
             ]
         self.reward_widget._update_data(self._survey_reward_df[columns])
         # TODO: reset column widths
