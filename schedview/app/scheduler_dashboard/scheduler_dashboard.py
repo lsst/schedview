@@ -59,11 +59,11 @@ TO DO BEFORE PUSH
 NEXT
 ----
 
-    1. Change basis function/survey table names to reflect underlying tables?
+    16. Add '' to survey_maps and rest selection on this when scalar reward chosen.
+    11. Is there a neater way to apply URL formatting to the columns so that it doesn't show in titles?
 
     4. pytests.
     5. Pop-out debugger.
-   11. Is there a neater way to apply URL formatting to the columns so that it doesn't show in titles?
    13. Try param.Path() for scheduler_fname.
        scheduler_fname = param.Path(default='scheduler.p', search_paths=['/'])
    14. Change debugging pane to update data rather than re-create string panel.
@@ -73,7 +73,7 @@ NEXT
 CAN'T FIGURE OUT
 ----------------
 
-    - Basis function table widths need updating when table is updated. [CASE: tier 1 > tier 3]
+    - Reward table widths need updating when table is updated. [CASE: tier 1 > tier 2]
 
 
 STILL TO IMPLEMENT
@@ -85,7 +85,6 @@ STILL TO IMPLEMENT
 
 
 /Users/me/Documents/2023/ADACS/Panel_scheduler/Rubin_scheduler_dashboard/example_pickle_scheduler.p.xz
-
 """
 
 DEFAULT_CURRENT_TIME = Time.now()
@@ -160,7 +159,7 @@ class Scheduler(param.Parameterized):
     survey_map = param.ObjectSelector(
         default='reward',
         objects=['reward'],
-        doc='Survey sky brightness maps, basis functions with non-scalar values and reward map.',
+        doc='Sky brightness maps, non-scalar rewards and survey reward map.',
         )
     nside = param.ObjectSelector(
         default=16,
@@ -173,35 +172,38 @@ class Scheduler(param.Parameterized):
         objects=COLOR_PALETTES,
         doc=''
         )
-    survey_df_widget = param.Parameter(
+    summary_widget = param.Parameter(
         default=None,
         doc='')
-    basis_function_df_widget = param.Parameter(
+    reward_widget = param.Parameter(
         default=None,
         doc='')
 
     # Param parameters (used in depends decoraters and trigger calls).
-    _publish_survey_widget = param.Parameter(None)
-    _publish_bf_widget = param.Parameter(None)
+    _publish_summary_widget = param.Parameter(None)
+    _publish_reward_widget = param.Parameter(None)
     _publish_map = param.Parameter(None)
-    _update_titles = param.Parameter(None)
+    _update_headings = param.Parameter(None)
     _show_loading_indicator = False
     _debugging_message = param.Parameter(None)
 
     # Non-Param private parameters.
     _tier = None
     _survey = 0
-    _basis_function = -1
+    _reward = -1
+    _survey_name = ''
+    _reward_name = ''
+    _map_name = ''
     _scheduler = None
     _conditions = None
     _date_time = None
-    _rewards = None
-    _survey_rewards = None
+    _reward_df = None
+    _scheduler_summary_df = None
     _survey_maps = None
-    _basis_functions = None
+    _survey_reward_df = None
     _sky_map_base = None
     _debug_string = ''
-    _display_basis_function = False
+    _display_reward = False
     _display_dashboard_data = False
     _do_not_trigger_update = True
     # _model_observatory = ModelObservatory()
@@ -219,28 +221,29 @@ class Scheduler(param.Parameterized):
             self._show_loading_indicator = False
             return
 
-        if not self.make_summary_df():
+        if not self.make_scheduler_summary_df():
             self.clear_dashboard()
             self._show_loading_indicator = False
             return
 
-        self.create_survey_tabulator_widget()
-        self.param.trigger('_publish_survey_widget')
+        self.create_summary_widget()
+        self.param.trigger('_publish_summary_widget')
 
         self.compute_survey_maps()
         self.survey_map = self.param['survey_map'].objects[-1]
+        self._map_name = self.survey_map.split('@')[0].strip()
 
         self.create_sky_map_base()
         self.update_sky_map_with_survey_map()
         self.param.trigger('_publish_map')
 
-        self.make_survey_reward_dataframe()
-        self.create_basis_function_tabulator_widget()
-        self.param.trigger('_publish_bf_widget')
+        self.make_reward_df()
+        self.create_reward_widget()
+        self.param.trigger('_publish_reward_widget')
 
         self._display_dashboard_data = True
-        self._display_basis_function = False
-        self.param.trigger('_update_titles')
+        self._display_reward = False
+        self.param.trigger('_update_headings')
 
         self._show_loading_indicator = False
 
@@ -255,31 +258,32 @@ class Scheduler(param.Parameterized):
             tzinfo=ZoneInfo(DEFAULT_TIMEZONE),
             )).mjd
 
-        if not self.make_summary_df():
+        if not self.make_scheduler_summary_df():
             self.clear_dashboard()
             self._show_loading_indicator = False
             return
 
-        if self.survey_df_widget is None:
-            self.create_survey_tabulator_widget()
+        if self.summary_widget is None:
+            self.create_summary_widget()
         else:
-            self.update_survey_tabulator_widget()
-        self.param.trigger('_publish_survey_widget')
+            self.update_summary_widget_data()
+        self.param.trigger('_publish_summary_widget')
 
         self.compute_survey_maps()
         self.survey_map = self.param['survey_map'].objects[-1]
+        self._map_name = self.survey_map.split('@')[0].strip()
 
         self.create_sky_map_base()
         self.update_sky_map_with_survey_map()
         self.param.trigger('_publish_map')
 
-        self.make_survey_reward_dataframe()
-        self.create_basis_function_tabulator_widget()
-        self.param.trigger('_publish_bf_widget')
+        self.make_reward_df()
+        self.create_reward_widget()
+        self.param.trigger('_publish_reward_widget')
 
         self._display_dashboard_data = True
-        self._display_basis_function = False
-        self.param.trigger('_update_titles')
+        self._display_reward = False
+        self.param.trigger('_update_headings')
 
         self._show_loading_indicator = False
 
@@ -291,80 +295,86 @@ class Scheduler(param.Parameterized):
 
         self._tier = self.USER_tier
         self._survey = 0
-
-        if self.survey_df_widget is None:
-            self.create_survey_tabulator_widget()
+        self._survey_name = self._scheduler_summary_df[self._scheduler_summary_df['tier'] ==
+                                                       self._tier].reset_index()['survey'][self._survey]
+        if self.summary_widget is None:
+            self.create_summary_widget()
         else:
-            self.update_survey_tabulator_widget()
-        self.param.trigger('_publish_survey_widget')
+            self.update_summary_widget_data()
+        self.param.trigger('_publish_summary_widget')
 
         self.compute_survey_maps()
         self._do_not_trigger_update = True
         self.survey_map = self.param['survey_map'].objects[-1]
+        self._map_name = self.survey_map.split('@')[0].strip()
         self._do_not_trigger_update = False
 
-        self.make_survey_reward_dataframe()
-        if self.basis_function_df_widget is None:
-            self.create_basis_function_tabulator_widget()
+        self.make_reward_df()
+        if self.reward_widget is None:
+            self.create_reward_widget()
         else:
-            self.update_basis_function_tabulator_widget()
-        self.param.trigger('_publish_bf_widget')
+            self.update_reward_widget_data()
+        self.param.trigger('_publish_reward_widget')
 
         self.create_sky_map_base()
         self.update_sky_map_with_survey_map()
         self.param.trigger('_publish_map')
 
-        self._display_basis_function = False
-        self.param.trigger('_update_titles')
+        self._display_reward = False
+        self.param.trigger('_update_headings')
 
-    @param.depends('survey_df_widget.selection', watch=True)
+    @param.depends('summary_widget.selection', watch=True)
     def _update_survey(self):
         """Update the dashboard when a user selects a survey."""
-        if self.survey_df_widget.selection == []:
+        if self.summary_widget.selection == []:
             return
 
-        self._survey = self.survey_df_widget.selection[0]
+        self._survey = self.summary_widget.selection[0]
+        self._survey_name = self._scheduler_summary_df[self._scheduler_summary_df['tier'] ==
+                                                       self._tier].reset_index()['survey'][self._survey]
 
         self.compute_survey_maps()
         self._do_not_trigger_update = True
         self.survey_map = self.param['survey_map'].objects[-1]
+        self._map_name = self.survey_map.split('@')[0].strip()
         self._do_not_trigger_update = False
 
-        self.make_survey_reward_dataframe()
-        if self.basis_function_df_widget is None:
-            self.create_basis_function_tabulator_widget()
+        self.make_reward_df()
+        if self.reward_widget is None:
+            self.create_reward_widget()
         else:
-            self.update_basis_function_tabulator_widget()
-        self.param.trigger('_publish_bf_widget')
+            self.update_reward_widget_data()
+        self.param.trigger('_publish_reward_widget')
 
         self.create_sky_map_base()
         self.update_sky_map_with_survey_map()
         self.param.trigger('_publish_map')
 
-        self._display_basis_function = False
-        self.param.trigger('_update_titles')
+        self._display_reward = False
+        self.param.trigger('_update_headings')
 
-    @param.depends('basis_function_df_widget.selection', watch=True)
-    def _update_basis_function(self):
-        """Update the dashboard when a user selects a basis function."""
+    @param.depends('reward_widget.selection', watch=True)
+    def _update_reward(self):
+        """Update the dashboard when a user selects a reward."""
         # Do not run code if no selection or when update flag is True.
-        if self.basis_function_df_widget.selection == [] or self._do_not_trigger_update:
+        if self.reward_widget.selection == [] or self._do_not_trigger_update:
             return
 
-        self._basis_function = self.basis_function_df_widget.selection[0]
+        self._reward = self.reward_widget.selection[0]
+        self._reward_name = self._survey_reward_df['basis_func'][self._reward]
 
-        # If basis function in survey maps, update survey maps drop-down.
-        basis_function_name = self._basis_functions['basis_func'][self._basis_function]
-        if any(basis_function_name in key for key in self._survey_maps):
+        # If reward is in survey maps, update survey maps drop-down.
+        if any(self._reward_name in key for key in self._survey_maps):
             self._do_not_trigger_update = True
-            self.survey_map = list(key for key in self._survey_maps if basis_function_name in key)[0]
+            self.survey_map = list(key for key in self._survey_maps if self._reward_name in key)[0]
+            self._map_name = self.survey_map.split('@')[0].strip()
             self._do_not_trigger_update = False
 
-        self.update_sky_map_with_basis_function()
+        self.update_sky_map_with_reward()
         self.param.trigger('_publish_map')
 
-        self._display_basis_function = True
-        self.param.trigger('_update_titles')
+        self._display_reward = True
+        self.param.trigger('_update_headings')
 
     @param.depends('survey_map', watch=True)
     def _update_survey_map(self):
@@ -373,22 +383,22 @@ class Scheduler(param.Parameterized):
         if not self._display_dashboard_data or self._do_not_trigger_update:
             return
 
-        # If selection is a basis function, reflect in basis function table.
+        # If selection is a reward map, reflect in reward table.
         self._do_not_trigger_update = True
-        map_name = self.survey_map.split('@')[0].strip()
-        if any(self._basis_functions['basis_func'].isin([map_name])):
-            index = self._basis_functions['basis_func'].index[self._basis_functions['basis_func']
-                                                              .tolist().index(map_name)]
-            self.basis_function_df_widget.selection = [index]
-        elif self.basis_function_df_widget is not None:
-            self.basis_function_df_widget.selection = []
+        self._map_name = self.survey_map.split('@')[0].strip()
+        if any(self._survey_reward_df['basis_func'].isin([self._map_name])):
+            index = self._survey_reward_df['basis_func'].index[self._survey_reward_df['basis_func']
+                                                               .tolist().index(self._map_name)]
+            self.reward_widget.selection = [index]
+        elif self.reward_widget is not None:
+            self.reward_widget.selection = []
         self._do_not_trigger_update = False
 
         self.update_sky_map_with_survey_map()
         self.param.trigger('_publish_map')
 
-        self._display_basis_function = False
-        self.param.trigger('_update_titles')
+        self._display_reward = False
+        self.param.trigger('_update_headings')
 
     @param.depends('nside', watch=True)
     def _update_nside(self):
@@ -406,8 +416,8 @@ class Scheduler(param.Parameterized):
     @param.depends('color_palette', watch=True)
     def _update_color_palette(self):
         """Update the dashboard when a user chooses a new color palette."""
-        if self._display_basis_function:
-            self.update_sky_map_with_basis_function()
+        if self._display_reward:
+            self.update_sky_map_with_reward()
         else:
             self.update_sky_map_with_survey_map()
         self.param.trigger('_publish_map')
@@ -416,25 +426,25 @@ class Scheduler(param.Parameterized):
 
     def clear_dashboard(self):
         """Clear the dashboard for a new pickle or a new date."""
-        self.survey_df_widget = None
-        self._basis_functions = None
+        self.summary_widget = None
+        self._survey_reward_df = None
         self._sky_map_base = None
         self._display_dashboard_data = False
 
-        self.param.trigger('_publish_survey_widget')
-        self.param.trigger('_publish_bf_widget')
+        self.param.trigger('_publish_summary_widget')
+        self.param.trigger('_publish_reward_widget')
         self.param.trigger('_publish_map')
-        self.param.trigger('_update_titles')
+        self.param.trigger('_update_headings')
 
         self.param['USER_tier'].objects = ['']
         self.param['survey_map'].objects = ['']
 
         self.USER_tier = ''
-        self._tier = ''
         self.survey_map = ''
 
+        self._tier = ''
         self._survey = 0
-        self._basis_function = -1
+        self._reward = -1
 
     def read_scheduler(self):
         """Load the scheduler and conditions objects from pickle file.
@@ -467,8 +477,8 @@ class Scheduler(param.Parameterized):
 
             return False
 
-    def make_summary_df(self):
-        """Update conditions, and make reward and scheduler summary dataframes.
+    def make_scheduler_summary_df(self):
+        """Update conditions, and make the reward and scheduler summary dataframes.
 
         Returns
         -------
@@ -495,29 +505,31 @@ class Scheduler(param.Parameterized):
             # self._conditions = self._model_observatory.return_conditions()
 
             self._scheduler.update_conditions(self._conditions)
-            self._rewards = self._scheduler.make_reward_df(self._conditions)
-            survey_rewards = schedview.compute.scheduler.make_scheduler_summary_df(
+            self._reward_df = self._scheduler.make_reward_df(self._conditions)
+            scheduler_summary_df = schedview.compute.scheduler.make_scheduler_summary_df(
                 self._scheduler,
                 self._conditions,
-                self._rewards,
+                self._reward_df,
                 )
 
             # TODO: Is there a neater way to apply URL formatting to columns (rather than duplicating?).
 
             # Duplicate column and apply URL formatting to one of the columns.
-            survey_rewards['survey'] = survey_rewards.loc[:, 'survey_name']
-            survey_rewards['survey_name'] = survey_rewards.apply(
+            scheduler_summary_df['survey'] = scheduler_summary_df.loc[:, 'survey_name']
+            scheduler_summary_df['survey_name'] = scheduler_summary_df.apply(
                 url_formatter,
                 axis=1,
                 args=('survey_name', 'survey_url'),
                 )
-            self._survey_rewards = survey_rewards
+            self._scheduler_summary_df = scheduler_summary_df
 
-            tiers = self._survey_rewards.tier.unique().tolist()
+            tiers = self._scheduler_summary_df.tier.unique().tolist()
             self.param['USER_tier'].objects = tiers
             self.USER_tier = tiers[0]
             self._tier = tiers[0]
             self._survey = 0
+            self._survey_name = self._scheduler_summary_df[self._scheduler_summary_df['tier'] ==
+                                                           self._tier].reset_index()['survey'][self._survey]
 
             pn.state.notifications.clear()
             pn.state.notifications.success('Scheduler summary dataframe updated successfully')
@@ -529,13 +541,13 @@ class Scheduler(param.Parameterized):
             self._debugging_message = f'Scheduler summary dataframe unable to be updated: \n{tb}'
             pn.state.notifications.clear()
             pn.state.notifications.error('Scheduler summary dataframe unable to be updated!', duration=0)
-            self._survey_rewards = None
+            self._scheduler_summary_df = None
 
             return False
 
-    def create_survey_tabulator_widget(self):
+    def create_summary_widget(self):
         """Create Tabulator widget with scheduler summary dataframe."""
-        if self._survey_rewards is None:
+        if self._scheduler_summary_df is None:
             return
 
         tabulator_formatter = {'survey_name': HTMLTemplateFormatter(template='<%= value %>')}
@@ -550,8 +562,8 @@ class Scheduler(param.Parameterized):
             'survey_name': 'Survey Name',
             'reward': 'Reward',
             }
-        survey_rewards_table = pn.widgets.Tabulator(
-            self._survey_rewards[self._survey_rewards['tier'] == self._tier][columns],
+        summary_widget = pn.widgets.Tabulator(
+            self._scheduler_summary_df[self._scheduler_summary_df['tier'] == self._tier][columns],
             widths={'survey_name': '60%',
                     'reward': '40%'},
             show_index=False,
@@ -564,9 +576,9 @@ class Scheduler(param.Parameterized):
             page_size=4,
             sizing_mode='stretch_width',
             )
-        self.survey_df_widget = survey_rewards_table
+        self.summary_widget = summary_widget
 
-    def update_survey_tabulator_widget(self):
+    def update_summary_widget_data(self):
         """Update data for survey Tabulator widget."""
         columns = [
             'tier',
@@ -575,29 +587,29 @@ class Scheduler(param.Parameterized):
             'survey',
             'survey_url',
             ]
-        self.survey_df_widget._update_data(
-            self._survey_rewards[self._survey_rewards['tier'] == self._tier][columns])
+        self.summary_widget._update_data(
+            self._scheduler_summary_df[self._scheduler_summary_df['tier'] == self._tier][columns])
 
-    @param.depends('_publish_survey_widget')
-    def publish_survey_tabulator_widget(self):
-        """Publish the survey Tabulator widget to be displayed on dashboard.
+    @param.depends('_publish_summary_widget')
+    def publish_summary_widget(self):
+        """Publish the summary Tabulator widget to be displayed on the dashboard.
 
         Returns
         -------
         widget: 'panel.widgets.Tabulator'
-            Table of survey data from scheduler summary dataframe.
+            Table of scheduler summary data.
         """
-        if self.survey_df_widget is None:
-            return 'No surveys available.'
+        if self.summary_widget is None:
+            return 'No summary available.'
         else:
-            return self.survey_df_widget
+            return self.summary_widget
 
     def compute_survey_maps(self):
         """Compute survey maps and update drop-down selection."""
         if self._scheduler is None:
             self._debugging_message = 'Cannot compute survey maps as no scheduler loaded.'
             return
-        if self._survey_rewards is None:
+        if self._scheduler_summary_df is None:
             self._debugging_message = 'Cannot compute survey maps as no scheduler summary made.'
             return
         try:
@@ -611,41 +623,41 @@ class Scheduler(param.Parameterized):
         except Exception:
             self._debugging_message = f'Cannot compute survey maps: \n{traceback.format_exc(limit=-1)}'
 
-    def make_survey_reward_dataframe(self):
-        """Make the survey reward dataframe."""
+    def make_reward_df(self):
+        """Make the summary dataframe."""
         if self._scheduler is None:
-            self._debugging_message = 'Cannot make survey reward dataframe as no scheduler loaded.'
+            self._debugging_message = 'Cannot make summary dataframe as no scheduler loaded.'
             return
-        if self._survey_rewards is None:
-            self._debugging_message = 'Cannot make survey reward dataframe as no scheduler summary made.'
+        if self._scheduler_summary_df is None:
+            self._debugging_message = 'Cannot make summary dataframe as no scheduler summary made.'
             return
         try:
-            # Survey has basis functions.
-            if self._rewards.index.isin([(int(self._tier[-1]), self._survey)]).any():
+            # Survey has rewards.
+            if self._reward_df.index.isin([(int(self._tier[-1]), self._survey)]).any():
 
-                basis_function_df = schedview.compute.survey.make_survey_reward_df(
+                survey_reward_df = schedview.compute.survey.make_survey_reward_df(
                     self._scheduler.survey_lists[int(self._tier[-1])][self._survey],
                     self._conditions,
-                    self._rewards.loc[[(int(self._tier[-1]), self._survey)], :]
+                    self._reward_df.loc[[(int(self._tier[-1]), self._survey)], :]
                     )
                 # Duplicate column and apply URL formatting to one of the columns.
-                basis_function_df['basis_func'] = basis_function_df.loc[:, 'basis_function']
-                basis_function_df['basis_function'] = basis_function_df.apply(
+                survey_reward_df['basis_func'] = survey_reward_df.loc[:, 'basis_function']
+                survey_reward_df['basis_function'] = survey_reward_df.apply(
                     url_formatter,
                     axis=1,
                     args=('basis_function', 'doc_url'),
                     )
-                self._basis_functions = basis_function_df
+                self._survey_reward_df = survey_reward_df
             else:
-                self._basis_functions = None
+                self._survey_reward_df = None
 
         except Exception:
             tb = traceback.format_exc(limit=-1)
             self._debugging_message = f'Cannot make survey reward dataframe: \n{tb}'
 
-    def create_basis_function_tabulator_widget(self):
+    def create_reward_widget(self):
         """Create Tabulator widget with survey reward dataframe."""
-        if self._basis_functions is None:
+        if self._survey_reward_df is None:
             return
 
         tabulator_formatter = {
@@ -674,8 +686,8 @@ class Scheduler(param.Parameterized):
             'max_accum_reward': 'Max Accumulated Reward',
             'accum_area': 'Accumulated Area',
             }
-        basis_function_table = pn.widgets.Tabulator(
-            self._basis_functions[columns],
+        reward_widget = pn.widgets.Tabulator(
+            self._survey_reward_df[columns],
             titles=titles,
             layout='fit_data',
             show_index=False,
@@ -687,14 +699,14 @@ class Scheduler(param.Parameterized):
             pagination='remote',
             page_size=13,
             )
-        self.basis_function_df_widget = basis_function_table
+        self.reward_widget = reward_widget
 
-    def update_basis_function_tabulator_widget(self):
-        """Update Tabulator widget data."""
-        if self._basis_functions is None:
+    def update_reward_widget_data(self):
+        """Update Treward abulator widget data."""
+        if self._survey_reward_df is None:
             return
 
-        self.basis_function_df_widget.selection = []
+        self.reward_widget.selection = []
         columns = [
             'basis_function',
             'basis_function_class',
@@ -707,22 +719,22 @@ class Scheduler(param.Parameterized):
             'doc_url',
             'basis_func',
             ]
-        self.basis_function_df_widget._update_data(self._basis_functions[columns])
+        self.reward_widget._update_data(self._survey_reward_df[columns])
         # TODO: reset column widths
 
-    @param.depends('_publish_bf_widget')
-    def publish_basis_function_widget(self):
-        """Return the basis function Tabulator widget for display.
+    @param.depends('_publish_reward_widget')
+    def publish_reward_widget(self):
+        """Return the reward Tabulator widget for display.
 
         Returns
         -------
         widget: 'panel.widgets.Tabulator'
-            Table of basis function data from survey reward dataframe.
+            Table of reward data for selected survey.
         """
-        if self._basis_functions is None:
-            return 'No basis functions available.'
+        if self._survey_reward_df is None:
+            return 'No rewards available.'
         else:
-            return self.basis_function_df_widget
+            return self.reward_widget
 
     def create_sky_map_base(self):
         """Create a base plot with a dummy map."""
@@ -750,7 +762,7 @@ class Scheduler(param.Parameterized):
         Notes
         -----
         There are three possible update cases:
-         - Case 1: Selection is a basis function.
+         - Case 1: Selection is a reward map.
          - Case 2: Selection is a survey map and is all NaNs.
          - Case 3: Selection is a survey map and is not all NaNs.
         """
@@ -762,22 +774,21 @@ class Scheduler(param.Parameterized):
             hpix_renderer = self._sky_map_base.plot.select(name='hpix_renderer')[0]
             hpix_data_source = self._sky_map_base.plot.select(name='hpix_ds')[0]
 
-            # CASE 1: Selection is a basis function.
+            # CASE 1: Selection is a reward map.
             if self.survey_map not in ['u_sky', 'g_sky', 'r_sky', 'i_sky', 'z_sky', 'y_sky', 'reward']:
-                basis_function_name = self.survey_map.split('@')[0].strip()
-                bf_underscored = basis_function_name.replace(' ', '_')
-                bf_survey_key = list(key for key in self._survey_maps if basis_function_name in key)[0]
-                bf_bokeh_key = list(key for key in hpix_data_source.data if bf_underscored in key)[0]
+                reward_underscored = self._map_name.replace(' ', '_')
+                reward_survey_key = list(key for key in self._survey_maps if self._map_name in key)[0]
+                reward_bokeh_key = list(key for key in hpix_data_source.data if reward_underscored in key)[0]
 
-                min_good_value = np.nanmin(self._survey_maps[bf_survey_key])
-                max_good_value = np.nanmax(self._survey_maps[bf_survey_key])
+                min_good_value = np.nanmin(self._survey_maps[reward_survey_key])
+                max_good_value = np.nanmax(self._survey_maps[reward_survey_key])
 
                 if min_good_value == max_good_value:
                     min_good_value -= 1
                     max_good_value += 1
 
                 hpix_renderer.glyph.fill_color = bokeh.transform.linear_cmap(
-                    field_name=bf_bokeh_key,
+                    field_name=reward_bokeh_key,
                     palette=self.color_palette,
                     low=min_good_value,
                     high=max_good_value,
@@ -814,34 +825,33 @@ class Scheduler(param.Parameterized):
         except Exception:
             self._debugging_message = f'Could not load map: \n{traceback.format_exc(limit=-1)}'
 
-    def update_sky_map_with_basis_function(self):
+    def update_sky_map_with_reward(self):
         """Update base plot with healpixel data from selected survey map.
 
         Notes
         -----
         There are three possible update cases:
-         - Case 1: Basis function is not scalar.
-         - Case 2: Basis function is scalar and finite.
-         - Case 3: Basis function is scalar and -Inf.
+         - Case 1: Reward is not scalar.
+         - Case 2: Reward is scalar and finite.
+         - Case 3: Reward is -Inf.
         """
         if self._sky_map_base is None:
-            self._debugging_message = 'Cannot update sky map with basis function as no base map loaded.'
+            self._debugging_message = 'Cannot update sky map with reward as no base map is loaded.'
             return
 
         try:
             hpix_renderer = self._sky_map_base.plot.select(name='hpix_renderer')[0]
             hpix_data_source = self._sky_map_base.plot.select(name='hpix_ds')[0]
 
-            basis_function_name = self._basis_functions['basis_func'][self._basis_function]
-            bf_underscored = basis_function_name.replace(' ', '_')
+            reward_underscored = self._reward_name.replace(' ', '_')
 
-            # CASE 1: Basis function is not scalar.
-            if any(basis_function_name in key for key in self._survey_maps):
-                bf_survey_key = list(key for key in self._survey_maps if basis_function_name in key)[0]
-                bf_bokeh_key = list(key for key in hpix_data_source.data if bf_underscored in key)[0]
+            # CASE 1: Reward is not scalar.
+            if any(self._reward_name in key for key in self._survey_maps):
+                reward_survey_key = list(key for key in self._survey_maps if self._reward_name in key)[0]
+                reward_bokeh_key = list(key for key in hpix_data_source.data if reward_underscored in key)[0]
 
-                min_good_value = np.nanmin(self._survey_maps[bf_survey_key])
-                max_good_value = np.nanmax(self._survey_maps[bf_survey_key])
+                min_good_value = np.nanmin(self._survey_maps[reward_survey_key])
+                max_good_value = np.nanmax(self._survey_maps[reward_survey_key])
 
                 if min_good_value == max_good_value:
                     min_good_value -= 1
@@ -849,33 +859,33 @@ class Scheduler(param.Parameterized):
 
                 # Modify existing bokeh object.
                 hpix_renderer.glyph.fill_color = bokeh.transform.linear_cmap(
-                    field_name=bf_bokeh_key,
+                    field_name=reward_bokeh_key,
                     palette=self.color_palette,
                     low=min_good_value,
                     high=max_good_value,
                     nan_color='white',
                     )
             else:
-                max_basis_reward = self._basis_functions.loc[self._basis_function, :]['max_basis_reward']
+                max_basis_reward = self._survey_reward_df.loc[self._reward, :]['max_basis_reward']
 
-                # CASE 2: Basis function is scalar and finite.
+                # CASE 2: Reward is scalar and finite.
                 if max_basis_reward != -np.inf:
                     # Create array populated with scalar values where sky brightness map is not NaN.
                     scalar_array = hpix_data_source.data['u_sky'].copy()
                     scalar_array[~np.isnan(hpix_data_source.data['u_sky'])] = max_basis_reward
-                    hpix_data_source.data[bf_underscored] = scalar_array
+                    hpix_data_source.data[reward_underscored] = scalar_array
 
                     hpix_renderer.glyph.fill_color = bokeh.transform.linear_cmap(
-                        field_name=bf_underscored,
+                        field_name=reward_underscored,
                         palette=self.color_palette,
                         low=max_basis_reward-1,
                         high=max_basis_reward+1,
                         nan_color='white',
                         )
-                # CASE 3: Basis function is scalar and -Inf.
+                # CASE 3: Reward is -Inf.
                 else:
                     hpix_renderer.glyph.fill_color = bokeh.transform.linear_cmap(
-                        field_name=self._basis_functions['basis_func'][self._basis_function],
+                        field_name=self._reward_name,
                         palette='Greys256',
                         low=-1,
                         high=1,
@@ -894,7 +904,7 @@ class Scheduler(param.Parameterized):
         Returns
         -------
         sky_map : 'bokeh.models.layouts.Column'
-            Map or survey or basis function as a Bokeh plot.
+            Map of survey map or reward map as a Bokeh plot.
         """
         if self._conditions is None:
             return 'No scheduler loaded.'
@@ -936,84 +946,83 @@ class Scheduler(param.Parameterized):
 
     # -------------------------------------------------------------------------------------- Dashboard titles
 
-    def generate_dashboard_title(self):
+    def generate_dashboard_subtitle(self):
         """Select the dashboard subtitle string based on whether whether a
-        survey map or basis function map is being displayed.
+        survey map or reward map is being displayed.
 
         Returns
         -------
-        title_string : 'str'
-            Lists the tier and survey, and either the map or basis function.
+        subtitle : 'str'
+            Lists the tier and survey, and either the survey or reward map.
         """
         if not self._display_dashboard_data:
             return ''
-        survey_name = self._survey_rewards[self._survey_rewards['tier'] ==
-                                           self._tier].reset_index()['survey'][self._survey].split(':')[0]
-        if not self._display_basis_function:
-            return f'\nTier {self._tier[-1]} - Survey {survey_name} - Map {self.survey_map}'
+        maps = ['u_sky', 'g_sky', 'r_sky', 'i_sky', 'z_sky', 'y_sky', 'reward']
+        if not self._display_reward and self.survey_map in maps:
+            return f'\nTier {self._tier[-1]} - Survey {self._survey} - Map {self._map_name}'
+        elif not self._display_reward and self.survey_map not in maps:
+            return f'\nTier {self._tier[-1]} - Survey {self._survey} - Reward {self._map_name}'
         else:
-            return f'\nTier {self._tier[-1]} - Survey {survey_name} - Basis function {self._basis_function}'
+            return f'\nTier {self._tier[-1]} - Survey {self._survey} - Reward {self._reward_name}'
 
-    def generate_survey_rewards_title(self):
-        """Select the survey table title based on whether data is being
-        displayed.
+    def generate_summary_table_heading(self):
+        """Select the summary table heading based on whether data is being
+        displayed or not.
 
         Returns
         -------
-        title_string : 'str'
+        heading : 'str'
             Lists the tier if data is displayed; else just a general title.
         """
         if not self._display_dashboard_data:
-            return 'Surveys and rewards'
+            return 'Scheduler summary'
         else:
-            return f'Surveys and rewards for tier {self._tier[-1]}'
+            return f'Scheduler summary for tier {self._tier[-1]}'
 
-    def generate_basis_function_table_title(self):
-        """Select the basis function table title based on whether data is
-        being displayed.
+    def generate_reward_table_heading(self):
+        """Select the reward table heading based on whether data is
+        being displayed or not.
 
         Returns
         -------
-        title_string : 'str'
+        heading : 'str'
             Lists the survey name if data is displayed; else a general title.
         """
         if not self._display_dashboard_data:
-            return 'Basis functions'
+            return 'Rewards'
         else:
-            survey_name = self._survey_rewards[self._survey_rewards['tier'] ==
-                                               self._tier].reset_index()['survey'][self._survey]
-            return f'Basis functions for survey {survey_name}'
+            return f'Rewards for survey {self._survey_name}'
 
-    def generate_map_title(self):
-        """Select the map title based on whether a survey map or basis function
+    def generate_map_heading(self):
+        """Select the map heading based on whether a survey or reward map
         is being displayed.
 
         Returns
         -------
-        title_string : 'str'
-            Lists the survey name and either the survey map name or basis
-            function name if data is being displayed; else a general title.
+        heading : 'str'
+            Lists the survey name and either the survey map name or reward
+            name if data is being displayed; else a general title.
         """
         if not self._display_dashboard_data:
             return 'Map'
-        survey_name = self._survey_rewards[self._survey_rewards['tier'] ==
-                                           self._tier].reset_index()['survey'][self._survey]
-        if not self._display_basis_function:
-            return f'Survey {survey_name}\nMap: {self.survey_map}'
+        maps = ['u_sky', 'g_sky', 'r_sky', 'i_sky', 'z_sky', 'y_sky', 'reward']
+        if not self._display_reward and self.survey_map in maps:
+            return f'Survey {self._survey_name}\nMap: {self._map_name}'
+        elif not self._display_reward and self.survey_map not in maps:
+            return f'Survey {self._survey_name}\nReward: {self._map_name}'
         else:
-            bf_name = self._basis_functions['basis_func'][self._basis_function]
-            return f'Survey {survey_name}\nBasis function {self._basis_function}: {bf_name}'
+            return f'Survey {self._survey_name}\nReward {self._reward_name}'
 
-    @param.depends('_update_titles')
-    def dashboard_title(self):
-        """Load title data and create a panel String pane to display title.
+    @param.depends('_update_headings')
+    def dashboard_subtitle(self):
+        """Load subtitle data and create a String pane to display subtitle.
 
         Returns
         -------
         title : 'panel.pane.Str'
             A panel String pane to display as the dashboard's subtitle.
         """
-        title_string = self.generate_dashboard_title()
+        title_string = self.generate_dashboard_subtitle()
         return pn.pane.Str(
             title_string,
             height=20,
@@ -1023,16 +1032,16 @@ class Scheduler(param.Parameterized):
             stylesheets=[stylesheet],
             )
 
-    @param.depends('_update_titles')
-    def survey_rewards_title(self):
-        """Load title data and create a panel String pane to display title.
+    @param.depends('_update_headings')
+    def summary_table_heading(self):
+        """Load heading data and create a panel String pane to display title.
 
         Returns
         -------
         title : 'panel.pane.Str'
             A panel String pane to display as the survey table's title.
         """
-        title_string = self.generate_survey_rewards_title()
+        title_string = self.generate_summary_table_heading()
         return pn.pane.Str(
             title_string,
             styles={'font-size': '13pt',
@@ -1041,16 +1050,16 @@ class Scheduler(param.Parameterized):
             stylesheets=[stylesheet]
             )
 
-    @param.depends('_update_titles')
-    def basis_function_table_title(self):
+    @param.depends('_update_headings')
+    def reward_table_heading(self):
         """Load title data and create a panel String pane to display title.
 
         Returns
         -------
         title : 'panel.pane.Str'
-            A panel String pane to display as the basis function table title.
+            A panel String pane to display as the reward table title.
         """
-        title_string = self.generate_basis_function_table_title()
+        title_string = self.generate_reward_table_heading()
         return pn.pane.Str(
             title_string,
             styles={'font-size': '13pt',
@@ -1060,7 +1069,7 @@ class Scheduler(param.Parameterized):
             css_classes=['title']
             )
 
-    @param.depends('_update_titles')
+    @param.depends('_update_headings')
     def map_title(self):
         """Load title data and create a panel String pane to display title.
 
@@ -1069,7 +1078,7 @@ class Scheduler(param.Parameterized):
         title : 'panel.pane.Str'
             A panel String pane to display as the map title.
         """
-        title_string = self.generate_map_title()
+        title_string = self.generate_map_heading()
         return pn.pane.Str(
             title_string,
             styles={'font-size': '13pt',
@@ -1107,7 +1116,7 @@ def generate_array_for_key(number_of_columns=4):
 
         # Colours and sizes of images.
         'line_colours': np.array(['black', 'red', '#1f8f20', '#110cff']),
-        'circle_colours': np.array(['#ffa500', 'grey', 'red', '#1f8f20']),
+        'circle_colours': np.array(['#ffa500', 'brown', 'red', '#1f8f20']),
         'circle_sizes': np.tile(10, number_of_columns),
 
         # Text for title and key items.
@@ -1280,7 +1289,7 @@ def scheduler_app(date=None, scheduler_pickle=None):
                                       'color': 'white'},
                               stylesheets=[stylesheet],
                               ),
-                  scheduler.dashboard_title,
+                  scheduler.dashboard_subtitle,
                   ),
         pn.layout.HSpacer(),
         pn.pane.PNG(LOGO,
@@ -1303,22 +1312,22 @@ def scheduler_app(date=None, scheduler_pickle=None):
     sched_app[8:33, 21:67] = pn.Row(
         pn.Spacer(width=10),
         pn.Column(pn.Spacer(height=10),
-                  pn.Row(scheduler.survey_rewards_title,
+                  pn.Row(scheduler.summary_table_heading,
                          styles={'background': '#048b8c'},
                          ),
-                  pn.param.ParamMethod(scheduler.publish_survey_tabulator_widget, loading_indicator=True),
+                  pn.param.ParamMethod(scheduler.publish_summary_widget, loading_indicator=True),
                   ),
         pn.Spacer(width=10),
         sizing_mode='stretch_height',
         )
-    # Basis function table and header.
+    # Reward table and header.
     sched_app[33:87, 0:67] = pn.Row(
         pn.Spacer(width=10),
         pn.Column(pn.Spacer(height=10),
-                  pn.Row(scheduler.basis_function_table_title,
+                  pn.Row(scheduler.reward_table_heading,
                          styles={'background': '#048b8c'},
                          ),
-                  pn.param.ParamMethod(scheduler.publish_basis_function_widget, loading_indicator=True)),
+                  pn.param.ParamMethod(scheduler.publish_reward_widget, loading_indicator=True)),
         pn.Spacer(width=10),
         )
     # Map display and header.
