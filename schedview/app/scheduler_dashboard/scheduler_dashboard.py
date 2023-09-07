@@ -59,8 +59,8 @@ TO DO BEFORE PUSH
 NEXT
 ----
 
-    16. Add '' to survey_maps and rest selection on this when scalar reward chosen.
     11. Is there a neater way to apply URL formatting to the columns so that it doesn't show in titles?
+    12. Swap basis_function and basis_func around. (Check summary df, too)
 
     4. pytests.
     5. Pop-out debugger.
@@ -369,6 +369,8 @@ class Scheduler(param.Parameterized):
             self.survey_map = list(key for key in self._survey_maps if self._reward_name in key)[0]
             self._map_name = self.survey_map.split('@')[0].strip()
             self._do_not_trigger_update = False
+        else:
+            self.survey_map = ''
 
         self.update_sky_map_with_reward()
         self.param.trigger('_publish_map')
@@ -381,6 +383,10 @@ class Scheduler(param.Parameterized):
         """Update the dashboard when a user chooses a new survey map."""
         # Don't run code during initial load or when updating tier or survey.
         if not self._display_dashboard_data or self._do_not_trigger_update:
+            return
+
+        # If user selects null map, do nothing.
+        if self.survey_map == '':
             return
 
         # If selection is a reward map, reflect in reward table.
@@ -618,7 +624,7 @@ class Scheduler(param.Parameterized):
                 self._conditions,
                 self.nside,
                 )
-            self.param['survey_map'].objects = list(self._survey_maps.keys())
+            self.param['survey_map'].objects = [''] + list(self._survey_maps.keys())
 
         except Exception:
             self._debugging_message = f'Cannot compute survey maps: \n{traceback.format_exc(limit=-1)}'
