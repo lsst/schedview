@@ -23,7 +23,6 @@ import schedview.plot.visits
 import schedview.plot.visitmap
 import schedview.plot.rewards
 import schedview.plot.visits
-import schedview.plot.maf
 import schedview.plot.nightbf
 import schedview.plot.nightly
 import schedview.param
