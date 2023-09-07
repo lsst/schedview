@@ -59,15 +59,13 @@ TO DO BEFORE PUSH
 NEXT
 ----
 
-    11. Is there a neater way to apply URL formatting to the columns so that it doesn't show in titles?
-    12. Swap basis_function and basis_func around. (Check summary df, too)
-
-    4. pytests.
+    1. Swap basis_function and basis_func around. (Check summary df, too)
+       Is there a neater way to apply URL formatting to the columns so that it doesn't show in titles?
+    2. Change debugging pane to update data rather than re-create string panel.
+    3. Change title panes to update data rather than re-create string panels.
+    4. Try param.Path() for scheduler_fname.
+        scheduler_fname = param.Path(default='scheduler.p', search_paths=['/'])
     5. Pop-out debugger.
-   13. Try param.Path() for scheduler_fname.
-       scheduler_fname = param.Path(default='scheduler.p', search_paths=['/'])
-   14. Change debugging pane to update data rather than re-create string panel.
-   15. Change title panes to update data rather than re-create string panels.
 
 
 CAN'T FIGURE OUT
@@ -79,6 +77,7 @@ CAN'T FIGURE OUT
 STILL TO IMPLEMENT
 ------------------
 
+    - unittest suite
     - Accept parameters (pickle file url, mjd, survey, nside) in the url
       so other dashboards can link to it in a given state.
     - Color scale below map.
@@ -206,6 +205,7 @@ class Scheduler(param.Parameterized):
     _display_dashboard_data = False
     _do_not_trigger_update = True
     _show_loading_indicator = False
+    _model_observatory = ModelObservatory(init_load_length=1)
     # _model_observatory = ModelObservatory()
 
     # ------------------------------------------------------------------------------------------ User actions
@@ -228,6 +228,10 @@ class Scheduler(param.Parameterized):
 
         self.create_summary_widget()
         self.param.trigger('_publish_summary_widget')
+
+        self._do_not_trigger_update = True
+        self.summary_widget.selection = [0]
+        self._do_not_trigger_update = False
 
         self.compute_survey_maps()
         self.survey_map = self.param['survey_map'].objects[-1]
@@ -269,6 +273,10 @@ class Scheduler(param.Parameterized):
             self.update_summary_widget_data()
         self.param.trigger('_publish_summary_widget')
 
+        self._do_not_trigger_update = True
+        self.summary_widget.selection = [0]
+        self._do_not_trigger_update = False
+
         self.compute_survey_maps()
         self.survey_map = self.param['survey_map'].objects[-1]
         self._map_name = self.survey_map.split('@')[0].strip()
@@ -297,6 +305,7 @@ class Scheduler(param.Parameterized):
         self._survey = 0
         self._survey_name = self._scheduler_summary_df[self._scheduler_summary_df['tier'] ==
                                                        self._tier].reset_index()['survey'][self._survey]
+
         if self.summary_widget is None:
             self.create_summary_widget()
         else:
@@ -307,6 +316,7 @@ class Scheduler(param.Parameterized):
         self._do_not_trigger_update = True
         self.survey_map = self.param['survey_map'].objects[-1]
         self._map_name = self.survey_map.split('@')[0].strip()
+        self.summary_widget.selection = [0]
         self._do_not_trigger_update = False
 
         self.make_reward_df()
@@ -326,7 +336,7 @@ class Scheduler(param.Parameterized):
     @param.depends('summary_widget.selection', watch=True)
     def _update_survey(self):
         """Update the dashboard when a user selects a survey."""
-        if self.summary_widget.selection == []:
+        if self.summary_widget.selection == [] or self._do_not_trigger_update:
             return
 
         self._survey = self.summary_widget.selection[0]
@@ -501,14 +511,14 @@ class Scheduler(param.Parameterized):
 
             # TODO: Conditions setter bug-fix.
 
-            self._conditions.mjd = self._date_time
-            # self._conditions.__dict__.clear()
-            # self._conditions.__dict__.update(_model_observatory.return_conditions().__dict__)
-
-            # if self._model_observatory.nside != self._scheduler.nside:
-            #     self._model_observatory = ModelObservatory(nside=self._scheduler.nside)
-            # self._model_observatory.mjd = self._date_time
-            # self._conditions = self._model_observatory.return_conditions()
+            # self._conditions.mjd = self._date_time
+            if self._model_observatory.nside != self._scheduler.nside:
+                self._model_observatory = ModelObservatory(
+                    nside=self._scheduler.nside,
+                    init_load_length=1,
+                    )
+            self._model_observatory.mjd = self._date_time
+            self._conditions = self._model_observatory.return_conditions()
 
             self._scheduler.update_conditions(self._conditions)
             self._reward_df = self._scheduler.make_reward_df(self._conditions)
@@ -964,12 +974,13 @@ class Scheduler(param.Parameterized):
         if not self._display_dashboard_data:
             return ''
         maps = ['u_sky', 'g_sky', 'r_sky', 'i_sky', 'z_sky', 'y_sky', 'reward']
+        survey = self._survey_name.split(':')[0]
         if not self._display_reward and self.survey_map in maps:
-            return f'\nTier {self._tier[-1]} - Survey {self._survey} - Map {self._map_name}'
+            return f'\nTier {self._tier[-1]} - Survey {survey} - Map {self._map_name}'
         elif not self._display_reward and self.survey_map not in maps:
-            return f'\nTier {self._tier[-1]} - Survey {self._survey} - Reward {self._map_name}'
+            return f'\nTier {self._tier[-1]} - Survey {survey} - Reward {self._map_name}'
         else:
-            return f'\nTier {self._tier[-1]} - Survey {self._survey} - Reward {self._reward_name}'
+            return f'\nTier {self._tier[-1]} - Survey {survey} - Reward {self._reward_name}'
 
     def generate_summary_table_heading(self):
         """Select the summary table heading based on whether data is being
