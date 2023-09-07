@@ -150,13 +150,13 @@ class Scheduler(param.Parameterized):
     date = param.Date(
         default=DEFAULT_CURRENT_TIME.datetime.date(),
         doc='')
-    USER_tier = param.ObjectSelector(
+    USER_tier = param.Selector(
         default='',
         objects=[''],
         label='Tier',
         doc='The label for the first index into the CoreScheduler.survey_lists.',
         )
-    survey_map = param.ObjectSelector(
+    survey_map = param.Selector(
         default='reward',
         objects=['reward'],
         doc='Sky brightness maps, non-scalar rewards and survey reward map.',
@@ -167,7 +167,7 @@ class Scheduler(param.Parameterized):
         label='Map resolution (nside)',
         doc='',
         )
-    color_palette = param.ObjectSelector(
+    color_palette = param.Selector(
         default='Viridis256',
         objects=COLOR_PALETTES,
         doc=''
@@ -184,7 +184,6 @@ class Scheduler(param.Parameterized):
     _publish_reward_widget = param.Parameter(None)
     _publish_map = param.Parameter(None)
     _update_headings = param.Parameter(None)
-    _show_loading_indicator = False
     _debugging_message = param.Parameter(None)
 
     # Non-Param private parameters.
@@ -206,6 +205,7 @@ class Scheduler(param.Parameterized):
     _display_reward = False
     _display_dashboard_data = False
     _do_not_trigger_update = True
+    _show_loading_indicator = False
     # _model_observatory = ModelObservatory()
 
     # ------------------------------------------------------------------------------------------ User actions
