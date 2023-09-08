@@ -175,7 +175,7 @@ class Scheduler(param.Parameterized):
     _display_dashboard_data = False
     _do_not_trigger_update = True
     _show_loading_indicator = False
-    # _model_observatory = ModelObservatory(init_load_length=1)
+    _model_observatory = ModelObservatory(init_load_length=1)
 
     # ------------------------------------------------------------------------------------------ User actions
 
@@ -480,14 +480,14 @@ class Scheduler(param.Parameterized):
 
             # TODO: Conditions setter bug-fix.
 
-            self._conditions.mjd = self._date_time
-            # if self._model_observatory.nside != self._scheduler.nside:
-            #     self._model_observatory = ModelObservatory(
-            #         nside=self._scheduler.nside,
-            #         init_load_length=1,
-            #         )
-            # self._model_observatory.mjd = self._date_time
-            # self._conditions = self._model_observatory.return_conditions()
+            # self._conditions.mjd = self._date_time
+            if self._model_observatory.nside != self._scheduler.nside:
+                self._model_observatory = ModelObservatory(
+                    nside=self._scheduler.nside,
+                    init_load_length=1,
+                    )
+            self._model_observatory.mjd = self._date_time
+            self._conditions = self._model_observatory.return_conditions()
 
             self._scheduler.update_conditions(self._conditions)
             self._reward_df = self._scheduler.make_reward_df(self._conditions)
@@ -741,6 +741,7 @@ class Scheduler(param.Parameterized):
                 location=(0, 0),
             )
             self._sky_map_base.plot.add_layout(color_bar, 'below')
+            self._sky_map_base.plot.below[1].visible = False
 
         except Exception:
             self._debugging_message = f'Can not create sky map: \n{traceback.format_exc(limit=-1)}'
@@ -783,6 +784,7 @@ class Scheduler(param.Parameterized):
                     high=max_good_value,
                     nan_color='white',
                     )
+                self._sky_map_base.plot.below[1].visible = True
                 self._sky_map_base.plot.below[1].color_mapper.palette = self.color_palette
                 self._sky_map_base.plot.below[1].color_mapper.low = min_good_value
                 self._sky_map_base.plot.below[1].color_mapper.high = max_good_value
@@ -796,6 +798,7 @@ class Scheduler(param.Parameterized):
                     high=1,
                     nan_color='white',
                     )
+                self._sky_map_base.plot.below[1].visible = False
 
             # CASE 3: Selection is a survey map and is not all NaNs.
             else:
@@ -813,6 +816,7 @@ class Scheduler(param.Parameterized):
                     high=max_good_value,
                     nan_color='white',
                     )
+                self._sky_map_base.plot.below[1].visible = True
                 self._sky_map_base.plot.below[1].color_mapper.palette = self.color_palette
                 self._sky_map_base.plot.below[1].color_mapper.low = min_good_value
                 self._sky_map_base.plot.below[1].color_mapper.high = max_good_value
@@ -862,6 +866,7 @@ class Scheduler(param.Parameterized):
                     high=max_good_value,
                     nan_color='white',
                     )
+                self._sky_map_base.plot.below[1].visible = True
                 self._sky_map_base.plot.below[1].color_mapper.palette = self.color_palette
                 self._sky_map_base.plot.below[1].color_mapper.low = min_good_value
                 self._sky_map_base.plot.below[1].color_mapper.high = max_good_value
@@ -878,13 +883,14 @@ class Scheduler(param.Parameterized):
                     hpix_renderer.glyph.fill_color = bokeh.transform.linear_cmap(
                         field_name=reward_underscored,
                         palette=self.color_palette,
-                        low=max_basis_reward-1,
-                        high=max_basis_reward+1,
+                        low=max_basis_reward - 1,
+                        high=max_basis_reward + 1,
                         nan_color='white',
                         )
+                    self._sky_map_base.plot.below[1].visible = True
                     self._sky_map_base.plot.below[1].color_mapper.palette = self.color_palette
-                    self._sky_map_base.plot.below[1].color_mapper.low = max_basis_reward-1
-                    self._sky_map_base.plot.below[1].color_mapper.high = max_basis_reward+1
+                    self._sky_map_base.plot.below[1].color_mapper.low = max_basis_reward - 1
+                    self._sky_map_base.plot.below[1].color_mapper.high = max_basis_reward + 1
 
                 # CASE 3: Reward is -Inf.
                 else:
@@ -895,6 +901,7 @@ class Scheduler(param.Parameterized):
                         high=1,
                         nan_color='white',
                         )
+                    self._sky_map_base.plot.below[1].visible = False
             hpix_renderer.glyph.line_color = hpix_renderer.glyph.fill_color
             self._sky_map_base.update()
 
