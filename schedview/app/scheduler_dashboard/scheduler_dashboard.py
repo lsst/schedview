@@ -411,6 +411,8 @@ class Scheduler(param.Parameterized):
 
     def clear_dashboard(self):
         """Clear the dashboard for a new pickle or a new date."""
+        self._debugging_message = "Starting to clear dashboard."
+
         self.summary_widget = None
         self._survey_reward_df = None
         self._sky_map_base = None
@@ -431,6 +433,8 @@ class Scheduler(param.Parameterized):
         self._survey = 0
         self._reward = -1
 
+        self._debugging_message = "Finished clearing dashboard."
+
     def read_scheduler(self):
         """Load the scheduler and conditions objects from pickle file.
 
@@ -440,12 +444,14 @@ class Scheduler(param.Parameterized):
             Record of success or failure of reading scheduler from file/URL.
         """
         try:
+            self._debugging_message = "Starting to load scheduler."
             pn.state.notifications.info('Scheduler loading...', duration=0)
 
             (scheduler, conditions) = schedview.collect.scheduler_pickle.read_scheduler(self.scheduler_fname)
             self._scheduler = scheduler
             self._conditions = conditions
 
+            self._debugging_message = "Finished loading scheduler."
             pn.state.notifications.clear()
             pn.state.notifications.success('Scheduler pickle loaded successfully!')
 
@@ -453,9 +459,9 @@ class Scheduler(param.Parameterized):
 
         except Exception:
             tb = traceback.format_exc(limit=-1)
-            self._debugging_message = f"Could not load scheduler from {self.scheduler_fname}: \n{tb}"
+            self._debugging_message = f"Cannot load scheduler from {self.scheduler_fname}: \n{tb}"
             pn.state.notifications.clear()
-            pn.state.notifications.error(f'Could not load scheduler from {self.scheduler_fname}', duration=0)
+            pn.state.notifications.error(f'Cannot load scheduler from {self.scheduler_fname}', duration=0)
 
             self._scheduler = None
             self._conditions = None
@@ -476,6 +482,7 @@ class Scheduler(param.Parameterized):
             return False
 
         try:
+            self._debugging_message = "Starting to make scheduler summary dataframe."
             pn.state.notifications.info('Making scheduler summary dataframe...', duration=0)
 
             # TODO: Conditions setter bug-fix.
@@ -514,6 +521,7 @@ class Scheduler(param.Parameterized):
             self._survey_name = self._scheduler_summary_df[self._scheduler_summary_df['tier'] ==
                                                            self._tier].reset_index()['survey'][self._survey]
 
+            self._debugging_message = "Finished making scheduler summary dataframe."
             pn.state.notifications.clear()
             pn.state.notifications.success('Scheduler summary dataframe updated successfully')
 
@@ -533,6 +541,7 @@ class Scheduler(param.Parameterized):
         if self._scheduler_summary_df is None:
             return
 
+        self._debugging_message = "Starting to create summary widget."
         tabulator_formatter = {'survey_name': HTMLTemplateFormatter(template='<%= value %>')}
         columns = [
             'tier',
@@ -560,9 +569,11 @@ class Scheduler(param.Parameterized):
             sizing_mode='stretch_width',
             )
         self.summary_widget = summary_widget
+        self._debugging_message = "Finished making summary widget."
 
     def update_summary_widget_data(self):
         """Update data for survey Tabulator widget."""
+        self._debugging_message = "Starting to update summary widget."
         columns = [
             'tier',
             'survey_name',
@@ -572,6 +583,7 @@ class Scheduler(param.Parameterized):
             ]
         self.summary_widget._update_data(
             self._scheduler_summary_df[self._scheduler_summary_df['tier'] == self._tier][columns])
+        self._debugging_message = "Finished updating summary widget."
 
     @param.depends('_publish_summary_widget')
     def publish_summary_widget(self):
@@ -585,6 +597,7 @@ class Scheduler(param.Parameterized):
         if self.summary_widget is None:
             return 'No summary available.'
         else:
+            self._debugging_message = "Publishing summary widget."
             return self.summary_widget
 
     def compute_survey_maps(self):
@@ -596,15 +609,18 @@ class Scheduler(param.Parameterized):
             self._debugging_message = 'Cannot compute survey maps as no scheduler summary made.'
             return
         try:
+            self._debugging_message = "Starting to compute survey maps."
             self._survey_maps = schedview.compute.survey.compute_maps(
                 self._scheduler.survey_lists[int(self._tier[-1])][self._survey],
                 self._conditions,
                 self.nside,
                 )
             self.param['survey_map'].objects = [''] + list(self._survey_maps.keys())
+            self._debugging_message = "Finished computing survey maps."
 
         except Exception:
             self._debugging_message = f'Cannot compute survey maps: \n{traceback.format_exc(limit=-1)}'
+            pn.state.notifications.error('Cannot compute survey maps!', duration=0)
 
     def make_reward_df(self):
         """Make the summary dataframe."""
@@ -615,6 +631,7 @@ class Scheduler(param.Parameterized):
             self._debugging_message = 'Cannot make summary dataframe as no scheduler summary made.'
             return
         try:
+            self._debugging_message = "Starting to make reward dataframe."
             # Survey has rewards.
             if self._reward_df.index.isin([(int(self._tier[-1]), self._survey)]).any():
 
@@ -631,18 +648,22 @@ class Scheduler(param.Parameterized):
                     args=('basis_function_href', 'doc_url'),
                     )
                 self._survey_reward_df = survey_reward_df
+                self._debugging_message = "Finished making reward dataframe."
             else:
                 self._survey_reward_df = None
+                self._debugging_message = "No reward dataframe made; survey has no rewards."
 
         except Exception:
             tb = traceback.format_exc(limit=-1)
             self._debugging_message = f'Cannot make survey reward dataframe: \n{tb}'
+            pn.state.notifications.error('Cannot make survey reward dataframe!', duration=0)
 
     def create_reward_widget(self):
         """Create Tabulator widget with survey reward dataframe."""
         if self._survey_reward_df is None:
             return
 
+        self._debugging_message = "Starting to create reward widget."
         tabulator_formatter = {
             'basis_function_href': HTMLTemplateFormatter(template='<%= value %>'),
             'feasible': BooleanFormatter(),
@@ -683,12 +704,14 @@ class Scheduler(param.Parameterized):
             page_size=13,
             )
         self.reward_widget = reward_widget
+        self._debugging_message = "Finished making reward widget."
 
     def update_reward_widget_data(self):
         """Update Treward abulator widget data."""
         if self._survey_reward_df is None:
             return
 
+        self._debugging_message = "Starting to update reward widget data."
         self.reward_widget.selection = []
         columns = [
             'basis_function_href',
@@ -703,6 +726,7 @@ class Scheduler(param.Parameterized):
             'basis_function',
             ]
         self.reward_widget._update_data(self._survey_reward_df[columns])
+        self._debugging_message = "Finished updating reward widget data."
 
     @param.depends('_publish_reward_widget')
     def publish_reward_widget(self):
@@ -716,15 +740,17 @@ class Scheduler(param.Parameterized):
         if self._survey_reward_df is None:
             return 'No rewards available.'
         else:
+            self._debugging_message = "Publishing reward widget."
             return self.reward_widget
 
     def create_sky_map_base(self):
         """Create a base plot with a dummy map."""
         if self._survey_maps is None:
-            self._debugging_message = 'Can not create sky map as no survey maps made.'
+            self._debugging_message = 'Cannot create sky map as no survey maps made.'
             return
 
         try:
+            self._debugging_message = "Starting to create sky map base."
             # Make a dummy map that is 1.0 for all healpixels that might have data.
             self._survey_maps['above_horizon'] = np.where(self._conditions.alt > 0, 1.0, np.nan)
             self._sky_map_base = schedview.plot.survey.map_survey_healpix(
@@ -742,9 +768,11 @@ class Scheduler(param.Parameterized):
             )
             self._sky_map_base.plot.add_layout(color_bar, 'below')
             self._sky_map_base.plot.below[1].visible = False
+            self._debugging_message = "Finished creating sky map base."
 
         except Exception:
-            self._debugging_message = f'Can not create sky map: \n{traceback.format_exc(limit=-1)}'
+            self._debugging_message = f'Cannot create sky map base: \n{traceback.format_exc(limit=-1)}'
+            pn.state.notifications.error('Cannot create sky map base!', duration=0)
 
     def update_sky_map_with_survey_map(self):
         """Update base plot with healpixel data from selected survey map.
@@ -761,6 +789,7 @@ class Scheduler(param.Parameterized):
             return
 
         try:
+            self._debugging_message = "Starting to update sky map with survey map."
             hpix_renderer = self._sky_map_base.plot.select(name='hpix_renderer')[0]
             hpix_data_source = self._sky_map_base.plot.select(name='hpix_ds')[0]
 
@@ -822,9 +851,11 @@ class Scheduler(param.Parameterized):
                 self._sky_map_base.plot.below[1].color_mapper.high = max_good_value
             hpix_renderer.glyph.line_color = hpix_renderer.glyph.fill_color
             self._sky_map_base.update()
+            self._debugging_message = "Finished updating sky map with survey map."
 
         except Exception:
-            self._debugging_message = f'Could not load map: \n{traceback.format_exc(limit=-1)}'
+            self._debugging_message = f'Cannot update sky map: \n{traceback.format_exc(limit=-1)}'
+            pn.state.notifications.error('Cannot update sky map!', duration=0)
 
     def update_sky_map_with_reward(self):
         """Update base plot with healpixel data from selected survey map.
@@ -841,6 +872,7 @@ class Scheduler(param.Parameterized):
             return
 
         try:
+            self._debugging_message = "Starting to update sky map with reward."
             hpix_renderer = self._sky_map_base.plot.select(name='hpix_renderer')[0]
             hpix_data_source = self._sky_map_base.plot.select(name='hpix_ds')[0]
 
@@ -871,6 +903,7 @@ class Scheduler(param.Parameterized):
                 self._sky_map_base.plot.below[1].color_mapper.low = min_good_value
                 self._sky_map_base.plot.below[1].color_mapper.high = max_good_value
             else:
+                # TODO: Fix nested if statements
                 max_basis_reward = self._survey_reward_df.loc[self._reward, :]['max_basis_reward']
 
                 # CASE 2: Reward is scalar and finite.
@@ -904,9 +937,11 @@ class Scheduler(param.Parameterized):
                     self._sky_map_base.plot.below[1].visible = False
             hpix_renderer.glyph.line_color = hpix_renderer.glyph.fill_color
             self._sky_map_base.update()
+            self._debugging_message = "Finished updating sky map with reward."
 
         except Exception:
-            self._debugging_message = f'Could not load map: \n{traceback.format_exc(limit=-1)}'
+            self._debugging_message = f'Cannot update sky map: \n{traceback.format_exc(limit=-1)}'
+            pn.state.notifications.error('Cannot update sky map!', duration=0)
 
     @param.depends('_publish_map')
     def publish_sky_map(self):
@@ -927,6 +962,7 @@ class Scheduler(param.Parameterized):
             return 'No map loaded.'
 
         else:
+            self._debugging_message = "Publishing sky map."
             return self._sky_map_base.figure
 
     @param.depends('_debugging_message')
