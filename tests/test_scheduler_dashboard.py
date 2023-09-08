@@ -7,7 +7,10 @@ import bokeh.io
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 from rubin_sim.scheduler.example import example_scheduler
 
-from schedview.app.scheduler_dashboard.scheduler_dashboard import (Scheduler, scheduler_app)
+from schedview.app.scheduler_dashboard.scheduler_dashboard import (
+    Scheduler,
+    scheduler_app,
+)
 
 # Schedview methods
 from schedview.collect.scheduler_pickle import read_scheduler
@@ -56,15 +59,16 @@ Notes
 
 TEST_PICKLE = "https://www.astronomy.swin.edu.au/~gpoole/rubin_datavis/example_pickle_scheduler.p.xz"
 TEST_DATE = datetime(2023, 8, 1, 23, 0)
-DEFAULT_TIMEZONE = 'America/Santiago'
+DEFAULT_TIMEZONE = "America/Santiago"
 
 
 class TestSchedulerDashboard(unittest.TestCase):
-
     observatory = ModelObservatory(init_load_length=1)
     scheduler = Scheduler()
     scheduler.scheduler_fname = TEST_PICKLE
-    scheduler._date_time = Time(Timestamp(TEST_DATE, tzinfo=ZoneInfo(DEFAULT_TIMEZONE))).mjd
+    scheduler._date_time = Time(
+        Timestamp(TEST_DATE, tzinfo=ZoneInfo(DEFAULT_TIMEZONE))
+    ).mjd
 
     def test_scheduler_app(self):
         app = scheduler_app(date=TEST_DATE, scheduler_pickle=TEST_PICKLE)
@@ -88,7 +92,7 @@ class TestSchedulerDashboard(unittest.TestCase):
         tier = self.scheduler._tier[-1]
         survey = self.scheduler._survey
         survey_map = self.scheduler.survey_map
-        expected_title = f'\nTier {tier} - Survey {survey} - Reward {survey_map}'
+        expected_title = f"\nTier {tier} - Survey {survey} - Reward {survey_map}"
         self.assertEqual(title, expected_title)
 
     def test_make_summary_df(self):
@@ -104,9 +108,9 @@ class TestSchedulerDashboard(unittest.TestCase):
         scheduler_summary_df = make_scheduler_summary_df(
             self.scheduler._scheduler,
             self.scheduler._conditions,
-            self.scheduler._scheduler.make_reward_df(self.scheduler._conditions)
-            )
-        scheduler_summary_df['survey'] = scheduler_summary_df.loc[:, 'survey_name']
+            self.scheduler._scheduler.make_reward_df(self.scheduler._conditions),
+        )
+        scheduler_summary_df["survey"] = scheduler_summary_df.loc[:, "survey_name"]
         self.scheduler.scheduler_summary_df = scheduler_summary_df
         self.scheduler.create_summary_widget()
         widget = self.scheduler.publish_summary_widget()
