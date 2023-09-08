@@ -59,7 +59,6 @@ TO DO BEFORE PUSH
 NEXT
 ----
 
-    2. Change debugging pane to update data rather than re-create string panel.
     3. Change title panes to update data rather than re-create string panels.
     4. Try param.Path() for scheduler_fname.
         scheduler_fname = param.Path(default='scheduler.p', search_paths=['/'])
@@ -182,6 +181,8 @@ class Scheduler(param.Parameterized):
     _publish_map = param.Parameter(None)
     _update_headings = param.Parameter(None)
     _debugging_message = param.Parameter(None)
+
+    debug_widget = None
 
     # Non-Param private parameters.
     _tier = None
@@ -940,15 +941,21 @@ class Scheduler(param.Parameterized):
         """
         if self._debugging_message is None:
             return None
+
         timestamp = datetime.now(timezone('America/Santiago')).strftime('%Y-%m-%d %H:%M:%S')
         self._debug_string = f'\n {timestamp} - {self._debugging_message}' + self._debug_string
-        return pn.pane.Str(
-            self._debug_string,
-            height=70,
-            styles={'font-size': '9pt',
-                    'color': 'black',
-                    'overflow': 'scroll'},
-            )
+
+        if self.debug_widget is None:
+            self.debug_widget = pn.pane.Str(
+                self._debug_string,
+                height=70,
+                styles={'font-size': '9pt',
+                        'color': 'black',
+                        'overflow': 'scroll'},
+                )
+        else:
+            self.debug_widget.object = self._debug_string
+        return self.debug_widget
 
     @param.depends('_show_loading_indicator', watch=True)
     def update_loading_indicator(self):
