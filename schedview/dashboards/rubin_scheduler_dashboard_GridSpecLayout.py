@@ -20,6 +20,15 @@ from pytz import timezone
 # from astropy.time import Time, TimezoneInfo
 # import astropy.units as u
 
+# Packages required for debugging timestamp option 2
+from datetime import datetime
+from pytz import timezone
+
+# Packages required for debugging timestamp option 3
+# from datetime import datetime
+# from astropy.time import Time, TimezoneInfo
+# import astropy.units as u
+
 import schedview
 import schedview.compute.scheduler
 import schedview.compute.survey
@@ -67,12 +76,18 @@ Still to implement
 Further potential modifications
 -------------------------------
 
+<<<<<<< Updated upstream
     1. [efficient code]  Find duplicate code sections and replace with methods, where sensible.
     2. [clean code]      Clean up sky_map().
     3. [product polish]  Populate with useful messages sent to debugger?
     4. [product polish]  Bokeh key degree symbol
                            - convert all Text objects to Label objects to use LaTeX.
     5. [code style]      Change all parameter lists to have their closing bracket on a new line.
+=======
+    1. Find duplicate code sections and replace with methods, where sensible.
+    2. Clean up sky_map().
+    3. Populate with useful messages sent to debugger.
+>>>>>>> Stashed changes
 
 
 Current issues/quirks
@@ -80,12 +95,20 @@ Current issues/quirks
 
     Blank map:
         
+<<<<<<< Updated upstream
         - SolarElongationMask (tier 4 surveys) shows blank map even though
           healpix array is not all -inf values (25%=1).
           - Perhaps something to do with basis_area=0?
         - Blank map also means no tooltip.
         - I currently send a message to debugging noting that basis_area=0.
           Is this behaviour okay? (Blank map, no tooltip, messsage).
+=======
+        - SolarElongationMask (tier 4 surveys) shows blank map because basis_area=0
+          (even though healpix array is not all -inf values. 25%=1)
+        - Blank map also means no tooltip.
+        - I currently send a message to debugging noting the map is empty due to
+          basis_area. Is this behaviour okay? (Blank map, no tooltip, messsage).
+>>>>>>> Stashed changes
         - Should we treat such a case differently?
     
     Deserialisation error:
@@ -126,7 +149,10 @@ Pending questions
     - Do they want to distinguish between -inf (infesible) vs -nan (feasible)
           - using different colours, i.e. two different greys?
     - Should scalar maps that return finite values be a colour or is grey okay?
+<<<<<<< Updated upstream
     - Is the moon coloured orange instead of the sun? (check out MoonAvoidance)
+=======
+>>>>>>> Stashed changes
     
 
 """
@@ -275,13 +301,23 @@ class Scheduler(param.Parameterized):
 
 
     # Panel for map title.
+<<<<<<< Updated upstream
     @param.depends("_data_loaded", "tier", "survey", "_plot_display", "survey_map", "basis_function")
+=======
+    @param.depends("data_loaded", "tier", "survey", "plot_display", "survey_map", "basis_function")
+>>>>>>> Stashed changes
     def map_title(self):
         if self._data_loaded==True and self._scheduler is not None:
             titleA = 'Survey {}\n'.format(self._tier_survey_rewards.reset_index()['survey'][self.survey])
+<<<<<<< Updated upstream
             if self._plot_display == 1:
                 titleB = 'Map: {}'.format(self.survey_map)
             elif self._plot_display == 2 and self.basis_function >= 0:
+=======
+            if self.plot_display == 1:
+                titleB = 'Map: {}'.format(self.survey_map)
+            elif self.plot_display == 2 and self.basis_function >= 0:
+>>>>>>> Stashed changes
                 titleB = 'Basis function {}: {}'.format(self.basis_function,
                                                         self._basis_functions['basis_func'][self.basis_function])
             else:
@@ -305,6 +341,7 @@ class Scheduler(param.Parameterized):
     def _update_scheduler(self):
         logging.info("Updating scheduler.")
         try:
+<<<<<<< Updated upstream
             self.is_loading = True
             (scheduler, conditions) = schedview.collect.scheduler_pickle.read_scheduler(self.scheduler_fname)            
             self.param.update(_data_loaded = True,
@@ -336,6 +373,33 @@ class Scheduler(param.Parameterized):
             # self.param.update(basis_function = -1,
             #                   tier = "",
             #                   )
+=======
+            (scheduler, conditions) = schedview.collect.scheduler_pickle.read_scheduler(self.scheduler_fname)
+            self.data_loaded = True
+            self._scheduler = scheduler
+            self._conditions = conditions
+        except:
+            logging.error(f"Could not load scheduler from {self.scheduler_fname} \n{traceback.format_exc(limit=-1)}")
+            self._debugging_message = f"Could not load scheduler from {self.scheduler_fname}: \n{traceback.format_exc(limit=-1)}"
+            self.data_loaded = False
+            self._scheduler = None
+            self._conditions = None
+            self._survey_rewards = None   # -> tier=""             -> _tier_survey_rewards=None
+            self.survey = -1              # -> _listed_survey=None -> _survey_maps=None
+            self._basis_functions = None
+            self.basis_function = -1
+            
+            # self.param.set_param(data_loaded= False,
+            #                      _scheduler = None,
+            #                      _conditions = None,
+            #                      _survey_rewards = None,
+            #                      survey = -1,
+            #                      )
+            
+            # self.param.set_param(basis_function = -1,
+            #                      tier = "",
+            #                      )
+>>>>>>> Stashed changes
             
     
     # Update datetime if new datetime chosen.
@@ -347,7 +411,11 @@ class Scheduler(param.Parameterized):
     
     
     # Update survey reward dataframe if given new pickle file or new date.
+<<<<<<< Updated upstream
     @param.depends("_conditions", "_date_time", watch=True)
+=======
+    @param.depends("_scheduler", "_conditions", "_date_time", watch=True)
+>>>>>>> Stashed changes
     def _update_survey_rewards(self):
         if self._scheduler is None:
             logging.info("Can not update survey reward table as no pickle is loaded.")
@@ -368,6 +436,7 @@ class Scheduler(param.Parameterized):
                                                                                    self._rewards)
             # Duplicate column and apply URL formatting to one of the columns.
             survey_rewards['survey'] = survey_rewards.loc[:, 'survey_name']
+<<<<<<< Updated upstream
             survey_rewards['survey_name'] = survey_rewards.apply(survey_url_formatter, axis=1)            
             self.param.update(_survey_rewards = survey_rewards,
                               _data_loaded    = True)
@@ -382,6 +451,17 @@ class Scheduler(param.Parameterized):
                               _basis_functions = None)
         finally:
             self.is_loading = False
+=======
+            survey_rewards['survey_name'] = survey_rewards.apply(survey_url_formatter, axis=1)
+            self._survey_rewards = survey_rewards
+            self.data_loaded = True
+        except:           
+            logging.info(f"Survey rewards dataframe unable to be updated: \n{traceback.format_exc(limit=-1)}")
+            self._debugging_message = f"Survey rewards dataframe unable to be updated: \n{traceback.format_exc(limit=-1)}"
+            self.data_loaded = False
+            self._survey_rewards = None
+            self._basis_functions = None
+>>>>>>> Stashed changes
             
 
     # Update available tier selections if given new pickle file.
@@ -410,7 +490,10 @@ class Scheduler(param.Parameterized):
         except:
             self._debugging_message = f"Survey rewards unable to be updated: \n{traceback.format_exc(limit=-1)}"
             logging.info(f"Survey rewards unable to be updated: \n{traceback.format_exc(limit=-1)}")
+<<<<<<< Updated upstream
             pn.state.notifications.error("Survey rewards unable to be updated!", 0)
+=======
+>>>>>>> Stashed changes
             self._tier_survey_rewards = None
             self.survey = 0
 
@@ -446,6 +529,10 @@ class Scheduler(param.Parameterized):
     # Update selected survey based on row selection of survey_rewards_table.
     @param.depends("_survey_df_widget.selection", watch=True)
     def _update_survey_with_row_selection(self):
+<<<<<<< Updated upstream
+=======
+        logging.info("Updating survey row selection.")
+>>>>>>> Stashed changes
         if self._survey_df_widget.selection == []:
             return
         try:
@@ -454,7 +541,11 @@ class Scheduler(param.Parameterized):
         except:
             self._debugging_message = f"Survey selection unable to be updated: \n{traceback.format_exc(limit=-1)}"
             logging.info(f"Survey selection unable to be updated: \n{traceback.format_exc(limit=-1)}")
+<<<<<<< Updated upstream
             self.survey = 0
+=======
+            self.survey = -1
+>>>>>>> Stashed changes
     
     
     # Update listed_survey if tier or survey selections change.
@@ -471,7 +562,10 @@ class Scheduler(param.Parameterized):
         except:
             self._debugging_message = f"Listed survey unable to be updated: \n{traceback.format_exc(limit=-1)}"
             logging.info(f"Listed survey unable to be updated: \n{traceback.format_exc(limit=-1)}")
+<<<<<<< Updated upstream
             pn.state.notifications.error("Listed survey unable to be updated", 0)
+=======
+>>>>>>> Stashed changes
             self._listed_survey = None
     
 
@@ -527,6 +621,7 @@ class Scheduler(param.Parameterized):
         try:
             tier_id = int(self.tier[-1])
             survey_id = self.survey
+<<<<<<< Updated upstream
             # Check that survey has basis functions.                           # If all surveys have basis functions, this won't be needed.
             if self._rewards.index.isin([(tier_id, survey_id)]).any():
                 # Create dataframe.
@@ -547,6 +642,18 @@ class Scheduler(param.Parameterized):
             self._debugging_message = f"Basis function dataframe unable to be updated: \n{traceback.format_exc(limit=-1)}"
             logging.info(f"Basis function dataframe unable to be updated: \n{traceback.format_exc(limit=-1)}")
             pn.state.notifications.error("Basis function dataframe unable to be updated", 0)
+=======
+            basis_function_df = schedview.compute.survey.make_survey_reward_df(self._listed_survey,
+                                                                               self._conditions,
+                                                                               self._rewards.loc[[(tier_id, survey_id)], :])
+            # Duplicate column and apply URL formatting to one of the columns.
+            basis_function_df['basis_func'] = basis_function_df.loc[:, 'basis_function']
+            basis_function_df['basis_function'] = basis_function_df.apply(basis_function_url_formatter, axis=1)
+            self._basis_functions = basis_function_df
+        except:
+            self._debugging_message = f"Basis function dataframe unable to be updated: \n{traceback.format_exc(limit=-1)}"
+            logging.info(f"Basis function dataframe unable to be updated: \n{traceback.format_exc(limit=-1)}")
+>>>>>>> Stashed changes
             self._basis_functions = None
 
 
@@ -602,12 +709,18 @@ class Scheduler(param.Parameterized):
             return
         logging.info("Updating basis function row selection.")
         try:
+<<<<<<< Updated upstream
             self.param.update(basis_function = self._basis_function_df_widget.selection[0],
                               _plot_display  = 2)                              # Display basis function instead of map.            
+=======
+            self.basis_function = self._basis_function_df_widget.selection[0]  # TODO: TEST BATCH UPDATE HERE
+            self.plot_display = 2                                              # Display basis function instead of a map.
+>>>>>>> Stashed changes
             logging.info(f"Basis function selection: {self._basis_functions['basis_func'][self.basis_function]}")
         except:
             self._debugging_message = f"Basis function table selection unable to be updated: \n{traceback.format_exc(limit=-1)}"
             logging.info(f"Basis function table selection unable to be updated: \n{traceback.format_exc(limit=-1)}")
+<<<<<<< Updated upstream
             pn.state.notifications.error("Basis function table selection unable to be updated", 0)
             self.basis_function = -1
 
@@ -635,6 +748,9 @@ class Scheduler(param.Parameterized):
             self.param.trigger("_make_a_new_map")
         else:
             logging.info("No, don't need to create a new sky map.")
+=======
+            self.basis_function = -1
+>>>>>>> Stashed changes
 
     
     # Create sky_map of survey for display.
@@ -644,14 +760,24 @@ class Scheduler(param.Parameterized):
             return "No scheduler loaded."
         if self._survey_maps is None:
             return "No surveys are loaded."
+        
         logging.info("Creating sky map.")
         try:            
+<<<<<<< Updated upstream
             logging.info(f"(_plot_display, basis_function, survey_map): ({self._plot_display}, {self.basis_function}, {self.survey_map})")
             self._debugging_message = f"(_plot_display, basis_function, survey_map): ({self._plot_display}, {self.basis_function}, {self.survey_map})"
             
             # -----------------------------------------------------------------
             # Load survey map.
             if self._plot_display==1:
+=======
+            logging.info(f"(plot_display, basis_function, survey_map): ({self.plot_display}, {self.basis_function}, {self.survey_map})")
+            self._debugging_message = f"(plot_display, basis_function, survey_map): ({self.plot_display}, {self.basis_function}, {self.survey_map})"
+            
+            # -----------------------------------------------------------------
+            # Load survey map.
+            if self.plot_display==1:
+>>>>>>> Stashed changes
                 # -------------------------------------------------------------
                 # CASE 1: If survey map is all NaNs (i.e. 'reward').
                 if np.isnan(self._survey_maps[self.survey_map]).all():
@@ -708,10 +834,17 @@ class Scheduler(param.Parameterized):
                 # Get name of basis function.
                 bf = self._basis_functions['basis_func'][self.basis_function]
                 
+<<<<<<< Updated upstream
                 # If area=0, show message in debugging (map *might* be blank).
                 if self._basis_functions.loc[self.basis_function, :]['basis_area'] == 0:
                     logging.info(f"Basis function {bf} has area 0: plot is empty.")
                     self._debugging_message = f"Basis function {bf} has area 0."
+=======
+                # If area=0, show message in debugging (map will be blank).
+                if self._basis_functions.loc[self.basis_function, :]['basis_area'] == 0:
+                    logging.info(f"Basis function {bf} has area 0: plot is empty.")
+                    self._debugging_message = f"Basis function {bf} has area 0: plot is empty."
+>>>>>>> Stashed changes
                 
                 # -------------------------------------------------------------
                 # CASE 3: If basis function IS in the list of survey maps.
@@ -802,7 +935,10 @@ class Scheduler(param.Parameterized):
                     except:
                         self._debugging_message = f"Could not load map of scalar basis function: \n{traceback.format_exc(limit=-1)}"
                         logging.info(f"Could not load map of scalar basis function: \n{traceback.format_exc(limit=-1)}")
+<<<<<<< Updated upstream
                         pn.state.notifications.error("Could not load map of scalar basis function!", 0)
+=======
+>>>>>>> Stashed changes
                         return "Basis function is a scalar."
             sky_map_figure = sky_map.figure
             # Add map parameters to cache.
@@ -815,10 +951,17 @@ class Scheduler(param.Parameterized):
                                       self.nside,
                                       self.color_palette]
             logging.info("Sky map successfully created.")
+<<<<<<< Updated upstream
         except:
             self._debugging_message = f"Could not load map: \n{traceback.format_exc(limit=-1)}"
             logging.info(f"Could not load map: \n{traceback.format_exc(limit=-1)}")
             pn.state.notifications.error("Could not load map!", 0)
+=======
+            self._debugging_message = "Sky map successfully created."
+        except:
+            self._debugging_message = f"Could not load map: \n{traceback.format_exc(limit=-1)}"
+            logging.info(f"Could not load map: \n{traceback.format_exc(limit=-1)}")
+>>>>>>> Stashed changes
             return "No map loaded."
         return sky_map_figure
     
@@ -834,8 +977,13 @@ class Scheduler(param.Parameterized):
         timestamp_option2 = datetime.now(timezone('America/Santiago')).strftime('%Y-%m-%d %H:%M:%S')
         # Requires astropy and datetime, displays Rubin time.
         # timestamp_option3 = Time(pd.Timestamp(Time.now().datetime, tzinfo=TimezoneInfo(utc_offset=4*u.hour))).strftime('%Y-%m-%d %H:%M:%S')
+<<<<<<< Updated upstream
         self._debug_string = f"\n {timestamp_option2} - {self._debugging_message}" + self._debug_string
         debugging_messages = pn.pane.Str(self._debug_string,
+=======
+        self.debug_string = f"\n {timestamp_option2} - {self._debugging_message}" + self.debug_string
+        debugging_messages = pn.pane.Str(self.debug_string,
+>>>>>>> Stashed changes
                                          height=70,
                                          styles={'font-size':'9pt',
                                                  'color':'black',
