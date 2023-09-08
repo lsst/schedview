@@ -877,6 +877,7 @@ class Scheduler(param.Parameterized):
             hpix_data_source = self._sky_map_base.plot.select(name='hpix_ds')[0]
 
             reward_underscored = self._reward_name.replace(' ', '_')
+            max_basis_reward = self._survey_reward_df.loc[self._reward, :]['max_basis_reward']
 
             # CASE 1: Reward is not scalar.
             if any(self._reward_name in key for key in self._survey_maps):
@@ -902,39 +903,36 @@ class Scheduler(param.Parameterized):
                 self._sky_map_base.plot.below[1].color_mapper.palette = self.color_palette
                 self._sky_map_base.plot.below[1].color_mapper.low = min_good_value
                 self._sky_map_base.plot.below[1].color_mapper.high = max_good_value
+
+            # CASE 2: Reward is scalar and finite.
+            elif max_basis_reward != -np.inf:
+                # Create array populated with scalar values where sky brightness map is not NaN.
+                scalar_array = hpix_data_source.data['u_sky'].copy()
+                scalar_array[~np.isnan(hpix_data_source.data['u_sky'])] = max_basis_reward
+                hpix_data_source.data[reward_underscored] = scalar_array
+
+                hpix_renderer.glyph.fill_color = bokeh.transform.linear_cmap(
+                    field_name=reward_underscored,
+                    palette=self.color_palette,
+                    low=max_basis_reward - 1,
+                    high=max_basis_reward + 1,
+                    nan_color='white',
+                    )
+                self._sky_map_base.plot.below[1].visible = True
+                self._sky_map_base.plot.below[1].color_mapper.palette = self.color_palette
+                self._sky_map_base.plot.below[1].color_mapper.low = max_basis_reward - 1
+                self._sky_map_base.plot.below[1].color_mapper.high = max_basis_reward + 1
+
+            # CASE 3: Reward is -Inf.
             else:
-                # TODO: Fix nested if statements
-                max_basis_reward = self._survey_reward_df.loc[self._reward, :]['max_basis_reward']
-
-                # CASE 2: Reward is scalar and finite.
-                if max_basis_reward != -np.inf:
-                    # Create array populated with scalar values where sky brightness map is not NaN.
-                    scalar_array = hpix_data_source.data['u_sky'].copy()
-                    scalar_array[~np.isnan(hpix_data_source.data['u_sky'])] = max_basis_reward
-                    hpix_data_source.data[reward_underscored] = scalar_array
-
-                    hpix_renderer.glyph.fill_color = bokeh.transform.linear_cmap(
-                        field_name=reward_underscored,
-                        palette=self.color_palette,
-                        low=max_basis_reward - 1,
-                        high=max_basis_reward + 1,
-                        nan_color='white',
-                        )
-                    self._sky_map_base.plot.below[1].visible = True
-                    self._sky_map_base.plot.below[1].color_mapper.palette = self.color_palette
-                    self._sky_map_base.plot.below[1].color_mapper.low = max_basis_reward - 1
-                    self._sky_map_base.plot.below[1].color_mapper.high = max_basis_reward + 1
-
-                # CASE 3: Reward is -Inf.
-                else:
-                    hpix_renderer.glyph.fill_color = bokeh.transform.linear_cmap(
-                        field_name=self._reward_name,
-                        palette='Greys256',
-                        low=-1,
-                        high=1,
-                        nan_color='white',
-                        )
-                    self._sky_map_base.plot.below[1].visible = False
+                hpix_renderer.glyph.fill_color = bokeh.transform.linear_cmap(
+                    field_name=self._reward_name,
+                    palette='Greys256',
+                    low=-1,
+                    high=1,
+                    nan_color='white',
+                    )
+                self._sky_map_base.plot.below[1].visible = False
             hpix_renderer.glyph.line_color = hpix_renderer.glyph.fill_color
             self._sky_map_base.update()
             self._debugging_message = "Finished updating sky map with reward."
