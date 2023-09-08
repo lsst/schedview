@@ -59,7 +59,6 @@ TO DO BEFORE PUSH
 NEXT
 ----
 
-    3. Change title panes to update data rather than re-create string panels.
     4. Try param.Path() for scheduler_fname.
         scheduler_fname = param.Path(default='scheduler.p', search_paths=['/'])
     5. Pop-out debugger.
@@ -182,9 +181,14 @@ class Scheduler(param.Parameterized):
     _update_headings = param.Parameter(None)
     _debugging_message = param.Parameter(None)
 
-    debug_widget = None
+    # Non-Param parameters storing Panel pane objects.
+    debug_pane = None
+    dashboard_subtitle_pane = None
+    summary_table_heading_pane = None
+    reward_table_heading_pane = None
+    map_title_pane = None
 
-    # Non-Param private parameters.
+    # Non-Param internal parameters.
     _tier = None
     _survey = 0
     _reward = -1
@@ -945,8 +949,8 @@ class Scheduler(param.Parameterized):
         timestamp = datetime.now(timezone('America/Santiago')).strftime('%Y-%m-%d %H:%M:%S')
         self._debug_string = f'\n {timestamp} - {self._debugging_message}' + self._debug_string
 
-        if self.debug_widget is None:
-            self.debug_widget = pn.pane.Str(
+        if self.debug_pane is None:
+            self.debug_pane = pn.pane.Str(
                 self._debug_string,
                 height=70,
                 styles={'font-size': '9pt',
@@ -954,8 +958,8 @@ class Scheduler(param.Parameterized):
                         'overflow': 'scroll'},
                 )
         else:
-            self.debug_widget.object = self._debug_string
-        return self.debug_widget
+            self.debug_pane.object = self._debug_string
+        return self.debug_pane
 
     @param.depends('_show_loading_indicator', watch=True)
     def update_loading_indicator(self):
@@ -1034,7 +1038,7 @@ class Scheduler(param.Parameterized):
 
     @param.depends('_update_headings')
     def dashboard_subtitle(self):
-        """Load subtitle data and create a String pane to display subtitle.
+        """Load subtitle data and create/update a String pane to display subtitle.
 
         Returns
         -------
@@ -1042,69 +1046,85 @@ class Scheduler(param.Parameterized):
             A panel String pane to display as the dashboard's subtitle.
         """
         title_string = self.generate_dashboard_subtitle()
-        return pn.pane.Str(
-            title_string,
-            height=20,
-            styles={'font-size': '14pt',
-                    'font-weight': '300',
-                    'color': 'white'},
-            stylesheets=[stylesheet],
-            )
+        if self.dashboard_subtitle_pane is None:
+            self.dashboard_subtitle_pane = pn.pane.Str(
+                title_string,
+                height=20,
+                styles={'font-size': '14pt',
+                        'font-weight': '300',
+                        'color': 'white'},
+                stylesheets=[stylesheet],
+                )
+        else:
+            self.dashboard_subtitle_pane.object = title_string
+        return self.dashboard_subtitle_pane
 
     @param.depends('_update_headings')
     def summary_table_heading(self):
-        """Load heading data and create a panel String pane to display title.
+        """Load heading data and create/update a String pane to display heading.
 
         Returns
         -------
         title : 'panel.pane.Str'
-            A panel String pane to display as the survey table's title.
+            A panel String pane to display as the survey table's heading.
         """
         title_string = self.generate_summary_table_heading()
-        return pn.pane.Str(
-            title_string,
-            styles={'font-size': '13pt',
-                    'font-weight': '300',
-                    'color': 'white'},
-            stylesheets=[stylesheet]
-            )
+        if self.summary_table_heading_pane is None:
+            self.summary_table_heading_pane = pn.pane.Str(
+                title_string,
+                styles={'font-size': '13pt',
+                        'font-weight': '300',
+                        'color': 'white'},
+                stylesheets=[stylesheet]
+                )
+        else:
+            self.summary_table_heading_pane.object = title_string
+        return self.summary_table_heading_pane
 
     @param.depends('_update_headings')
     def reward_table_heading(self):
-        """Load title data and create a panel String pane to display title.
+        """Load title data and create/update a String pane to display heading.
 
         Returns
         -------
         title : 'panel.pane.Str'
-            A panel String pane to display as the reward table title.
+            A panel String pane to display as the reward table heading.
         """
         title_string = self.generate_reward_table_heading()
-        return pn.pane.Str(
-            title_string,
-            styles={'font-size': '13pt',
-                    'font-weight': '300',
-                    'color': 'white'},
-            stylesheets=[stylesheet],
-            css_classes=['title']
-            )
+        if self.reward_table_heading_pane is None:
+            self.reward_table_heading_pane = pn.pane.Str(
+                title_string,
+                styles={'font-size': '13pt',
+                        'font-weight': '300',
+                        'color': 'white'},
+                stylesheets=[stylesheet],
+                css_classes=['title']
+                )
+        else:
+            self.reward_table_heading_pane.object = title_string
+        return self.reward_table_heading_pane
 
     @param.depends('_update_headings')
     def map_title(self):
-        """Load title data and create a panel String pane to display title.
+        """Load title data and create/update a String pane to display heading.
 
         Returns
         -------
         title : 'panel.pane.Str'
-            A panel String pane to display as the map title.
+            A panel String pane to display as the map heading.
         """
         title_string = self.generate_map_heading()
-        return pn.pane.Str(
-            title_string,
-            styles={'font-size': '13pt',
-                    'font-weight': '300',
-                    'color': 'white'},
-            stylesheets=[stylesheet]
-            )
+        if self.map_title_pane is None:
+            self.map_title_pane = pn.pane.Str(
+                title_string,
+                styles={'font-size': '13pt',
+                        'font-weight': '300',
+                        'color': 'white'},
+                stylesheets=[stylesheet]
+                )
+        else:
+            self.map_title_pane.object = title_string
+        return self.map_title_pane
 
 # --------------------------------------------------------------------------------------------- Key functions
 
