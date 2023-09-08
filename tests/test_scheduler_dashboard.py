@@ -54,14 +54,14 @@ Notes
 
 """
 
-TEST_PICKLE = "/Users/me/Documents/2023/ADACS/Panel_scheduler/Rubin_scheduler_dashboard/example_pickle_scheduler.p.xz"
+TEST_PICKLE = "https://www.astronomy.swin.edu.au/~gpoole/rubin_datavis/example_pickle_scheduler.p.xz"
 TEST_DATE = datetime(2023, 8, 1, 23, 0)
 DEFAULT_TIMEZONE = 'America/Santiago'
 
 
-class test_scheduler_dashboard(unittest.TestCase):
+class TestSchedulerDashboard(unittest.TestCase):
 
-    observatory = ModelObservatory()
+    observatory = ModelObservatory(init_load_length=1)
     scheduler = Scheduler()
     scheduler.scheduler_fname = TEST_PICKLE
     scheduler._date_time = Time(Timestamp(TEST_DATE, tzinfo=ZoneInfo(DEFAULT_TIMEZONE))).mjd
@@ -82,32 +82,34 @@ class test_scheduler_dashboard(unittest.TestCase):
 
     def test_title(self):
         self.scheduler._tier = "tier 2"
-        self.scheduler._survey = 3
+        self.scheduler._survey = 0
         self.scheduler._display_dashboard_data = True
-        self.scheduler._display_dashboard_data = True
-        title = self.scheduler.generate_dashboard_title()
-        expected_title = f'\nTier {self.scheduler._tier[-1]} - Survey {self.scheduler._survey} - Map {self.scheduler.survey_map}'
+        title = self.scheduler.generate_dashboard_subtitle()
+        tier = self.scheduler._tier[-1]
+        survey = self.scheduler._survey
+        survey_map = self.scheduler.survey_map
+        expected_title = f'\nTier {tier} - Survey {survey} - Reward {survey_map}'
         self.assertEqual(title, expected_title)
 
     def test_make_summary_df(self):
         self.scheduler._scheduler = example_scheduler()
         self.scheduler._conditions = self.observatory.return_conditions()
-        self.scheduler.make_summary_df()
-        self.assertIsInstance(self.scheduler._survey_rewards, pd.DataFrame)
+        self.scheduler.make_scheduler_summary_df()
+        self.assertIsInstance(self.scheduler._scheduler_summary_df, pd.DataFrame)
 
-    def test_survey_widget(self):
+    def test_summary_widget(self):
         self.scheduler._scheduler = example_scheduler()
         self.scheduler._conditions = self.observatory.return_conditions()
         self.scheduler._scheduler.update_conditions(self.scheduler._conditions)
-        survey_rewards = make_scheduler_summary_df(
+        scheduler_summary_df = make_scheduler_summary_df(
             self.scheduler._scheduler,
             self.scheduler._conditions,
             self.scheduler._scheduler.make_reward_df(self.scheduler._conditions)
             )
-        survey_rewards['survey'] = survey_rewards.loc[:, 'survey_name']
-        self.scheduler._survey_rewards = survey_rewards
-        self.scheduler.create_survey_tabulator_widget()
-        widget = self.scheduler.publish_survey_tabulator_widget()
+        scheduler_summary_df['survey'] = scheduler_summary_df.loc[:, 'survey_name']
+        self.scheduler.scheduler_summary_df = scheduler_summary_df
+        self.scheduler.create_summary_widget()
+        widget = self.scheduler.publish_summary_widget()
         self.assertIsInstance(widget, Tabulator)
 
     def test_compute_survey_maps(self):
