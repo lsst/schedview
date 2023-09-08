@@ -35,6 +35,7 @@ def plot_survey_rewards(rewards):
     """
     reward_plot = (
         rewards.replace([np.inf, -np.inf], np.nan)
+        .loc[:, ["survey_name", "time", "reward"]]
         .hvplot(
             by=["survey_name"], x="time", y=["reward"], title="Rewards for each survey"
         )
