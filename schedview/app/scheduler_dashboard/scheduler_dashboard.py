@@ -33,6 +33,7 @@ import traceback
 
 from astropy.time import Time
 from bokeh.models.widgets.tables import HTMLTemplateFormatter, BooleanFormatter
+from bokeh.models import LinearColorMapper, ColorBar
 from datetime import datetime
 from pandas import Timestamp
 from pytz import timezone
@@ -47,40 +48,6 @@ import schedview.plot.survey
 # For the conditions.mjd bugfix
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 
-"""
-
-TO DO BEFORE PUSH
------------------
-
-    - Remove this section.
-    - Uncomment/comment code for conditions.mjd bugfix.
-    - ...
-
-NEXT
-----
-
-    4. Try param.Path() for scheduler_fname.
-        scheduler_fname = param.Path(default='scheduler.p', search_paths=['/'])
-    5. Pop-out debugger.
-
-
-CAN'T FIGURE OUT
-----------------
-
-    - Reward table widths need updating when table is updated. [CASE: tier 1 > tier 2]
-
-
-STILL TO IMPLEMENT
-------------------
-
-    - unittest suite
-    - Accept parameters (pickle file url, mjd, survey, nside) in the url
-      so other dashboards can link to it in a given state.
-    - Color scale below map.
-
-
-/Users/me/Documents/2023/ADACS/Panel_scheduler/Rubin_scheduler_dashboard/example_pickle_scheduler.p.xz
-"""
 
 DEFAULT_CURRENT_TIME = Time.now()
 DEFAULT_TIMEZONE = 'America/Santiago'
@@ -736,7 +703,6 @@ class Scheduler(param.Parameterized):
             'basis_function',
             ]
         self.reward_widget._update_data(self._survey_reward_df[columns])
-        # TODO: reset column widths
 
     @param.depends('_publish_reward_widget')
     def publish_reward_widget(self):
@@ -768,6 +734,13 @@ class Scheduler(param.Parameterized):
                 self.nside,
                 )
             self._sky_map_base.plot.toolbar.tools[-1].tooltips.remove(('above_horizon', '@above_horizon'))
+
+            color_bar = ColorBar(
+                color_mapper=LinearColorMapper(palette=self.color_palette, low=0, high=1),
+                label_standoff=10,
+                location=(0, 0),
+            )
+            self._sky_map_base.plot.add_layout(color_bar, 'below')
 
         except Exception:
             self._debugging_message = f'Can not create sky map: \n{traceback.format_exc(limit=-1)}'
@@ -810,6 +783,10 @@ class Scheduler(param.Parameterized):
                     high=max_good_value,
                     nan_color='white',
                     )
+                self._sky_map_base.plot.below[1].color_mapper.palette = self.color_palette
+                self._sky_map_base.plot.below[1].color_mapper.low = min_good_value
+                self._sky_map_base.plot.below[1].color_mapper.high = max_good_value
+
             # CASE 2: Selection is a survey map and is all NaNs.
             elif np.isnan(self._survey_maps[self.survey_map]).all():
                 hpix_renderer.glyph.fill_color = bokeh.transform.linear_cmap(
@@ -819,6 +796,7 @@ class Scheduler(param.Parameterized):
                     high=1,
                     nan_color='white',
                     )
+
             # CASE 3: Selection is a survey map and is not all NaNs.
             else:
                 min_good_value = np.nanmin(self._survey_maps[self.survey_map])
@@ -835,6 +813,9 @@ class Scheduler(param.Parameterized):
                     high=max_good_value,
                     nan_color='white',
                     )
+                self._sky_map_base.plot.below[1].color_mapper.palette = self.color_palette
+                self._sky_map_base.plot.below[1].color_mapper.low = min_good_value
+                self._sky_map_base.plot.below[1].color_mapper.high = max_good_value
             hpix_renderer.glyph.line_color = hpix_renderer.glyph.fill_color
             self._sky_map_base.update()
 
@@ -881,6 +862,9 @@ class Scheduler(param.Parameterized):
                     high=max_good_value,
                     nan_color='white',
                     )
+                self._sky_map_base.plot.below[1].color_mapper.palette = self.color_palette
+                self._sky_map_base.plot.below[1].color_mapper.low = min_good_value
+                self._sky_map_base.plot.below[1].color_mapper.high = max_good_value
             else:
                 max_basis_reward = self._survey_reward_df.loc[self._reward, :]['max_basis_reward']
 
@@ -898,6 +882,10 @@ class Scheduler(param.Parameterized):
                         high=max_basis_reward+1,
                         nan_color='white',
                         )
+                    self._sky_map_base.plot.below[1].color_mapper.palette = self.color_palette
+                    self._sky_map_base.plot.below[1].color_mapper.low = max_basis_reward-1
+                    self._sky_map_base.plot.below[1].color_mapper.high = max_basis_reward+1
+
                 # CASE 3: Reward is -Inf.
                 else:
                     hpix_renderer.glyph.fill_color = bokeh.transform.linear_cmap(
@@ -952,7 +940,7 @@ class Scheduler(param.Parameterized):
         if self.debug_pane is None:
             self.debug_pane = pn.pane.Str(
                 self._debug_string,
-                height=70,
+                height=200,
                 styles={'font-size': '9pt',
                         'color': 'black',
                         'overflow': 'scroll'},
@@ -1291,7 +1279,10 @@ def generate_key():
 
 
 # Initialize the dashboard layout.
-sched_app = pn.GridSpec(sizing_mode='stretch_both', max_height=1000).servable()
+sched_app = pn.GridSpec(
+    sizing_mode='stretch_both',
+    max_height=1000,
+    ).servable()
 
 
 def scheduler_app(date=None, scheduler_pickle=None):
