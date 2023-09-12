@@ -55,6 +55,8 @@ pn.config.console_output = "accumulate"
 
 
 class Prenight(param.Parameterized):
+    """The pre-night briefing application."""
+
     custom_hvplot_tab_settings_file = param.FileSelector(
         default="",
         doc="The file containing the settings for the custom hvplot tabs.",
@@ -851,9 +853,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
 
         Returns
         -------
-        pn_app : `panel.viewable.Viewable` or
-                `tuple` ['panel.viewable.Viewable',
-                `schedview.prenight.Prenight`]
+        pn_app : `panel.viewable.Viewable` or `tuple` ['panel.viewable.Viewable', `schedview.prenight.Prenight`]
             The pre-night briefing app.
         """
         prenight = cls()
