@@ -1,5 +1,6 @@
-import bokeh.command.bootstrap
 from pathlib import Path
+
+import bokeh.command.bootstrap
 
 
 def start_app(app_name):

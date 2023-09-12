@@ -1,9 +1,10 @@
-import unittest
 import importlib.resources
-from tempfile import TemporaryDirectory
+import unittest
 from pathlib import Path
-import bokeh.plotting
+from tempfile import TemporaryDirectory
+
 import bokeh.io
+import bokeh.plotting
 
 from schedview.app.prenight.prenight import prenight_app
 

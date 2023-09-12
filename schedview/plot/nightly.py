@@ -3,6 +3,7 @@
 import bokeh
 import colorcet
 import numpy as np
+
 from .visitmap import BAND_COLORS
 
 DEFAULT_EVENT_LABELS = {
@@ -157,9 +158,11 @@ def plot_airmass_vs_time(
     band_colors : `dict`
         Mapping of filter names to colors.  Default is `BAND_COLORS`.
     event_labels : `dict`
-        Mapping of almanac events to labels.  Default is `DEFAULT_EVENT_LABELS`.
+        Mapping of almanac events to labels.
+        Default is `DEFAULT_EVENT_LABELS`.
     event_colors : `dict`
-        Mapping of almanac events to colors.  Default is `DEFAULT_EVENT_COLORS`.
+        Mapping of almanac events to colors.
+        Default is `DEFAULT_EVENT_COLORS`.
     figure : `bokeh.plotting.Figure`
         Bokeh figure object to plot on.  If None, a new figure will be created.
 
@@ -250,9 +253,11 @@ def plot_alt_vs_time(
     band_colors : `dict`
         Mapping of filter names to colors.  Default is `BAND_COLORS`.
     event_labels : `dict`
-        Mapping of almanac events to labels.  Default is `DEFAULT_EVENT_LABELS`.
+        Mapping of almanac events to labels.
+        Default is `DEFAULT_EVENT_LABELS`.
     event_colors : `dict`
-        Mapping of almanac events to colors.  Default is `DEFAULT_EVENT_COLORS`.
+        Mapping of almanac events to colors.
+        Default is `DEFAULT_EVENT_COLORS`.
     figure : `bokeh.plotting.Figure`
         Bokeh figure object to plot on.  If None, a new figure will be created.
 

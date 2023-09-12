@@ -1,9 +1,10 @@
-from copy import deepcopy
 from collections import OrderedDict
-import numpy as np
-import healpy as hp
-import rubin_sim.scheduler.basis_functions
+from copy import deepcopy
 from inspect import getmembers
+
+import healpy as hp
+import numpy as np
+import rubin_sim.scheduler.basis_functions
 
 
 def make_survey_reward_df(survey, conditions, reward_df=None):

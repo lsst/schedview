@@ -1,24 +1,19 @@
-import bokeh.plotting
-from astropy.time import Time
-
-import pandas as pd
-import bokeh.models
 import bokeh.core.properties
-
-from uranography.api import (
-    ArmillarySphere,
-    HorizonMap,
-    Planisphere,
-    MollweideMap,
-)
-
-from schedview.collect import sample_pickle
-
-from schedview.plot.scheduler import SchedulerDisplay
-from rubin_sim.scheduler.model_observatory import ModelObservatory
-from schedview.collect import read_scheduler
-from schedview.plot.scheduler import LOGGER, DEFAULT_NSIDE, DEFAULT_MJD
+import bokeh.models
+import bokeh.plotting
+import pandas as pd
 import rubin_sim.scheduler.example
+from astropy.time import Time
+from rubin_sim.scheduler.model_observatory import ModelObservatory
+from uranography.api import ArmillarySphere, HorizonMap, MollweideMap, Planisphere
+
+from schedview.collect import read_scheduler, sample_pickle
+from schedview.plot.scheduler import (
+    DEFAULT_MJD,
+    DEFAULT_NSIDE,
+    LOGGER,
+    SchedulerDisplay,
+)
 
 
 class SchedulerDisplayApp(SchedulerDisplay):

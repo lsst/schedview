@@ -1,17 +1,17 @@
-import numbers
-import numpy as np
-import pandas as pd
-import pickle
-import lzma
 import copy
 import datetime
-from astropy.timeseries import TimeSeries
+import lzma
+import numbers
+import pickle
+
+import numpy as np
+import pandas as pd
 from astropy.time import Time
-from rubin_sim.scheduler.utils import empty_observation
-from rubin_sim.scheduler.model_observatory import ModelObservatory
-from rubin_sim.scheduler.example import example_scheduler
+from astropy.timeseries import TimeSeries
 from rubin_sim.scheduler import sim_runner
-from rubin_sim.scheduler.utils import SchemaConverter
+from rubin_sim.scheduler.example import example_scheduler
+from rubin_sim.scheduler.model_observatory import ModelObservatory
+from rubin_sim.scheduler.utils import SchemaConverter, empty_observation
 
 
 def _make_observation_from_record(record):

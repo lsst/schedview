@@ -1,5 +1,6 @@
-from collections import OrderedDict
 import os
+from collections import OrderedDict
+
 import pandas as pd
 
 BSC5_URL = "http://tdc-www.harvard.edu/catalogs/bsc5.dat.gz"

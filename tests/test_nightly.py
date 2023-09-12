@@ -1,12 +1,12 @@
-import unittest
-from tempfile import TemporaryDirectory
-from pathlib import Path
 import importlib.resources
-import pandas as pd
-import bokeh
+import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
-from rubin_sim.scheduler.utils import SchemaConverter
+import bokeh
+import pandas as pd
 from rubin_sim.scheduler.model_observatory import ModelObservatory
+from rubin_sim.scheduler.utils import SchemaConverter
 
 import schedview
 import schedview.plot.nightly

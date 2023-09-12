@@ -1,39 +1,35 @@
-import bokeh.plotting
-import numpy as np
-import healpy as hp
-from astropy.time import Time
-import logging
 import collections.abc
-from collections import OrderedDict
-import warnings
 import itertools
+import logging
+import warnings
+from collections import OrderedDict
 
-import pandas as pd
-import bokeh.models
 import bokeh.core.properties
-
-from rubin_sim.scheduler.features.conditions import Conditions
-from rubin_sim.scheduler.schedulers.core_scheduler import (
-    CoreScheduler as CoreScheduler,
-)
-from rubin_sim.scheduler.model_observatory import ModelObservatory
-import rubin_sim.scheduler.schedulers
-import rubin_sim.scheduler.surveys
+import bokeh.models
+import bokeh.plotting
+import healpy as hp
+import numpy as np
+import pandas as pd
 import rubin_sim.scheduler.basis_functions
 import rubin_sim.scheduler.example
-
+import rubin_sim.scheduler.schedulers
+import rubin_sim.scheduler.surveys
+from astropy.time import Time
+from rubin_sim.scheduler.features.conditions import Conditions
+from rubin_sim.scheduler.model_observatory import ModelObservatory
+from rubin_sim.scheduler.schedulers.core_scheduler import CoreScheduler as CoreScheduler
 from uranography.api import (
     ArmillarySphere,
     HorizonMap,
-    Planisphere,
     MollweideMap,
+    Planisphere,
     make_zscale_linear_cmap,
 )
 
 from schedview.collect import read_scheduler
 from schedview.compute.scheduler import (
-    make_unique_survey_name,
     make_scheduler_summary_df,
+    make_unique_survey_name,
 )
 from schedview.compute.survey import make_survey_reward_df
 
@@ -57,11 +53,11 @@ def make_logger():
 LOGGER = make_logger()
 
 
-class BadSchedulerException(Exception):
+class BadSchedulerError(Exception):
     pass
 
 
-class BadConditionsException(Exception):
+class BadConditionsError(Exception):
     pass
 
 
@@ -303,10 +299,10 @@ class SchedulerDisplay:
         """
         scheduler, conditions = read_scheduler(file_name)
         if not isinstance(scheduler, CoreScheduler):
-            raise BadSchedulerException()
+            raise BadSchedulerError()
 
         if not isinstance(conditions, Conditions):
-            raise BadConditionsException()
+            raise BadConditionsError()
 
         scheduler.update_conditions(conditions)
         self.scheduler = scheduler

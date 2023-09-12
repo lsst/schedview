@@ -1,11 +1,12 @@
-from functools import cache
 import datetime
+from functools import cache
+
 import numpy as np
 import pandas as pd
-from astropy.time import Time
 import pytz
-from rubin_sim.site_models.almanac import Almanac
+from astropy.time import Time
 from rubin_sim.scheduler.model_observatory import ModelObservatory
+from rubin_sim.site_models.almanac import Almanac
 
 
 @cache

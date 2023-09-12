@@ -1,12 +1,12 @@
-import warnings
-import numpy as np
+import argparse
 import lzma
 import pickle
-import argparse
+import warnings
 
+import numpy as np
 from astropy.time import Time
-from rubin_sim.scheduler.example import example_scheduler
 from rubin_sim.scheduler import sim_runner
+from rubin_sim.scheduler.example import example_scheduler
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 from rubin_sim.scheduler.utils import SchemaConverter
 
@@ -17,11 +17,6 @@ warnings.filterwarnings(
     "ignore",
     module="astropy.time",
     message="Numerical value without unit or explicit format passed to TimeDelta, assuming days",
-)
-warnings.filterwarnings(
-    "ignore",
-    module="pandas",
-    message="In a future version of pandas, a length 1 tuple will be returned when iterating over a groupby with a grouper equal to a list of length 1. Don't supply a list with a single grouper to avoid this warning.",
 )
 warnings.filterwarnings(
     "ignore",
@@ -89,13 +84,18 @@ def make_sample_test_data():
 
     observatory = ModelObservatory()
 
-    # Set `evening_mjd` to the integer calendar MJD of the local calendar day on which sunset falls on the night of interest.
+    # Set `evening_mjd` to the integer calendar MJD of the local calendar day
+    # on which sunset falls on the night of interest.
     evening_mjd = Time(evening_iso8601).mjd
 
-    # If we just use this day as the start and make the simulation duration 1 day, the begin and end of the simulation will probably begin in the middle on one night and end in the middle of the next.
-    # Instead, find the sunset and sunrise of the night we want using the almanac, and use these to determine our start time and duration.
+    # If we just use this day as the start and make the simulation duration 1
+    # day, the begin and end of the simulation will probably begin in the
+    # middle on one night and end in the middle of the next.
+    # Instead, find the sunset and sunrise of the night we want using the
+    # almanac, and use these to determine our start time and duration.
 
-    # If the date represents the local calendar date at sunset, we need to shift by the longitude in units of days
+    # If the date represents the local calendar date at sunset, we need to
+    # shift by the longitude in units of days
     this_night = (
         np.floor(
             observatory.almanac.sunsets["sunset"] + observatory.site.longitude / 360

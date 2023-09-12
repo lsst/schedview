@@ -1,10 +1,11 @@
-from astropy.time import Time
-import schedview.collect.opsim
-import schedview.compute.astro
 import hvplot
+from astropy.time import Time
 
 # Imported to help sphinx make the link
 from rubin_sim.scheduler.model_observatory import ModelObservatory  # noqa F401
+
+import schedview.collect.opsim
+import schedview.compute.astro
 
 
 def plot_visits(visits):

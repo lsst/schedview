@@ -1,13 +1,14 @@
-import pickle
-import os
-import gzip
 import bz2
-import lzma
+import gzip
 import importlib.resources
-from pathlib import Path
-from tempfile import TemporaryDirectory
+import lzma
+import os
+import pickle
 import urllib
 import urllib.request
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 
 __all__ = ["read_scheduler", "sample_pickle"]

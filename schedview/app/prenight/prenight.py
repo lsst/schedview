@@ -1,31 +1,30 @@
 import argparse
-import param
+import importlib
+import json
 import logging
+import os
+
+import astropy.utils.iers
+import bokeh
+import hvplot.pandas  # noqa: F401
 import numpy as np
 import pandas as pd
-import os
-import json
-import importlib
 import panel as pn
-import bokeh
-import hvplot.pandas
-from astropy.time import Time
-import astropy.utils.iers
-
-from rubin_sim.scheduler.model_observatory import ModelObservatory
+import param
 import rubin_sim.scheduler.example
+from astropy.time import Time
+from rubin_sim.scheduler.model_observatory import ModelObservatory
 
-import schedview.compute.astro
-import schedview.collect.opsim
-import schedview.compute.scheduler
 import schedview.collect.footprint
-import schedview.plot.visits
-import schedview.plot.visitmap
-import schedview.plot.rewards
-import schedview.plot.visits
+import schedview.collect.opsim
+import schedview.compute.astro
+import schedview.compute.scheduler
+import schedview.param
 import schedview.plot.nightbf
 import schedview.plot.nightly
-import schedview.param
+import schedview.plot.rewards
+import schedview.plot.visitmap
+import schedview.plot.visits
 
 AVAILABLE_TIMEZONES = [
     "Chile/Continental",
@@ -853,7 +852,9 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
 
         Returns
         -------
-        pn_app : `panel.viewable.Viewable` or `tuple` ['panel.viewable.Viewable', `schedview.prenight.Prenight`]
+        pn_app : `panel.viewable.Viewable`
+            or `tuple`
+            ['panel.viewable.Viewable', `schedview.prenight.Prenight`]
             The pre-night briefing app.
         """
         prenight = cls()

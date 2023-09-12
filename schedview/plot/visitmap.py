@@ -1,23 +1,18 @@
-import numpy as np
-import healpy as hp
 import bokeh
+import healpy as hp
+import numpy as np
 import pandas as pd
 from astropy.time import Time
 
-import schedview.collect.scheduler_pickle
-from uranography.api import (
-    Planisphere,
-    ArmillarySphere,
-    split_healpix_by_resolution,
-)
-from schedview.compute.camera import LsstCameraFootprintPerimeter
+# Imported to help sphinx make the link
 from rubin_sim.scheduler.model_observatory.model_observatory import ModelObservatory
+from rubin_sim.scheduler.schedulers import CoreScheduler  # noqa F401
+from uranography.api import ArmillarySphere, Planisphere, split_healpix_by_resolution
+
+import schedview.collect.scheduler_pickle
 import schedview.compute.astro
 from schedview.collect.stars import load_bright_stars
-
-# Imported to help sphinx make the link
-from rubin_sim.scheduler.model_observatory import ModelObservatory  # noqa F401
-from rubin_sim.scheduler.schedulers import CoreScheduler  # noqa F401
+from schedview.compute.camera import LsstCameraFootprintPerimeter
 
 BAND_COLORS = dict(
     u="#56b4e9", g="#008060", r="#ff4000", i="#850000", z="#6600cc", y="#222222"

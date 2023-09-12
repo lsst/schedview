@@ -1,9 +1,11 @@
 import unittest
 from collections import OrderedDict
+
 import pandas as pd
-from schedview.compute.survey import make_survey_reward_df, compute_maps
-from rubin_sim.scheduler.model_observatory import ModelObservatory
 from rubin_sim.scheduler.example import example_scheduler
+from rubin_sim.scheduler.model_observatory import ModelObservatory
+
+from schedview.compute.survey import compute_maps, make_survey_reward_df
 
 
 class TestComputeSurvey(unittest.TestCase):

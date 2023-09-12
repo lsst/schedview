@@ -1,4 +1,5 @@
 import unittest
+
 from schedview.collect.stars import load_bright_stars
 
 

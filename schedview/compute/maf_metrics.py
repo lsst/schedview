@@ -1,12 +1,13 @@
 from copy import deepcopy
 
 from rubin_sim import maf
-import schedview
-import schedview.compute.astro
+from rubin_sim.maf import MetricBundleGroup  # noqa F401
 
 # Imported to help sphinx make the link
 from rubin_sim.scheduler.model_observatory import ModelObservatory  # noqa F401
-from rubin_sim.maf import MetricBundleGroup  # noqa F401
+
+import schedview
+import schedview.compute.astro
 
 
 def compute_night_metric_bundle(

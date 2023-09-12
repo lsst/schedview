@@ -4,13 +4,13 @@ import holoviews as hv
 import numpy as np
 from astropy.time import Time
 
-import schedview.collect.scheduler_pickle
-import schedview.collect.opsim
-import schedview.compute.scheduler
-import schedview.compute.astro
-
 # Imported to help sphinx make the link
 from rubin_sim.scheduler.model_observatory import ModelObservatory  # noqa F401
+
+import schedview.collect.opsim
+import schedview.collect.scheduler_pickle
+import schedview.compute.astro
+import schedview.compute.scheduler
 
 
 def plot_survey_rewards(rewards):

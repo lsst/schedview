@@ -1,8 +1,10 @@
 import unittest
-from tempfile import TemporaryDirectory
 from pathlib import Path
-import bokeh.plotting
+from tempfile import TemporaryDirectory
+
 import bokeh.io
+import bokeh.plotting
+
 from schedview.app.sched_maps.sched_maps import SchedulerDisplayApp
 from schedview.collect import sample_pickle
 

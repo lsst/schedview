@@ -1,9 +1,8 @@
 import unittest
 
-import numpy as np
 import healpy as hp
+import numpy as np
 from astropy.coordinates import SkyCoord
-
 from numpy.random import default_rng
 
 from schedview import sphere

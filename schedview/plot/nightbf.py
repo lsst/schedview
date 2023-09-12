@@ -3,7 +3,6 @@ import itertools
 import bokeh
 import numpy as np
 from astropy.time import Time
-
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 
 

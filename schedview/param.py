@@ -1,7 +1,7 @@
 # Subclasses of param.Parameter for use in schedview.
 
-import param
 import pandas as pd
+import param
 
 
 class Series(param.Parameter):

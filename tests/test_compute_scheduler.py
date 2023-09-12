@@ -1,14 +1,16 @@
 import unittest
+
 import pandas as pd
 import rubin_sim.scheduler.example
+from rubin_sim.scheduler.example import example_scheduler
+from rubin_sim.scheduler.features.conditions import Conditions
+from rubin_sim.scheduler.model_observatory import ModelObservatory
+
 from schedview.compute.scheduler import (
     create_example,
-    make_unique_survey_name,
     make_scheduler_summary_df,
+    make_unique_survey_name,
 )
-from rubin_sim.scheduler.model_observatory import ModelObservatory
-from rubin_sim.scheduler.features.conditions import Conditions
-from rubin_sim.scheduler.example import example_scheduler
 
 
 class TestComputeScheduler(unittest.TestCase):
