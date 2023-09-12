@@ -1,26 +1,40 @@
 Installation
 ============
 
+Installing dashboards
+---------------------
 
-Quick Installation
-------------------
+First, get the code by cloning the github project:
 
-Installation from PyPI:
-``pip install schedview``
+    $ git clone git@github.com:lsst/schedview.git
 
-coming soon: ``conda install -c conda-forge schedview``
+Create a `conda` environment with the appropriate dependencies, and activate it.
+If you are running the `metric_maps` application, use the `conda` environment
+file that includes a recent version of `rubin_sim`:
+
+    $ conda env create -f environment.yaml
+    $ conda activate schedview
+
+Install the (development) `schedview` in your new environment:
+
+    $ pip install -e .
+
+Run the tests:
+
+    $ pytest
+
 
 Building Documentation
 ----------------------
 
-An online copy of the documentation is available at https://uranography.lsst.io,
-however building a local copy can be done as follows:
+Online documentation require the installation of `documenteer[guide]`:
 
 ::
 
  pip install "documenteer[guide]"
  cd docs
- package-docs build
+ make clean
+ make html
 
 
 The root of the local documentation will then be `docs/_build/html/index.html`.
