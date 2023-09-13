@@ -8,7 +8,7 @@ from astropy.time import Time
 def read_opsim(filename, start_time="2000-01-01", end_time="2100-01-01"):
     """Read visits from an opsim database.
 
-    Paramaters
+    Parameters
     ----------
     filename : `str`
         The file from which to load visits

@@ -36,7 +36,7 @@ class LsstCameraFootprintPerimeter(object):
     def single_eq_vertices(self, ra, decl, rotation=0):
         """Compute vertices for a single pair of equatorial coordinates
 
-        Paremeters
+        Parameters
         ----------
         ra : `float`
             The R.A. (in degrees)
@@ -69,7 +69,7 @@ class LsstCameraFootprintPerimeter(object):
     def __call__(self, ra, decl, rotation=0):
         """Compute vertices for a single pair of equatorial coordinates
 
-        Paremeters
+        Parameters
         ----------
         ra : `np.ndarray`
             The R.A. of pointings (in degrees)
