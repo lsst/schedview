@@ -17,9 +17,7 @@ class TestSchedMaps(unittest.TestCase):
 
         render_figure(scheduler_app)
 
-        scheduler_app.bokeh_models["file_input_box"].value = sample_pickle(
-            "scheduler1_sample.pickle.gz"
-        )
+        scheduler_app.bokeh_models["file_input_box"].value = sample_pickle("scheduler1_sample.pickle.gz")
         scheduler_app.disable_controls()
 
 

@@ -54,14 +54,7 @@ def _visits_tooltips(visits, weather=False):
         ("Filter", "@filter"),
         (
             "Field coordinates",
-            "RA=@fieldRA"
-            + deg
-            + ", Decl=@fieldDec"
-            + deg
-            + ", Az=@azimuth"
-            + deg
-            + ", Alt=@altitude"
-            + deg,
+            "RA=@fieldRA" + deg + ", Decl=@fieldDec" + deg + ", Az=@azimuth" + deg + ", Alt=@altitude" + deg,
         ),
         ("Parallactic angle", "@paraAngle" + deg),
         ("Rotator angle", "@rotTelPos" + deg),
@@ -124,9 +117,7 @@ def _add_almanac_events(fig, almanac_events, event_labels, event_colors):
         if event_labels[event] is None:
             continue
 
-        event_marker = bokeh.models.Span(
-            location=row.UTC, dimension="height", line_color=event_colors[event]
-        )
+        event_marker = bokeh.models.Span(location=row.UTC, dimension="height", line_color=event_colors[event])
         fig.add_layout(event_marker)
         event_label = bokeh.models.Label(
             x=row.UTC,
@@ -283,9 +274,7 @@ def plot_alt_vs_time(
     else:
         visits_ds = bokeh.models.ColumnDataSource(visits)
 
-    ha_color_mapper = bokeh.models.LinearColorMapper(
-        low=-5, high=5, palette=colorcet.palette["bkr"]
-    )
+    ha_color_mapper = bokeh.models.LinearColorMapper(low=-5, high=5, palette=colorcet.palette["bkr"])
 
     filter_marker_mapper = bokeh.models.CategoricalMarkerMapper(
         factors=tuple(band_shapes.keys()),
@@ -368,16 +357,12 @@ def _add_alt_graticules(fig, transform, min_alt=0, max_alt=90, alt_step=30, labe
             )
 
 
-def _add_az_graticules(
-    fig, transform, min_alt=0, min_az=0, max_az=360, az_step=30, label=True
-):
+def _add_az_graticules(fig, transform, min_alt=0, min_az=0, max_az=360, az_step=30, label=True):
     """Add azimuth graticules to a figure"""
     for azimuth in np.arange(min_az, max_az + az_step, az_step):
         zd = [0, 90 - min_alt]
         azimuths = [azimuth, azimuth]
-        graticule_source = bokeh.models.ColumnDataSource(
-            {"azimuth": azimuths, "zd": zd}
-        )
+        graticule_source = bokeh.models.ColumnDataSource({"azimuth": azimuths, "zd": zd})
 
         fig.line(
             transform.y,
@@ -465,10 +450,7 @@ def plot_polar_alt_az(visits, band_shapes=BAND_SHAPES, figure=None, legend=True)
 
     if "HA_hours" not in visits_ds.column_names:
         hour_angle = (
-            (
-                np.array(visits_ds.data["observationStartLST"])
-                - np.array(visits_ds.data["fieldRA"])
-            )
+            (np.array(visits_ds.data["observationStartLST"]) - np.array(visits_ds.data["fieldRA"]))
             * 24.0
             / 360.0
         )
@@ -478,9 +460,7 @@ def plot_polar_alt_az(visits, band_shapes=BAND_SHAPES, figure=None, legend=True)
     if "zd" not in visits_ds.column_names:
         visits_ds.add(90 - np.array(visits_ds.data["altitude"]), "zd")
 
-    ha_color_mapper = bokeh.models.LinearColorMapper(
-        low=-5, high=5, palette=colorcet.palette["bkr"]
-    )
+    ha_color_mapper = bokeh.models.LinearColorMapper(low=-5, high=5, palette=colorcet.palette["bkr"])
 
     filter_marker_mapper = bokeh.models.CategoricalMarkerMapper(
         factors=tuple(band_shapes.keys()),

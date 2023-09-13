@@ -88,9 +88,7 @@ def replay_visits(scheduler, visits):
         obs = _make_observation_from_record(visit_record)
         scheduler.add_observation(obs)
 
-    scheduler.conditions.mjd = float(
-        obs["mjd"] + (obs["slewtime"] + obs["visittime"]) / (24 * 60 * 60)
-    )
+    scheduler.conditions.mjd = float(obs["mjd"] + (obs["slewtime"] + obs["visittime"]) / (24 * 60 * 60))
 
 
 def compute_basis_function_reward_at_time(scheduler, time, observatory=None):
@@ -112,25 +110,19 @@ def compute_basis_function_reward_at_time(scheduler, time, observatory=None):
 
     def get_survey_name(row):
         try:
-            survey_name = scheduler.survey_lists[row.list_index][
-                row.survey_index
-            ].survey_name
+            survey_name = scheduler.survey_lists[row.list_index][row.survey_index].survey_name
         except AttributeError:
             survey_name = ""
 
         if len(survey_name) == 0:
-            class_name = scheduler.survey_lists[row.list_index][
-                row.survey_index
-            ].__class__.__name__
+            class_name = scheduler.survey_lists[row.list_index][row.survey_index].__class__.__name__
             survey_name = f"{class_name}_{row.list_index}_{row.survey_index}"
         return survey_name
 
     summary_df["survey_name"] = summary_df.apply(get_survey_name, axis=1)
 
     def make_survey_row(survey_bfs):
-        infeasible_bf = ", ".join(
-            survey_bfs.loc[~survey_bfs.feasible.astype(bool)].basis_function.to_list()
-        )
+        infeasible_bf = ", ".join(survey_bfs.loc[~survey_bfs.feasible.astype(bool)].basis_function.to_list())
         infeasible = ~np.all(survey_bfs.feasible.astype(bool))
         reward = survey_bfs.max_accum_reward.iloc[-1]
 
@@ -154,12 +146,8 @@ def compute_basis_function_rewards(scheduler, sample_times=None, observatory=Non
     if sample_times is None:
         # Compute values for the current night by default.
         sample_times = pd.date_range(
-            Time(
-                float(scheduler.conditions.sun_n12_setting), format="mjd", scale="utc"
-            ).datetime,
-            Time(
-                float(scheduler.conditions.sun_n12_rising), format="mjd", scale="utc"
-            ).datetime,
+            Time(float(scheduler.conditions.sun_n12_setting), format="mjd", scale="utc").datetime,
+            Time(float(scheduler.conditions.sun_n12_rising), format="mjd", scale="utc").datetime,
             freq="10T",
         )
 
@@ -168,9 +156,7 @@ def compute_basis_function_rewards(scheduler, sample_times=None, observatory=Non
 
     reward_list = []
     for time in sample_times:
-        this_time_reward = compute_basis_function_reward_at_time(
-            scheduler, time, observatory
-        )
+        this_time_reward = compute_basis_function_reward_at_time(scheduler, time, observatory)
         this_time_reward["mjd"] = Time(time).mjd
         this_time_reward["time"] = time
         reward_list.append(this_time_reward)
@@ -287,9 +273,7 @@ def create_example(
 
     if scheduler_pickle_fname is not None:
         if scheduler_pickle_fname.endswith(".xz"):
-            with lzma.open(
-                scheduler_pickle_fname, "wb", format=lzma.FORMAT_XZ
-            ) as out_file:
+            with lzma.open(scheduler_pickle_fname, "wb", format=lzma.FORMAT_XZ) as out_file:
                 pickle.dump((scheduler, scheduler.conditions), out_file)
         else:
             with open(scheduler_pickle_fname, "wb") as out_file:
@@ -332,9 +316,7 @@ def make_unique_survey_name(scheduler, survey_index=None):
     except AttributeError:
         survey_name = str(survey)
 
-    if hasattr(survey, "observations") and (
-        survey.survey_name != survey.observations["note"][0]
-    ):
+    if hasattr(survey, "observations") and (survey.survey_name != survey.observations["note"][0]):
         survey_name = f"{survey.observations['note'][0]}"
 
     survey_name = f"{survey_index[1]}: {survey_name}"
@@ -378,12 +360,8 @@ def make_scheduler_summary_df(scheduler, conditions, reward_df=None):
         for survey_index, survey in enumerate(survey_list):
             if (list_index, survey_index) not in summary_df.index:
                 survey.calc_reward_function(conditions)
-                summary_df.loc[
-                    (list_index, survey_index), "max_basis_reward"
-                ] = survey.reward
-                summary_df.loc[
-                    (list_index, survey_index), "max_accum_reward"
-                ] = survey.reward
+                summary_df.loc[(list_index, survey_index), "max_basis_reward"] = survey.reward
+                summary_df.loc[(list_index, survey_index), "max_accum_reward"] = survey.reward
                 summary_df.loc[(list_index, survey_index), "feasible"] = (
                     np.isfinite(survey.reward) or survey.reward > 0
                 )
@@ -397,9 +375,7 @@ def make_scheduler_summary_df(scheduler, conditions, reward_df=None):
     summary_df["tier"] = summary_df.apply(make_tier_name, axis=1)
 
     def get_survey_name(row):
-        survey_name = make_unique_survey_name(
-            scheduler, [row.list_index, row.survey_index]
-        )
+        survey_name = make_unique_survey_name(scheduler, [row.list_index, row.survey_index])
         return survey_name
 
     summary_df["survey_name"] = summary_df.apply(get_survey_name, axis=1)
@@ -414,9 +390,7 @@ def make_scheduler_summary_df(scheduler, conditions, reward_df=None):
     summary_df["survey_url"] = summary_df.apply(get_survey_url, axis=1)
 
     def make_survey_row(survey_bfs):
-        infeasible_bf = ", ".join(
-            survey_bfs.loc[~survey_bfs.feasible.astype(bool)].basis_function.to_list()
-        )
+        infeasible_bf = ", ".join(survey_bfs.loc[~survey_bfs.feasible.astype(bool)].basis_function.to_list())
         infeasible = ~np.all(survey_bfs.feasible.astype(bool))
         reward = infeasible_bf if infeasible else survey_bfs.max_accum_reward.iloc[-1]
         if reward in (None, "N/A", "None"):
@@ -425,8 +399,6 @@ def make_scheduler_summary_df(scheduler, conditions, reward_df=None):
         survey_row = pd.Series({"reward": reward, "infeasible": infeasible})
         return survey_row
 
-    survey_df = summary_df.groupby(["tier", "survey_name", "survey_url"]).apply(
-        make_survey_row
-    )
+    survey_df = summary_df.groupby(["tier", "survey_name", "survey_url"]).apply(make_survey_row)
 
     return survey_df["reward"].reset_index()

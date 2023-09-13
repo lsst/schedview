@@ -6,11 +6,7 @@ from rubin_sim.scheduler.example import example_scheduler
 from rubin_sim.scheduler.features.conditions import Conditions
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 
-from schedview.compute.scheduler import (
-    create_example,
-    make_scheduler_summary_df,
-    make_unique_survey_name,
-)
+from schedview.compute.scheduler import create_example, make_scheduler_summary_df, make_unique_survey_name
 
 
 class TestComputeScheduler(unittest.TestCase):
@@ -20,9 +16,7 @@ class TestComputeScheduler(unittest.TestCase):
     def test_create_example(self):
         current_time = "2025-07-02T02:00:00Z"
         survey_start = "2026-07-01T16:00:00Z"
-        scheduler, observatory, conditions, observations = create_example(
-            current_time, survey_start
-        )
+        scheduler, observatory, conditions, observations = create_example(current_time, survey_start)
         self.assertIsInstance(scheduler, rubin_sim.scheduler.schedulers.CoreScheduler)
         self.assertIsInstance(observatory, ModelObservatory)
         self.assertIsInstance(conditions, Conditions)
@@ -40,7 +34,5 @@ class TestComputeScheduler(unittest.TestCase):
         self.observatory.mjd = 60100.2
         conditions = self.observatory.return_conditions()
         reward_df = self.sample_scheduler.make_reward_df(conditions)
-        summary_df = make_scheduler_summary_df(
-            self.sample_scheduler, conditions, reward_df
-        )
+        summary_df = make_scheduler_summary_df(self.sample_scheduler, conditions, reward_df)
         self.assertIsInstance(summary_df, pd.DataFrame)

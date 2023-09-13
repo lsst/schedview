@@ -18,8 +18,7 @@ class Series(param.Parameter):
 
         if not isinstance(val, pd.Series):
             raise ValueError(
-                f"Parameter {self.name} only takes a pandas.Series, "
-                f"not value of type {type(val)}."
+                f"Parameter {self.name} only takes a pandas.Series, " f"not value of type {type(val)}."
             )
 
     def _validate(self, val):
@@ -41,9 +40,7 @@ class DataFrame(param.Parameter):
 
     __slots__ = ["columns", "allow_empty"]
 
-    def __init__(
-        self, default=None, columns=None, allow_empty=True, allow_None=False, **kwargs
-    ):
+    def __init__(self, default=None, columns=None, allow_empty=True, allow_None=False, **kwargs):
         super().__init__(default=default, allow_None=allow_None, **kwargs)
         self.columns = columns
         self.allow_empty = allow_empty
@@ -60,9 +57,7 @@ class DataFrame(param.Parameter):
             )
 
         if not self.allow_empty and len(val) == 0:
-            raise ValueError(
-                f"DataFrame parameter {self.name} must have at least one row."
-            )
+            raise ValueError(f"DataFrame parameter {self.name} must have at least one row.")
 
         # If the DataFrame is empty, do not check columns or column types.
         if self.columns is None or len(val) == 0:
@@ -70,9 +65,7 @@ class DataFrame(param.Parameter):
 
         for column in self.columns:
             if column not in val.columns:
-                raise ValueError(
-                    f"DataFrame parameter {self.name} must have column {column}."
-                )
+                raise ValueError(f"DataFrame parameter {self.name} must have column {column}.")
 
             try:
                 required_type = self.columns[column]

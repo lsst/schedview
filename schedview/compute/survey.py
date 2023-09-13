@@ -54,9 +54,7 @@ def make_survey_reward_df(survey, conditions, reward_df=None):
 
         root_bf_name = basis_function_name.split()[0]
 
-        standard_basis_functions = dict(
-            getmembers(rubin_sim.scheduler.basis_functions)
-        ).keys()
+        standard_basis_functions = dict(getmembers(rubin_sim.scheduler.basis_functions)).keys()
         if root_bf_name in standard_basis_functions:
             url = f"https://rubin-sim.lsst.io/api/rubin_sim.scheduler.basis_functions.{root_bf_name}.html#rubin_sim.scheduler.basis_functions.{root_bf_name}"  # noqa E501
         else:
@@ -64,9 +62,7 @@ def make_survey_reward_df(survey, conditions, reward_df=None):
         return url
 
     try:
-        reward_df["doc_url"] = reward_df["basis_function_class"].map(
-            _guess_basis_function_doc_url
-        )
+        reward_df["doc_url"] = reward_df["basis_function_class"].map(_guess_basis_function_doc_url)
     except KeyError:
         reward_df["doc_url"] = None
 

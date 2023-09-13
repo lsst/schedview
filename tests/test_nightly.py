@@ -13,11 +13,7 @@ import schedview.plot.nightly
 
 
 def _load_sample_visits():
-    visits_path = (
-        importlib.resources.files(schedview)
-        .joinpath("data")
-        .joinpath("sample_opsim.db")
-    )
+    visits_path = importlib.resources.files(schedview).joinpath("data").joinpath("sample_opsim.db")
     visits = pd.DataFrame(SchemaConverter().opsim2obs(visits_path))
     if "observationStartMJD" not in visits.columns and "mjd" in visits.columns:
         visits["observationStartMJD"] = visits["mjd"]

@@ -20,20 +20,14 @@ def get_footprint(scheduler=None):
                         bf_class = basis_function.__class__
                         if bf_class.__name__.startswith("Footprint"):
                             if footprint is None:
-                                footprint = np.sum(
-                                    basis_function.footprint.footprints, axis=0
-                                )
+                                footprint = np.sum(basis_function.footprint.footprints, axis=0)
                             else:
-                                footprint += np.sum(
-                                    basis_function.footprint.footprints, axis=0
-                                )
+                                footprint += np.sum(basis_function.footprint.footprints, axis=0)
 
     if footprint is None:
         sky_area_generator = SkyAreaGenerator(nside=nside)
         band_footprints, _ = sky_area_generator.return_maps()
-        footprint = np.sum(
-            band_footprints[b] for b in band_footprints.dtype.fields.keys()
-        )
+        footprint = np.sum(band_footprints[b] for b in band_footprints.dtype.fields.keys())
 
     footprint[footprint == 0] = np.nan
     return footprint

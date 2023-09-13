@@ -127,9 +127,7 @@ def sample_pickle(base_fname="sample_scheduler.pickle.xz"):
     root_package = __package__.split(".")[0]
 
     try:
-        fname = str(
-            importlib.resources.files(root_package).joinpath("data", base_fname)
-        )
+        fname = str(importlib.resources.files(root_package).joinpath("data", base_fname))
     except AttributeError as e:
         # If we are using an older version of importlib, we need to do
         # this instead:

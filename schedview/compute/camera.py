@@ -23,18 +23,14 @@ class LsstCameraFootprintPerimeter(object):
         self.vertices = pd.DataFrame(
             {
                 "x": [
-                    offsets[i] - self.footprint_width_deg / 2
-                    for i in (0, 1, 1, 2, 2, 3, 3, 2, 2, 1, 1, 0, 0)
+                    offsets[i] - self.footprint_width_deg / 2 for i in (0, 1, 1, 2, 2, 3, 3, 2, 2, 1, 1, 0, 0)
                 ],
                 "y": [
-                    offsets[i] - self.footprint_width_deg / 2
-                    for i in (2, 2, 3, 3, 2, 2, 1, 1, 0, 0, 1, 1, 2)
+                    offsets[i] - self.footprint_width_deg / 2 for i in (2, 2, 3, 3, 2, 2, 1, 1, 0, 0, 1, 1, 2)
                 ],
             }
         )
-        self.vertices["angle"] = np.degrees(
-            np.arctan2(self.vertices.y, self.vertices.x)
-        )
+        self.vertices["angle"] = np.degrees(np.arctan2(self.vertices.y, self.vertices.x))
         self.vertices["r"] = np.hypot(self.vertices.y, self.vertices.x)
 
     def single_eq_vertices(self, ra, decl, rotation=0):
@@ -99,9 +95,7 @@ class LsstCameraFootprintPerimeter(object):
 
         vertex_ras, vertex_decls = [], []
         for this_ra, this_decl, this_rotation in zip(ra, decl, rotation):
-            this_vertex_ra, this_vertex_decl = self.single_eq_vertices(
-                this_ra, this_decl, this_rotation
-            )
+            this_vertex_ra, this_vertex_decl = self.single_eq_vertices(this_ra, this_decl, this_rotation)
             vertex_ras.append(this_vertex_ra)
             vertex_decls.append(this_vertex_decl)
 

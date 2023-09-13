@@ -46,9 +46,7 @@ warnings.filterwarnings(
 
 
 def make_sample_test_data():
-    parser = argparse.ArgumentParser(
-        description="Generate sample test data for testing schedview."
-    )
+    parser = argparse.ArgumentParser(description="Generate sample test data for testing schedview.")
     parser.add_argument(
         "--opsim_output_fname",
         type=str,
@@ -97,10 +95,7 @@ def make_sample_test_data():
     # If the date represents the local calendar date at sunset, we need to
     # shift by the longitude in units of days
     this_night = (
-        np.floor(
-            observatory.almanac.sunsets["sunset"] + observatory.site.longitude / 360
-        )
-        == evening_mjd
+        np.floor(observatory.almanac.sunsets["sunset"] + observatory.site.longitude / 360) == evening_mjd
     )
 
     mjd_start = observatory.almanac.sunsets[this_night]["sun_n12_setting"][0]
