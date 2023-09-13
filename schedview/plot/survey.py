@@ -1,7 +1,10 @@
 import re
-import numpy as np
-import bokeh
+
 import astropy
+import bokeh
+import numpy as np
+import rubin_sim.scheduler.features.conditions  # noqa: F401
+import rubin_sim.scheduler.surveys  # noqa: F401
 from astropy.time import Time
 from uranography.api import HorizonMap, make_zscale_linear_cmap
 
@@ -15,6 +18,8 @@ def map_survey_healpix(
     map_kwargs=None,
     cmap=None,
     cmap_scale="full",
+    conditions=None,
+    survey=None,
 ):
     """Map a healpix map of a survey at a given MJD.
 
@@ -40,6 +45,14 @@ def map_survey_healpix(
         The scale to use for the cmap.  Defaults to "full", which uses the full
         range of values in the healpix map.  Alternatively, "zscale" can be
         used to use a zscale cmap.
+    conditions : `rubin_sim.scheduler.features.conditions.Conditions`, optional
+        Default is None.
+        The observing conditions at which to map the survey, used to determine
+        telescope pointing. If None, do not mark telescope pointing.
+    survey : `rubin_sim.scheduler.surveys.BaseSurvey`, optional
+        Default is None.
+        The survey with fields to mark on the map.
+        If None or an unsuitable survey type, do not mark survey fields.
 
     Returns
     -------
@@ -115,6 +128,49 @@ def map_survey_healpix(
         ("Declination (deg)", "@center_decl"),
     ]
 
+    if (
+        conditions is not None
+        and conditions.tel_az is not None
+        and conditions.tel_alt is not None
+    ):
+        telescope_marker_data_source = bokeh.models.ColumnDataSource(
+            data={
+                "az": [np.degrees(conditions.tel_az)],
+                "alt": [np.degrees(conditions.tel_alt)],
+                "name": ["telescope_pointing"],
+                "glyph_size": [20],
+            },
+            name="telescope_pointing",
+        )
+
+        sky_map.add_marker(
+            data_source=telescope_marker_data_source,
+            name="telescope_pointing_marker",
+            circle_kwargs={"color": "green", "fill_alpha": 0.5},
+        )
+
+    if survey is not None:
+        try:
+            survey_field_data_source = bokeh.models.ColumnDataSource(
+                data={
+                    "ra": list(survey.ra_deg),
+                    "decl": list(survey.dec_deg),
+                    "name": [
+                        "survey_pointing {i}"
+                        for i, ra in enumerate(list(survey.ra_deg))
+                    ],
+                    "glyph_size": [20] * len(list(survey.ra_deg)),
+                },
+                name="survey_pointings",
+            )
+            sky_map.add_marker(
+                data_source=survey_field_data_source,
+                name="survey_field_marker",
+                circle_kwargs={"color": "black", "fill_alpha": 0},
+            )
+        except AttributeError:
+            pass
+
     # If we have alt/az coordinates, include them
     if "x_hz" in shown_hpix_data.keys() and "y_hz" in shown_hpix_data.keys():
         x_hz = np.mean(np.array(shown_hpix_data["x_hz"]), axis=1)
@@ -146,6 +202,9 @@ def map_survey_healpix(
         if "airmass" not in shown_hpix_data and "airmass" not in hpix_data:
             shown_hpix_data["airmass"] = airmass
             tooltips.append(("airmass", "@airmass"))
+
+        sky_map.add_horizon(89.99, line_kwargs={"color": "black", "line_width": 2})
+        sky_map.add_horizon(70, line_kwargs={"color": "red", "line_width": 2})
 
     for key in hpix_data:
         column_name = key.replace(" ", "_").replace(".", "_").replace("@", "_")
