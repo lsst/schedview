@@ -1,4 +1,4 @@
-scehdview
+schedview
 =========
 
 To do.
