@@ -1,6 +1,3 @@
-from .footprint import get_footprint
-from .local import *
-
 __all__ = [
     "get_footprint",
     "read_opsim",
@@ -8,3 +5,6 @@ __all__ = [
     "sample_pickle",
     "load_bright_stars",
 ]
+
+from .footprint import get_footprint
+from .local import *

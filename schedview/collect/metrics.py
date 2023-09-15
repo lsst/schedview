@@ -1,7 +1,7 @@
+__all__ = ["get_metric_path"]
+
 import importlib.resources
 from os import environ
-
-__all__ = ["get_metric_path"]
 
 
 def get_metric_path():

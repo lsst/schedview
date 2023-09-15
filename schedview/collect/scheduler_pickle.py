@@ -1,3 +1,5 @@
+__all__ = ["read_scheduler", "sample_pickle"]
+
 import bz2
 import gzip
 import importlib.resources
@@ -10,8 +12,6 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from rubin_sim.scheduler.model_observatory import ModelObservatory
-
-__all__ = ["read_scheduler", "sample_pickle"]
 
 try:
     PICKLE_FNAME = os.environ["SCHED_PICKLE"]
