@@ -1,16 +1,17 @@
-import pickle
-import os
-import gzip
+__all__ = ["read_scheduler", "sample_pickle"]
+
 import bz2
-import lzma
+import gzip
 import importlib.resources
-from pathlib import Path
-from tempfile import TemporaryDirectory
+import lzma
+import os
+import pickle
 import urllib
 import urllib.request
-from rubin_sim.scheduler.model_observatory import ModelObservatory
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
-__all__ = ["read_scheduler", "sample_pickle"]
+from rubin_sim.scheduler.model_observatory import ModelObservatory
 
 try:
     PICKLE_FNAME = os.environ["SCHED_PICKLE"]
@@ -126,9 +127,7 @@ def sample_pickle(base_fname="sample_scheduler.pickle.xz"):
     root_package = __package__.split(".")[0]
 
     try:
-        fname = str(
-            importlib.resources.files(root_package).joinpath("data", base_fname)
-        )
+        fname = str(importlib.resources.files(root_package).joinpath("data", base_fname))
     except AttributeError as e:
         # If we are using an older version of importlib, we need to do
         # this instead:

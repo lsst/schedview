@@ -1,14 +1,16 @@
-import unittest
-from tempfile import TemporaryDirectory
 import os.path
 import pickle
-from rubin_sim.scheduler.schedulers.core_scheduler import CoreScheduler
-from rubin_sim.scheduler.features.conditions import Conditions
-from schedview.collect.scheduler_pickle import read_scheduler
+import unittest
+from tempfile import TemporaryDirectory
+
 from rubin_sim.scheduler.example import example_scheduler
+from rubin_sim.scheduler.features.conditions import Conditions
+from rubin_sim.scheduler.schedulers.core_scheduler import CoreScheduler
+
+from schedview.collect.scheduler_pickle import read_scheduler
 
 
-class test_scheduler_pickle(unittest.TestCase):
+class TestSchedulerPickle(unittest.TestCase):
     def test_read_scheduler(self):
         scheduler, conditions = read_scheduler()
         self.assertIsInstance(scheduler, CoreScheduler)

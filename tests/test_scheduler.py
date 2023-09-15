@@ -1,22 +1,21 @@
 import unittest
-import healpy as hp
+
 import astropy.utils.iers
-from astropy.time import TimeDelta
-from schedview.plot.scheduler import (
-    SchedulerDisplay,
-    DEFAULT_MJD,
-)
-from schedview.collect import sample_pickle
+import healpy as hp
 import rubin_sim.scheduler.example
-from rubin_sim.scheduler.model_observatory import ModelObservatory
+from astropy.time import TimeDelta
 from rubin_sim.scheduler.features.conditions import Conditions
+from rubin_sim.scheduler.model_observatory import ModelObservatory
+
+from schedview.collect import sample_pickle
+from schedview.plot.scheduler import DEFAULT_MJD, SchedulerDisplay
 
 NSIDE = 8
 
 astropy.utils.iers.conf.iers_degraded_accuracy = "warn"
 
 
-class test_SchedulerDisplay(unittest.TestCase):
+class TestSchedulerDisplay(unittest.TestCase):
     def test_scheduler_display(self):
         mjd = DEFAULT_MJD
         nside = NSIDE

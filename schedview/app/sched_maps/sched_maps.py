@@ -1,24 +1,14 @@
-import bokeh.plotting
-from astropy.time import Time
-
-import pandas as pd
-import bokeh.models
 import bokeh.core.properties
-
-from uranography.api import (
-    ArmillarySphere,
-    HorizonMap,
-    Planisphere,
-    MollweideMap,
-)
-
-from schedview.collect import sample_pickle
-
-from schedview.plot.scheduler import SchedulerDisplay
-from rubin_sim.scheduler.model_observatory import ModelObservatory
-from schedview.collect import read_scheduler
-from schedview.plot.scheduler import LOGGER, DEFAULT_NSIDE, DEFAULT_MJD
+import bokeh.models
+import bokeh.plotting
+import pandas as pd
 import rubin_sim.scheduler.example
+from astropy.time import Time
+from rubin_sim.scheduler.model_observatory import ModelObservatory
+from uranography.api import ArmillarySphere, HorizonMap, MollweideMap, Planisphere
+
+from schedview.collect import read_scheduler, sample_pickle
+from schedview.plot.scheduler import DEFAULT_MJD, DEFAULT_NSIDE, LOGGER, SchedulerDisplay
 
 
 class SchedulerDisplayApp(SchedulerDisplay):
@@ -34,15 +24,11 @@ class SchedulerDisplayApp(SchedulerDisplay):
         # Need a bokeh model we can use to send a callback to to get the
         # browser to show an error. See
         # https://discourse.bokeh.org/t/send-user-warning-messages-on-python-error/6750
-        file_read_status = bokeh.models.Div(
-            name="file read status", text="Initial", visible=False
-        )
+        file_read_status = bokeh.models.Div(name="file read status", text="Initial", visible=False)
         code = 'if (file_read_status.text.startsWith("Could not read")) {alert(file_read_status.text); }'
         file_read_status.js_on_change(
             "text",
-            bokeh.models.callbacks.CustomJS(
-                args={"file_read_status": file_read_status}, code=code
-            ),
+            bokeh.models.callbacks.CustomJS(args={"file_read_status": file_read_status}, code=code),
         )
 
         def switch_pickle(attrname, old, new):
@@ -294,12 +280,8 @@ class SchedulerDisplayApp(SchedulerDisplay):
     def _select_survey_from_summary_table(self, attr, old, new):
         LOGGER.debug("Called select_survey_from_summary_table")
         selected_index = new[0]
-        tier_name = self.data_sources["reward_summary_table"].data["tier"][
-            selected_index
-        ]
-        survey_name = self.data_sources["reward_summary_table"].data["survey_name"][
-            selected_index
-        ]
+        tier_name = self.data_sources["reward_summary_table"].data["tier"][selected_index]
+        survey_name = self.data_sources["reward_summary_table"].data["survey_name"][selected_index]
 
         # Update the selectors, and this will run
         # the callbacks to do all the updates
@@ -441,15 +423,9 @@ class SchedulerDisplayApp(SchedulerDisplay):
             frame_height=512,
             decorate=True,
         )
-        self.bokeh_models["alt_slider"] = self.sphere_maps["armillary_sphere"].sliders[
-            "alt"
-        ]
-        self.bokeh_models["az_slider"] = self.sphere_maps["armillary_sphere"].sliders[
-            "az"
-        ]
-        self.bokeh_models["mjd_slider"] = self.sphere_maps["armillary_sphere"].sliders[
-            "mjd"
-        ]
+        self.bokeh_models["alt_slider"] = self.sphere_maps["armillary_sphere"].sliders["alt"]
+        self.bokeh_models["az_slider"] = self.sphere_maps["armillary_sphere"].sliders["az"]
+        self.bokeh_models["mjd_slider"] = self.sphere_maps["armillary_sphere"].sliders["mjd"]
         # self.bokeh_models["mjd_slider"].visible = False
         self.make_sphere_map(
             "planisphere",
@@ -575,9 +551,7 @@ def make_scheduler_map_figure(
         observatory = ModelObservatory(mjd_start=start_mjd, nside=nside)
         observatory.mjd = DEFAULT_MJD
         conditions = observatory.return_conditions()
-        scheduler = rubin_sim.scheduler.example.example_scheduler(
-            mjd_start=start_mjd, nside=nside
-        )
+        scheduler = rubin_sim.scheduler.example.example_scheduler(mjd_start=start_mjd, nside=nside)
         scheduler.update_conditions(conditions)
         scheduler.request_observation()
     else:

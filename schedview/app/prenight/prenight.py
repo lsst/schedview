@@ -1,31 +1,30 @@
 import argparse
-import param
+import importlib
+import json
 import logging
+import os
+
+import astropy.utils.iers
+import bokeh
+import hvplot.pandas  # noqa: F401
 import numpy as np
 import pandas as pd
-import os
-import json
-import importlib
 import panel as pn
-import bokeh
-import hvplot.pandas
-from astropy.time import Time
-import astropy.utils.iers
-
-from rubin_sim.scheduler.model_observatory import ModelObservatory
+import param
 import rubin_sim.scheduler.example
+from astropy.time import Time
+from rubin_sim.scheduler.model_observatory import ModelObservatory
 
-import schedview.compute.astro
-import schedview.collect.opsim
-import schedview.compute.scheduler
 import schedview.collect.footprint
-import schedview.plot.visits
-import schedview.plot.visitmap
-import schedview.plot.rewards
-import schedview.plot.visits
+import schedview.collect.opsim
+import schedview.compute.astro
+import schedview.compute.scheduler
+import schedview.param
 import schedview.plot.nightbf
 import schedview.plot.nightly
-import schedview.param
+import schedview.plot.rewards
+import schedview.plot.visitmap
+import schedview.plot.visits
 
 AVAILABLE_TIMEZONES = [
     "Chile/Continental",
@@ -55,6 +54,8 @@ pn.config.console_output = "accumulate"
 
 
 class Prenight(param.Parameterized):
+    """The pre-night briefing application."""
+
     custom_hvplot_tab_settings_file = param.FileSelector(
         default="",
         doc="The file containing the settings for the custom hvplot tabs.",
@@ -257,9 +258,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
     @param.depends("night", "timezone", watch=True)
     def _update_almanac_events(self):
         self.logger.info("Updating almanac events.")
-        night_events = schedview.compute.astro.night_events(
-            self.night, self._site, self.timezone
-        )
+        night_events = schedview.compute.astro.night_events(self.night, self._site, self.timezone)
 
         # Bokeh automatically converts all datetimes to UTC
         # when displaying, which we do not want. So, turn the localized
@@ -333,9 +332,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             "note",
         ]
 
-        visit_table = pn.widgets.Tabulator(
-            self._visits[columns], pagination="remote", header_filters=True
-        )
+        visit_table = pn.widgets.Tabulator(self._visits[columns], pagination="remote", header_filters=True)
 
         if len(self._visits) < 1:
             visit_table = "No visits on this night"
@@ -383,13 +380,9 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             return "Visits loaded, but no visits on this night."
 
         custom_plot_name = self._custom_hvplot_tab_settings[custom_plot_index]["name"]
-        self.logger.info(
-            f"Starting to create custom hvplot {custom_plot_index} ({custom_plot_name})"
-        )
+        self.logger.info(f"Starting to create custom hvplot {custom_plot_index} ({custom_plot_name})")
         try:
-            plot = self._visits.hvplot(
-                **self._custom_hvplot_tab_settings[custom_plot_index]["settings"]
-            )
+            plot = self._visits.hvplot(**self._custom_hvplot_tab_settings[custom_plot_index]["settings"])
             self.logger.info(f"Finished creating custom hvplot {custom_plot_index}")
         except Exception as e:
             self.logger.error(f"Could not create custom hvplot: {e}")
@@ -429,14 +422,10 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             self._scheduler = scheduler
             self.logger.info("Finished updating the scheduler.")
         except Exception as e:
-            self.logger.error(
-                f"Could not load scheduler from {self.scheduler_fname} {e}"
-            )
+            self.logger.error(f"Could not load scheduler from {self.scheduler_fname} {e}")
             if USE_EXAMPLE_SCHEDULER:
                 self.logger.info("Starting to load example scheduler.")
-                self._scheduler = rubin_sim.scheduler.example.example_scheduler(
-                    nside=self._nside
-                )
+                self._scheduler = rubin_sim.scheduler.example.example_scheduler(nside=self._nside)
                 self.logger.info("Finished loading example scheduler.")
 
     @param.depends(
@@ -536,9 +525,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             tools="pan,wheel_zoom,box_zoom,box_select,lasso_select,save,reset,help",
         )
 
-        fig = schedview.plot.nightly.plot_polar_alt_az(
-            visits=self._visits_cds, figure=fig, legend=False
-        )
+        fig = schedview.plot.nightly.plot_polar_alt_az(visits=self._visits_cds, figure=fig, legend=False)
 
         self.logger.info("Finished updating polar alt-az plot")
         return fig
@@ -618,18 +605,9 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
 
         self.logger.info("Starting to update surveys selector.")
 
-        surveys = (
-            self._reward_df.set_index("tier_label")
-            .loc[self.tier, "survey_label"]
-            .unique()
-            .tolist()
-        )
+        surveys = self._reward_df.set_index("tier_label").loc[self.tier, "survey_label"].unique().tolist()
         self.param["surveys"].objects = surveys
-        self.surveys = (
-            surveys[:init_displayed_surveys]
-            if len(surveys) > init_displayed_surveys
-            else surveys
-        )
+        self.surveys = surveys[:init_displayed_surveys] if len(surveys) > init_displayed_surveys else surveys
         self.logger.info("Finished updating surveys selector.")
 
     @param.depends("_reward_df", "tier", "surveys", watch=True)
@@ -644,10 +622,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         tier_reward_df = self._reward_df.set_index("tier_label").loc[self.tier, :]
 
         basis_functions = ["Total"] + (
-            tier_reward_df.set_index("survey_label")
-            .loc[self.surveys, "basis_function"]
-            .unique()
-            .tolist()
+            tier_reward_df.set_index("survey_label").loc[self.surveys, "basis_function"].unique().tolist()
         )
         self.param["basis_function"].objects = basis_functions
         self.basis_function = "Total"
@@ -768,23 +743,15 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                 pn.param.ParamMethod(self.alt_vs_time, loading_indicator=True),
                 pn.param.ParamMethod(self.horizon_map, loading_indicator=True),
             ),
-            "Airmass vs. time": pn.param.ParamMethod(
-                self.airmass_vs_time, loading_indicator=True
-            ),
-            "Sky maps": pn.param.ParamMethod(
-                self.visit_skymaps, loading_indicator=True
-            ),
-            "Table of visits": pn.param.ParamMethod(
-                self.visit_table, loading_indicator=True
-            ),
+            "Airmass vs. time": pn.param.ParamMethod(self.airmass_vs_time, loading_indicator=True),
+            "Sky maps": pn.param.ParamMethod(self.visit_skymaps, loading_indicator=True),
+            "Table of visits": pn.param.ParamMethod(self.visit_table, loading_indicator=True),
             "Reward plots": pn.Column(
                 pn.param.ParamMethod(self.reward_params, loading_indicator=True),
                 pn.param.ParamMethod(self.reward_plot, loading_indicator=True),
                 pn.param.ParamMethod(self.infeasible_plot, loading_indicator=True),
             ),
-            "Visit explorer": pn.param.ParamMethod(
-                self.visit_explorer, loading_indicator=True
-            ),
+            "Visit explorer": pn.param.ParamMethod(self.visit_explorer, loading_indicator=True),
         }
         self.logger.info("Finished creating initial dict of tab contents.")
         return tab_contents
@@ -851,9 +818,9 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
 
         Returns
         -------
-        pn_app : `panel.viewable.Viewable` or
-                `tuple` ['panel.viewable.Viewable',
-                `schedview.prenight.Prenight`]
+        pn_app : `panel.viewable.Viewable`
+            or `tuple`
+            ['panel.viewable.Viewable', `schedview.prenight.Prenight`]
             The pre-night briefing app.
         """
         prenight = cls()
@@ -877,9 +844,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                 prenight.rewards_fname = rewards
 
             if custom_hvplot_tab_settings_file is not None:
-                prenight.custom_hvplot_tab_settings_file = (
-                    custom_hvplot_tab_settings_file
-                )
+                prenight.custom_hvplot_tab_settings_file = custom_hvplot_tab_settings_file
 
             if shown_tabs is not None:
                 prenight.shown_tabs = shown_tabs
@@ -900,9 +865,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                 ),
                 pn.Column(
                     "<h2>Astronomical Events</h2>",
-                    pn.param.ParamMethod(
-                        prenight.almanac_events_table, loading_indicator=True
-                    ),
+                    pn.param.ParamMethod(prenight.almanac_events_table, loading_indicator=True),
                 ),
             ),
             pn.param.ParamMethod(prenight.tab_contents, loading_indicator=True),
@@ -937,9 +900,7 @@ def prenight_app(*args, **kwargs):
 def parse_prenight_args():
     """Parse the command line arguments for the pre-night dashboard."""
 
-    parser = argparse.ArgumentParser(
-        description="Pre-night dashboard for Rubin Observatory scheduler."
-    )
+    parser = argparse.ArgumentParser(description="Pre-night dashboard for Rubin Observatory scheduler.")
 
     parser.add_argument(
         "--night",
@@ -989,9 +950,7 @@ def parse_prenight_args():
     )
 
     default_custom_hvplot_tab_settings_file = str(
-        importlib.resources.files("schedview").joinpath(
-            "data", "sample_prenight_custom_hvplots.json"
-        )
+        importlib.resources.files("schedview").joinpath("data", "sample_prenight_custom_hvplots.json")
     )
     parser.add_argument(
         "--custom-hvplot-tab-settings-file",

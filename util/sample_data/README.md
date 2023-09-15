@@ -13,4 +13,3 @@ There is a `--help` option to describe optional parameters.
 
 The primary use for it is to generated update sample data for use in
 `${SCHEDVIEW_DIR}/schedview/data`.
-

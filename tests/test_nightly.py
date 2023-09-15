@@ -1,23 +1,19 @@
-import unittest
-from tempfile import TemporaryDirectory
-from pathlib import Path
 import importlib.resources
-import pandas as pd
-import bokeh
+import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
-from rubin_sim.scheduler.utils import SchemaConverter
+import bokeh
+import pandas as pd
 from rubin_sim.scheduler.model_observatory import ModelObservatory
+from rubin_sim.scheduler.utils import SchemaConverter
 
 import schedview
 import schedview.plot.nightly
 
 
 def _load_sample_visits():
-    visits_path = (
-        importlib.resources.files(schedview)
-        .joinpath("data")
-        .joinpath("sample_opsim.db")
-    )
+    visits_path = importlib.resources.files(schedview).joinpath("data").joinpath("sample_opsim.db")
     visits = pd.DataFrame(SchemaConverter().opsim2obs(visits_path))
     if "observationStartMJD" not in visits.columns and "mjd" in visits.columns:
         visits["observationStartMJD"] = visits["mjd"]
@@ -35,7 +31,7 @@ def _create_almanac(night):
     return almanac_events
 
 
-class test_nightly(unittest.TestCase):
+class TestNightly(unittest.TestCase):
     def test_plot_airmass_vs_time(self):
         visits = _load_sample_visits()
         almanac_events = _create_almanac(visits["start_date"].dt.date[0])

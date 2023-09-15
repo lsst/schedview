@@ -1,11 +1,12 @@
-from functools import cache
 import datetime
+from functools import cache
+
 import numpy as np
 import pandas as pd
-from astropy.time import Time
 import pytz
-from rubin_sim.site_models.almanac import Almanac
+from astropy.time import Time
 from rubin_sim.scheduler.model_observatory import ModelObservatory
+from rubin_sim.site_models.almanac import Almanac
 
 
 @cache
@@ -14,9 +15,7 @@ def _compute_all_night_events():
     # that caches the result (using the functools.cache decorator).
     almanac = Almanac()
     all_nights_events = pd.DataFrame(almanac.sunsets)
-    all_nights_events["night_middle"] = (
-        all_nights_events["sunrise"] + all_nights_events["sunset"]
-    ) / 2
+    all_nights_events["night_middle"] = (all_nights_events["sunrise"] + all_nights_events["sunset"]) / 2
     return all_nights_events
 
 
@@ -38,17 +37,11 @@ def convert_evening_date_to_night_of_survey(night_date, timezone="Chile/Continen
     """
     sample_time = Time(
         pytz.timezone(timezone)
-        .localize(
-            datetime.datetime(
-                night_date.year, night_date.month, night_date.day, 23, 59, 59
-            )
-        )
+        .localize(datetime.datetime(night_date.year, night_date.month, night_date.day, 23, 59, 59))
         .astimezone(pytz.timezone("UTC"))
     )
     all_nights_events = _compute_all_night_events()
-    closest_middle_iloc = np.abs(
-        sample_time.mjd - all_nights_events["night_middle"]
-    ).argsort()[0]
+    closest_middle_iloc = np.abs(sample_time.mjd - all_nights_events["night_middle"]).argsort()[0]
     night_of_survey = all_nights_events.iloc[closest_middle_iloc, :]["night"]
     return night_of_survey
 
@@ -77,9 +70,7 @@ def night_events(night_date=None, site=None, timezone="Chile/Continental"):
         site = ModelObservatory().location
 
     all_nights_events = _compute_all_night_events().set_index("night")
-    night_of_survey = convert_evening_date_to_night_of_survey(
-        night_date, timezone=timezone
-    )
+    night_of_survey = convert_evening_date_to_night_of_survey(night_date, timezone=timezone)
     mjds = all_nights_events.loc[night_of_survey]
 
     # Not all night have both a moon rise and moon set. If a night is missing

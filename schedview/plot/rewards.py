@@ -4,13 +4,13 @@ import holoviews as hv
 import numpy as np
 from astropy.time import Time
 
-import schedview.collect.scheduler_pickle
-import schedview.collect.opsim
-import schedview.compute.scheduler
-import schedview.compute.astro
-
 # Imported to help sphinx make the link
 from rubin_sim.scheduler.model_observatory import ModelObservatory  # noqa F401
+
+import schedview.collect.opsim
+import schedview.collect.scheduler_pickle
+import schedview.compute.astro
+import schedview.compute.scheduler
 
 
 def plot_survey_rewards(rewards):
@@ -36,9 +36,7 @@ def plot_survey_rewards(rewards):
     reward_plot = (
         rewards.replace([np.inf, -np.inf], np.nan)
         .loc[:, ["survey_name", "time", "reward"]]
-        .hvplot(
-            by=["survey_name"], x="time", y=["reward"], title="Rewards for each survey"
-        )
+        .hvplot(by=["survey_name"], x="time", y=["reward"], title="Rewards for each survey")
         .options({"Curve": {"color": hv.Cycle("Category20")}})
     )
     return reward_plot
@@ -83,9 +81,7 @@ def create_survey_reward_plot(
 
     # Collect
     if isinstance(scheduler, str):
-        scheduler, conditions = schedview.collect.scheduler_pickle.read_scheduler(
-            scheduler
-        )
+        scheduler, conditions = schedview.collect.scheduler_pickle.read_scheduler(scheduler)
         scheduler.update_conditions(conditions)
 
     if isinstance(additional_visits, str):

@@ -1,13 +1,14 @@
+import sqlite3
+
 import numpy as np
 import pandas as pd
-import sqlite3
 from astropy.time import Time
 
 
 def read_opsim(filename, start_time="2000-01-01", end_time="2100-01-01"):
     """Read visits from an opsim database.
 
-    Paramaters
+    Parameters
     ----------
     filename : `str`
         The file from which to load visits
@@ -36,9 +37,7 @@ def read_opsim(filename, start_time="2000-01-01", end_time="2100-01-01"):
     )
 
     if "HA_hours" not in visits.columns:
-        visits["HA_hours"] = (
-            (visits.observationStartLST - visits.fieldRA) * 24.0 / 360.0
-        )
+        visits["HA_hours"] = (visits.observationStartLST - visits.fieldRA) * 24.0 / 360.0
         visits["HA_hours"] = np.mod(visits["HA_hours"] + 12.0, 24) - 12
 
     return visits

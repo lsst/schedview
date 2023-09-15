@@ -3,7 +3,6 @@ import itertools
 import bokeh
 import numpy as np
 from astropy.time import Time
-
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 
 
@@ -66,17 +65,13 @@ def plot_rewards(
         The figure itself.
     """
 
-    tier_reward_df = (
-        reward_df.set_index("tier_label").loc[tier_label, :].set_index("survey_label")
-    )
+    tier_reward_df = reward_df.set_index("tier_label").loc[tier_label, :].set_index("survey_label")
     # If surveys is set, only show listed surveys
     if surveys is not None:
         tier_reward_df = tier_reward_df.loc[surveys, :]
 
     # Show only the night in question
-    tier_reward_df, mjd_limits = _extract_night(
-        tier_reward_df, "queue_start_mjd", night, observatory
-    )
+    tier_reward_df, mjd_limits = _extract_night(tier_reward_df, "queue_start_mjd", night, observatory)
 
     survey_labels = tier_reward_df.index.unique()
     num_surveys = len(survey_labels)
@@ -178,9 +173,7 @@ def plot_rewards(
                     # call were observed.
                     continue
 
-                reward = this_survey_reward_df.query(f"queue_fill_mjd_ns=={fill_mjd}")[
-                    y_column
-                ][0]
+                reward = this_survey_reward_df.query(f"queue_fill_mjd_ns=={fill_mjd}")[y_column][0]
                 if not np.isfinite(reward):
                     continue
 
@@ -201,9 +194,7 @@ def plot_rewards(
     return plot
 
 
-def plot_infeasible(
-    reward_df, tier_label, night, observatory=None, surveys=None, plot_kwargs={}
-):
+def plot_infeasible(reward_df, tier_label, night, observatory=None, surveys=None, plot_kwargs={}):
     """Create a plot showing infeasible basis functions.
 
     Parameters
@@ -228,9 +219,7 @@ def plot_infeasible(
     app : `bokeh.plotting.figure`
         The figure itself.
     """
-    tier_df = (
-        reward_df.reset_index().set_index("tier_label").loc[tier_label, :]
-    ).query("not feasible")
+    tier_df = (reward_df.reset_index().set_index("tier_label").loc[tier_label, :]).query("not feasible")
 
     if surveys is not None:
         available_surveys = [s for s in surveys if s in tier_df.survey_label.unique()]
@@ -252,11 +241,7 @@ def plot_infeasible(
             plot.add_layout(message)
             return plot
         else:
-            tier_df = (
-                tier_df.set_index("survey_label")
-                .loc[available_surveys, :]
-                .reset_index()
-            )
+            tier_df = tier_df.set_index("survey_label").loc[available_surveys, :].reset_index()
 
     tier_df, mjd_limits = _extract_night(tier_df, "queue_start_mjd", night, observatory)
 

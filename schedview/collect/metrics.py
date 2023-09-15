@@ -1,7 +1,7 @@
+__all__ = ["get_metric_path"]
+
 import importlib.resources
 from os import environ
-
-__all__ = ["get_metric_path"]
 
 
 def get_metric_path():
@@ -19,9 +19,7 @@ def get_metric_path():
     base_fname = "test_metric1.npz"
 
     try:
-        fname = str(
-            importlib.resources.files(root_package).joinpath("data", base_fname)
-        )
+        fname = str(importlib.resources.files(root_package).joinpath("data", base_fname))
     except AttributeError as e:
         # If we are using an older version of importlib, we need to do
         # this instead:

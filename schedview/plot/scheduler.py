@@ -1,40 +1,27 @@
-import bokeh.plotting
-import numpy as np
-import healpy as hp
-from astropy.time import Time
-import logging
 import collections.abc
-from collections import OrderedDict
-import warnings
 import itertools
+import logging
+import warnings
+from collections import OrderedDict
 
-import pandas as pd
-import bokeh.models
 import bokeh.core.properties
-
-from rubin_sim.scheduler.features.conditions import Conditions
-from rubin_sim.scheduler.schedulers.core_scheduler import (
-    CoreScheduler as CoreScheduler,
-)
-from rubin_sim.scheduler.model_observatory import ModelObservatory
-import rubin_sim.scheduler.schedulers
-import rubin_sim.scheduler.surveys
+import bokeh.models
+import bokeh.plotting
+import healpy as hp
+import numpy as np
+import pandas as pd
 import rubin_sim.scheduler.basis_functions
 import rubin_sim.scheduler.example
-
-from uranography.api import (
-    ArmillarySphere,
-    HorizonMap,
-    Planisphere,
-    MollweideMap,
-    make_zscale_linear_cmap,
-)
+import rubin_sim.scheduler.schedulers
+import rubin_sim.scheduler.surveys
+from astropy.time import Time
+from rubin_sim.scheduler.features.conditions import Conditions
+from rubin_sim.scheduler.model_observatory import ModelObservatory
+from rubin_sim.scheduler.schedulers.core_scheduler import CoreScheduler as CoreScheduler
+from uranography.api import ArmillarySphere, HorizonMap, MollweideMap, Planisphere, make_zscale_linear_cmap
 
 from schedview.collect import read_scheduler
-from schedview.compute.scheduler import (
-    make_unique_survey_name,
-    make_scheduler_summary_df,
-)
+from schedview.compute.scheduler import make_scheduler_summary_df, make_unique_survey_name
 from schedview.compute.survey import make_survey_reward_df
 
 DEFAULT_MJD = 60200.2
@@ -57,11 +44,11 @@ def make_logger():
 LOGGER = make_logger()
 
 
-class BadSchedulerException(Exception):
+class BadSchedulerError(Exception):
     pass
 
 
-class BadConditionsException(Exception):
+class BadConditionsError(Exception):
     pass
 
 
@@ -303,10 +290,10 @@ class SchedulerDisplay:
         """
         scheduler, conditions = read_scheduler(file_name)
         if not isinstance(scheduler, CoreScheduler):
-            raise BadSchedulerException()
+            raise BadSchedulerError()
 
         if not isinstance(conditions, Conditions):
-            raise BadConditionsException()
+            raise BadConditionsError()
 
         scheduler.update_conditions(conditions)
         self.scheduler = scheduler
@@ -380,9 +367,9 @@ class SchedulerDisplay:
             sphere_map.mjd = self.mjd
 
         if "armillary_sphere" in self.sphere_maps:
-            self.sphere_maps["armillary_sphere"].sliders[
-                "mjd"
-            ].value = self.sphere_maps["armillary_sphere"].mjd
+            self.sphere_maps["armillary_sphere"].sliders["mjd"].value = self.sphere_maps[
+                "armillary_sphere"
+            ].mjd
 
         LOGGER.info("Finished updating conditions")
 
@@ -407,8 +394,7 @@ class SchedulerDisplay:
         """List of surveys in the current tier."""
         tier = self.survey_index[0]
         surveys_in_tier = [
-            self._unique_survey_name([tier, i])
-            for i in range(len(self.scheduler.survey_lists[tier]))
+            self._unique_survey_name([tier, i]) for i in range(len(self.scheduler.survey_lists[tier]))
         ]
         return surveys_in_tier
 
@@ -448,9 +434,7 @@ class SchedulerDisplay:
         horizon_graticules=False,
     ):
         if "hover_tool" not in self.bokeh_models:
-            self.bokeh_models["hover_tool"] = bokeh.models.HoverTool(
-                renderers=[], tooltips=self.tooltips
-            )
+            self.bokeh_models["hover_tool"] = bokeh.models.HoverTool(renderers=[], tooltips=self.tooltips)
 
         plot = bokeh.plotting.figure(
             frame_width=frame_width,
@@ -499,9 +483,7 @@ class SchedulerDisplay:
             sphere_map.decorate()
 
         if "survey_marker" not in self.data_sources:
-            self.data_sources["survey_marker"] = self.make_survey_marker_data_source(
-                sphere_map
-            )
+            self.data_sources["survey_marker"] = self.make_survey_marker_data_source(sphere_map)
 
         sphere_map.add_marker(
             data_source=self.data_sources["survey_marker"],
@@ -510,9 +492,7 @@ class SchedulerDisplay:
         )
 
         if "telescope_marker" not in self.data_sources:
-            self.data_sources[
-                "telescope_marker"
-            ] = self.make_telescope_marker_data_source(sphere_map)
+            self.data_sources["telescope_marker"] = self.make_telescope_marker_data_source(sphere_map)
 
         sphere_map.add_marker(
             data_source=self.data_sources["telescope_marker"],
@@ -521,9 +501,7 @@ class SchedulerDisplay:
         )
 
         if "moon_marker" not in self.data_sources:
-            self.data_sources["moon_marker"] = self.make_moon_marker_data_source(
-                sphere_map
-            )
+            self.data_sources["moon_marker"] = self.make_moon_marker_data_source(sphere_map)
 
         sphere_map.add_marker(
             data_source=self.data_sources["moon_marker"],
@@ -532,9 +510,7 @@ class SchedulerDisplay:
         )
 
         if "sun_marker" not in self.data_sources:
-            self.data_sources["sun_marker"] = self.make_sun_marker_data_source(
-                sphere_map
-            )
+            self.data_sources["sun_marker"] = self.make_sun_marker_data_source(sphere_map)
 
         sphere_map.add_marker(
             data_source=self.data_sources["sun_marker"],
@@ -581,9 +557,7 @@ class SchedulerDisplay:
 
         sources = {
             "conditions": self.conditions,
-            "survey": self.scheduler.survey_lists[self.survey_index[0]][
-                self.survey_index[1]
-            ],
+            "survey": self.scheduler.survey_lists[self.survey_index[0]][self.survey_index[1]],
         }
         source = sources[source_name]
 
@@ -595,9 +569,7 @@ class SchedulerDisplay:
             ra = np.array([])
         if decl is None:
             decl = np.array([])
-        LOGGER.debug(
-            f"{name.capitalize()} coordinates: ra={np.degrees(ra)}, decl={np.degrees(decl)}"
-        )
+        LOGGER.debug(f"{name.capitalize()} coordinates: ra={np.degrees(ra)}, decl={np.degrees(decl)}")
         if source_units == "radians":
             ra_deg = np.degrees(ra)
             decl_deg = np.degrees(decl)
@@ -850,9 +822,7 @@ class SchedulerDisplay:
     def update_reward_table_bokeh_model(self):
         """Update the bokeh model for the table of rewards."""
         if "reward_table" in self.bokeh_models:
-            survey = self.scheduler.survey_lists[self.survey_index[0]][
-                self.survey_index[1]
-            ]
+            survey = self.scheduler.survey_lists[self.survey_index[0]][self.survey_index[1]]
             reward_df = make_survey_reward_df(survey, self.conditions)
 
             any_bad_urls = False
@@ -870,9 +840,7 @@ class SchedulerDisplay:
                     template='<a href="<%= doc_url %>" target="_blank"><%= value %></a>'
                 )
 
-            self.bokeh_models["reward_table"].source = bokeh.models.ColumnDataSource(
-                reward_df
-            )
+            self.bokeh_models["reward_table"].source = bokeh.models.ColumnDataSource(reward_df)
 
             new_columns = []
             for column_name in reward_df.columns:
@@ -885,9 +853,7 @@ class SchedulerDisplay:
                 elif column_name == "doc_url":
                     continue
                 else:
-                    new_column = bokeh.models.TableColumn(
-                        field=column_name, title=column_name
-                    )
+                    new_column = bokeh.models.TableColumn(field=column_name, title=column_name)
                 new_columns.append(new_column)
 
             self.bokeh_models["reward_table"].columns = new_columns
@@ -898,9 +864,7 @@ class SchedulerDisplay:
 
     def make_chosen_survey(self):
         """Create the bokeh model for text showing the chosen survey."""
-        self.bokeh_models["chosen_survey"] = bokeh.models.Div(
-            text="<p>No chosen survey</p>"
-        )
+        self.bokeh_models["chosen_survey"] = bokeh.models.Div(text="<p>No chosen survey</p>")
 
     def update_chosen_survey_bokeh_model(self):
         """Update the bokeh model for text showing the chosen survey."""
@@ -912,15 +876,11 @@ class SchedulerDisplay:
         ):
             tier = f"tier {self.scheduler.survey_index[0]}"
             survey = self._unique_survey_name()
-            self.bokeh_models[
-                "chosen_survey"
-            ].text = f"<p>Chosen survey: {tier}, {survey}</p>"
+            self.bokeh_models["chosen_survey"].text = f"<p>Chosen survey: {tier}, {survey}</p>"
 
     def make_displayed_value_metadata(self):
         """Create the bokeh model specifying what values are displayed."""
-        self.bokeh_models["displayed_value_metadata"] = bokeh.models.Div(
-            text="<p>No displayed values</p>"
-        )
+        self.bokeh_models["displayed_value_metadata"] = bokeh.models.Div(text="<p>No displayed values</p>")
 
     def update_displayed_value_metadata_bokeh_model(self):
         """Update the bokeh model specifying what values are displayed."""
@@ -984,20 +944,13 @@ class SchedulerDisplay:
 
                 return float("{:.5g}".format(value))
 
-            scheduler_summary_df["reward"] = scheduler_summary_df["reward"].apply(
-                to_sigfig
-            )
+            scheduler_summary_df["reward"] = scheduler_summary_df["reward"].apply(to_sigfig)
 
             # Get URLs for survey documentation
             # Flatten the list of lists of surveys into one long list
             surveys = itertools.chain.from_iterable(self.scheduler.survey_lists)
-            survey_class_names = [
-                "rubin_sim.scheduler.surveys." + s.__class__.__name__ for s in surveys
-            ]
-            survey_doc_url = [
-                f"https://rubin-sim.lsst.io/api/{cn}.html#{cn}"
-                for cn in survey_class_names
-            ]
+            survey_class_names = ["rubin_sim.scheduler.surveys." + s.__class__.__name__ for s in surveys]
+            survey_doc_url = [f"https://rubin-sim.lsst.io/api/{cn}.html#{cn}" for cn in survey_class_names]
             survey_name_formatter = bokeh.models.widgets.HTMLTemplateFormatter(
                 template='<a href="<%= doc_url %>" target="_blank"><%= value %></a>'
             )
@@ -1019,9 +972,7 @@ class SchedulerDisplay:
                 elif column_name == "doc_url":
                     continue
                 else:
-                    new_column = bokeh.models.TableColumn(
-                        field=column_name, title=column_name
-                    )
+                    new_column = bokeh.models.TableColumn(field=column_name, title=column_name)
                 new_columns.append(new_column)
 
             self.bokeh_models["reward_summary_table"].columns = new_columns
@@ -1043,15 +994,9 @@ class SchedulerDisplay:
             frame_height=512,
             decorate=True,
         )
-        self.bokeh_models["alt_slider"] = self.sphere_maps["armillary_sphere"].sliders[
-            "alt"
-        ]
-        self.bokeh_models["az_slider"] = self.sphere_maps["armillary_sphere"].sliders[
-            "az"
-        ]
-        self.bokeh_models["mjd_slider"] = self.sphere_maps["armillary_sphere"].sliders[
-            "mjd"
-        ]
+        self.bokeh_models["alt_slider"] = self.sphere_maps["armillary_sphere"].sliders["alt"]
+        self.bokeh_models["az_slider"] = self.sphere_maps["armillary_sphere"].sliders["az"]
+        self.bokeh_models["mjd_slider"] = self.sphere_maps["armillary_sphere"].sliders["mjd"]
         self.bokeh_models["mjd_slider"].visible = False
         self.make_sphere_map(
             "planisphere",

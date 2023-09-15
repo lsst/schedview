@@ -1,33 +1,28 @@
 import unittest
-from tempfile import TemporaryDirectory
+from collections import OrderedDict
+from datetime import datetime
 from pathlib import Path
-import bokeh.plotting
+from tempfile import TemporaryDirectory
+from zoneinfo import ZoneInfo
+
 import bokeh.io
-
-from rubin_sim.scheduler.model_observatory import ModelObservatory
+import bokeh.plotting
+import pandas as pd
+from astropy.time import Time
+from pandas import Timestamp
+from panel.widgets import Tabulator
 from rubin_sim.scheduler.example import example_scheduler
-
-from schedview.app.scheduler_dashboard.scheduler_dashboard import (
-    Scheduler,
-    scheduler_app,
-)
-
-# Schedview methods
-from schedview.collect.scheduler_pickle import read_scheduler
-from schedview.compute.scheduler import make_scheduler_summary_df
-from schedview.compute.survey import make_survey_reward_df, compute_maps
+from rubin_sim.scheduler.features.conditions import Conditions
+from rubin_sim.scheduler.model_observatory import ModelObservatory
 
 # Objects to test instances against
 from rubin_sim.scheduler.schedulers.core_scheduler import CoreScheduler
-from rubin_sim.scheduler.features.conditions import Conditions
-from panel.widgets import Tabulator
-from collections import OrderedDict
-import pandas as pd
 
-from astropy.time import Time
-from pandas import Timestamp
-from zoneinfo import ZoneInfo
-from datetime import datetime
+from schedview.app.scheduler_dashboard.scheduler_dashboard import Scheduler, scheduler_app
+
+# Schedview methods
+from schedview.compute.scheduler import make_scheduler_summary_df
+from schedview.compute.survey import compute_maps
 
 """
 Tests I usually perform:
@@ -66,9 +61,7 @@ class TestSchedulerDashboard(unittest.TestCase):
     observatory = ModelObservatory(init_load_length=1)
     scheduler = Scheduler()
     scheduler.scheduler_fname = TEST_PICKLE
-    scheduler._date_time = Time(
-        Timestamp(TEST_DATE, tzinfo=ZoneInfo(DEFAULT_TIMEZONE))
-    ).mjd
+    scheduler._date_time = Time(Timestamp(TEST_DATE, tzinfo=ZoneInfo(DEFAULT_TIMEZONE))).mjd
 
     def test_scheduler_app(self):
         app = scheduler_app(date=TEST_DATE, scheduler_pickle=TEST_PICKLE)

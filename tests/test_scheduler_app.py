@@ -1,23 +1,23 @@
 import unittest
-from tempfile import TemporaryDirectory
 from pathlib import Path
-import bokeh.plotting
+from tempfile import TemporaryDirectory
+
 import bokeh.io
+import bokeh.plotting
+
 from schedview.app.sched_maps.sched_maps import SchedulerDisplayApp
 from schedview.collect import sample_pickle
 
 NSIDE = 8
 
 
-class test_sched_maps(unittest.TestCase):
+class TestSchedMaps(unittest.TestCase):
     def test_sched_maps(self):
         scheduler_app = SchedulerDisplayApp(None, nside=NSIDE)
 
         render_figure(scheduler_app)
 
-        scheduler_app.bokeh_models["file_input_box"].value = sample_pickle(
-            "scheduler1_sample.pickle.gz"
-        )
+        scheduler_app.bokeh_models["file_input_box"].value = sample_pickle("scheduler1_sample.pickle.gz")
         scheduler_app.disable_controls()
 
 

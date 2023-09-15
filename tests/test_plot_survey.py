@@ -1,8 +1,10 @@
 import unittest
+
 import healpy as hp
 import numpy as np
-from schedview.plot.survey import map_survey_healpix
 from uranography.api import SphereMap
+
+from schedview.plot.survey import map_survey_healpix
 
 RANDOM_NUMBER_GENERATOR = np.random.default_rng(6563)
 

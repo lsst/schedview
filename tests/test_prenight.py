@@ -1,29 +1,26 @@
-import unittest
 import importlib.resources
-from tempfile import TemporaryDirectory
+import unittest
 from pathlib import Path
-import bokeh.plotting
+from tempfile import TemporaryDirectory
+
 import bokeh.io
+import bokeh.plotting
 
 from schedview.app.prenight.prenight import prenight_app
 
 
-class test_prenight(unittest.TestCase):
+class TestPrenight(unittest.TestCase):
     def test_prenight_app(self):
         sample_data_dir = importlib.resources.files("schedview").joinpath("data")
 
         sample_opsim_db = str(sample_data_dir.joinpath("sample_opsim.db"))
-        sample_scheduler_pickle = str(
-            sample_data_dir.joinpath("sample_scheduler.pickle.xz")
-        )
+        sample_scheduler_pickle = str(sample_data_dir.joinpath("sample_scheduler.pickle.xz"))
         sample_rewards_h5 = str(sample_data_dir.joinpath("sample_rewards.h5"))
 
         # Use a separate test custom settings file from the sample, because
         # some of the settings in the sample file work well when tested with
         # a interactive browser, but do not work as part of the test.
-        custom_hvplot_tabs = str(
-            sample_data_dir.joinpath("test_prenight_custom_hvplots.json")
-        )
+        custom_hvplot_tabs = str(sample_data_dir.joinpath("test_prenight_custom_hvplots.json"))
 
         app = prenight_app(
             opsim_db=sample_opsim_db,

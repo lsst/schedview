@@ -1,27 +1,20 @@
-import numpy as np
-import healpy as hp
 import bokeh
+import healpy as hp
+import numpy as np
 import pandas as pd
 from astropy.time import Time
 
-import schedview.collect.scheduler_pickle
-from uranography.api import (
-    Planisphere,
-    ArmillarySphere,
-    split_healpix_by_resolution,
-)
-from schedview.compute.camera import LsstCameraFootprintPerimeter
+# Imported to help sphinx make the link
 from rubin_sim.scheduler.model_observatory.model_observatory import ModelObservatory
+from rubin_sim.scheduler.schedulers import CoreScheduler  # noqa F401
+from uranography.api import ArmillarySphere, Planisphere, split_healpix_by_resolution
+
+import schedview.collect.scheduler_pickle
 import schedview.compute.astro
 from schedview.collect.stars import load_bright_stars
+from schedview.compute.camera import LsstCameraFootprintPerimeter
 
-# Imported to help sphinx make the link
-from rubin_sim.scheduler.model_observatory import ModelObservatory  # noqa F401
-from rubin_sim.scheduler.schedulers import CoreScheduler  # noqa F401
-
-BAND_COLORS = dict(
-    u="#56b4e9", g="#008060", r="#ff4000", i="#850000", z="#6600cc", y="#222222"
-)
+BAND_COLORS = dict(u="#56b4e9", g="#008060", r="#ff4000", i="#850000", z="#6600cc", y="#222222")
 BAND_HATCH_PATTERNS = dict(
     u="dot",
     g="ring",
@@ -95,23 +88,15 @@ def plot_visit_skymaps(
     psphere = Planisphere(mjd=conditions.mjd)
     psphere.sliders["mjd"] = asphere.sliders["mjd"]
 
-    cmap = bokeh.transform.linear_cmap(
-        "value", "Greys256", int(np.ceil(np.nanmax(footprint) * 2)), 0
-    )
+    cmap = bokeh.transform.linear_cmap("value", "Greys256", int(np.ceil(np.nanmax(footprint) * 2)), 0)
 
     nside_high = hp.npix2nside(footprint.shape[0])
-    footprint_high, footprint_low = split_healpix_by_resolution(
-        footprint, nside_low, nside_high
-    )
+    footprint_high, footprint_low = split_healpix_by_resolution(footprint, nside_low, nside_high)
 
-    healpix_high_ds, cmap, glyph = asphere.add_healpix(
-        footprint_high, nside=nside_high, cmap=cmap
-    )
+    healpix_high_ds, cmap, glyph = asphere.add_healpix(footprint_high, nside=nside_high, cmap=cmap)
     psphere.add_healpix(healpix_high_ds, nside=nside_high, cmap=cmap)
 
-    healpix_low_ds, cmap, glyph = asphere.add_healpix(
-        footprint_low, nside=nside_low, cmap=cmap
-    )
+    healpix_low_ds, cmap, glyph = asphere.add_healpix(footprint_low, nside=nside_low, cmap=cmap)
     psphere.add_healpix(healpix_low_ds, nside=nside_low, cmap=cmap)
 
     # Transforms for recent, past, future visits
@@ -154,9 +139,7 @@ def plot_visit_skymaps(
         if len(band_visits) < 1:
             continue
 
-        ras, decls = camera_perimeter(
-            band_visits.fieldRA, band_visits.fieldDec, band_visits.rotSkyPos
-        )
+        ras, decls = camera_perimeter(band_visits.fieldRA, band_visits.fieldDec, band_visits.rotSkyPos)
 
         perimeter_df = pd.DataFrame(
             {
@@ -228,9 +211,7 @@ def plot_visit_skymaps(
         star_data = load_bright_stars().loc[:, ["name", "ra", "decl", "Vmag"]]
         star_data["glyph_size"] = 15 - (15.0 / 3.5) * star_data["Vmag"]
         star_data.query("glyph_size>0", inplace=True)
-        star_ds = asphere.add_stars(
-            star_data, mag_limit_slider=False, star_kwargs={"color": "yellow"}
-        )
+        star_ds = asphere.add_stars(star_data, mag_limit_slider=False, star_kwargs={"color": "yellow"})
 
         psphere.add_stars(
             star_data,
@@ -241,12 +222,8 @@ def plot_visit_skymaps(
 
     horizon_ds = asphere.add_horizon()
     psphere.add_horizon(data_source=horizon_ds)
-    horizon70_ds = asphere.add_horizon(
-        zd=70, line_kwargs={"color": "red", "line_width": 2}
-    )
-    psphere.add_horizon(
-        data_source=horizon70_ds, line_kwargs={"color": "red", "line_width": 2}
-    )
+    horizon70_ds = asphere.add_horizon(zd=70, line_kwargs={"color": "red", "line_width": 2})
+    psphere.add_horizon(data_source=horizon70_ds, line_kwargs={"color": "red", "line_width": 2})
 
     asphere.sliders["mjd"].start = conditions.sun_n12_setting
     asphere.sliders["mjd"].end = conditions.sun_n12_rising
@@ -323,31 +300,21 @@ def plot_visit_planisphere(
     psphere = Planisphere(mjd=conditions.mjd, plot=plot)
     psphere.add_mjd_slider()
 
-    cmap = bokeh.transform.linear_cmap(
-        "value", "Greys256", int(np.ceil(np.nanmax(footprint) * 2)), 0
-    )
+    cmap = bokeh.transform.linear_cmap("value", "Greys256", int(np.ceil(np.nanmax(footprint) * 2)), 0)
 
     nside_high = hp.npix2nside(footprint.shape[0])
-    footprint_high, footprint_low = split_healpix_by_resolution(
-        footprint, nside_low, nside_high
-    )
+    footprint_high, footprint_low = split_healpix_by_resolution(footprint, nside_low, nside_high)
 
-    healpix_high_ds, cmap, glyph = psphere.add_healpix(
-        footprint_high, nside=nside_high, cmap=cmap
-    )
+    healpix_high_ds, cmap, glyph = psphere.add_healpix(footprint_high, nside=nside_high, cmap=cmap)
 
-    healpix_low_ds, cmap, glyph = psphere.add_healpix(
-        footprint_low, nside=nside_low, cmap=cmap
-    )
+    healpix_low_ds, cmap, glyph = psphere.add_healpix(footprint_low, nside=nside_low, cmap=cmap)
 
     for band in "ugrizy":
         band_visits = visits.query(f"filter == '{band}'")
         if len(band_visits) < 1:
             continue
 
-        ras, decls = camera_perimeter(
-            band_visits.fieldRA, band_visits.fieldDec, band_visits.rotSkyPos
-        )
+        ras, decls = camera_perimeter(band_visits.fieldRA, band_visits.fieldDec, band_visits.rotSkyPos)
 
         mjd_start = band_visits.observationStartMJD.values
         current_mjd = conditions.sun_n12_setting
@@ -361,9 +328,7 @@ def plot_visit_planisphere(
                 "recent_mjd": np.clip((current_mjd - mjd_start) / fade_scale, 0, 1),
             }
         )
-        patches_kwargs = dict(
-            line_alpha="recent_mjd", line_color="#ff00ff", line_width=2
-        )
+        patches_kwargs = dict(line_alpha="recent_mjd", line_color="#ff00ff", line_width=2)
 
         if hatch:
             patches_kwargs.update(
@@ -413,9 +378,7 @@ def plot_visit_planisphere(
         star_data = load_bright_stars().loc[:, ["name", "ra", "decl", "Vmag"]]
         star_data["glyph_size"] = 15 - (15.0 / 3.5) * star_data["Vmag"]
         star_data.query("glyph_size>0", inplace=True)
-        psphere.add_stars(
-            star_data, mag_limit_slider=False, star_kwargs={"color": "yellow"}
-        )
+        psphere.add_stars(star_data, mag_limit_slider=False, star_kwargs={"color": "yellow"})
 
     psphere.add_horizon()
     psphere.add_horizon(zd=70, line_kwargs={"color": "red", "line_width": 2})
@@ -479,9 +442,7 @@ def create_visit_skymaps(
         `plot_visit_skymaps`.
     """
     site = None if observatory is None else observatory.location
-    night_events = schedview.compute.astro.night_events(
-        night_date=night_date, site=site, timezone=timezone
-    )
+    night_events = schedview.compute.astro.night_events(night_date=night_date, site=site, timezone=timezone)
     start_time = Time(night_events.loc["sunset", "UTC"])
     end_time = Time(night_events.loc["sunrise", "UTC"])
 
@@ -495,9 +456,7 @@ def create_visit_skymaps(
         visits.query(f"observationStartMJD <= {Time(end_time).mjd}", inplace=True)
 
     if isinstance(scheduler, str):
-        scheduler, conditions = schedview.collect.scheduler_pickle.read_scheduler(
-            scheduler
-        )
+        scheduler, conditions = schedview.collect.scheduler_pickle.read_scheduler(scheduler)
 
     if observatory is None:
         observatory = ModelObservatory(nside=scheduler.nside, init_load_length=1)
