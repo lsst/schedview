@@ -23,31 +23,30 @@
 
 """schedview docstring"""
 
-import bokeh
 import logging
-import numpy as np
 import os
+import traceback
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+import bokeh
+import numpy as np
 import panel as pn
 import param
-import traceback
-
 from astropy.time import Time
-from bokeh.models.widgets.tables import HTMLTemplateFormatter, BooleanFormatter
-from bokeh.models import LinearColorMapper, ColorBar
-from datetime import datetime
+from bokeh.models import ColorBar, LinearColorMapper
+from bokeh.models.widgets.tables import BooleanFormatter, HTMLTemplateFormatter
 from pandas import Timestamp
 from pytz import timezone
-from zoneinfo import ZoneInfo
+
+# For the conditions.mjd bugfix
+from rubin_sim.scheduler.model_observatory import ModelObservatory
 
 import schedview
 import schedview.collect.scheduler_pickle
 import schedview.compute.scheduler
 import schedview.compute.survey
 import schedview.plot.survey
-
-# For the conditions.mjd bugfix
-from rubin_sim.scheduler.model_observatory import ModelObservatory
-
 
 DEFAULT_CURRENT_TIME = Time.now()
 DEFAULT_TIMEZONE = "America/Santiago"
@@ -168,7 +167,7 @@ class Scheduler(param.Parameterized):
     _show_loading_indicator = False
     _model_observatory = ModelObservatory(init_load_length=1)
 
-    # ------------------------------------------------------------------------------------------ User actions
+    # ------------------------------------------------- User actions
 
     @param.depends("scheduler_fname", watch=True)
     def _update_scheduler_fname(self):
@@ -340,9 +339,7 @@ class Scheduler(param.Parameterized):
         # If reward is in survey maps, update survey maps drop-down.
         if any(self._reward_name in key for key in self._survey_maps):
             self._do_not_trigger_update = True
-            self.survey_map = list(
-                key for key in self._survey_maps if self._reward_name in key
-            )[0]
+            self.survey_map = list(key for key in self._survey_maps if self._reward_name in key)[0]
             self._map_name = self.survey_map.split("@")[0].strip()
             self._do_not_trigger_update = False
         else:
@@ -405,7 +402,7 @@ class Scheduler(param.Parameterized):
             self.update_sky_map_with_survey_map()
         self.param.trigger("_publish_map")
 
-    # ------------------------------------------------------------------------------------- Internal workings
+    # ------------------------------------------------------ Internal workings
 
     def clear_dashboard(self):
         """Clear the dashboard for a new pickle or a new date."""
@@ -445,9 +442,7 @@ class Scheduler(param.Parameterized):
             self._debugging_message = "Starting to load scheduler."
             pn.state.notifications.info("Scheduler loading...", duration=0)
 
-            (scheduler, conditions) = schedview.collect.scheduler_pickle.read_scheduler(
-                self.scheduler_fname
-            )
+            (scheduler, conditions) = schedview.collect.scheduler_pickle.read_scheduler(self.scheduler_fname)
             self._scheduler = scheduler
             self._conditions = conditions
 
@@ -459,13 +454,9 @@ class Scheduler(param.Parameterized):
 
         except Exception:
             tb = traceback.format_exc(limit=-1)
-            self._debugging_message = (
-                f"Cannot load scheduler from {self.scheduler_fname}: \n{tb}"
-            )
+            self._debugging_message = f"Cannot load scheduler from {self.scheduler_fname}: \n{tb}"
             pn.state.notifications.clear()
-            pn.state.notifications.error(
-                f"Cannot load scheduler from {self.scheduler_fname}", duration=0
-            )
+            pn.state.notifications.error(f"Cannot load scheduler from {self.scheduler_fname}", duration=0)
 
             self._scheduler = None
             self._conditions = None
@@ -473,7 +464,7 @@ class Scheduler(param.Parameterized):
             return False
 
     def make_scheduler_summary_df(self):
-        """Update conditions, and make the reward and scheduler summary dataframes.
+        """Update conditions, make the reward and scheduler summary dataframes.
 
         Returns
         -------
@@ -481,17 +472,13 @@ class Scheduler(param.Parameterized):
             Record of success of conditions update and dataframe construction.
         """
         if self._scheduler is None:
-            self._debugging_message = (
-                "Cannot update survey reward table as no pickle is loaded."
-            )
+            self._debugging_message = "Cannot update survey reward table as no pickle is loaded."
 
             return False
 
         try:
             self._debugging_message = "Starting to make scheduler summary dataframe."
-            pn.state.notifications.info(
-                "Making scheduler summary dataframe...", duration=0
-            )
+            pn.state.notifications.info("Making scheduler summary dataframe...", duration=0)
 
             # TODO: Conditions setter bug-fix.
 
@@ -506,12 +493,10 @@ class Scheduler(param.Parameterized):
 
             self._scheduler.update_conditions(self._conditions)
             self._reward_df = self._scheduler.make_reward_df(self._conditions)
-            scheduler_summary_df = (
-                schedview.compute.scheduler.make_scheduler_summary_df(
-                    self._scheduler,
-                    self._conditions,
-                    self._reward_df,
-                )
+            scheduler_summary_df = schedview.compute.scheduler.make_scheduler_summary_df(
+                self._scheduler,
+                self._conditions,
+                self._reward_df,
             )
 
             # Duplicate column and apply URL formatting to one of the columns.
@@ -534,21 +519,15 @@ class Scheduler(param.Parameterized):
 
             self._debugging_message = "Finished making scheduler summary dataframe."
             pn.state.notifications.clear()
-            pn.state.notifications.success(
-                "Scheduler summary dataframe updated successfully"
-            )
+            pn.state.notifications.success("Scheduler summary dataframe updated successfully")
 
             return True
 
         except Exception:
             tb = traceback.format_exc(limit=-1)
-            self._debugging_message = (
-                f"Scheduler summary dataframe unable to be updated: \n{tb}"
-            )
+            self._debugging_message = f"Scheduler summary dataframe unable to be updated: \n{tb}"
             pn.state.notifications.clear()
-            pn.state.notifications.error(
-                "Scheduler summary dataframe unable to be updated!", duration=0
-            )
+            pn.state.notifications.error("Scheduler summary dataframe unable to be updated!", duration=0)
             self._scheduler_summary_df = None
 
             return False
@@ -559,9 +538,7 @@ class Scheduler(param.Parameterized):
             return
 
         self._debugging_message = "Starting to create summary widget."
-        tabulator_formatter = {
-            "survey_name": HTMLTemplateFormatter(template="<%= value %>")
-        }
+        tabulator_formatter = {"survey_name": HTMLTemplateFormatter(template="<%= value %>")}
         columns = [
             "tier",
             "survey_name",
@@ -574,9 +551,7 @@ class Scheduler(param.Parameterized):
             "reward": "Reward",
         }
         summary_widget = pn.widgets.Tabulator(
-            self._scheduler_summary_df[
-                self._scheduler_summary_df["tier"] == self._tier
-            ][columns],
+            self._scheduler_summary_df[self._scheduler_summary_df["tier"] == self._tier][columns],
             widths={"survey_name": "60%", "reward": "40%"},
             show_index=False,
             formatters=tabulator_formatter,
@@ -602,15 +577,13 @@ class Scheduler(param.Parameterized):
             "survey_url",
         ]
         self.summary_widget._update_data(
-            self._scheduler_summary_df[
-                self._scheduler_summary_df["tier"] == self._tier
-            ][columns]
+            self._scheduler_summary_df[self._scheduler_summary_df["tier"] == self._tier][columns]
         )
         self._debugging_message = "Finished updating summary widget."
 
     @param.depends("_publish_summary_widget")
     def publish_summary_widget(self):
-        """Publish the summary Tabulator widget to be displayed on the dashboard.
+        """Publish the summary Tabulator widget to be shown on the dashboard.
 
         Returns
         -------
@@ -626,14 +599,10 @@ class Scheduler(param.Parameterized):
     def compute_survey_maps(self):
         """Compute survey maps and update drop-down selection."""
         if self._scheduler is None:
-            self._debugging_message = (
-                "Cannot compute survey maps as no scheduler loaded."
-            )
+            self._debugging_message = "Cannot compute survey maps as no scheduler loaded."
             return
         if self._scheduler_summary_df is None:
-            self._debugging_message = (
-                "Cannot compute survey maps as no scheduler summary made."
-            )
+            self._debugging_message = "Cannot compute survey maps as no scheduler summary made."
             return
         try:
             self._debugging_message = "Starting to compute survey maps."
@@ -646,22 +615,16 @@ class Scheduler(param.Parameterized):
             self._debugging_message = "Finished computing survey maps."
 
         except Exception:
-            self._debugging_message = (
-                f"Cannot compute survey maps: \n{traceback.format_exc(limit=-1)}"
-            )
+            self._debugging_message = f"Cannot compute survey maps: \n{traceback.format_exc(limit=-1)}"
             pn.state.notifications.error("Cannot compute survey maps!", duration=0)
 
     def make_reward_df(self):
         """Make the summary dataframe."""
         if self._scheduler is None:
-            self._debugging_message = (
-                "Cannot make summary dataframe as no scheduler loaded."
-            )
+            self._debugging_message = "Cannot make summary dataframe as no scheduler loaded."
             return
         if self._scheduler_summary_df is None:
-            self._debugging_message = (
-                "Cannot make summary dataframe as no scheduler summary made."
-            )
+            self._debugging_message = "Cannot make summary dataframe as no scheduler summary made."
             return
         try:
             self._debugging_message = "Starting to make reward dataframe."
@@ -672,10 +635,9 @@ class Scheduler(param.Parameterized):
                     self._conditions,
                     self._reward_df.loc[[(int(self._tier[-1]), self._survey)], :],
                 )
-                # Duplicate column and apply URL formatting to one of the columns.
-                survey_reward_df["basis_function_href"] = survey_reward_df.loc[
-                    :, "basis_function"
-                ]
+                # Duplicate column and apply URL formatting
+                # to one of the columns.
+                survey_reward_df["basis_function_href"] = survey_reward_df.loc[:, "basis_function"]
                 survey_reward_df["basis_function_href"] = survey_reward_df.apply(
                     url_formatter,
                     axis=1,
@@ -685,16 +647,12 @@ class Scheduler(param.Parameterized):
                 self._debugging_message = "Finished making reward dataframe."
             else:
                 self._survey_reward_df = None
-                self._debugging_message = (
-                    "No reward dataframe made; survey has no rewards."
-                )
+                self._debugging_message = "No reward dataframe made; survey has no rewards."
 
         except Exception:
             tb = traceback.format_exc(limit=-1)
             self._debugging_message = f"Cannot make survey reward dataframe: \n{tb}"
-            pn.state.notifications.error(
-                "Cannot make survey reward dataframe!", duration=0
-            )
+            pn.state.notifications.error("Cannot make survey reward dataframe!", duration=0)
 
     def create_reward_widget(self):
         """Create Tabulator widget with survey reward dataframe."""
@@ -789,24 +747,19 @@ class Scheduler(param.Parameterized):
 
         try:
             self._debugging_message = "Starting to create sky map base."
-            # Make a dummy map that is 1.0 for all healpixels that might have data.
-            self._survey_maps["above_horizon"] = np.where(
-                self._conditions.alt > 0, 1.0, np.nan
-            )
+            # Make a dummy map that is 1.0 for all healpixels
+            # that might have data.
+            self._survey_maps["above_horizon"] = np.where(self._conditions.alt > 0, 1.0, np.nan)
             self._sky_map_base = schedview.plot.survey.map_survey_healpix(
                 self._conditions.mjd,
                 self._survey_maps,
                 "above_horizon",
                 self.nside,
             )
-            self._sky_map_base.plot.toolbar.tools[-1].tooltips.remove(
-                ("above_horizon", "@above_horizon")
-            )
+            self._sky_map_base.plot.toolbar.tools[-1].tooltips.remove(("above_horizon", "@above_horizon"))
 
             color_bar = ColorBar(
-                color_mapper=LinearColorMapper(
-                    palette=self.color_palette, low=0, high=1
-                ),
+                color_mapper=LinearColorMapper(palette=self.color_palette, low=0, high=1),
                 label_standoff=10,
                 location=(0, 0),
             )
@@ -815,9 +768,7 @@ class Scheduler(param.Parameterized):
             self._debugging_message = "Finished creating sky map base."
 
         except Exception:
-            self._debugging_message = (
-                f"Cannot create sky map base: \n{traceback.format_exc(limit=-1)}"
-            )
+            self._debugging_message = f"Cannot create sky map base: \n{traceback.format_exc(limit=-1)}"
             pn.state.notifications.error("Cannot create sky map base!", duration=0)
 
     def update_sky_map_with_survey_map(self):
@@ -831,9 +782,7 @@ class Scheduler(param.Parameterized):
          - Case 3: Selection is a survey map and is not all NaNs.
         """
         if self._sky_map_base is None:
-            self._debugging_message = (
-                "Cannot update sky map with survey map as no base map loaded."
-            )
+            self._debugging_message = "Cannot update sky map with survey map as no base map loaded."
             return
 
         try:
@@ -852,12 +801,8 @@ class Scheduler(param.Parameterized):
                 "reward",
             ]:
                 reward_underscored = self._map_name.replace(" ", "_")
-                reward_survey_key = list(
-                    key for key in self._survey_maps if self._map_name in key
-                )[0]
-                reward_bokeh_key = list(
-                    key for key in hpix_data_source.data if reward_underscored in key
-                )[0]
+                reward_survey_key = list(key for key in self._survey_maps if self._map_name in key)[0]
+                reward_bokeh_key = list(key for key in hpix_data_source.data if reward_underscored in key)[0]
 
                 min_good_value = np.nanmin(self._survey_maps[reward_survey_key])
                 max_good_value = np.nanmax(self._survey_maps[reward_survey_key])
@@ -874,9 +819,7 @@ class Scheduler(param.Parameterized):
                     nan_color="white",
                 )
                 self._sky_map_base.plot.below[1].visible = True
-                self._sky_map_base.plot.below[
-                    1
-                ].color_mapper.palette = self.color_palette
+                self._sky_map_base.plot.below[1].color_mapper.palette = self.color_palette
                 self._sky_map_base.plot.below[1].color_mapper.low = min_good_value
                 self._sky_map_base.plot.below[1].color_mapper.high = max_good_value
 
@@ -908,9 +851,7 @@ class Scheduler(param.Parameterized):
                     nan_color="white",
                 )
                 self._sky_map_base.plot.below[1].visible = True
-                self._sky_map_base.plot.below[
-                    1
-                ].color_mapper.palette = self.color_palette
+                self._sky_map_base.plot.below[1].color_mapper.palette = self.color_palette
                 self._sky_map_base.plot.below[1].color_mapper.low = min_good_value
                 self._sky_map_base.plot.below[1].color_mapper.high = max_good_value
             hpix_renderer.glyph.line_color = hpix_renderer.glyph.fill_color
@@ -918,9 +859,7 @@ class Scheduler(param.Parameterized):
             self._debugging_message = "Finished updating sky map with survey map."
 
         except Exception:
-            self._debugging_message = (
-                f"Cannot update sky map: \n{traceback.format_exc(limit=-1)}"
-            )
+            self._debugging_message = f"Cannot update sky map: \n{traceback.format_exc(limit=-1)}"
             pn.state.notifications.error("Cannot update sky map!", duration=0)
 
     def update_sky_map_with_reward(self):
@@ -934,9 +873,7 @@ class Scheduler(param.Parameterized):
          - Case 3: Reward is -Inf.
         """
         if self._sky_map_base is None:
-            self._debugging_message = (
-                "Cannot update sky map with reward as no base map is loaded."
-            )
+            self._debugging_message = "Cannot update sky map with reward as no base map is loaded."
             return
 
         try:
@@ -945,18 +882,12 @@ class Scheduler(param.Parameterized):
             hpix_data_source = self._sky_map_base.plot.select(name="hpix_ds")[0]
 
             reward_underscored = self._reward_name.replace(" ", "_")
-            max_basis_reward = self._survey_reward_df.loc[self._reward, :][
-                "max_basis_reward"
-            ]
+            max_basis_reward = self._survey_reward_df.loc[self._reward, :]["max_basis_reward"]
 
             # CASE 1: Reward is not scalar.
             if any(self._reward_name in key for key in self._survey_maps):
-                reward_survey_key = list(
-                    key for key in self._survey_maps if self._reward_name in key
-                )[0]
-                reward_bokeh_key = list(
-                    key for key in hpix_data_source.data if reward_underscored in key
-                )[0]
+                reward_survey_key = list(key for key in self._survey_maps if self._reward_name in key)[0]
+                reward_bokeh_key = list(key for key in hpix_data_source.data if reward_underscored in key)[0]
 
                 min_good_value = np.nanmin(self._survey_maps[reward_survey_key])
                 max_good_value = np.nanmax(self._survey_maps[reward_survey_key])
@@ -974,19 +905,16 @@ class Scheduler(param.Parameterized):
                     nan_color="white",
                 )
                 self._sky_map_base.plot.below[1].visible = True
-                self._sky_map_base.plot.below[
-                    1
-                ].color_mapper.palette = self.color_palette
+                self._sky_map_base.plot.below[1].color_mapper.palette = self.color_palette
                 self._sky_map_base.plot.below[1].color_mapper.low = min_good_value
                 self._sky_map_base.plot.below[1].color_mapper.high = max_good_value
 
             # CASE 2: Reward is scalar and finite.
             elif max_basis_reward != -np.inf:
-                # Create array populated with scalar values where sky brightness map is not NaN.
+                # Create array populated with scalar values where
+                # the sky brightness map is not NaN.
                 scalar_array = hpix_data_source.data["u_sky"].copy()
-                scalar_array[
-                    ~np.isnan(hpix_data_source.data["u_sky"])
-                ] = max_basis_reward
+                scalar_array[~np.isnan(hpix_data_source.data["u_sky"])] = max_basis_reward
                 hpix_data_source.data[reward_underscored] = scalar_array
 
                 hpix_renderer.glyph.fill_color = bokeh.transform.linear_cmap(
@@ -997,13 +925,9 @@ class Scheduler(param.Parameterized):
                     nan_color="white",
                 )
                 self._sky_map_base.plot.below[1].visible = True
-                self._sky_map_base.plot.below[
-                    1
-                ].color_mapper.palette = self.color_palette
+                self._sky_map_base.plot.below[1].color_mapper.palette = self.color_palette
                 self._sky_map_base.plot.below[1].color_mapper.low = max_basis_reward - 1
-                self._sky_map_base.plot.below[1].color_mapper.high = (
-                    max_basis_reward + 1
-                )
+                self._sky_map_base.plot.below[1].color_mapper.high = max_basis_reward + 1
 
             # CASE 3: Reward is -Inf.
             else:
@@ -1020,9 +944,7 @@ class Scheduler(param.Parameterized):
             self._debugging_message = "Finished updating sky map with reward."
 
         except Exception:
-            self._debugging_message = (
-                f"Cannot update sky map: \n{traceback.format_exc(limit=-1)}"
-            )
+            self._debugging_message = f"Cannot update sky map: \n{traceback.format_exc(limit=-1)}"
             pn.state.notifications.error("Cannot update sky map!", duration=0)
 
     @param.depends("_publish_map")
@@ -1059,12 +981,8 @@ class Scheduler(param.Parameterized):
         if self._debugging_message is None:
             return None
 
-        timestamp = datetime.now(timezone("America/Santiago")).strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
-        self._debug_string = (
-            f"\n {timestamp} - {self._debugging_message}" + self._debug_string
-        )
+        timestamp = datetime.now(timezone("America/Santiago")).strftime("%Y-%m-%d %H:%M:%S")
+        self._debug_string = f"\n {timestamp} - {self._debugging_message}" + self._debug_string
 
         if self.debug_pane is None:
             self.debug_pane = pn.pane.Str(
@@ -1081,7 +999,7 @@ class Scheduler(param.Parameterized):
         """Update the app to show or stop showing the loading indicator."""
         sched_app.loading = self._show_loading_indicator
 
-    # -------------------------------------------------------------------------------------- Dashboard titles
+    # ------------------------------------------------------- Dashboard titles
 
     def generate_dashboard_subtitle(self):
         """Select the dashboard subtitle string based on whether whether a
@@ -1099,9 +1017,7 @@ class Scheduler(param.Parameterized):
         if not self._display_reward and self.survey_map in maps:
             return f"\nTier {self._tier[-1]} - Survey {survey} - Map {self._map_name}"
         elif not self._display_reward and self.survey_map not in maps:
-            return (
-                f"\nTier {self._tier[-1]} - Survey {survey} - Reward {self._map_name}"
-            )
+            return f"\nTier {self._tier[-1]} - Survey {survey} - Reward {self._map_name}"
         else:
             return f"\nTier {self._tier[-1]} - Survey {survey} - Reward {self._reward_name}"
 
@@ -1155,7 +1071,7 @@ class Scheduler(param.Parameterized):
 
     @param.depends("_update_headings")
     def dashboard_subtitle(self):
-        """Load subtitle data and create/update a String pane to display subtitle.
+        """Load subtitle data and create/update a pane to display subtitle.
 
         Returns
         -------
@@ -1176,7 +1092,7 @@ class Scheduler(param.Parameterized):
 
     @param.depends("_update_headings")
     def summary_table_heading(self):
-        """Load heading data and create/update a String pane to display heading.
+        """Load heading data and create/update a pane to display heading.
 
         Returns
         -------
@@ -1236,7 +1152,7 @@ class Scheduler(param.Parameterized):
         return self.map_title_pane
 
 
-# --------------------------------------------------------------------------------------------- Key functions
+# -------------------------------------------------------------- Key functions
 
 
 def generate_array_for_key(number_of_columns=4):
@@ -1269,9 +1185,7 @@ def generate_array_for_key(number_of_columns=4):
         # Text for title and key items.
         "title_text": np.array(["Key"]),
         "text_1": np.array(["Horizon", "ZD=70 degrees", "Ecliptic", "Galactic plane"]),
-        "text_2": np.array(
-            ["Moon position", "Sun position", "Survey field(s)", "Telescope pointing"]
-        ),
+        "text_2": np.array(["Moon position", "Sun position", "Survey field(s)", "Telescope pointing"]),
     }
 
 
@@ -1407,7 +1321,7 @@ def generate_key():
     return key
 
 
-# ------------------------------------------------------------------------------------------ Create dashboard
+# ----------------------------------------------------------- Create dashboard
 
 
 # Initialize the dashboard layout.
@@ -1485,9 +1399,7 @@ def scheduler_app(date=None, scheduler_pickle=None):
                 scheduler.summary_table_heading,
                 styles={"background": "#048b8c"},
             ),
-            pn.param.ParamMethod(
-                scheduler.publish_summary_widget, loading_indicator=True
-            ),
+            pn.param.ParamMethod(scheduler.publish_summary_widget, loading_indicator=True),
         ),
         pn.Spacer(width=10),
         sizing_mode="stretch_height",
@@ -1501,9 +1413,7 @@ def scheduler_app(date=None, scheduler_pickle=None):
                 scheduler.reward_table_heading,
                 styles={"background": "#048b8c"},
             ),
-            pn.param.ParamMethod(
-                scheduler.publish_reward_widget, loading_indicator=True
-            ),
+            pn.param.ParamMethod(scheduler.publish_reward_widget, loading_indicator=True),
         ),
         pn.Spacer(width=10),
     )

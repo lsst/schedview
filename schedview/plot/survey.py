@@ -3,7 +3,7 @@ import re
 import astropy
 import bokeh
 import numpy as np
-import rubin_sim.scheduler.features.conditions  # noqa: F401
+import rubin_sim.scheduler.features.conditions
 import rubin_sim.scheduler.surveys  # noqa: F401
 from astropy.time import Time
 from uranography.api import HorizonMap, make_zscale_linear_cmap
@@ -128,11 +128,7 @@ def map_survey_healpix(
         ("Declination (deg)", "@center_decl"),
     ]
 
-    if (
-        conditions is not None
-        and conditions.tel_az is not None
-        and conditions.tel_alt is not None
-    ):
+    if conditions is not None and conditions.tel_az is not None and conditions.tel_alt is not None:
         telescope_marker_data_source = bokeh.models.ColumnDataSource(
             data={
                 "az": [np.degrees(conditions.tel_az)],
@@ -155,10 +151,7 @@ def map_survey_healpix(
                 data={
                     "ra": list(survey.ra_deg),
                     "decl": list(survey.dec_deg),
-                    "name": [
-                        "survey_pointing {i}"
-                        for i, ra in enumerate(list(survey.ra_deg))
-                    ],
+                    "name": ["survey_pointing {i}" for i, ra in enumerate(list(survey.ra_deg))],
                     "glyph_size": [20] * len(list(survey.ra_deg)),
                 },
                 name="survey_pointings",
