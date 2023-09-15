@@ -49,17 +49,9 @@ ignore = [
     "N803",
     "N806",
     "N812",
+    "N813",
     "N815",
     "N816",
-    "N999",
-    "D107",
-    "D105",
-    "D102",
-    "D104",
-    "D100",
-    "D200",
-    "D205",
-    "D400",
 ]
 line-length = 110
 select = [
@@ -67,9 +59,8 @@ select = [
     "F",  # pyflakes
     "N",  # pep8-naming
     "W",  # pycodestyle
-    #"D",  # pydocstyle
 ]
-target-version = "py310"
+target-version = "py311"
 extend-select = [
     "RUF100", # Warn about unused noqa
 ]
