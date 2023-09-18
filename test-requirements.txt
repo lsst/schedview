@@ -1,0 +1,7 @@
+pytest
+black
+ruff
+pytest-cov
+pytest-black
+firefox
+geckodriver
