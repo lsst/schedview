@@ -111,7 +111,9 @@ class SchedulerDisplay:
 
     @property
     def mjd(self):
-        return self.conditions.mjd
+        # Sometimes conditions.mjd is a one-d numpy array, sometimes a float.
+        # make sure we always return a float.
+        return float(self.conditions.mjd)
 
     @mjd.setter
     def mjd(self, value):
@@ -345,9 +347,6 @@ class SchedulerDisplay:
         if conditions.nside != self.nside:
             warnings.warn("Setting conditions to an unequal nside.")
 
-        # We might get it back with a one element array,
-        # which is not what we want.
-        conditions.mjd = float(conditions.mjd)
         self._set_conditions(conditions)
 
     def _set_conditions(self, conditions):
