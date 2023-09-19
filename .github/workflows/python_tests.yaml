@@ -2,8 +2,8 @@ name: Run Unit Tests
 
 on:
   # Trigger the workflow on pull request to main, or by hand
-  pull_request:
-    push:
+  push:
+    branches:
       - "tickets/PREOPS-3766"
   workflow_dispatch:
 
