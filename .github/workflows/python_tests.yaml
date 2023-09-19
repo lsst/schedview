@@ -2,9 +2,13 @@ name: Run Unit Tests
 
 on:
   # Trigger the workflow on pull request to main, or by hand
+  # Trigger the workflow on push (to main) or pull request
   push:
     branches:
-      - "tickets/PREOPS-3766"
+      - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -40,7 +44,7 @@ jobs:
         shell: bash -l {0}
         run: |
           export RUBIN_SIM_DATA_DIR=${{ github.workspace }}/data_dir
-          rs_download_data --force --tdqm_disable
+          rs_download_data --force --tdqm_disable --dirs tests,skybrightness_pre
 
       - name: install schedview
         shell: bash -l {0}
