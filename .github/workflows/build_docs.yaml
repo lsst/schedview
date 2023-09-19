@@ -31,7 +31,7 @@ jobs:
           conda install --quiet pip
           pip install "documenteer[guide]"
 
-      - name: install uranography
+      - name: install schedview
         shell: bash -l {0}
         run: |
           echo `pwd`
