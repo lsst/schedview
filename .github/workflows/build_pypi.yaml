@@ -33,17 +33,26 @@ jobs:
           mamba install --quiet --file=requirements.txt
           mamba install --quiet --file=test-requirements.txt
 
+      - name: download rubin_sim_data components needed for unit tests
+        shell: bash -l {0}
+        run: |
+          export RUBIN_SIM_DATA_DIR=${{ github.workspace }}/data_dir
+          rs_download_data --force --tdqm_disable --dirs tests,skybrightness_pre,maps,site_models,scheduler
+
       - name: install schedview
         shell: bash -l {0}
         run: |
           echo `pwd`
           python -m pip install .
+
       - name: conda list
         shell: bash -l {0}
         run: conda list
+
       - name: run unit tests
         shell: bash -l {0}
         run: |
+          export RUBIN_SIM_DATA_DIR=${{ github.workspace }}/data_dir
           pytest -r a -v --cov=schedview --cov=tests --cov-report=xml --cov-report=term --cov-branch
 
       - name: Upload coverage to codecov
