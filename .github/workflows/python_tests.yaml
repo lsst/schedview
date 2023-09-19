@@ -43,7 +43,7 @@ jobs:
         shell: bash -l {0}
         run: |
           export RUBIN_SIM_DATA_DIR=${{ github.workspace }}/data_dir
-          rs_download_data --force --tdqm_disable --dirs tests,skybrightness_pre,maps,site_models,scheduler
+          rs_download_data --force --tdqm_disable --dirs tests,skybrightness_pre,maps,site_models,scheduler,throughputs
 
       - name: install schedview
         shell: bash -l {0}
