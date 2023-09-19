@@ -14,8 +14,8 @@ class TestComputeScheduler(unittest.TestCase):
     observatory = ModelObservatory()
 
     def test_create_example(self):
-        current_time = "2025-07-02T02:00:00Z"
-        survey_start = "2026-07-01T16:00:00Z"
+        current_time = "2023-09-11T02:00:00Z"
+        survey_start = "2023-12-01T16:00:00Z"
         scheduler, observatory, conditions, observations = create_example(current_time, survey_start)
         self.assertIsInstance(scheduler, rubin_sim.scheduler.schedulers.CoreScheduler)
         self.assertIsInstance(observatory, ModelObservatory)

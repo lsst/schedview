@@ -13,13 +13,13 @@ class TestComputeSurvey(unittest.TestCase):
     observatory = ModelObservatory()
 
     def test_make_survey_reward_df(self):
-        self.observatory.mjd = 60100.2
+        self.observatory.mjd = 60200.2
         conditions = self.observatory.return_conditions()
         reward_df = make_survey_reward_df(self.scheduler, conditions)
         self.assertIsInstance(reward_df, pd.DataFrame)
 
     def test_compute_maps(self):
-        self.observatory.mjd = 60100.2
+        self.observatory.mjd = 60200.2
         conditions = self.observatory.return_conditions()
         survey = self.scheduler.survey_lists[2][2]
         survey_maps = compute_maps(survey, conditions, nside=8)
