@@ -3,8 +3,8 @@ import bokeh.models
 import bokeh.plotting
 import pandas as pd
 from astropy.time import Time
-from rubin_sim.scheduler.model_observatory import ModelObservatory
 from rubin_sim.scheduler.example import example_scheduler
+from rubin_sim.scheduler.model_observatory import ModelObservatory
 from uranography.api import ArmillarySphere, HorizonMap, MollweideMap, Planisphere
 
 from schedview.collect import read_scheduler, sample_pickle
