@@ -950,14 +950,11 @@ def parse_prenight_args():
         help="The names of the tabs to show.",
     )
 
-    default_custom_hvplot_tab_settings_file = str(
-        importlib.resources.files("schedview").joinpath("data", "sample_prenight_custom_hvplots.json")
-    )
     parser.add_argument(
         "--custom-hvplot-tab-settings-file",
         "-c",
         type=str,
-        default=default_custom_hvplot_tab_settings_file,
+        default=None,
         help="The file containing the settings for the custom hvplot tabs.",
     )
 
