@@ -14,6 +14,7 @@ import param
 import rubin_sim.scheduler.example
 from astropy.time import Time
 from rubin_sim.scheduler.model_observatory import ModelObservatory
+from rubin_sim.utils import survey_start_mjd
 
 import schedview.collect.footprint
 import schedview.collect.opsim
@@ -35,7 +36,7 @@ AVAILABLE_TIMEZONES = [
     "US/Eastern",
 ]
 DEFAULT_TIMEZONE = AVAILABLE_TIMEZONES[0]
-DEFAULT_CURRENT_TIME = Time.now()
+DEFAULT_CURRENT_TIME = Time(max(Time.now().mjd, survey_start_mjd()), format="mjd")
 DEFAULT_OPSIM_FNAME = "opsim.db"
 DEFAULT_SCHEDULER_FNAME = "scheduler.pickle.xz"
 DEFAULT_REWARDS_FNAME = "rewards.h5"
