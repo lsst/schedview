@@ -2,25 +2,24 @@ import unittest
 
 import astropy.utils.iers
 import healpy as hp
-import rubin_sim.scheduler.example
 from astropy.time import TimeDelta
 from rubin_sim.scheduler.features.conditions import Conditions
 from rubin_sim.scheduler.model_observatory import ModelObservatory
-
+from rubin_sim.scheduler.example import example_scheduler
 from schedview.collect import sample_pickle
 from schedview.plot.scheduler import DEFAULT_MJD, SchedulerDisplay
 
 NSIDE = 8
-
+MJD_SCHED = DEFAULT_MJD
 astropy.utils.iers.conf.iers_degraded_accuracy = "warn"
 
 
 class TestSchedulerDisplay(unittest.TestCase):
     def test_scheduler_display(self):
-        mjd = DEFAULT_MJD
+        mjd = MJD_SCHED
         nside = NSIDE
 
-        scheduler = rubin_sim.scheduler.example.example_scheduler(nside=nside)
+        scheduler = example_scheduler(nside=nside, mjd_start=MJD_SCHED)
 
         try:
             observatory = ModelObservatory(mjd_start=mjd - 1, nside=nside)
@@ -46,11 +45,11 @@ class TestSchedulerDisplay(unittest.TestCase):
 
         self.assertGreater(len(sched_display.map_keys), 0)
 
-        self.assertEqual(sched_display.mjd, DEFAULT_MJD)
-        self.assertLessEqual(sched_display.conditions.sun_n18_setting, DEFAULT_MJD)
-        self.assertGreaterEqual(sched_display.conditions.sun_n18_rising, DEFAULT_MJD)
+        self.assertEqual(sched_display.mjd, MJD_SCHED)
+        self.assertLessEqual(sched_display.conditions.sun_n18_setting, MJD_SCHED)
+        self.assertGreaterEqual(sched_display.conditions.sun_n18_rising, MJD_SCHED)
 
-        new_mjd = DEFAULT_MJD + 1.1
+        new_mjd = MJD_SCHED + 1.1
         sched_display.mjd = new_mjd
         self.assertEqual(sched_display.mjd, new_mjd)
         self.assertLessEqual(sched_display.conditions.sun_n18_setting, new_mjd)

@@ -9,6 +9,8 @@ from rubin_sim.scheduler.schedulers.core_scheduler import CoreScheduler
 
 from schedview.collect.scheduler_pickle import read_scheduler
 
+MJD_SCHED = 60200.2
+
 
 class TestSchedulerPickle(unittest.TestCase):
     def test_read_scheduler(self):
@@ -18,7 +20,7 @@ class TestSchedulerPickle(unittest.TestCase):
 
     def test_bare_scheduler(self):
         # Read a file with just a scheduler, no conditions
-        raw_scheduler = example_scheduler()
+        raw_scheduler = example_scheduler(mjd_start=MJD_SCHED)
         with TemporaryDirectory() as data_dir:
             sample_path = os.path.join(data_dir, "sample_scheduler.pickle")
             with open(sample_path, "wb") as file_io:

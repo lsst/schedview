@@ -8,9 +8,11 @@ from rubin_sim.scheduler.model_observatory import ModelObservatory
 
 from schedview.compute.scheduler import create_example, make_scheduler_summary_df, make_unique_survey_name
 
+MJD_SCHED = 60200.2
+
 
 class TestComputeScheduler(unittest.TestCase):
-    sample_scheduler = example_scheduler()
+    sample_scheduler = example_scheduler(mjd_start=MJD_SCHED)
     observatory = ModelObservatory()
 
     def test_create_example(self):
@@ -31,7 +33,7 @@ class TestComputeScheduler(unittest.TestCase):
         self.assertEqual(len(names), len(set(names)))
 
     def test_make_scheduler_summary_df(self):
-        self.observatory.mjd = 60100.2
+        self.observatory.mjd = MJD_SCHED
         conditions = self.observatory.return_conditions()
         reward_df = self.sample_scheduler.make_reward_df(conditions)
         summary_df = make_scheduler_summary_df(self.sample_scheduler, conditions, reward_df)

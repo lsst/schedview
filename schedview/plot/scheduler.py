@@ -91,7 +91,7 @@ class SchedulerDisplay:
             self.observatory = None
 
         if scheduler is None:
-            scheduler = rubin_sim.scheduler.example.example_scheduler(nside=nside)
+            scheduler = rubin_sim.scheduler.example.example_scheduler(nside=nside, mjd_start=DEFAULT_MJD)
             if self.observatory is not None:
                 conditions = self.observatory.return_conditions()
             else:

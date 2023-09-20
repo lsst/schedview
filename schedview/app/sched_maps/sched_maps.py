@@ -2,9 +2,9 @@ import bokeh.core.properties
 import bokeh.models
 import bokeh.plotting
 import pandas as pd
-import rubin_sim.scheduler.example
 from astropy.time import Time
 from rubin_sim.scheduler.model_observatory import ModelObservatory
+from rubin_sim.scheduler.example import example_scheduler
 from uranography.api import ArmillarySphere, HorizonMap, MollweideMap, Planisphere
 
 from schedview.collect import read_scheduler, sample_pickle
@@ -551,7 +551,7 @@ def make_scheduler_map_figure(
         observatory = ModelObservatory(mjd_start=start_mjd, nside=nside)
         observatory.mjd = DEFAULT_MJD
         conditions = observatory.return_conditions()
-        scheduler = rubin_sim.scheduler.example.example_scheduler(mjd_start=start_mjd, nside=nside)
+        scheduler = example_scheduler(mjd_start=start_mjd, nside=nside)
         scheduler.update_conditions(conditions)
         scheduler.request_observation()
     else:

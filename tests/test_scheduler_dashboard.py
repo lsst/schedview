@@ -55,6 +55,7 @@ Notes
 TEST_PICKLE = "https://www.astronomy.swin.edu.au/~gpoole/rubin_datavis/example_pickle_scheduler.p.xz"
 TEST_DATE = datetime(2023, 8, 1, 23, 0)
 DEFAULT_TIMEZONE = "America/Santiago"
+MJD_SCHED = 60200.2
 
 
 class TestSchedulerDashboard(unittest.TestCase):
@@ -90,13 +91,13 @@ class TestSchedulerDashboard(unittest.TestCase):
         self.assertEqual(title, expected_title)
 
     def test_make_summary_df(self):
-        self.scheduler._scheduler = example_scheduler()
+        self.scheduler._scheduler = example_scheduler(mjd_start=MJD_SCHED)
         self.scheduler._conditions = self.observatory.return_conditions()
         self.scheduler.make_scheduler_summary_df()
         self.assertIsInstance(self.scheduler._scheduler_summary_df, pd.DataFrame)
 
     def test_summary_widget(self):
-        self.scheduler._scheduler = example_scheduler()
+        self.scheduler._scheduler = example_scheduler(mjd_start=MJD_SCHED)
         self.scheduler._conditions = self.observatory.return_conditions()
         self.scheduler._scheduler.update_conditions(self.scheduler._conditions)
         scheduler_summary_df = make_scheduler_summary_df(
@@ -111,7 +112,7 @@ class TestSchedulerDashboard(unittest.TestCase):
         self.assertIsInstance(widget, Tabulator)
 
     def test_compute_survey_maps(self):
-        self.scheduler._scheduler = example_scheduler()
+        self.scheduler._scheduler = example_scheduler(mjd_start=MJD_SCHED)
         self.scheduler._conditions = self.observatory.return_conditions()
         self.scheduler._scheduler.update_conditions(self.scheduler._conditions)
         survey = self.scheduler._scheduler.survey_lists[2][3]
