@@ -3,9 +3,10 @@ import unittest
 import astropy.utils.iers
 import healpy as hp
 from astropy.time import TimeDelta
+from rubin_sim.scheduler.example import example_scheduler
 from rubin_sim.scheduler.features.conditions import Conditions
 from rubin_sim.scheduler.model_observatory import ModelObservatory
-from rubin_sim.scheduler.example import example_scheduler
+
 from schedview.collect import sample_pickle
 from schedview.plot.scheduler import DEFAULT_MJD, SchedulerDisplay
 
