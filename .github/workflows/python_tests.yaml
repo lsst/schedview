@@ -39,19 +39,6 @@ jobs:
           mamba install --quiet --file=requirements.txt
           mamba install --quiet --file=test-requirements.txt
 
-      - name: get rubin_sim from main
-        uses: actions/checkout@v3
-        with:
-          repository: lsst/rubin_sim
-          ref: main
-          path: rubin_sim
-
-      - name: install rubin_sim
-        shell: bash -l {0}
-        run: |
-          cd rubin_sim
-          python -m pip install .
-
       - name: download rubin_sim_data components needed for unit tests
         shell: bash -l {0}
         run: |

@@ -29,7 +29,7 @@ __version__ = "{version}"
 """
 
 [tool.pytest.ini_options]
-addopts = "--black --ignore-glob=*/version.py --ignore-glob=*data_dir/* --ignore-glob=*rubin_sim/*"
+addopts = "--black --ignore-glob=*/version.py --ignore-glob=*data_dir/*"
 testpaths = "."
 
 [tool.black]
