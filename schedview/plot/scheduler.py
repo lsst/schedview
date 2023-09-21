@@ -18,14 +18,14 @@ from astropy.time import Time
 from rubin_sim.scheduler.features.conditions import Conditions
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 from rubin_sim.scheduler.schedulers.core_scheduler import CoreScheduler as CoreScheduler
+from rubin_sim.utils import survey_start_mjd
 from uranography.api import ArmillarySphere, HorizonMap, MollweideMap, Planisphere, make_zscale_linear_cmap
 
 from schedview.collect import read_scheduler
 from schedview.compute.scheduler import make_scheduler_summary_df, make_unique_survey_name
 from schedview.compute.survey import make_survey_reward_df
 
-DEFAULT_MJD = 60200.2
-# DEFAULT_NSIDE = 16
+DEFAULT_MJD = survey_start_mjd() + 0.2
 DEFAULT_NSIDE = 32
 
 
@@ -91,7 +91,7 @@ class SchedulerDisplay:
             self.observatory = None
 
         if scheduler is None:
-            scheduler = rubin_sim.scheduler.example.example_scheduler(nside=nside)
+            scheduler = rubin_sim.scheduler.example.example_scheduler(nside=nside, mjd_start=DEFAULT_MJD)
             if self.observatory is not None:
                 conditions = self.observatory.return_conditions()
             else:
@@ -111,7 +111,9 @@ class SchedulerDisplay:
 
     @property
     def mjd(self):
-        return self.conditions.mjd
+        # Sometimes conditions.mjd is a one-d numpy array, sometimes a float.
+        # make sure we always return a float.
+        return float(self.conditions.mjd)
 
     @mjd.setter
     def mjd(self, value):
@@ -345,9 +347,6 @@ class SchedulerDisplay:
         if conditions.nside != self.nside:
             warnings.warn("Setting conditions to an unequal nside.")
 
-        # We might get it back with a one element array,
-        # which is not what we want.
-        conditions.mjd = float(conditions.mjd)
         self._set_conditions(conditions)
 
     def _set_conditions(self, conditions):

@@ -9,6 +9,9 @@ from rubin_sim.scheduler import sim_runner
 from rubin_sim.scheduler.example import example_scheduler
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 from rubin_sim.scheduler.utils import SchemaConverter
+from rubin_sim.utils import survey_start_mjd
+
+DEFAULT_DATE = Time(survey_start_mjd(), format="mjd").iso[:10]
 
 # Several dependencies throw prodigious instances of (benign) warnings.
 # Suppress them to avoid poluting the executed notebook.
@@ -68,7 +71,7 @@ def make_sample_test_data():
     parser.add_argument(
         "--date",
         type=str,
-        default="2023-12-22",
+        default=DEFAULT_DATE,
         help="Date of the night to simulate (YYYY-MM-DD).",
     )
     args = parser.parse_args()
