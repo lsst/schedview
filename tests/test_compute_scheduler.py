@@ -2,6 +2,7 @@ import unittest
 
 import pandas as pd
 import rubin_sim.scheduler.example
+from astropy.time import Time
 from rubin_sim.scheduler.example import example_scheduler
 from rubin_sim.scheduler.features.conditions import Conditions
 from rubin_sim.scheduler.model_observatory import ModelObservatory
@@ -18,8 +19,8 @@ class TestComputeScheduler(unittest.TestCase):
     observatory = ModelObservatory()
 
     def test_create_example(self):
-        current_time = "2023-09-11T02:00:00Z"
-        survey_start = "2023-12-01T16:00:00Z"
+        current_time = Time(TEST_MJD, format="mjd").iso[:19] + "Z"
+        survey_start = Time(MJD_START, format="mjd").iso[:19] + "Z"
         scheduler, observatory, conditions, observations = create_example(current_time, survey_start)
         self.assertIsInstance(scheduler, rubin_sim.scheduler.schedulers.CoreScheduler)
         self.assertIsInstance(observatory, ModelObservatory)
