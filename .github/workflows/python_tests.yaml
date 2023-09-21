@@ -22,6 +22,9 @@ jobs:
         python-version: ["3.11"]
     steps:
       - uses: actions/checkout@v3
+        with:
+          path: schedview
+
       - uses: conda-incubator/setup-miniconda@v2
         with:
           python-version: ${{ matrix.python-version }}
@@ -50,6 +53,7 @@ jobs:
         shell: bash -l {0}
         run: |
           cd rubin_sim
+          python -m build
           python -m pip install .
 
       - name: download rubin_sim_data components needed for unit tests
@@ -61,6 +65,7 @@ jobs:
       - name: install schedview
         shell: bash -l {0}
         run: |
+          cd schedview
           echo `pwd`
           python -m pip install .
 
@@ -71,10 +76,11 @@ jobs:
       - name: run unit tests
         shell: bash -l {0}
         run: |
+          cd schedview
           export RUBIN_SIM_DATA_DIR=${{ github.workspace }}/data_dir
           pytest -r a -v --cov=schedview --cov=tests --cov-report=xml --cov-report=term --cov-branch
 
       - name: Upload coverage to codecov
         uses: codecov/codecov-action@v2
         with:
-          file: coverage.xml
+          file: schedview/coverage.xml
