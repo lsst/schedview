@@ -43,7 +43,10 @@ jobs:
         shell: bash -l {0}
         run: |
           export RUBIN_SIM_DATA_DIR=${{ github.workspace }}/data_dir
-          rs_download_data --force --tdqm_disable --dirs tests,skybrightness_pre,maps,site_models,scheduler,throughputs
+          rs_download_data --force --tdqm_disable --dirs tests,maps,site_models,scheduler,throughputs
+          cd $RUBIN_SIM_DATA_DIR
+          wget https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/skybrightness_pre_2023_09_19.tgz
+          tar -xf skybrightness_pre_2023_09_19.tgz
 
       - name: install schedview
         shell: bash -l {0}
