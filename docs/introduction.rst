@@ -25,11 +25,14 @@ In addition to the pre-built web applications, the supporting functions and clas
 The ``scheduler_dashboard`` looks like this:
 
 .. image:: figures/scheduler_dashboard.png
-    :width: 512
+    :width: 768
+    :align: center
 
-and the ``prenight`` like this:
-  .. image:: figures/prenight.png
-    :width: 512
+The ``prenight`` dashboard looks like this:
+
+.. image:: figures/prenight.png
+  :width: 768
+  :align: center
 
 
 In addition to the default set of plots, the ``prenight`` dashboard supports adding custom plots to the dashboard.
