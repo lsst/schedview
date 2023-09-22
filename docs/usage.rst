@@ -1,26 +1,36 @@
 Usage
 =====
 
-Running `sched_maps`
+Running `sceduler_dashboard`
 --------------------
 
-Activate the environment, and start the `bokeh` app. If `SCHEDVIEW_DIR` is the
-directory into which you cloned the `schedview` github repository, then
+Activate the conda environment and start the app:
 
 ::
 
     $ conda activate schedview
-    $ bokeh serve ${SCHEDVIEW_DIR}/schedview/app/sched_maps
+    $ scheduler_dashboard
 
 The app will then give you the URL at which you can find the app.
 
 Running `prenight`
 ------------------
 
-Activate the environment, and start the `bokeh` app. If `SCHEDVIEW_DIR` is the
-directory into which you cloned the `schedview` github repository, then:
+Activate the conda environment and start the app:
 
 ::
 
     $ conda activate schedview
-    $ python ${SCHEDVIEW_DIR}/schedview/app/prenight/prenight.py
+    $ prenight
+
+The app will then give you the URL at which you can find the app.
+
+You can also supply an initial set of data files to show on startup:
+
+::
+    $ conda activate schedview
+    $ prenight --night 2023-10-01 \
+    > --opsim_db /sdf/data/rubin/user/neilsen/devel/schedview/schedview/data/sample_opsim.db \
+    > --scheduler /sdf/data/rubin/user/neilsen/devel/schedview/schedview/data/sample_scheduler.pickle.xz \
+    > --rewards /sdf/data/rubin/user/neilsen/devel/schedview/schedview/data/sample_rewards.h5 \
+    > --port 8080
