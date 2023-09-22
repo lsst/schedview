@@ -37,7 +37,26 @@ jobs:
         shell: bash -l {0}
         run: |
           export RUBIN_SIM_DATA_DIR=${{ github.workspace }}/data_dir
-          rs_download_data --force --tdqm_disable --dirs tests,skybrightness_pre,maps,site_models,scheduler,throughputs
+          mkdir $RUBIN_SIM_DATA_DIR
+          cd $RUBIN_SIM_DATA_DIR
+          wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/tests_2022_10_18.tgz
+          tar -xf tests_2022_10_18.tgz
+          echo "tests_2022_10_18.tgz complete"
+          wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/throughputs_2023_09_07.tgz
+          tar -xf throughputs_2023_09_07.tgz
+          echo "throughputs_2023_09_07.tgz complete"
+          wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/maps_2022_2_28.tgz
+          tar -xf maps_2022_2_28.tgz
+          echo "maps_2022_2_28.tgz complete"
+          wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/site_models_2023_03_28.tgz
+          tar -xf site_models_2023_03_28.tgz
+          echo "site_models_2023_03_28.tgz complete"
+          wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/scheduler_2023_03_09.tgz
+          tar -xf scheduler_2023_03_09.tgz
+          echo "scheduler_2023_03_09.tgz complete"
+          wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/skybrightness_pre_2023_09_19.tgz
+          tar -xf skybrightness_pre_2023_09_19.tgz
+          echo "skybrightness_pre_2023_09_19.tgz complete"
 
       - name: install schedview
         shell: bash -l {0}
