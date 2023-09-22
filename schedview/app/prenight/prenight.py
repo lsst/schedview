@@ -1,5 +1,4 @@
 import argparse
-import importlib
 import json
 import logging
 import os
@@ -977,7 +976,7 @@ def parse_prenight_args():
     return prenight_app_parameters
 
 
-if __name__ == "__main__":
+def main():
     print("Starting prenight dashboard")
 
     prenight_app_parameters = parse_prenight_args()
@@ -1004,3 +1003,7 @@ if __name__ == "__main__":
         admin=True,
         profiler=True,
     )
+
+
+if __name__ == "__main__":
+    main()
