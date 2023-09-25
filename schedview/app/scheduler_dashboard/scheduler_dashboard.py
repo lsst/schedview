@@ -23,6 +23,7 @@
 
 """schedview docstring"""
 
+import importlib.resources
 import logging
 import os
 import traceback
@@ -1453,13 +1454,15 @@ def scheduler_app(date=None, scheduler_pickle=None):
     return sched_app
 
 
-if __name__ == "__main__":
+def main():
     print("Starting scheduler dashboard.")
 
     if "SCHEDULER_PORT" in os.environ:
         scheduler_port = int(os.environ["SCHEDULER_PORT"])
     else:
         scheduler_port = 8080
+
+    assets_dir = os.path.join(importlib.resources.files("schedview"), "app", "scheduler_dashboard", "assets")
 
     pn.serve(
         scheduler_app,
@@ -1469,5 +1472,9 @@ if __name__ == "__main__":
         start=True,
         autoreload=True,
         threaded=True,
-        static_dirs={"assets": "./assets"},
+        static_dirs={"assets": assets_dir},
     )
+
+
+if __name__ == "__main__":
+    main()

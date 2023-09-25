@@ -14,6 +14,10 @@ classifiers = [
  ]
 dynamic = [ "version" ]
 
+[project.scripts]
+prenight = "schedview.app.prenight.prenight:main"
+scheduler_dashboard = "schedview.app.scheduler_dashboard.scheduler_dashboard:main"
+
 [tool.setuptools.dynamic]
 version = { attr = "setuptools_scm.get_version" }
 
