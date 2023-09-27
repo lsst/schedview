@@ -7,7 +7,7 @@ name = "schedview"
 description = "Tools for visualization of Rubin Observatory's scheduler status, strategy and progress on LSST."
 readme = "README.md"
 authors = [
-    {name="Eric H. Neilsen, Jr.", email="neilsen@fnal.gov"},
+    {name="Eric Neilsen"},
     {name="Lynne Jones"},
     {name="Eman Ali"},
     {name="Alice Serene"}
@@ -19,7 +19,30 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering :: Astronomy",
  ]
+urls = {documentation = "https://schedview.lsst.io", repository = "https://github.com/lsst/schedview"}
 dynamic = [ "version" ]
+dependencies = [
+    "numpy",
+    "pandas",
+    "pytz",
+    "holoviews",
+    "hvplot",
+    "astropy >= 5.3",
+    "healpy",
+    "healsparse",
+    "uranography >= 1.1.0 ",
+    "bokeh >= 3.1.1",
+    "panel >= 1.1.0",
+    "colorcet",
+    "jupyter",
+    "nbconvert",
+    "selenium >= 4.10.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+]
 
 [project.scripts]
 prenight = "schedview.app.prenight.prenight:main"
