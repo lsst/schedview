@@ -5,6 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "schedview"
 description = "Tools for visualization of Rubin Observatory's scheduler status, strategy and progress on LSST."
+readme = "README.md"
+authors = [
+    {name="Eric H. Neilsen, Jr.", email="neilsen@fnal.gov"},
+    {name="Lynne Jones"},
+    {name="Eman Ali"},
+    {name="Alice Serene"}
+]
 classifiers = [
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
