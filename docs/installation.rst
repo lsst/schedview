@@ -1,40 +1,55 @@
 Installation
 ============
 
-Installing dashboards
----------------------
+Installing with ``pip``
+-----------------------
 
-First, get the code by cloning the github project:
-
-    $ git clone git@github.com:lsst/schedview.git
-
-Create a `conda` environment with the appropriate dependencies, and activate it.
-If you are running the `metric_maps` application, use the `conda` environment
-file that includes a recent version of `rubin_sim`:
-
-    $ conda env create -f environment.yaml
-    $ conda activate schedview
-
-Install the (development) `schedview` in your new environment:
-
-    $ pip install -e .
-
-Run the tests:
-
-    $ pytest
-
-
-Building Documentation
-----------------------
-
-Online documentation require the installation of `documenteer[guide]`:
+Use pip install:
 
 ::
 
- pip install "documenteer[guide]"
- cd docs
- make clean
- make html
+ $ pip install schedview
 
+Coming soon: ``conda install -c conda-forge schedview``
 
-The root of the local documentation will then be `docs/_build/html/index.html`.
+For developer use
+-----------------
+
+First, get the code by cloning the github project:
+
+::
+
+ $ git clone git@github.com:lsst/schedview.git
+ $ cd schedview
+
+Create a ``conda`` environment with the appropriate dependencies, and activate it:
+
+::
+
+ $ conda create -n schedvie
+ $ conda activate schedview
+ $ conda install -f requirements.txt
+
+Install the (development) ``schedview`` in your new environment:
+
+::
+
+ $ pip install -e .
+
+Some additional packages are required to run the tests.
+To install the tests, install the dependenices, then run the tests:
+
+::
+
+ $ conda install -f test-requirements.txt
+ $ pytest .
+
+Building the documentation requires the installation of ``documenteer[guide]``:
+
+::
+
+ $ pip install "documenteer[guide]"
+ $ cd docs
+ $ package-docs build
+
+The root of the local documentation will then be ``docs/_build/html/index.html``.

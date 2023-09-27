@@ -1,7 +1,7 @@
 schedview
 =========
 
-To do.
+The `schedview` module provides tools for visualizing Rubin Observatory scheduler behaviour and Rubin Observatory/LSST survey status.
 
 
 Contents

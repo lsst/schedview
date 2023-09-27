@@ -131,15 +131,18 @@ dmypy.json
 # dynamically created files
 schedview/version.py
 
-# Scratch notebooks and data
+# Scratch notebooks, data, and backups
 notebooks/202?-??-*.ipynb
 notebooks/scratch
+notebooks/rewards.db
+notebooks/example_scheduler.p.xz
 schedview/data/local
+notebooks/*~
 
 # Externally supplied data
 schedview/data/bsc5.dat
 util/sample_data/sample_opsim.db
 util/sample_data/sample_rewards.h5
 util/sample_data/sample_scheduler.pickle.xz
-notebooks/rewards.db
-notebooks/example_scheduler.p.xz
+notebooks/de421.bsp
+notebooks/MPCORB.DAT.gz

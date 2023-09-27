@@ -1,8 +1,8 @@
 Usage
 =====
 
-Running `sceduler_dashboard`
---------------------
+Running ``scheduler_dashboard``
+-------------------------------
 
 Activate the conda environment and start the app:
 
@@ -13,8 +13,8 @@ Activate the conda environment and start the app:
 
 The app will then give you the URL at which you can find the app.
 
-Running `prenight`
-------------------
+Running ``prenight``
+--------------------
 
 Activate the conda environment and start the app:
 
@@ -28,6 +28,7 @@ The app will then give you the URL at which you can find the app.
 You can also supply an initial set of data files to show on startup:
 
 ::
+
     $ conda activate schedview
     $ prenight --night 2023-10-01 \
     > --opsim_db /sdf/data/rubin/user/neilsen/devel/schedview/schedview/data/sample_opsim.db \
