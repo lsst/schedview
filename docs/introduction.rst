@@ -13,7 +13,7 @@ In addition to the pre-built web applications, the supporting functions and clas
 * ``scheduler_dashboard``, a dashboard for examining the state of a the scheduler an a specific time, intended for using during the night to give insight into the schedulers current behavior.
   The ``scheduler_dashboard`` shows maps and relevant statistics for all basis functions and rewards for all surveys, given a time and an instance of the scheduler.
 * ``prenight``, a dashboard for preparing for a night of observing.
-  Visualizations included in this dashboard are intended to help schedulers and observing staff understand what the scheduler will to in a night, given the output of a simualtion of the night (as created by `rubin_sim`).
+  Visualizations included in this dashboard are intended to help schedulers and observing staff understand what the scheduler will do in a night, given the output of a simulation of the night (as created by `rubin_sim`).
   Elements include:
 
   * A table of astronomical events (sunrise, sunset, moonrise, moonset, etc.)
