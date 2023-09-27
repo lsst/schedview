@@ -66,16 +66,20 @@ class TestSchedulerDashboard(unittest.TestCase):
     scheduler.scheduler_fname = TEST_PICKLE
     scheduler._date_time = Time(Timestamp(TEST_DATE, tzinfo=ZoneInfo(DEFAULT_TIMEZONE))).mjd
 
-    @unittest.skip("Skipping so it does not block implementation of CI")
-    def test_scheduler_app(self):
-        app = scheduler_app(date=TEST_DATE, scheduler_pickle=TEST_PICKLE)
-        app_bokeh_model = app.get_root()
-        with TemporaryDirectory() as dir:
-            out_path = Path(dir)
-            saved_html_fname = out_path.joinpath("test_page.html")
-            bokeh.plotting.output_file(filename=saved_html_fname, title="Test Page")
-            bokeh.plotting.save(app_bokeh_model)
+    def setUp(self) -> None:
+        bokeh.io.reset_output()
 
+    def test_scheduler_app(self):
+        sched_app = scheduler_app(date=TEST_DATE, scheduler_pickle=TEST_PICKLE)
+        sched_app_bokeh_model = sched_app.get_root()
+        with TemporaryDirectory() as scheduler_dir:
+            sched_out_path = Path(scheduler_dir)
+            sched_saved_html_fname = sched_out_path.joinpath("sched_test_page.html")
+            bokeh.plotting.output_file(filename=sched_saved_html_fname, title="Scheduler Test Page")
+            bokeh.plotting.save(sched_app_bokeh_model)
+        bokeh.io.reset_output()
+
+    @unittest.skip("Skipping so it does not block implementation of CI")
     def test_read_scheduler(self):
         self.scheduler.read_scheduler()
         self.assertIsInstance(self.scheduler._scheduler, CoreScheduler)

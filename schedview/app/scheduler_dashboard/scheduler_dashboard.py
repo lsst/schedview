@@ -38,6 +38,7 @@ from astropy.time import Time
 from bokeh.models import ColorBar, LinearColorMapper
 from bokeh.models.widgets.tables import BooleanFormatter, HTMLTemplateFormatter
 from pandas import Timestamp
+from panel.io.loading import start_loading_spinner, stop_loading_spinner
 from pytz import timezone
 
 # For the conditions.mjd bugfix
@@ -51,7 +52,6 @@ import schedview.plot.survey
 
 DEFAULT_CURRENT_TIME = Time.now()
 DEFAULT_TIMEZONE = "America/Santiago"
-COLOR_PALETTES = [color for color in bokeh.palettes.__palettes__ if "256" in color]
 LOGO = "/assets/lsst_white_logo.png"
 
 pn.extension(
@@ -73,6 +73,11 @@ stylesheet = """
 """
 
 
+def get_color_palettes():
+    palettes = [color for color in bokeh.palettes.__palettes__ if "256" in color]
+    return palettes
+
+
 def url_formatter(dataframe_row, name_column, url_column):
     """Format survey name as a HTML href to survey URL (if URL exists).
 
@@ -89,7 +94,8 @@ def url_formatter(dataframe_row, name_column, url_column):
     if dataframe_row[url_column] == "":
         return dataframe_row[name_column]
     else:
-        return f'<a href="{dataframe_row[url_column]}" target="_blank"> {dataframe_row[name_column]}</a>'
+        return f'<a href="{dataframe_row[url_column]}" target="_blank"> \
+            {dataframe_row[name_column]}</a>'
 
 
 class Scheduler(param.Parameterized):
@@ -128,9 +134,10 @@ class Scheduler(param.Parameterized):
         label="Map resolution (nside)",
         doc="",
     )
-    color_palette = param.Selector(default="Viridis256", objects=COLOR_PALETTES, doc="")
+    color_palette = param.Selector(default="Viridis256", objects=get_color_palettes(), doc="")
     summary_widget = param.Parameter(default=None, doc="")
     reward_widget = param.Parameter(default=None, doc="")
+    show_loading_indicator = param.Boolean(default=False)
 
     # Param parameters (used in depends decoraters and trigger calls).
     _publish_summary_widget = param.Parameter(None)
@@ -165,25 +172,24 @@ class Scheduler(param.Parameterized):
     _display_reward = False
     _display_dashboard_data = False
     _do_not_trigger_update = True
-    _show_loading_indicator = False
     _model_observatory = ModelObservatory(init_load_length=1)
 
-    # ------------------------------------------------- User actions
+    # ------------------------------------------------------------ User actions
 
     @param.depends("scheduler_fname", watch=True)
     def _update_scheduler_fname(self):
         """Update the dashboard when a user enters a new filepath/URL."""
-        self._show_loading_indicator = True
+        self.show_loading_indicator = True
         self.clear_dashboard()
 
         if not self.read_scheduler():
             self.clear_dashboard()
-            self._show_loading_indicator = False
+            self.show_loading_indicator = False
             return
 
         if not self.make_scheduler_summary_df():
             self.clear_dashboard()
-            self._show_loading_indicator = False
+            self.show_loading_indicator = False
             return
 
         self.create_summary_widget()
@@ -209,12 +215,12 @@ class Scheduler(param.Parameterized):
         self._display_reward = False
         self.param.trigger("_update_headings")
 
-        self._show_loading_indicator = False
+        self.show_loading_indicator = False
 
     @param.depends("date", watch=True)
     def _update_date(self):
         """Update the dashboard when a user chooses a new date/time."""
-        self._show_loading_indicator = True
+        self.show_loading_indicator = True
         self.clear_dashboard()
 
         self._date_time = Time(
@@ -226,7 +232,7 @@ class Scheduler(param.Parameterized):
 
         if not self.make_scheduler_summary_df():
             self.clear_dashboard()
-            self._show_loading_indicator = False
+            self.show_loading_indicator = False
             return
 
         if self.summary_widget is None:
@@ -255,7 +261,7 @@ class Scheduler(param.Parameterized):
         self._display_reward = False
         self.param.trigger("_update_headings")
 
-        self._show_loading_indicator = False
+        self.show_loading_indicator = False
 
     @param.depends("USER_tier", watch=True)
     def _update_tier(self):
@@ -403,7 +409,7 @@ class Scheduler(param.Parameterized):
             self.update_sky_map_with_survey_map()
         self.param.trigger("_publish_map")
 
-    # ------------------------------------------------------ Internal workings
+    # ------------------------------------------------------- Internal workings
 
     def clear_dashboard(self):
         """Clear the dashboard for a new pickle or a new date."""
@@ -465,7 +471,9 @@ class Scheduler(param.Parameterized):
             return False
 
     def make_scheduler_summary_df(self):
-        """Update conditions, make the reward and scheduler summary dataframes.
+        """
+        Update conditions, and make the reward
+        and scheduler summary dataframes.
 
         Returns
         -------
@@ -584,7 +592,8 @@ class Scheduler(param.Parameterized):
 
     @param.depends("_publish_summary_widget")
     def publish_summary_widget(self):
-        """Publish the summary Tabulator widget to be shown on the dashboard.
+        """
+        Publish the summary Tabulator widget to be displayed on the dashboard.
 
         Returns
         -------
@@ -636,8 +645,8 @@ class Scheduler(param.Parameterized):
                     self._conditions,
                     self._reward_df.loc[[(int(self._tier[-1]), self._survey)], :],
                 )
-                # Duplicate column and apply URL formatting
-                # to one of the columns.
+                # Duplicate column and apply
+                # URL formatting to one of the columns.
                 survey_reward_df["basis_function_href"] = survey_reward_df.loc[:, "basis_function"]
                 survey_reward_df["basis_function_href"] = survey_reward_df.apply(
                     url_formatter,
@@ -792,15 +801,7 @@ class Scheduler(param.Parameterized):
             hpix_data_source = self._sky_map_base.plot.select(name="hpix_ds")[0]
 
             # CASE 1: Selection is a reward map.
-            if self.survey_map not in [
-                "u_sky",
-                "g_sky",
-                "r_sky",
-                "i_sky",
-                "z_sky",
-                "y_sky",
-                "reward",
-            ]:
+            if self.survey_map not in ["u_sky", "g_sky", "r_sky", "i_sky", "z_sky", "y_sky", "reward"]:
                 reward_underscored = self._map_name.replace(" ", "_")
                 reward_survey_key = list(key for key in self._survey_maps if self._map_name in key)[0]
                 reward_bokeh_key = list(key for key in hpix_data_source.data if reward_underscored in key)[0]
@@ -912,8 +913,8 @@ class Scheduler(param.Parameterized):
 
             # CASE 2: Reward is scalar and finite.
             elif max_basis_reward != -np.inf:
-                # Create array populated with scalar values where
-                # the sky brightness map is not NaN.
+                # Create array populated with scalar values
+                # where sky brightness map is not NaN.
                 scalar_array = hpix_data_source.data["u_sky"].copy()
                 scalar_array[~np.isnan(hpix_data_source.data["u_sky"])] = max_basis_reward
                 hpix_data_source.data[reward_underscored] = scalar_array
@@ -995,12 +996,7 @@ class Scheduler(param.Parameterized):
             self.debug_pane.object = self._debug_string
         return self.debug_pane
 
-    @param.depends("_show_loading_indicator", watch=True)
-    def update_loading_indicator(self):
-        """Update the app to show or stop showing the loading indicator."""
-        sched_app.loading = self._show_loading_indicator
-
-    # ------------------------------------------------------- Dashboard titles
+    # ------------------------------------------------------ Dashboard titles
 
     def generate_dashboard_subtitle(self):
         """Select the dashboard subtitle string based on whether whether a
@@ -1072,7 +1068,8 @@ class Scheduler(param.Parameterized):
 
     @param.depends("_update_headings")
     def dashboard_subtitle(self):
-        """Load subtitle data and create/update a pane to display subtitle.
+        """
+        Load subtitle data and create/update a String pane to display subtitle.
 
         Returns
         -------
@@ -1093,7 +1090,8 @@ class Scheduler(param.Parameterized):
 
     @param.depends("_update_headings")
     def summary_table_heading(self):
-        """Load heading data and create/update a pane to display heading.
+        """
+        Load heading data and create/update a String pane to display heading.
 
         Returns
         -------
@@ -1153,7 +1151,7 @@ class Scheduler(param.Parameterized):
         return self.map_title_pane
 
 
-# -------------------------------------------------------------- Key functions
+# --------------------------------------------------------------- Key functions
 
 
 def generate_array_for_key(number_of_columns=4):
@@ -1322,14 +1320,15 @@ def generate_key():
     return key
 
 
-# ----------------------------------------------------------- Create dashboard
+def get_grid_layout():
+    grid_layout = pn.GridSpec(
+        sizing_mode="stretch_both",
+        max_height=1000,
+    ).servable()
+    return grid_layout
 
 
-# Initialize the dashboard layout.
-sched_app = pn.GridSpec(
-    sizing_mode="stretch_both",
-    max_height=1000,
-).servable()
+# ------------------------------------------------------------ Create dashboard
 
 
 def scheduler_app(date=None, scheduler_pickle=None):
@@ -1348,6 +1347,14 @@ def scheduler_app(date=None, scheduler_pickle=None):
     sched_app : 'panel.layout.grid.GridSpec'
         The dashboard.
     """
+    # Initialize the dashboard layout.
+    # sched_app = pn.GridSpec(
+    #     sizing_mode='stretch_both',
+    #     max_height=1000,
+    #     ).servable()
+
+    sched_app = get_grid_layout()
+
     scheduler = Scheduler()
 
     if date is not None:
@@ -1355,6 +1362,11 @@ def scheduler_app(date=None, scheduler_pickle=None):
 
     if scheduler_pickle is not None:
         scheduler.scheduler_fname = scheduler_pickle
+
+    # show dashboard as busy when scheduler.show_loading_spinner is True
+    @pn.depends(loading=scheduler.param.show_loading_indicator, watch=True)
+    def update_loading(loading):
+        start_loading_spinner(sched_app) if loading else stop_loading_spinner(sched_app)
 
     # Dashboard title.
     sched_app[0:8, :] = pn.Row(
@@ -1450,6 +1462,9 @@ def scheduler_app(date=None, scheduler_pickle=None):
         sizing_mode="stretch_width",
         collapsed=True,
     )
+
+    if pn.state.location is not None:
+        pn.state.location.sync(scheduler, {"scheduler_fname": "scheduler", "nside": "nside"})
 
     return sched_app
 
