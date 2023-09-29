@@ -1,7 +1,9 @@
 import argparse
+import importlib.resources
 import json
 import logging
 import os
+from glob import glob
 
 import astropy.utils.iers
 import bokeh
@@ -36,12 +38,12 @@ AVAILABLE_TIMEZONES = [
 ]
 DEFAULT_TIMEZONE = AVAILABLE_TIMEZONES[0]
 DEFAULT_CURRENT_TIME = Time(max(Time.now().mjd, survey_start_mjd()), format="mjd")
-DEFAULT_OPSIM_FNAME = "opsim.db"
-DEFAULT_SCHEDULER_FNAME = "scheduler.pickle.xz"
-DEFAULT_REWARDS_FNAME = "rewards.h5"
 USE_EXAMPLE_SCHEDULER = False
 DEFAULT_MODEL_OBSERVATORY = ModelObservatory(init_load_length=1)
 DEFAULT_MODEL_OBSERVATORY.sky_model.load_length = 1
+
+PACKAGE_DATA_DIR = importlib.resources.files("schedview.data").as_posix()
+USDF_DATA_DIR = "/sdf/group/rubin/web_data/sim-data/schedview"
 
 astropy.utils.iers.conf.iers_degraded_accuracy = "warn"
 
@@ -87,7 +89,6 @@ class Prenight(param.Parameterized):
     )
 
     opsim_output_fname = param.String(
-        default=DEFAULT_OPSIM_FNAME,
         doc="The file name or URL of the OpSim output database.",
         label="OpSim output database path or URL",
     )
@@ -99,13 +100,11 @@ rubin_sim.scheduler.schedulers.CoreScheduler, or a tuple of the form
 rubin_sim.scheduler.schedulers.CoreScheduler, and conditions is an
 instance of rubin_sim.scheduler.conditions.Conditions."""
     scheduler_fname = param.String(
-        default=DEFAULT_SCHEDULER_FNAME,
         doc=scheduler_fname_doc,
         label="URL or file name of scheduler pickle file",
     )
 
     rewards_fname = param.String(
-        default=DEFAULT_REWARDS_FNAME,
         doc="URL or file name of the rewards HDF5 file.",
         label="URL or file name of rewards HDF5 file",
     )
@@ -201,6 +200,13 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         super().__init__(**params)
         self.config_logger()
 
+        # Make sure the display elements that depend on the
+        # night are initialized, because param won't automatically
+        # update them if the night is not changed.
+        # That is, if we do not do this, things will fail if the sure
+        # wants to look at the default night.
+        self.param.trigger("night")
+
     def config_logger(self, logger_name="prenight"):
         """Configure the logger.
 
@@ -279,7 +285,11 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
 
     @param.depends("opsim_output_fname", "_almanac_events", watch=True)
     def _update_visits(self):
-        if self.opsim_output_fname is None or self._almanac_events is None:
+        if (
+            self.opsim_output_fname is None
+            or len(self.opsim_output_fname) == 0
+            or self._almanac_events is None
+        ):
             self._visits = None
             return
 
@@ -568,7 +578,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
 
     @param.depends("rewards_fname", watch=True)
     def _update_reward_df(self):
-        if self.rewards_fname is None:
+        if self.rewards_fname is None or len(self.rewards_fname) < 1:
             return None
 
         self.logger.info("Starting to update reward dataframe.")
@@ -783,14 +793,12 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         self.logger.info("Finished updating tab contents.")
         return detail_tabs
 
-    @classmethod
     def make_app(
-        cls,
+        self,
         night_date=None,
         opsim_db=None,
         scheduler=None,
         rewards=None,
-        return_app=False,
         shown_tabs=None,
         custom_hvplot_tab_settings_file=None,
     ):
@@ -806,8 +814,6 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             Path to the scheduler pickle file.
         rewards : `str`, optional
             Path to the rewards hdf5 file.
-        return_app : `bool`, optional
-            Return the instances of the app class itself.
         shown_tabs : `list` [`str`], optional
             Names of the tabs to show. If None, show all tabs except the visit
             explorer.
@@ -823,37 +829,29 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             ['panel.viewable.Viewable', `schedview.prenight.Prenight`]
             The pre-night briefing app.
         """
-        prenight = cls()
-        logger = prenight.logger
+        if night_date is not None:
+            self.night = night_date
 
-        # Rather than set each parameter one at a time, and execute the
-        # callbacks for each as they are set, we can use the
-        # batch_call_watchers context manager to set all the parameters at
-        # once, and only execute the callbacks once.
-        with param.parameterized.batch_call_watchers(prenight):
-            if night_date is not None:
-                prenight.night = night_date
+        if scheduler is not None:
+            self.scheduler_fname = scheduler
 
-            if opsim_db is not None:
-                prenight.opsim_output_fname = opsim_db
+        if opsim_db is not None:
+            self.opsim_output_fname = opsim_db
 
-            if scheduler is not None:
-                prenight.scheduler_fname = scheduler
+        if rewards is not None:
+            self.rewards_fname = rewards
 
-            if rewards is not None:
-                prenight.rewards_fname = rewards
+        if custom_hvplot_tab_settings_file is not None:
+            self.custom_hvplot_tab_settings_file = custom_hvplot_tab_settings_file
 
-            if custom_hvplot_tab_settings_file is not None:
-                prenight.custom_hvplot_tab_settings_file = custom_hvplot_tab_settings_file
-
-            if shown_tabs is not None:
-                prenight.shown_tabs = shown_tabs
+        if shown_tabs is not None:
+            self.shown_tabs = shown_tabs
 
         pn_app = pn.Column(
             "<h1>Pre-night briefing</h1>",
             pn.Row(
                 pn.Param(
-                    prenight,
+                    self,
                     parameters=[
                         "night",
                         "timezone",
@@ -865,10 +863,10 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                 ),
                 pn.Column(
                     "<h2>Astronomical Events</h2>",
-                    pn.param.ParamMethod(prenight.almanac_events_table, loading_indicator=True),
+                    pn.param.ParamMethod(self.almanac_events_table, loading_indicator=True),
                 ),
             ),
-            pn.param.ParamMethod(prenight.tab_contents, loading_indicator=True),
+            pn.param.ParamMethod(self.tab_contents, loading_indicator=True),
             pn.widgets.Debugger(
                 name="Debugger",
                 level=logging.DEBUG,
@@ -878,23 +876,71 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         ).servable()
 
         def clear_caches(session_context):
-            logger.info("session cleared")
+            self.logger.info("session cleared")
             pn_app.stop()
 
         try:
             pn.state.on_session_destroyed(clear_caches)
         except RuntimeError as e:
-            logger.info("RuntimeError: %s", e)
+            self.logger.info("RuntimeError: %s", e)
 
-        if return_app:
-            return pn_app, prenight
-        else:
-            return pn_app
+        return pn_app
+
+
+class RestrictedInputPrenight(Prenight):
+    """A pre-night dashboard that restricts the data to files in a dir."""
+
+    opsim_output_fname = schedview.param.FileSelectorWithEmptyOption(
+        path=f"{PACKAGE_DATA_DIR}/*opsim*.db", label="OpSim output database", default=None, allow_None=True
+    )
+
+    scheduler_fname = schedview.param.FileSelectorWithEmptyOption(
+        path=f"{PACKAGE_DATA_DIR}/*scheduler*.p*",
+        label="Scheduler pickle file",
+        default=None,
+        allow_None=True,
+    )
+
+    rewards_fname = schedview.param.FileSelectorWithEmptyOption(
+        path=f"{PACKAGE_DATA_DIR}/*rewards*.h5", label="rewards HDF5 file", default=None, allow_None=True
+    )
+
+    def __init__(self, *args, data_dir=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if data_dir is not None:
+            self.param["opsim_output_fname"].path = f"{data_dir}/*opsim*.db"
+            self.param["scheduler_fname"].path = f"{data_dir}/*scheduler*.p*"
+            self.param["rewards_fname"].path = f"{data_dir}/*rewards*.h5"
 
 
 def prenight_app(*args, **kwargs):
     """Create the pre-night briefing app."""
-    return Prenight.make_app(*args, **kwargs)
+
+    try:
+        insecure = kwargs["insecure"]
+        del kwargs["insecure"]
+    except KeyError:
+        insecure = False
+
+    if insecure:
+        prenight = Prenight()
+    else:
+        try:
+            data_dir = kwargs["data_dir"]
+        except KeyError:
+            data_dir = None
+
+        prenight = RestrictedInputPrenight(data_dir=data_dir)
+
+    try:
+        del kwargs["data_dir"]
+    except KeyError:
+        pass
+
+    app = prenight.make_app(*args, **kwargs)
+
+    return app
 
 
 def parse_prenight_args():
@@ -934,6 +980,21 @@ def parse_prenight_args():
         help="The path to the rewards HDF5 file.",
     )
 
+    default_data_dir = f"{USDF_DATA_DIR}/*" if os.path.exists(USDF_DATA_DIR) else PACKAGE_DATA_DIR
+    parser.add_argument(
+        "--data_dir",
+        "-d",
+        type=str,
+        default=default_data_dir,
+        help="The base directory for data files.",
+    )
+
+    parser.add_argument(
+        "--insecure",
+        action="store_true",
+        help="Allow insecure execution.",
+    )
+
     parser.add_argument(
         "--shown_tabs",
         "-t",
@@ -966,6 +1027,9 @@ def parse_prenight_args():
     )
 
     args = parser.parse_args()
+
+    if len(glob(args.data_dir)) == 0 and not args.insecure:
+        args.data_dir = PACKAGE_DATA_DIR
 
     if args.night is not None:
         args.night_date = Time(pd.Timestamp(args.night, tz="UTC")).datetime.date()
