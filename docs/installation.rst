@@ -4,7 +4,17 @@ Installation
 Installing with ``pip``
 -----------------------
 
-Use pip install:
+Begin by installing ``rubin_sim``.
+Note that ``rubin_sim`` is not presently available through ``pypi``, so you will need to use ``conda``, following the instructions on the ``rubin_sim`` documentation:
+
+::
+
+ $ conda create -n rubin-sim -c conda-forge rubin_sim # Create a new environment
+ $ conda activate rubin-sim
+ $ rs_download_data  # Downloads ~2Gb of data to $RUBIN_SIM_DATA_DIR (~/rubin_sim_data if unset)
+ $ conda install -c conda-forge jupyter # Optional install of jupyter
+
+Use ``pip`` to install ``schedview`` itself:
 
 ::
 
