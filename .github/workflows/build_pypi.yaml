@@ -51,9 +51,9 @@ jobs:
           wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/site_models_2023_03_28.tgz
           tar -xf site_models_2023_03_28.tgz
           echo "site_models_2023_03_28.tgz complete"
-          wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/scheduler_2023_03_09.tgz
-          tar -xf scheduler_2023_03_09.tgz
-          echo "scheduler_2023_03_09.tgz complete"
+          wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/scheduler_2023_09_22.tgz
+          tar -xf scheduler_2023_09_22.tgz
+          echo "scheduler_2023_09_22.tgz complete"
           wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/skybrightness_pre_2023_09_19.tgz
           tar -xf skybrightness_pre_2023_09_19.tgz
           echo "skybrightness_pre_2023_09_19.tgz complete"
