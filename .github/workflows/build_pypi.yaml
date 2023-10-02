@@ -45,9 +45,6 @@ jobs:
           wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/throughputs_2023_09_07.tgz
           tar -xf throughputs_2023_09_07.tgz
           echo "throughputs_2023_09_07.tgz complete"
-          wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/maps_2022_2_28.tgz
-          tar -xf maps_2022_2_28.tgz
-          echo "maps_2022_2_28.tgz complete"
           wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/site_models_2023_03_28.tgz
           tar -xf site_models_2023_03_28.tgz
           echo "site_models_2023_03_28.tgz complete"
