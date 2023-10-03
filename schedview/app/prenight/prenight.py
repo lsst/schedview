@@ -918,12 +918,12 @@ def prenight_app(*args, **kwargs):
     """Create the pre-night briefing app."""
 
     try:
-        insecure = kwargs["insecure"]
-        del kwargs["insecure"]
+        data_from_urls = kwargs["data_from_urls"]
+        del kwargs["data_from_urls"]
     except KeyError:
-        insecure = False
+        data_from_urls = False
 
-    if insecure:
+    if data_from_urls:
         prenight = Prenight()
     else:
         try:
@@ -990,9 +990,9 @@ def parse_prenight_args():
     )
 
     parser.add_argument(
-        "--insecure",
+        "--data_from_urls",
         action="store_true",
-        help="Allow insecure execution.",
+        help="Let the user specify URLs from which to load data. THIS IS NOT SECURE.",
     )
 
     parser.add_argument(
@@ -1028,7 +1028,7 @@ def parse_prenight_args():
 
     args = parser.parse_args()
 
-    if len(glob(args.data_dir)) == 0 and not args.insecure:
+    if len(glob(args.data_dir)) == 0 and not args.data_from_urls:
         args.data_dir = PACKAGE_DATA_DIR
 
     if args.night is not None:

@@ -41,7 +41,7 @@ dashboard is not possible.) Such a dashboard can be started thus:
 
 ::
 
-    $ prenight --insecure
+    $ prenight --data_from_urls
 
 You can also supply an initial set of data files to show on startup:
 
