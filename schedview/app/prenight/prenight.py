@@ -3,6 +3,7 @@ import importlib.resources
 import json
 import logging
 import os
+import sys
 from glob import glob
 
 import astropy.utils.iers
@@ -996,6 +997,12 @@ def parse_prenight_args():
     )
 
     parser.add_argument(
+        "--no_confirmation",
+        action="store_true",
+        help="Do not query for confirmation for insecure parameters.",
+    )
+
+    parser.add_argument(
         "--shown_tabs",
         "-t",
         type=str,
@@ -1044,6 +1051,19 @@ def main():
     print("Starting prenight dashboard")
 
     prenight_app_parameters = parse_prenight_args()
+
+    if not prenight_app_parameters["no_confirmation"]:
+        if prenight_app_parameters["data_from_urls"]:
+            print("You have set the dashboard to allow data to be loaded from arbitrary URLs.")
+            print("This is insecure: arbitrary URLs can point to malicious data.")
+            print("Do not use this option unless you know what you are doing.")
+
+            response = input("Continue? (y/n) ")
+            if response != "y":
+                print("Aborting")
+                sys.exit(0)
+
+    del prenight_app_parameters["no_confirmation"]
 
     prenight_port = prenight_app_parameters["port"]
     del prenight_app_parameters["port"]
