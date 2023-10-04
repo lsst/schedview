@@ -997,7 +997,7 @@ def parse_prenight_args():
     )
 
     parser.add_argument(
-        "--no_confirmation",
+        "--yes",
         action="store_true",
         help="Do not query for confirmation for insecure parameters.",
     )
@@ -1052,7 +1052,7 @@ def main():
 
     prenight_app_parameters = parse_prenight_args()
 
-    if not prenight_app_parameters["no_confirmation"]:
+    if not prenight_app_parameters["yes"]:
         if prenight_app_parameters["data_from_urls"]:
             print("You have set the dashboard to allow data to be loaded from arbitrary URLs.")
             print("This is insecure: arbitrary URLs can point to malicious data.")
@@ -1063,7 +1063,7 @@ def main():
                 print("Aborting")
                 sys.exit(0)
 
-    del prenight_app_parameters["no_confirmation"]
+    del prenight_app_parameters["yes"]
 
     prenight_port = prenight_app_parameters["port"]
     del prenight_app_parameters["port"]
