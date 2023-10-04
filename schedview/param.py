@@ -1,5 +1,7 @@
 # Subclasses of param.Parameter for use in schedview.
 
+import glob
+
 import pandas as pd
 import param
 
@@ -79,3 +81,15 @@ class DataFrame(param.Parameter):
 
     def _validate(self, val):
         self._validate_value(val, self.allow_None)
+
+
+class FileSelectorWithEmptyOption(param.FileSelector):
+    """
+    Like param.FileSelector, but allows None to be deliberately selected.
+    """
+
+    def update(self):
+        self.objects = [""] + sorted(glob.glob(self.path))
+        if self.default in self.objects:
+            return
+        self.default = self.objects[0] if self.objects else None
