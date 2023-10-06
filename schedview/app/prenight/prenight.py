@@ -1026,6 +1026,12 @@ def parse_prenight_args():
     )
 
     parser.add_argument(
+        "--show",
+        action="store_true",
+        help="Open a browser window to show the dashboard.",
+    )
+
+    parser.add_argument(
         "--port",
         "-p",
         type=int,
@@ -1065,6 +1071,12 @@ def main():
 
     del prenight_app_parameters["yes"]
 
+    try:
+        show = prenight_app_parameters["show"]
+        del prenight_app_parameters["show"]
+    except KeyError:
+        show = False
+
     prenight_port = prenight_app_parameters["port"]
     del prenight_app_parameters["port"]
 
@@ -1080,7 +1092,7 @@ def main():
         prenight_app_with_params,
         port=prenight_port,
         title="Prenight Dashboard",
-        show=False,
+        show=show,
         start=True,
         autoreload=True,
         threaded=True,
