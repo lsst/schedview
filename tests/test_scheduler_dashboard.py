@@ -78,7 +78,6 @@ class TestSchedulerDashboard(unittest.TestCase):
             bokeh.plotting.save(sched_app_bokeh_model)
         bokeh.io.reset_output()
 
-    @unittest.skip("Skipping so it does not block implementation of CI")
     def test_read_scheduler(self):
         print(TEST_PICKLE)
         self.scheduler = Scheduler()
