@@ -138,6 +138,7 @@ class Scheduler(param.Parameterized):
     summary_widget = param.Parameter(default=None, doc="")
     reward_widget = param.Parameter(default=None, doc="")
     show_loading_indicator = param.Boolean(default=False)
+    # date_time = param.Number(default=None)
 
     # Param parameters (used in depends decoraters and trigger calls).
     _publish_summary_widget = param.Parameter(None)
@@ -163,6 +164,7 @@ class Scheduler(param.Parameterized):
     _scheduler = None
     _conditions = None
     _date_time = None
+    # _date_time = param.Number(default=None)
     _reward_df = None
     _scheduler_summary_df = None
     _survey_maps = None
@@ -173,6 +175,7 @@ class Scheduler(param.Parameterized):
     _display_dashboard_data = False
     _do_not_trigger_update = True
     _model_observatory = ModelObservatory(init_load_length=1)
+    # _isDateUpdating = False
 
     # ------------------------------------------------------------ User actions
 
@@ -217,6 +220,29 @@ class Scheduler(param.Parameterized):
 
         self.show_loading_indicator = False
 
+    # @param.depends("date_time", watch=True)
+    # def _update_date_from_mjd(self):
+    #     """Update the dashboard when a user chooses a new date/time."""
+
+    #     print("updating date_time from url")
+    #     self._isDateUpdating = True
+    #     self._date_time = self.date_time
+    #     self.date = Time(self.date_time, format="mjd").to_datetime()
+    #     self._isDateUpdating = False
+
+    # @param.depends("date", watch=True)
+    # def _update_date_from_picker(self):
+    #     """Update the dashboard when a user chooses a new date/time."""
+    #     if not self._isDateUpdating:
+    #         print("updating date_time from date selector")
+    #         self._isDateUpdating = True
+    #         self.date_time = Time(
+    #             Timestamp(
+    #                 self.date,
+    #                 tzinfo=ZoneInfo(DEFAULT_TIMEZONE),
+    #             )
+    #         ).mjd
+
     @param.depends("date", watch=True)
     def _update_date(self):
         """Update the dashboard when a user chooses a new date/time."""
@@ -229,6 +255,8 @@ class Scheduler(param.Parameterized):
                 tzinfo=ZoneInfo(DEFAULT_TIMEZONE),
             )
         ).mjd
+
+        print(f"date in mjd: {self._date_time}")
 
         if not self.make_scheduler_summary_df():
             self.clear_dashboard()
@@ -268,7 +296,7 @@ class Scheduler(param.Parameterized):
         """Update the dashboard when a user chooses a new tier."""
         if not self._display_dashboard_data:
             return
-
+        print(self.USER_tier)
         self._tier = self.USER_tier
         self._survey = 0
         self._survey_name = self._scheduler_summary_df[
@@ -1463,13 +1491,14 @@ def scheduler_app(date=None, scheduler_pickle=None):
         collapsed=True,
     )
 
-    if pn.state.location is not None:
-        pn.state.location.sync(scheduler, {"scheduler_fname": "scheduler", "nside": "nside"})
-
     return sched_app
 
 
+<<<<<<< HEAD
 def main():
+=======
+if __name__ == "__main__":
+>>>>>>> precommit fixes
     print("Starting scheduler dashboard.")
 
     if "SCHEDULER_PORT" in os.environ:

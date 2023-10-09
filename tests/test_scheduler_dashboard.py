@@ -53,7 +53,6 @@ Notes
     - Unit tests are run in alphabetical order.
 
 """
-
 TEST_PICKLE = str(importlib.resources.files(schedview).joinpath("data", "sample_scheduler.pickle.xz"))
 MJD_START = survey_start_mjd()
 TEST_DATE = Time(MJD_START + 0.2, format="mjd").datetime
@@ -81,6 +80,10 @@ class TestSchedulerDashboard(unittest.TestCase):
 
     @unittest.skip("Skipping so it does not block implementation of CI")
     def test_read_scheduler(self):
+        print(TEST_PICKLE)
+        self.scheduler = Scheduler()
+        self.scheduler.scheduler_fname = TEST_PICKLE
+        self.scheduler._date_time = Time(Timestamp(TEST_DATE, tzinfo=ZoneInfo(DEFAULT_TIMEZONE))).mjd
         self.scheduler.read_scheduler()
         self.assertIsInstance(self.scheduler._scheduler, CoreScheduler)
         self.assertIsInstance(self.scheduler._conditions, Conditions)
