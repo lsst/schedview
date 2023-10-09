@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 from glob import glob
+from pathlib import Path
 
 import astropy.utils.iers
 import bokeh
@@ -909,10 +910,24 @@ class RestrictedInputPrenight(Prenight):
     def __init__(self, *args, data_dir=None, **kwargs):
         super().__init__(*args, **kwargs)
 
+        path_for_kwargs = {
+            "opsim_db": self.param["opsim_output_fname"].path,
+            "scheduler": self.param["scheduler_fname"].path,
+            "reward": self.param["rewards_fname"].path,
+        }
+
         if data_dir is not None:
-            self.param["opsim_output_fname"].path = f"{data_dir}/*opsim*.db"
-            self.param["scheduler_fname"].path = f"{data_dir}/*scheduler*.p*"
-            self.param["rewards_fname"].path = f"{data_dir}/*rewards*.h5"
+            fname_glob = {
+                "opsim_db": f"{data_dir}/*opsim*.db",
+                "scheduler": f"{data_dir}/*scheduler*.p*",
+                "reward": f"{data_dir}/*rewards*.h5",
+            }
+
+        for arg_name in path_for_kwargs:
+            if arg_name in kwargs:
+                path_for_kwargs[arg_name] = kwargs[arg_name]
+            elif data_dir is not None:
+                path_for_kwargs[arg_name] = fname_glob[arg_name]
 
 
 def prenight_app(*args, **kwargs):
@@ -932,7 +947,16 @@ def prenight_app(*args, **kwargs):
         except KeyError:
             data_dir = None
 
-        prenight = RestrictedInputPrenight(data_dir=data_dir)
+        specified_data_files = {}
+        data_args = set(["opsim_db", "scheduler", "rewards"]) & set(kwargs.keys())
+        for data_arg in data_args:
+            # Fully resolve the path to the file.
+            file_path = Path(kwargs[data_arg]).resolve()
+            kwargs[data_arg] = str(file_path)
+            if data_arg in kwargs:
+                specified_data_files[data_arg] = str(file_path)
+
+        prenight = RestrictedInputPrenight(data_dir=data_dir, **specified_data_files)
 
     try:
         del kwargs["data_dir"]
