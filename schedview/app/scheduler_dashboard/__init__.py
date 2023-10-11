@@ -1,1 +1,1 @@
-from .scheduler_dashboard import sched_app
+from .scheduler_dashboard import scheduler_app
