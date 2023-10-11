@@ -79,7 +79,6 @@ class TestSchedulerDashboard(unittest.TestCase):
         bokeh.io.reset_output()
 
     def test_read_scheduler(self):
-        print(TEST_PICKLE)
         self.scheduler = Scheduler()
         self.scheduler.scheduler_fname = TEST_PICKLE
         self.scheduler._date_time = Time(Timestamp(TEST_DATE, tzinfo=ZoneInfo(DEFAULT_TIMEZONE))).mjd

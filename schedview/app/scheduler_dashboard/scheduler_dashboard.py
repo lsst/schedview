@@ -53,6 +53,8 @@ import schedview.plot.survey
 DEFAULT_CURRENT_TIME = Time.now()
 DEFAULT_TIMEZONE = "America/Santiago"
 LOGO = "/assets/lsst_white_logo.png"
+COLOR_PALETTES = [color for color in bokeh.palettes.__palettes__ if "256" in color]
+
 
 pn.extension(
     "tabulator",
@@ -71,11 +73,6 @@ stylesheet = """
 --mono-font: Helvetica;
 }
 """
-
-
-def get_color_palettes():
-    palettes = [color for color in bokeh.palettes.__palettes__ if "256" in color]
-    return palettes
 
 
 def url_formatter(dataframe_row, name_column, url_column):
@@ -134,7 +131,7 @@ class Scheduler(param.Parameterized):
         label="Map resolution (nside)",
         doc="",
     )
-    color_palette = param.Selector(default="Viridis256", objects=get_color_palettes(), doc="")
+    color_palette = param.Selector(default="Viridis256", objects=COLOR_PALETTES, doc="")
     summary_widget = param.Parameter(default=None, doc="")
     reward_widget = param.Parameter(default=None, doc="")
     show_loading_indicator = param.Boolean(default=False)
@@ -229,8 +226,6 @@ class Scheduler(param.Parameterized):
                 tzinfo=ZoneInfo(DEFAULT_TIMEZONE),
             )
         ).mjd
-
-        print(f"date in mjd: {self._date_time}")
 
         if not self.make_scheduler_summary_df():
             self.clear_dashboard()
@@ -473,8 +468,7 @@ class Scheduler(param.Parameterized):
             return False
 
     def make_scheduler_summary_df(self):
-        """
-        Update conditions, and make the reward
+        """Update conditions, and make the reward
         and scheduler summary dataframes.
 
         Returns
@@ -594,8 +588,8 @@ class Scheduler(param.Parameterized):
 
     @param.depends("_publish_summary_widget")
     def publish_summary_widget(self):
-        """
-        Publish the summary Tabulator widget to be displayed on the dashboard.
+        """Publish the summary Tabulator widget
+        to be displayed on the dashboard.
 
         Returns
         -------
@@ -1070,8 +1064,8 @@ class Scheduler(param.Parameterized):
 
     @param.depends("_update_headings")
     def dashboard_subtitle(self):
-        """
-        Load subtitle data and create/update a String pane to display subtitle.
+        """Load subtitle data and create/update
+        a String pane to display subtitle.
 
         Returns
         -------
@@ -1092,8 +1086,8 @@ class Scheduler(param.Parameterized):
 
     @param.depends("_update_headings")
     def summary_table_heading(self):
-        """
-        Load heading data and create/update a String pane to display heading.
+        """Load heading data and create/update
+        a String pane to display heading.
 
         Returns
         -------
@@ -1322,14 +1316,6 @@ def generate_key():
     return key
 
 
-def get_grid_layout():
-    grid_layout = pn.GridSpec(
-        sizing_mode="stretch_both",
-        max_height=1000,
-    ).servable()
-    return grid_layout
-
-
 # ------------------------------------------------------------ Create dashboard
 
 
@@ -1350,12 +1336,10 @@ def scheduler_app(date=None, scheduler_pickle=None):
         The dashboard.
     """
     # Initialize the dashboard layout.
-    # sched_app = pn.GridSpec(
-    #     sizing_mode='stretch_both',
-    #     max_height=1000,
-    #     ).servable()
-
-    sched_app = get_grid_layout()
+    sched_app = pn.GridSpec(
+        sizing_mode="stretch_both",
+        max_height=1000,
+    ).servable()
 
     scheduler = Scheduler()
 
