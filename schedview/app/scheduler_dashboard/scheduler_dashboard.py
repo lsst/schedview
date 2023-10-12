@@ -135,6 +135,11 @@ class Scheduler(param.Parameterized):
     summary_widget = param.Parameter(default=None, doc="")
     reward_widget = param.Parameter(default=None, doc="")
     show_loading_indicator = param.Boolean(default=False)
+    # data_time in mjd accepted as URL paramater
+    date_time = param.Number(default=None)
+    # the date_time value used allover the dashboard
+    # either set by URL parameter or date picker
+    _date_time = param.Number(default=None)
 
     # Param parameters (used in depends decoraters and trigger calls).
     _publish_summary_widget = param.Parameter(None)
@@ -159,7 +164,6 @@ class Scheduler(param.Parameterized):
     _map_name = ""
     _scheduler = None
     _conditions = None
-    _date_time = None
     _reward_df = None
     _scheduler_summary_df = None
     _survey_maps = None
@@ -170,6 +174,7 @@ class Scheduler(param.Parameterized):
     _display_dashboard_data = False
     _do_not_trigger_update = True
     _model_observatory = ModelObservatory(init_load_length=1)
+    _isDateUpdating = False
 
     # ------------------------------------------------------------ User actions
 
@@ -214,18 +219,34 @@ class Scheduler(param.Parameterized):
 
         self.show_loading_indicator = False
 
-    @param.depends("date", watch=True)
-    def _update_date(self):
+    @param.depends("date_time", watch=True)
+    def _update_date_from_mjd(self):
         """Update the dashboard when a user chooses a new date/time."""
+
+        self._isDateUpdating = True
+        self._date_time = self.date_time
+        self.date = Time(self.date_time, format="mjd").to_datetime()
+        self._isDateUpdating = False
+
+    @param.depends("date", watch=True)
+    def _update_date_from_picker(self):
+        """Update the dashboard when a user chooses a new date/time."""
+        if not self._isDateUpdating:
+            self._isDateUpdating = True
+            self.date_time = Time(
+                Timestamp(
+                    self.date,
+                    tzinfo=ZoneInfo(DEFAULT_TIMEZONE),
+                )
+            ).mjd
+
+    @param.depends("_date_time", watch=True)
+    def _update_date(self):
+        """Update the dashboard when date/time mjd value changes
+        either by url parameter or date picker
+        """
         self.show_loading_indicator = True
         self.clear_dashboard()
-
-        self._date_time = Time(
-            Timestamp(
-                self.date,
-                tzinfo=ZoneInfo(DEFAULT_TIMEZONE),
-            )
-        ).mjd
 
         if not self.make_scheduler_summary_df():
             self.clear_dashboard()
@@ -265,7 +286,6 @@ class Scheduler(param.Parameterized):
         """Update the dashboard when a user chooses a new tier."""
         if not self._display_dashboard_data:
             return
-        print(self.USER_tier)
         self._tier = self.USER_tier
         self._survey = 0
         self._survey_name = self._scheduler_summary_df[
@@ -1453,6 +1473,17 @@ def scheduler_app(date=None, scheduler_pickle=None):
         sizing_mode="stretch_width",
         collapsed=True,
     )
+
+    # sync URL parameters to scheduler params
+    if pn.state.location is not None:
+        pn.state.location.sync(
+            scheduler,
+            {
+                "scheduler_fname": "scheduler",
+                "nside": "nside",
+                "date_time": "mjd",
+            },
+        )
 
     return sched_app
 
