@@ -761,6 +761,8 @@ class Scheduler(param.Parameterized):
                 self._survey_maps,
                 "above_horizon",
                 self.nside,
+                conditions=self._conditions,
+                survey=self._scheduler.survey_lists[int(self._tier[-1])][self._survey],
             )
             self._sky_map_base.plot.toolbar.tools[-1].tooltips.remove(("above_horizon", "@above_horizon"))
 
@@ -1175,7 +1177,8 @@ def generate_array_for_key(number_of_columns=4):
         "y": np.arange(number_of_columns, 0, -1),  # y coords for all items except title
         # Colours and sizes of images.
         "line_colours": np.array(["black", "red", "#1f8f20", "#110cff"]),
-        "circle_colours": np.array(["#ffa500", "brown", "red", "#1f8f20"]),
+        "circle_colours": np.array(["#ffa500", "brown", "black", "#1f8f20"]),
+        "circle_fill_alpha": np.array([1, 1, 0, 0.5]),
         "circle_sizes": np.tile(10, number_of_columns),
         # Text for title and key items.
         "title_text": np.array(["Key"]),
@@ -1222,6 +1225,7 @@ def generate_key():
             y=data_array["y"],
             sizes=data_array["circle_sizes"],
             colours=data_array["circle_colours"],
+            fill_alpha=data_array["circle_fill_alpha"],
         )
     )
     line_source = bokeh.models.ColumnDataSource(
@@ -1286,6 +1290,7 @@ def generate_key():
         size="sizes",
         line_color="colours",
         fill_color="colours",
+        fill_alpha="fill_alpha",
     )
     line_glyph = bokeh.models.Segment(
         x0="x0",
