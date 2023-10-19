@@ -89,7 +89,9 @@ class TestSchedulerDashboard(unittest.TestCase):
     def test_title(self):
         self.scheduler._tier = "tier 2"
         self.scheduler._survey = 0
-        self.scheduler._survey_name = "0: survey"
+        self.scheduler.param["survey_map"].objects = ["reward"]
+        self.scheduler.survey_map = "reward"
+        self.scheduler._map_name = "reward"
         self.scheduler._display_dashboard_data = True
         title = self.scheduler.generate_dashboard_subtitle()
         tier = self.scheduler._tier[-1]
