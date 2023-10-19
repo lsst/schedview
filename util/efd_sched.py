@@ -9,34 +9,32 @@ import pickle
 import re
 
 import astropy.units as u
-from astropy.time import Time
+from astropy.time import Time, TimeDelta
 from lsst.resources import ResourcePath
 from lsst_efd_client import EfdClient
 from rubin_sim.utils import Site
 
 
-async def query_schedulers_in_window(desired_time, efd="usdf_efd", time_window_seconds=2):
+async def query_schedulers_in_window(desired_time, efd="usdf_efd", time_window=TimeDelta(2 * u.second)):
     """Query the EFD for scheduler URLs within a given time window.
 
     Parameters
     ----------
-    desired_time : `str`
-        The central time to query the event service in ISO format
-        (YYYY-MM-DDTHH:MM:SS).
+    desired_time : `astropy.time.Time`
+        The central time to query the event service.
     efd : `str`, optional
         The name of the EFD to connect to (default is 'usdf_efd').
-    time_window_seconds : `float`, optional
-        The size of the time window to search for scheduler URLs, in seconds
-        (default is 2).
+    time_window : `astropy.time.TimeDelta`, optional
+        The size of the time window to search for scheduler URLs
+        (default is 2 seconds).
 
     Returns
     -------
     scheduler_urls : `pandas.DataFrame`
         A DataFrame containing the scheduler snapshot times URLs.
     """
-    desired_time = Time(desired_time)
-    start_time = desired_time - (time_window_seconds / 2) * u.second
-    end_time = desired_time + (time_window_seconds / 2) * u.second
+    start_time = desired_time - (time_window / 2)
+    end_time = desired_time + (time_window / 2)
 
     efd_client = EfdClient(efd)
     topic = "lsst.sal.Scheduler.logevent_largeFileObjectAvailable"
@@ -76,10 +74,8 @@ async def query_night_schedulers(night, efd="usdf_efd"):
     # The offset of 1 makes the night specificed refer to the
     # local date corresponding to sunset.
     local_midnight = Time(reference_time.mjd + 1 - Site("LSST").longitude / 360, format="mjd")
-    time_window_seconds = u.day.to(u.second)
-    scheduler_urls = await query_schedulers_in_window(
-        local_midnight, efd=efd, time_window_seconds=time_window_seconds
-    )
+    time_window = TimeDelta(1, format="jd")
+    scheduler_urls = await query_schedulers_in_window(local_midnight, efd=efd, time_window=time_window)
     return scheduler_urls
 
 
