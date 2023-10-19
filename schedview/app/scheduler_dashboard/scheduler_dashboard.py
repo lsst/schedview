@@ -1028,13 +1028,12 @@ class Scheduler(param.Parameterized):
         if not self._display_dashboard_data:
             return ""
         maps = ["u_sky", "g_sky", "r_sky", "i_sky", "z_sky", "y_sky", "reward"]
-        survey = self._survey_name.split(":")[0]
         if not self._display_reward and self.survey_map in maps:
-            return f"\nTier {self._tier[-1]} - Survey {survey} - Map {self._map_name}"
+            return f"\nTier {self._tier[-1]} - Survey {self._survey} - Map {self._map_name}"
         elif not self._display_reward and self.survey_map not in maps:
-            return f"\nTier {self._tier[-1]} - Survey {survey} - Reward {self._map_name}"
+            return f"\nTier {self._tier[-1]} - Survey {self._survey} - Reward {self._map_name}"
         else:
-            return f"\nTier {self._tier[-1]} - Survey {survey} - Reward {self._reward_name}"
+            return f"\nTier {self._tier[-1]} - Survey {self._survey} - Reward {self._reward_name}"
 
     def generate_summary_table_heading(self):
         """Select the summary table heading based on whether data is being
