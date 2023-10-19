@@ -14,6 +14,8 @@ from lsst.resources import ResourcePath
 from lsst_efd_client import EfdClient
 from rubin_sim.utils import Site
 
+LOCAL_ROOT_URI = {"usdf": "s3://rubin:", "summit": "https://s3.cp.lsst.org/"}
+
 
 async def query_schedulers_in_window(desired_time, efd="usdf_efd", time_window=TimeDelta(2 * u.second)):
     """Query the EFD for scheduler URLs within a given time window.
@@ -79,6 +81,34 @@ async def query_night_schedulers(night, efd="usdf_efd"):
     return scheduler_urls
 
 
+def localize_scheduler_url(scheduler_url, site="usdf"):
+    """Localizes the scheduler URL for a given site.
+
+    Parameters
+    ----------
+    scheduler_url : `str`
+        The URL of the scheduler to be localized.
+    site : `str` , optional
+        The site to which the scheduler URL should be localized.
+        Defaults to 'usdf'.
+
+    Returns
+    -------
+    scheduler_url : `str`
+        The localized URL of the scheduler.
+    """
+    # If we don't have a cannonical root for the site, just return
+    # the original
+    if site not in LOCAL_ROOT_URI:
+        return scheduler_url
+
+    original_scheduler_resource_path = ResourcePath(scheduler_url)
+    scheduler_path = original_scheduler_resource_path.path.lstrip("/")
+    root_uri = LOCAL_ROOT_URI[site]
+    scheduler_url = f"{root_uri}{scheduler_path}"
+    return scheduler_url
+
+
 def get_scheduler(scheduler_url, destination=None):
     """Load a scheduler, conditions tuple from a URI and optionally save it.
 
@@ -104,7 +134,7 @@ def get_scheduler(scheduler_url, destination=None):
     """
 
     os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
-    scheduler_resource_path = ResourcePath(scheduler_url.replace("https://s3.cp.lsst.org/", "s3://rubin:"))
+    scheduler_resource_path = ResourcePath(scheduler_url)
     scheduler_pickle_bytes = scheduler_resource_path.read()
 
     if destination is None:
@@ -113,7 +143,8 @@ def get_scheduler(scheduler_url, destination=None):
         if os.path.isdir(destination):
             base_file_name = (
                 scheduler_resource_path.basename()
-                .replace("Scheduler:2_Scheduler:2", "auxtel")
+                .replace("Scheduler:2_Scheduler:2", "auxtel_scheduler")
+                .replace("Scheduler:1_Scheduler:1", "lsst_scheduler")
                 .replace(":", "")
                 + ".xz"
             )
@@ -152,6 +183,8 @@ async def get_scheduler_at_time(desired_time, destination=None, efd="usdf_efd"):
     """
     these_scheduler_references = await query_schedulers_in_window(desired_time, efd)
     this_url = these_scheduler_references.url[0]
+    site = efd.removesuffix("_efd")
+    this_url = localize_scheduler_url(this_url, site=site)
     result = get_scheduler(this_url, destination)
     return result
 
@@ -178,6 +211,8 @@ async def get_scheduler_on_night(night, scheduler_index, destination, efd="usdf_
     """
     these_scheduler_references = await query_night_schedulers(night, efd=efd)
     this_url = these_scheduler_references.url[scheduler_index]
+    site = efd.removesuffix("_efd")
+    this_url = localize_scheduler_url(this_url, site=site)
     result = get_scheduler(this_url, destination)
     return result
 
