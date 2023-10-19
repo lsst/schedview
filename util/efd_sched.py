@@ -219,11 +219,12 @@ async def get_scheduler_on_night(night, row_number, destination, efd="usdf_efd")
 
 async def main():
     parser = argparse.ArgumentParser(description="Query the EFD for a scheduler.")
+    parser.add_argument("action", help="The action to perform. Must be one of 'query' or 'get'.")
     parser.add_argument(
         "datetime", help="The desired time or night to get the scheduler for in iso8601 format."
     )
     parser.add_argument(
-        "--destination", type=str, default=None, help="The file path to save the scheduler to."
+        "--destination", type=str, default=".", help="The file path to save the scheduler to."
     )
     parser.add_argument(
         "--row", type=int, default=0, help="The index of the scheduler to retrieve (default is 0)."
@@ -243,19 +244,23 @@ async def main():
         desired_time = Time(args.datetime)
         time_specified = True
 
-    if args.destination is not None:
-        if time_specified:
-            file_name = await get_scheduler_at_time(desired_time, args.destination, args.efd)
-        else:
-            file_name = await get_scheduler_on_night(night, args.row, args.destination, args.efd)
-        print(file_name)
-    else:
-        if time_specified:
-            matching_schedulers = await query_schedulers_in_window(desired_time, args.efd)
-        else:
-            matching_schedulers = await query_night_schedulers(night, args.efd)
+    match args.action:
+        case "get":
+            if time_specified:
+                file_name = await get_scheduler_at_time(desired_time, args.destination, args.efd)
+            else:
+                file_name = await get_scheduler_on_night(night, args.row, args.destination, args.efd)
 
-        print(matching_schedulers.to_csv(sep="\t"))
+            print(file_name)
+        case "query":
+            if time_specified:
+                matching_schedulers = await query_schedulers_in_window(desired_time, args.efd)
+            else:
+                matching_schedulers = await query_night_schedulers(night, args.efd)
+
+            print(matching_schedulers.to_csv(sep="\t"))
+        case _:
+            raise ValueError("action must be one of 'query' or 'get'")
 
 
 if __name__ == "__main__":
