@@ -189,15 +189,15 @@ async def get_scheduler_at_time(desired_time, destination=None, efd="usdf_efd"):
     return result
 
 
-async def get_scheduler_on_night(night, scheduler_index, destination, efd="usdf_efd"):
+async def get_scheduler_on_night(night, row_number, destination, efd="usdf_efd"):
     """Get a scheduler for a given night from the EFD.
 
     Parameters
     ----------
     night : `str`
         The night for which to get the scheduler.
-    scheduler_index : `int`, optional
-        The index of the scheduler to retrieve (default is 0).
+    row_number : `int`, optional
+        The row of the scheduler to retrieve (default is 0).
     destination : `str`, optional
         The file path to save the scheduler to.
         If None, the (scheduler, conditions) tuple is returned.
@@ -210,7 +210,7 @@ async def get_scheduler_on_night(night, scheduler_index, destination, efd="usdf_
         The scheduler for the given night.
     """
     these_scheduler_references = await query_night_schedulers(night, efd=efd)
-    this_url = these_scheduler_references.url[scheduler_index]
+    this_url = these_scheduler_references.url.iloc[row_number]
     site = efd.removesuffix("_efd")
     this_url = localize_scheduler_url(this_url, site=site)
     result = get_scheduler(this_url, destination)
@@ -226,7 +226,7 @@ async def main():
         "--destination", type=str, default=None, help="The file path to save the scheduler to."
     )
     parser.add_argument(
-        "--id", type=int, default=0, help="The index of the scheduler to retrieve (default is 0)."
+        "--row", type=int, default=0, help="The index of the scheduler to retrieve (default is 0)."
     )
     parser.add_argument("--efd", default="usdf_efd", help="The EFD to query (default is 'usdf_efd').")
     args = parser.parse_args()
@@ -247,7 +247,7 @@ async def main():
         if time_specified:
             file_name = await get_scheduler_at_time(desired_time, args.destination, args.efd)
         else:
-            file_name = await get_scheduler_on_night(night, args.id, args.destination, args.efd)
+            file_name = await get_scheduler_on_night(night, args.row, args.destination, args.efd)
         print(file_name)
     else:
         if time_specified:
