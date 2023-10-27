@@ -74,6 +74,12 @@ def make_sample_test_data():
         default=DEFAULT_DATE,
         help="Date of the night to simulate (YYYY-MM-DD).",
     )
+    parser.add_argument(
+        "--duration",
+        type=int,
+        default=None,
+        help="The number of hours to simulate (defaults to one night).",
+    )
     args = parser.parse_args()
 
     opsim_output_fname = args.opsim_output_fname
@@ -104,7 +110,10 @@ def make_sample_test_data():
     mjd_start = observatory.almanac.sunsets[this_night]["sun_n12_setting"][0]
     mjd_end = observatory.almanac.sunsets[this_night]["sunrise"][0]
 
-    night_duration = mjd_end - mjd_start
+    if args.duration is not None:
+        duration = args.duration / 24.0
+    else:
+        duration = mjd_end - mjd_start
 
     observatory = ModelObservatory(mjd_start=mjd_start)
 
@@ -115,7 +124,7 @@ def make_sample_test_data():
         observatory,
         scheduler,
         mjd_start=mjd_start,
-        survey_length=night_duration,
+        survey_length=duration,
         record_rewards=True,
     )
 
