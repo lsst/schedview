@@ -173,7 +173,7 @@ def plot_rewards(
                     # call were observed.
                     continue
 
-                reward = this_survey_reward_df.query(f"queue_fill_mjd_ns=={fill_mjd}")[y_column][0]
+                reward = this_survey_reward_df.query(f"queue_fill_mjd_ns=={fill_mjd}")[y_column].iloc[0]
                 if not np.isfinite(reward):
                     continue
 
