@@ -2,5 +2,6 @@ name: base
 channels:
  - conda-forge
 dependencies:
+ - param < 2.0.0
  - schedview
  - curl
