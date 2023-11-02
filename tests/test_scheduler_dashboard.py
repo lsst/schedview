@@ -63,7 +63,7 @@ class TestSchedulerDashboard(unittest.TestCase):
     observatory = ModelObservatory(init_load_length=1)
     scheduler = Scheduler()
     scheduler.scheduler_fname = TEST_PICKLE
-    scheduler._date_time = Time(Timestamp(TEST_DATE, tzinfo=ZoneInfo(DEFAULT_TIMEZONE))).mjd
+    scheduler._mjd = Time(Timestamp(TEST_DATE, tzinfo=ZoneInfo(DEFAULT_TIMEZONE))).mjd
 
     def setUp(self) -> None:
         bokeh.io.reset_output()
@@ -81,7 +81,7 @@ class TestSchedulerDashboard(unittest.TestCase):
     def test_read_scheduler(self):
         self.scheduler = Scheduler()
         self.scheduler.scheduler_fname = TEST_PICKLE
-        self.scheduler._date_time = Time(Timestamp(TEST_DATE, tzinfo=ZoneInfo(DEFAULT_TIMEZONE))).mjd
+        self.scheduler._mjd = Time(Timestamp(TEST_DATE, tzinfo=ZoneInfo(DEFAULT_TIMEZONE))).mjd
         self.scheduler.read_scheduler()
         self.assertIsInstance(self.scheduler._scheduler, CoreScheduler)
         self.assertIsInstance(self.scheduler._conditions, Conditions)
