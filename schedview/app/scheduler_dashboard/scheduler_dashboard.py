@@ -564,13 +564,15 @@ class Scheduler(param.Parameterized):
 
             # Use instance of ModelObservatory until Conditions
             # setting bug is fixed.
-            self._model_observatory = ModelObservatory(init_load_length=1)
-
-            if self._model_observatory.nside != self._scheduler.nside:
+            if (
+                not hasattr(self, "_model_observatory")
+                or self._model_observatory.nside != self._scheduler.nside
+            ):
                 self._model_observatory = ModelObservatory(
                     nside=self._scheduler.nside,
                     init_load_length=1,
                 )
+
             self._model_observatory.mjd = self._mjd
             self._conditions = self._model_observatory.return_conditions()
 
