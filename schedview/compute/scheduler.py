@@ -399,6 +399,8 @@ def make_scheduler_summary_df(scheduler, conditions, reward_df=None):
         survey_row = pd.Series({"reward": reward, "infeasible": infeasible})
         return survey_row
 
-    survey_df = summary_df.groupby(["tier", "survey_name_with_id", "survey_url"]).apply(make_survey_row)
+    survey_df = summary_df.groupby(
+        ["list_index", "survey_index", "survey_name_with_id", "survey_url", "tier"]
+    ).apply(make_survey_row)
 
     return survey_df["reward"].reset_index()
