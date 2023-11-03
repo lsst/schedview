@@ -127,7 +127,7 @@ class Scheduler(param.Parameterized):
     )
     nside = param.ObjectSelector(
         default=16,
-        objects=[2**n for n in np.arange(1, 6)],
+        objects=[2, 4, 16, 32, 64],
         label="Map resolution (nside)",
         doc="",
     )
@@ -635,7 +635,7 @@ class Scheduler(param.Parameterized):
             self._survey_maps = schedview.compute.survey.compute_maps(
                 self._scheduler.survey_lists[int(self._tier[-1])][self._survey],
                 self._conditions,
-                self.nside,
+                np.int64(self.nside),
             )
             self.param["survey_map"].objects = [""] + list(self._survey_maps.keys())
             self._debugging_message = "Finished computing survey maps."
@@ -780,7 +780,7 @@ class Scheduler(param.Parameterized):
                 self._conditions.mjd,
                 self._survey_maps,
                 "above_horizon",
-                self.nside,
+                np.int64(self.nside),
                 conditions=self._conditions,
                 survey=self._scheduler.survey_lists[int(self._tier[-1])][self._survey],
             )
