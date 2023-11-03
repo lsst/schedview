@@ -1,18 +1,28 @@
-name: Build and Publish PyPI
+name: Run CI
 
 on:
+  # Run job at the end of each day
+  schedule:
+      - cron: "0 0 * * *"
+  # Run job on push to main
   push:
-    tags:
-      - "*"
+    branches:
+      - main
+  # Run job on pull request to main
+  pull_request:
+    branches:
+      - main
+  # Run job manually on request
+  workflow_dispatch:
 
 jobs:
   tests:
-    name: Check Tests (${{ matrix.python-version }}, ${{ matrix.os }})
+    name: Run Tests (${{ matrix.python-version }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu-latest"]
+        os: ["ubuntu-latest", "macos-latest"]
         python-version: ["3.11"]
     steps:
       - uses: actions/checkout@v3
@@ -27,39 +37,48 @@ jobs:
           show-channel-urls: true
 
       - name: configure conda and install requirements
+        id: rs-install
         shell: bash -l {0}
         run: |
-          mamba config --set always_yes yes
           mamba install --quiet --file=requirements.txt
           mamba install --quiet --file=test-requirements.txt
+          mamba list rubin-sim | grep -v "#" | awk '{print $2}' > ${{ github.workspace }}/rs_version
+          echo "rs-version" `cat ${{ github.workspace }}/rs_version`
+          echo "rs-version=`cat ${{ github.workspace }}/rs_version`" >> $GITHUB_OUTPUT   
 
-      - name: download rubin_sim_data components needed for unit tests
+      - name: Access rubin-sim-data cache
+        id: cache-rs
+        uses: actions/cache@v3
+        env:
+          cache-name: cached-rubin-sim-data
+        with:
+          path: ~/rubin_sim_data
+          key: ${{ env.cache-name }}-v${{ steps.rs-install.outputs.rs-version }}
+          restore-keys: |
+            ${{ env.cache-name }}-v
+
+      - if: ${{ steps.cache-rs.outputs.cache-hit == 'true' }}
+        name: List cache contents.
         shell: bash -l {0}
         run: |
-          export RUBIN_SIM_DATA_DIR=${{ github.workspace }}/data_dir
-          mkdir $RUBIN_SIM_DATA_DIR
-          cd $RUBIN_SIM_DATA_DIR
-          wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/tests_2022_10_18.tgz
-          tar -xf tests_2022_10_18.tgz
-          echo "tests_2022_10_18.tgz complete"
-          wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/throughputs_2023_09_07.tgz
-          tar -xf throughputs_2023_09_07.tgz
-          echo "throughputs_2023_09_07.tgz complete"
-          wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/site_models_2023_03_28.tgz
-          tar -xf site_models_2023_03_28.tgz
-          echo "site_models_2023_03_28.tgz complete"
-          wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/scheduler_2023_09_22.tgz
-          tar -xf scheduler_2023_09_22.tgz
-          echo "scheduler_2023_09_22.tgz complete"
-          wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/skybrightness_pre_2023_09_19.tgz
-          tar -xf skybrightness_pre_2023_09_19.tgz
-          echo "skybrightness_pre_2023_09_19.tgz complete"
+          export RUBIN_SIM_DATA_DIR=~/rubin_sim_data
+          echo $RUBIN_SIM_DATA_DIR 
+          ls $RUBIN_SIM_DATA_DIR
+          echo "__contents of versions.txt__"
+          cat $RUBIN_SIM_DATA_DIR/versions.txt
+
+      - if: ${{ steps.cache-rs.outputs.cache-hit != 'true' }}
+        name: Download data.
+        shell: bash -l {0}
+        run: |
+          export RUBIN_SIM_DATA_DIR=~/rubin_sim_data       
+          rs_download_data --force --dirs scheduler,site_models,skybrightness_pre,throughputs,tests --tdqm_disable
 
       - name: install schedview
         shell: bash -l {0}
         run: |
           echo `pwd`
-          python -m pip install .
+          python -m pip install . --no-deps
 
       - name: conda list
         shell: bash -l {0}
@@ -68,7 +87,7 @@ jobs:
       - name: run unit tests
         shell: bash -l {0}
         run: |
-          export RUBIN_SIM_DATA_DIR=${{ github.workspace }}/data_dir
+          export RUBIN_SIM_DATA_DIR=~/rubin_sim_data
           pytest -r a -v --cov=schedview --cov=tests --cov-report=xml --cov-report=term --cov-branch
 
       - name: Upload coverage to codecov
