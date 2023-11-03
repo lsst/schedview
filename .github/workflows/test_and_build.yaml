@@ -1,4 +1,4 @@
-name: Run Unit Tests
+name: Run CI
 
 on:
   # Run job at the end of each day
