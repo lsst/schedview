@@ -51,7 +51,7 @@ import schedview.compute.survey
 import schedview.plot.survey
 
 DEFAULT_CURRENT_TIME = Time.now()
-DEFAULT_TIMEZONE = "America/Santiago"
+DEFAULT_TIMEZONE = "UTC"  # "America/Santiago"
 LOGO = "/assets/lsst_white_logo.png"
 COLOR_PALETTES = [color for color in bokeh.palettes.__palettes__ if "256" in color]
 
@@ -113,8 +113,13 @@ class Scheduler(param.Parameterized):
         label="Scheduler pickle file",
         doc=scheduler_fname_doc,
     )
-    date = param.Date(default=DEFAULT_CURRENT_TIME.datetime.date(), doc="")
-    USER_tier = param.Selector(
+    widget_datetime = param.Date(
+        default=DEFAULT_CURRENT_TIME.datetime.date(),
+        label="Date and time (UTC)",
+        doc="",
+    )
+    url_mjd = param.Number(default=None)
+    widget_tier = param.Selector(
         default="",
         objects=[""],
         label="Tier",
@@ -135,11 +140,6 @@ class Scheduler(param.Parameterized):
     summary_widget = param.Parameter(default=None, doc="")
     reward_widget = param.Parameter(default=None, doc="")
     show_loading_indicator = param.Boolean(default=False)
-    # data_time in mjd accepted as URL paramater
-    date_time = param.Number(default=None)
-    # the date_time value used allover the dashboard
-    # either set by URL parameter or date picker
-    _date_time = param.Number(default=None)
 
     # Param parameters (used in depends decoraters and trigger calls).
     _publish_summary_widget = param.Parameter(None)
@@ -156,6 +156,7 @@ class Scheduler(param.Parameterized):
     map_title_pane = None
 
     # Non-Param internal parameters.
+    _mjd = None
     _tier = None
     _survey = 0
     _reward = -1
@@ -173,8 +174,6 @@ class Scheduler(param.Parameterized):
     _display_reward = False
     _display_dashboard_data = False
     _do_not_trigger_update = True
-    _model_observatory = ModelObservatory(init_load_length=1)
-    _isDateUpdating = False
 
     # ------------------------------------------------------------ User actions
 
@@ -188,6 +187,16 @@ class Scheduler(param.Parameterized):
             self.clear_dashboard()
             self.show_loading_indicator = False
             return
+
+        # Current fix for _conditions.mjd having different datatypes.
+        if type(self._conditions._mjd) == np.ndarray:
+            self._conditions._mjd = self._conditions._mjd[0]
+
+        # Get mjd from pickle and set widget and URL to match.
+        self._do_not_trigger_update = True
+        self.url_mjd = self._conditions._mjd
+        self.widget_datetime = Time(self._conditions._mjd, format="mjd").to_datetime()
+        self._do_not_trigger_update = False
 
         if not self.make_scheduler_summary_df():
             self.clear_dashboard()
@@ -219,34 +228,29 @@ class Scheduler(param.Parameterized):
 
         self.show_loading_indicator = False
 
-    @param.depends("date_time", watch=True)
-    def _update_date_from_mjd(self):
-        """Update the dashboard when a user chooses a new date/time."""
+    @param.depends("widget_datetime", watch=True)
+    def _update_mjd_from_picker(self):
+        """Update the dashboard when a datetime is input in widget."""
+        if self._do_not_trigger_update:
+            return
 
-        self._isDateUpdating = True
-        self._date_time = self.date_time
-        self.date = Time(self.date_time, format="mjd").to_datetime()
-        self._isDateUpdating = False
-
-    @param.depends("date", watch=True)
-    def _update_date_from_picker(self):
-        """Update the dashboard when a user chooses a new date/time."""
-        if not self._isDateUpdating:
-            self._isDateUpdating = True
-            self.date_time = Time(
-                Timestamp(
-                    self.date,
-                    tzinfo=ZoneInfo(DEFAULT_TIMEZONE),
-                )
-            ).mjd
-
-    @param.depends("_date_time", watch=True)
-    def _update_date(self):
-        """Update the dashboard when date/time mjd value changes
-        either by url parameter or date picker
-        """
         self.show_loading_indicator = True
         self.clear_dashboard()
+
+        self._do_not_trigger_update = True
+        self.url_mjd = Time(
+            Timestamp(
+                self.widget_datetime,
+                tzinfo=ZoneInfo(DEFAULT_TIMEZONE),
+            )
+        ).mjd
+        self._do_not_trigger_update = False
+        self._mjd = self.url_mjd
+
+        if not self.update_conditions():
+            self.clear_dashboard()
+            self.show_loading_indicator = False
+            return
 
         if not self.make_scheduler_summary_df():
             self.clear_dashboard()
@@ -281,12 +285,64 @@ class Scheduler(param.Parameterized):
 
         self.show_loading_indicator = False
 
-    @param.depends("USER_tier", watch=True)
+    @param.depends("url_mjd", watch=True)
+    def _update_mjd_from_url(self):
+        """Update the dashboard when an mjd is input in URL."""
+        if self._do_not_trigger_update:
+            return
+
+        self.show_loading_indicator = True
+        self.clear_dashboard()
+
+        self._do_not_trigger_update = True
+        self.widget_datetime = Time(self.url_mjd, format="mjd").to_datetime()
+        self._do_not_trigger_update = False
+        self._mjd = self.url_mjd
+
+        if not self.update_conditions():
+            self.clear_dashboard()
+            self.show_loading_indicator = False
+            return
+
+        if not self.make_scheduler_summary_df():
+            self.clear_dashboard()
+            self.show_loading_indicator = False
+            return
+
+        if self.summary_widget is None:
+            self.create_summary_widget()
+        else:
+            self.update_summary_widget_data()
+        self.param.trigger("_publish_summary_widget")
+
+        self._do_not_trigger_update = True
+        self.summary_widget.selection = [0]
+        self._do_not_trigger_update = False
+
+        self.compute_survey_maps()
+        self.survey_map = self.param["survey_map"].objects[-1]
+        self._map_name = self.survey_map.split("@")[0].strip()
+
+        self.create_sky_map_base()
+        self.update_sky_map_with_survey_map()
+        self.param.trigger("_publish_map")
+
+        self.make_reward_df()
+        self.create_reward_widget()
+        self.param.trigger("_publish_reward_widget")
+
+        self._display_dashboard_data = True
+        self._display_reward = False
+        self.param.trigger("_update_headings")
+
+        self.show_loading_indicator = False
+
+    @param.depends("widget_tier", watch=True)
     def _update_tier(self):
         """Update the dashboard when a user chooses a new tier."""
         if not self._display_dashboard_data:
             return
-        self._tier = self.USER_tier
+        self._tier = self.widget_tier
         self._survey = 0
         self._survey_name = self._scheduler_summary_df[
             self._scheduler_summary_df["tier"] == self._tier
@@ -442,10 +498,10 @@ class Scheduler(param.Parameterized):
         self.param.trigger("_publish_map")
         self.param.trigger("_update_headings")
 
-        self.param["USER_tier"].objects = [""]
+        self.param["widget_tier"].objects = [""]
         self.param["survey_map"].objects = [""]
 
-        self.USER_tier = ""
+        self.widget_tier = ""
         self.survey_map = ""
 
         self._tier = ""
@@ -487,14 +543,62 @@ class Scheduler(param.Parameterized):
 
             return False
 
-    def make_scheduler_summary_df(self):
-        """Update conditions, and make the reward
-        and scheduler summary dataframes.
+    def update_conditions(self):
+        """Update Conditions object.
 
         Returns
         -------
         success : 'bool'
-            Record of success of conditions update and dataframe construction.
+            Record of success of Conditions update.
+        """
+        if self._conditions is None:
+            self._debugging_message = "Cannot update Conditions object as no Conditions object is loaded."
+
+            return False
+
+        try:
+            self._debugging_message = "Starting to update Conditions object."
+            pn.state.notifications.info("Updating Conditions object...", duration=0)
+
+            # self._conditions.mjd = self._mjd
+
+            # Use instance of ModelObservatory until Conditions
+            # setting bug is fixed.
+            if (
+                not hasattr(self, "_model_observatory")
+                or self._model_observatory.nside != self._scheduler.nside
+            ):
+                self._model_observatory = ModelObservatory(
+                    nside=self._scheduler.nside,
+                    init_load_length=1,
+                )
+
+            self._model_observatory.mjd = self._mjd
+            self._conditions = self._model_observatory.return_conditions()
+
+            self._scheduler.update_conditions(self._conditions)
+
+            self._debugging_message = "Finished updating Conditions object."
+            pn.state.notifications.clear()
+            pn.state.notifications.success("Conditions object updated successfully")
+
+            return True
+
+        except Exception:
+            tb = traceback.format_exc(limit=-1)
+            self._debugging_message = f"Conditions object unable to be updated: \n{tb}"
+            pn.state.notifications.clear()
+            pn.state.notifications.error("Conditions object unable to be updated!", duration=0)
+
+            return False
+
+    def make_scheduler_summary_df(self):
+        """Make the reward and scheduler summary dataframes.
+
+        Returns
+        -------
+        success : 'bool'
+            Record of success of dataframe construction.
         """
         if self._scheduler is None:
             self._debugging_message = "Cannot update survey reward table as no pickle is loaded."
@@ -505,18 +609,6 @@ class Scheduler(param.Parameterized):
             self._debugging_message = "Starting to make scheduler summary dataframe."
             pn.state.notifications.info("Making scheduler summary dataframe...", duration=0)
 
-            # TODO: Conditions setter bug-fix.
-
-            # self._conditions.mjd = self._date_time
-            if self._model_observatory.nside != self._scheduler.nside:
-                self._model_observatory = ModelObservatory(
-                    nside=self._scheduler.nside,
-                    init_load_length=1,
-                )
-            self._model_observatory.mjd = self._date_time
-            self._conditions = self._model_observatory.return_conditions()
-
-            self._scheduler.update_conditions(self._conditions)
             self._reward_df = self._scheduler.make_reward_df(self._conditions)
             scheduler_summary_df = schedview.compute.scheduler.make_scheduler_summary_df(
                 self._scheduler,
@@ -534,8 +626,8 @@ class Scheduler(param.Parameterized):
             self._scheduler_summary_df = scheduler_summary_df
 
             tiers = self._scheduler_summary_df.tier.unique().tolist()
-            self.param["USER_tier"].objects = tiers
-            self.USER_tier = tiers[0]
+            self.param["widget_tier"].objects = tiers
+            self.widget_tier = tiers[0]
             self._tier = tiers[0]
             self._survey = 0
             self._survey_name = self._scheduler_summary_df[
@@ -1347,13 +1439,13 @@ def generate_key():
 # ------------------------------------------------------------ Create dashboard
 
 
-def scheduler_app(date=None, scheduler_pickle=None):
+def scheduler_app(date_time=None, scheduler_pickle=None):
     """Create a dashboard with grids of Param parameters, Tabulator widgets,
     and Bokeh plots.
 
     Parameters
     ----------
-    date : 'datetime' or 'date', optional
+    widget_datetime : 'datetime' or 'date', optional
         The date/datetime of interest. The default is None.
     scheduler_pickle : 'str', optional
         A filepath or URL for the scheduler pickle. The default is None.
@@ -1371,8 +1463,8 @@ def scheduler_app(date=None, scheduler_pickle=None):
 
     scheduler = Scheduler()
 
-    if date is not None:
-        scheduler.date = date
+    if date_time is not None:
+        scheduler.widget_datetime = date_time
 
     if scheduler_pickle is not None:
         scheduler.scheduler_fname = scheduler_pickle
@@ -1404,16 +1496,16 @@ def scheduler_app(date=None, scheduler_pickle=None):
         sizing_mode="stretch_width",
         styles={"background": "#048b8c"},
     )
-    # Parameter inputs (pickle, date, tier).
+    # Parameter inputs (pickle, widget_datetime, tier).
     sched_app[8:33, 0:21] = pn.Param(
         scheduler,
-        parameters=["scheduler_fname", "date", "USER_tier"],
+        parameters=["scheduler_fname", "widget_datetime", "widget_tier"],
         widgets={
             "scheduler_fname": {
                 "widget_type": pn.widgets.TextInput,
                 "placeholder": "filepath or URL of pickle",
             },
-            "date": pn.widgets.DatetimePicker,
+            "widget_datetime": pn.widgets.DatetimePicker,
         },
         name="Select pickle file, date and tier.",
     )
@@ -1484,7 +1576,7 @@ def scheduler_app(date=None, scheduler_pickle=None):
             {
                 "scheduler_fname": "scheduler",
                 "nside": "nside",
-                "date_time": "mjd",
+                "url_mjd": "mjd",
             },
         )
 
