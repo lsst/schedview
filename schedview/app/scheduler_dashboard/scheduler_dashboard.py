@@ -566,18 +566,21 @@ class Scheduler(param.Parameterized):
         tabulator_formatter = {"survey_name_with_id": HTMLTemplateFormatter(template="<%= value %>")}
         columns = [
             "tier",
+            "survey_index",
             "survey_name_with_id",
             "reward",
             "survey",
             "survey_url",
         ]
         titles = {
+            "survey_index": "Index",
             "survey_name_with_id": "Survey",
             "reward": "Reward",
         }
         summary_widget = pn.widgets.Tabulator(
             self._scheduler_summary_df[self._scheduler_summary_df["tier"] == self._tier][columns],
-            widths={"survey_name_with_id": "60%", "reward": "40%"},
+            widths={"survey_index": "10%", "survey_name_with_id": "60%", "reward": "30%"},
+            text_align={"survey_index": "left", "survey_name": "left", "reward": "right"},
             show_index=False,
             formatters=tabulator_formatter,
             titles=titles,
@@ -596,6 +599,7 @@ class Scheduler(param.Parameterized):
         self._debugging_message = "Starting to update summary widget."
         columns = [
             "tier",
+            "survey_index",
             "survey_name_with_id",
             "reward",
             "survey",
