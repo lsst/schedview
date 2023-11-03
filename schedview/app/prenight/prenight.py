@@ -907,15 +907,26 @@ class RestrictedInputPrenight(Prenight):
         path=f"{PACKAGE_DATA_DIR}/*rewards*.h5", label="rewards HDF5 file", default=None, allow_None=True
     )
 
-    def __init__(self, *args, data_dir=None, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, data_dir=None, **kwargs):
+        # A few arguments (scheduler, opsim_db, rewards) will be used
+        # later in this method to set the options for parameters, but
+        # are not themselves parameters. So, remove them them the
+        # params list before calling super().__init__().
+        # Otherwise, param will complain that they are not parameters.
+        params = {k: v for k, v in kwargs.items() if k in self.param}
+        super().__init__(**params)
 
+        # make a dictionary of refereneces to the param paths, so that
+        # they can be updated by key.
         path_for_kwargs = {
             "opsim_db": self.param["opsim_output_fname"].path,
             "scheduler": self.param["scheduler_fname"].path,
             "reward": self.param["rewards_fname"].path,
         }
 
+        # In cases where the caller has not specified a value, set
+        # the paths to a glob matching the expected file name format
+        # for each type.
         if data_dir is not None:
             fname_glob = {
                 "opsim_db": f"{data_dir}/*opsim*.db",
@@ -923,6 +934,7 @@ class RestrictedInputPrenight(Prenight):
                 "reward": f"{data_dir}/*rewards*.h5",
             }
 
+        # Actually assign the names or globs to the path references.
         for arg_name in path_for_kwargs:
             if arg_name in kwargs:
                 path_for_kwargs[arg_name] = kwargs[arg_name]

@@ -57,9 +57,9 @@ jobs:
           wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/scheduler_2023_09_22.tgz
           tar -xf scheduler_2023_09_22.tgz
           echo "scheduler_2023_09_22.tgz complete"
-          wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/skybrightness_pre_2023_09_19.tgz
-          tar -xf skybrightness_pre_2023_09_19.tgz
-          echo "skybrightness_pre_2023_09_19.tgz complete"
+          wget -q https://s3df.slac.stanford.edu/data/rubin/sim-data/rubin_sim_data/skybrightness_pre_2023_10_17.tgz
+          tar -xf skybrightness_pre_2023_10_17.tgz
+          echo "skybrightness_pre_2023_10_17.tgz complete"
 
       - name: install schedview
         shell: bash -l {0}

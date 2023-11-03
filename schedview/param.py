@@ -88,7 +88,10 @@ class FileSelectorWithEmptyOption(param.FileSelector):
     Like param.FileSelector, but allows None to be deliberately selected.
     """
 
-    def update(self):
+    def update(self, path=None):
+        if path is not None and path != self.path:
+            self.path = path
+
         self.objects = [""] + sorted(glob.glob(self.path))
         if self.default in self.objects:
             return
