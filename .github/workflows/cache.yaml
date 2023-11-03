@@ -29,13 +29,12 @@ jobs:
         id: rs-install
         shell: bash -l {0}
         run: |
-          export RUBIN_SIM_DATA_DIR=~/rubin_sim_data
           mamba install --quiet rubin_sim           
-          python -c "import rubin_sim; print(rubin_sim.__version__)" > ${{ github.workspace }}/rs_version      
-          echo `cat ${{ github.workspace }}/rs_version`
+          mamba list rubin-sim | grep -v "#" | awk '{print $2}' > ${{ github.workspace }}/rs_version
+          echo "rs-version" `cat ${{ github.workspace }}/rs_version`
           echo "rs-version=`cat ${{ github.workspace }}/rs_version`" >> $GITHUB_OUTPUT          
 
-      - name: Cache rubin-sim-data
+      - name: Access rubin-sim-data cache
         id: cache-rs
         uses: actions/cache@v3
         env:
@@ -47,18 +46,17 @@ jobs:
             ${{ env.cache-name }}-v
 
       - if: ${{ steps.cache-rs.outputs.cache-hit == 'true' }}
-        name: Hit cache? List contents
-        continue-on-error: true
+        name: List cache contents.
         shell: bash -l {0}
         run: |
           export RUBIN_SIM_DATA_DIR=~/rubin_sim_data
-          echo $RUBIN_SIM_DATA_DIR (contents)
+          echo $RUBIN_SIM_DATA_DIR contents
           ls $RUBIN_SIM_DATA_DIR
           echo "__contents of versions.txt__"
           cat $RUBIN_SIM_DATA_DIR/versions.txt
 
       - if: ${{ steps.cache-rs.outputs.cache-hit != 'true' }}
-        name: Download data
+        name: Download data.
         shell: bash -l {0}
         run: |
           export RUBIN_SIM_DATA_DIR=~/rubin_sim_data       
