@@ -51,7 +51,7 @@ import schedview.compute.survey
 import schedview.plot.survey
 
 DEFAULT_CURRENT_TIME = Time.now()
-DEFAULT_TIMEZONE = "America/Santiago"
+DEFAULT_TIMEZONE = "UTC"  # "America/Santiago"
 LOGO = "/assets/lsst_white_logo.png"
 COLOR_PALETTES = [color for color in bokeh.palettes.__palettes__ if "256" in color]
 
@@ -115,7 +115,7 @@ class Scheduler(param.Parameterized):
     )
     widget_datetime = param.Date(
         default=DEFAULT_CURRENT_TIME.datetime.date(),
-        label="Date and time",
+        label="Date and time (UTC)",
         doc="",
     )
     url_mjd = param.Number(default=None)
