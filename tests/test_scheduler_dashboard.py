@@ -69,7 +69,7 @@ class TestSchedulerDashboard(unittest.TestCase):
         bokeh.io.reset_output()
 
     def test_scheduler_app(self):
-        sched_app = scheduler_app(date=TEST_DATE, scheduler_pickle=TEST_PICKLE)
+        sched_app = scheduler_app(date_time=TEST_DATE, scheduler_pickle=TEST_PICKLE)
         sched_app_bokeh_model = sched_app.get_root()
         with TemporaryDirectory() as scheduler_dir:
             sched_out_path = Path(scheduler_dir)
@@ -115,7 +115,7 @@ class TestSchedulerDashboard(unittest.TestCase):
             self.scheduler._conditions,
             self.scheduler._scheduler.make_reward_df(self.scheduler._conditions),
         )
-        scheduler_summary_df["survey"] = scheduler_summary_df.loc[:, "survey_name"]
+        scheduler_summary_df["survey"] = scheduler_summary_df.loc[:, "survey_name_with_id"]
         self.scheduler.scheduler_summary_df = scheduler_summary_df
         self.scheduler.create_summary_widget()
         widget = self.scheduler.publish_summary_widget()
