@@ -378,7 +378,7 @@ def make_scheduler_summary_df(scheduler, conditions, reward_df=None):
         survey_name = make_unique_survey_name(scheduler, [row.list_index, row.survey_index])
         return survey_name
 
-    summary_df["survey_name"] = summary_df.apply(get_survey_name, axis=1)
+    summary_df["survey_name_with_id"] = summary_df.apply(get_survey_name, axis=1)
 
     def get_survey_url(row):
         if isinstance(row.survey_class, str):
@@ -399,6 +399,8 @@ def make_scheduler_summary_df(scheduler, conditions, reward_df=None):
         survey_row = pd.Series({"reward": reward, "infeasible": infeasible})
         return survey_row
 
-    survey_df = summary_df.groupby(["tier", "survey_name", "survey_url"]).apply(make_survey_row)
+    survey_df = summary_df.groupby(
+        ["list_index", "survey_index", "survey_name_with_id", "survey_url", "tier"]
+    ).apply(make_survey_row)
 
     return survey_df["reward"].reset_index()
