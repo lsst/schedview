@@ -35,7 +35,6 @@ from datetime import datetime
 from glob import glob
 from zoneinfo import ZoneInfo
 
-import astropy.utils.iers
 import bokeh
 import numpy as np
 import panel as pn
@@ -59,6 +58,7 @@ import schedview.compute.survey
 import schedview.param
 import schedview.plot.survey
 
+# filter astropy warning that's filling the terminal with every update
 warnings.filterwarnings("ignore", category=AstropyWarning)
 
 DEFAULT_CURRENT_TIME = Time.now()
@@ -67,8 +67,6 @@ LOGO = "/assets/lsst_white_logo.png"
 COLOR_PALETTES = [color for color in bokeh.palettes.__palettes__ if "256" in color]
 PACKAGE_DATA_DIR = importlib.resources.files("schedview.data").as_posix()
 USDF_DATA_DIR = "/sdf/group/rubin/web_data/sim-data/schedview"
-
-astropy.utils.iers.conf.iers_degraded_accuracy = "warn"
 
 pn.extension(
     "tabulator",
@@ -1306,13 +1304,10 @@ class RestrictedFilesScheduler(Scheduler):
         allow_None=True,
     )
 
-    # print(f'sceduler_fname: {scheduler_fname.path}')
-
     def __init__(self, data_dir=None):
         super().__init__()
 
         if data_dir is not None:
-            # print(f'init: {data_dir}')
             self.param.scheduler_fname.path = f"{data_dir}/*scheduler*.p*"
 
 
@@ -1513,36 +1508,38 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         max_height=1000,
     ).servable()
 
-    scheduler = None
-    # print(f"data directory: {data_dir}")
+    scheduler = Scheduler()
+    # read scheduler_pickle if provided to the function in a notebook
+    # it will be overriden if the dashboard runs in an app
+    if scheduler_pickle is not None:
+        scheduler.scheduler_fname = scheduler_pickle
+
     from_urls = kwargs["data_from_urls"]
     data_dir = kwargs["data_dir"]
+
+    # accept pickle files from url or any path
     if from_urls:
-        scheduler = Scheduler()
-        if scheduler_pickle is not None:
-            scheduler.scheduler_fname = scheduler_pickle
-            # if pn.state.location is not None:
-            #     pn.state.location.sync(
-            #         scheduler,
-            #         {
-            #             "scheduler_fname": "scheduler",
-            #             "nside": "nside",
-            #             "url_mjd": "mjd",
-            #         },
-            #     )
+        # add placeholder text if the widget is a text input
+        # this cannot be done for a FileSelector parameter
+        pn.Param(scheduler, widgets={"scheduler_fname": {"placeholder": "filepath or URL of pickle"}})
+
+        # sync url parameters only if the files aren't restricted
+        if pn.state.location is not None:
+            pn.state.location.sync(
+                scheduler,
+                {
+                    "scheduler_fname": "scheduler",
+                    "nside": "nside",
+                    "url_mjd": "mjd",
+                },
+            )
+    # restrict files to data_directory
     else:
+        pn.state.location.reload = False
         scheduler = RestrictedFilesScheduler(data_dir=data_dir)
         # this line is already in RestrictedFilesScheduler.__init__
         # but the selector path doesn't update without calling it here
         scheduler.param.scheduler_fname.path = data_dir
-        # if pn.state.location is not None:
-        #     pn.state.location.sync(
-        #         scheduler,
-        #         {
-        #             "nside": "nside",
-        #             "url_mjd": "mjd",
-        #         },
-        #     )
 
     if date_time is not None:
         scheduler.widget_datetime = date_time
@@ -1579,10 +1576,10 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         scheduler,
         parameters=["scheduler_fname", "widget_datetime", "widget_tier"],
         widgets={
-            # "scheduler_fname": {
-            #     "widget_type": pn.widgets.TextInput,
-            #     "placeholder": "filepath or URL of pickle",
-            # },
+            "scheduler_fname": {
+                # "widget_type": pn.widgets.TextInput,
+                "placeholder": "filepath or URL of pickle",
+            },
             "widget_datetime": pn.widgets.DatetimePicker,
         },
         name="Select pickle file, date and tier.",
@@ -1647,17 +1644,6 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         collapsed=True,
     )
 
-    # sync URL parameters to scheduler params
-    # if pn.state.location is not None:
-    #     pn.state.location.sync(
-    #         scheduler,
-    #         {
-    #             "scheduler_fname": "scheduler",
-    #             "nside": "nside",
-    #             "url_mjd": "mjd",
-    #         },
-    #     )
-
     return sched_app
 
 
@@ -1694,7 +1680,6 @@ def parse_arguments():
 
 def main():
     commandline_args = parse_arguments()
-    print(commandline_args)
     print("Starting scheduler dashboard.")
 
     if "SCHEDULER_PORT" in os.environ:
