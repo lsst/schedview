@@ -23,19 +23,26 @@
 
 """schedview docstring"""
 
+import argparse
 import importlib.resources
 import logging
 import os
 import traceback
+
+# Filter the astropy warnings swamping the terminal
+import warnings
 from datetime import datetime
+from glob import glob
 from zoneinfo import ZoneInfo
 
+import astropy.utils.iers
 import bokeh
 import numpy as np
 import panel as pn
 import param
 import rubin_sim.site_models
 from astropy.time import Time
+from astropy.utils.exceptions import AstropyWarning
 from bokeh.models import ColorBar, LinearColorMapper
 from bokeh.models.widgets.tables import BooleanFormatter, HTMLTemplateFormatter
 from pandas import Timestamp
@@ -49,13 +56,19 @@ import schedview
 import schedview.collect.scheduler_pickle
 import schedview.compute.scheduler
 import schedview.compute.survey
+import schedview.param
 import schedview.plot.survey
+
+warnings.filterwarnings("ignore", category=AstropyWarning)
 
 DEFAULT_CURRENT_TIME = Time.now()
 DEFAULT_TIMEZONE = "UTC"  # "America/Santiago"
 LOGO = "/assets/lsst_white_logo.png"
 COLOR_PALETTES = [color for color in bokeh.palettes.__palettes__ if "256" in color]
+PACKAGE_DATA_DIR = importlib.resources.files("schedview.data").as_posix()
+USDF_DATA_DIR = "/sdf/group/rubin/web_data/sim-data/schedview"
 
+astropy.utils.iers.conf.iers_degraded_accuracy = "warn"
 
 pn.extension(
     "tabulator",
@@ -1274,6 +1287,35 @@ class Scheduler(param.Parameterized):
         return self.map_title_pane
 
 
+class RestrictedFilesScheduler(Scheduler):
+    """A Parametrized container for parameters, data, and panel objects for the
+    scheduler dashboard.
+    """
+
+    # Param parameters that are modifiable by user actions.
+    scheduler_fname_doc = """URL or file name of the scheduler pickle file.
+    Such a pickle file can either be of an instance of a subclass of
+    rubin_sim.scheduler.schedulers.CoreScheduler, or a tuple of the form
+    (scheduler, conditions), where scheduler is an instance of a subclass of
+    rubin_sim.scheduler.schedulers.CoreScheduler, and conditions is an
+    instance of rubin_sim.scheduler.conditions.Conditions.
+    """
+    scheduler_fname = schedview.param.FileSelectorWithEmptyOption(
+        doc=scheduler_fname_doc,
+        default="",
+        allow_None=True,
+    )
+
+    # print(f'sceduler_fname: {scheduler_fname.path}')
+
+    def __init__(self, data_dir=None):
+        super().__init__()
+
+        if data_dir is not None:
+            # print(f'init: {data_dir}')
+            self.param.scheduler_fname.path = f"{data_dir}/*scheduler*.p*"
+
+
 # --------------------------------------------------------------- Key functions
 
 
@@ -1449,7 +1491,7 @@ def generate_key():
 # ------------------------------------------------------------ Create dashboard
 
 
-def scheduler_app(date_time=None, scheduler_pickle=None):
+def scheduler_app(date_time=None, scheduler_pickle=None, data_dir=None):
     """Create a dashboard with grids of Param parameters, Tabulator widgets,
     and Bokeh plots.
 
@@ -1471,13 +1513,35 @@ def scheduler_app(date_time=None, scheduler_pickle=None):
         max_height=1000,
     ).servable()
 
-    scheduler = Scheduler()
+    scheduler = None
+    # print(f"data directory: {data_dir}")
+    if data_dir is not None:
+        scheduler = RestrictedFilesScheduler(data_dir=data_dir)
+        scheduler.param.scheduler_fname.path = data_dir
+        # if pn.state.location is not None:
+        #     pn.state.location.sync(
+        #         scheduler,
+        #         {
+        #             "nside": "nside",
+        #             "url_mjd": "mjd",
+        #         },
+        #     )
+    else:
+        scheduler = Scheduler()
+        if scheduler_pickle is not None:
+            scheduler.scheduler_fname = scheduler_pickle
+            # if pn.state.location is not None:
+            #     pn.state.location.sync(
+            #         scheduler,
+            #         {
+            #             "scheduler_fname": "scheduler",
+            #             "nside": "nside",
+            #             "url_mjd": "mjd",
+            #         },
+            #     )
 
     if date_time is not None:
         scheduler.widget_datetime = date_time
-
-    if scheduler_pickle is not None:
-        scheduler.scheduler_fname = scheduler_pickle
 
     # show dashboard as busy when scheduler.show_loading_spinner is True
     @pn.depends(loading=scheduler.param.show_loading_indicator, watch=True)
@@ -1511,10 +1575,10 @@ def scheduler_app(date_time=None, scheduler_pickle=None):
         scheduler,
         parameters=["scheduler_fname", "widget_datetime", "widget_tier"],
         widgets={
-            "scheduler_fname": {
-                "widget_type": pn.widgets.TextInput,
-                "placeholder": "filepath or URL of pickle",
-            },
+            # "scheduler_fname": {
+            #     "widget_type": pn.widgets.TextInput,
+            #     "placeholder": "filepath or URL of pickle",
+            # },
             "widget_datetime": pn.widgets.DatetimePicker,
         },
         name="Select pickle file, date and tier.",
@@ -1580,20 +1644,47 @@ def scheduler_app(date_time=None, scheduler_pickle=None):
     )
 
     # sync URL parameters to scheduler params
-    if pn.state.location is not None:
-        pn.state.location.sync(
-            scheduler,
-            {
-                "scheduler_fname": "scheduler",
-                "nside": "nside",
-                "url_mjd": "mjd",
-            },
-        )
+    # if pn.state.location is not None:
+    #     pn.state.location.sync(
+    #         scheduler,
+    #         {
+    #             "scheduler_fname": "scheduler",
+    #             "nside": "nside",
+    #             "url_mjd": "mjd",
+    #         },
+    #     )
 
     return sched_app
 
 
+def parse_arguments():
+    """
+    Parse commandline arguments to read data directory if provided
+    """
+    parser = argparse.ArgumentParser(description="On-the-fly Rubin Scheduler dashboard")
+    default_data_dir = f"{USDF_DATA_DIR}/*" if os.path.exists(USDF_DATA_DIR) else PACKAGE_DATA_DIR
+
+    parser.add_argument(
+        "--data_dir",
+        "-d",
+        type=str,
+        default=default_data_dir,
+        help="The base directory for data files.",
+    )
+
+    args = parser.parse_args()
+
+    if len(glob(args.data_dir)) == 0 and not args.data_from_urls:
+        args.data_dir = PACKAGE_DATA_DIR
+
+    scheduler_app_params = args.__dict__
+
+    return scheduler_app_params
+
+
 def main():
+    commandline_args = parse_arguments()
+    print(commandline_args)
     print("Starting scheduler dashboard.")
 
     if "SCHEDULER_PORT" in os.environ:
@@ -1603,8 +1694,11 @@ def main():
 
     assets_dir = os.path.join(importlib.resources.files("schedview"), "app", "scheduler_dashboard", "assets")
 
+    def scheduler_app_with_params():
+        return scheduler_app(data_dir=commandline_args["data_dir"])
+
     pn.serve(
-        scheduler_app,
+        scheduler_app_with_params,
         port=scheduler_port,
         title="Scheduler Dashboard",
         show=True,
