@@ -1491,7 +1491,7 @@ def generate_key():
 # ------------------------------------------------------------ Create dashboard
 
 
-def scheduler_app(date_time=None, scheduler_pickle=None, data_dir=None):
+def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     """Create a dashboard with grids of Param parameters, Tabulator widgets,
     and Bokeh plots.
 
@@ -1515,18 +1515,9 @@ def scheduler_app(date_time=None, scheduler_pickle=None, data_dir=None):
 
     scheduler = None
     # print(f"data directory: {data_dir}")
-    if data_dir is not None:
-        scheduler = RestrictedFilesScheduler(data_dir=data_dir)
-        scheduler.param.scheduler_fname.path = data_dir
-        # if pn.state.location is not None:
-        #     pn.state.location.sync(
-        #         scheduler,
-        #         {
-        #             "nside": "nside",
-        #             "url_mjd": "mjd",
-        #         },
-        #     )
-    else:
+    from_urls = kwargs["data_from_urls"]
+    data_dir = kwargs["data_dir"]
+    if from_urls:
         scheduler = Scheduler()
         if scheduler_pickle is not None:
             scheduler.scheduler_fname = scheduler_pickle
@@ -1539,6 +1530,19 @@ def scheduler_app(date_time=None, scheduler_pickle=None, data_dir=None):
             #             "url_mjd": "mjd",
             #         },
             #     )
+    else:
+        scheduler = RestrictedFilesScheduler(data_dir=data_dir)
+        # this line is already in RestrictedFilesScheduler.__init__
+        # but the selector path doesn't update without calling it here
+        scheduler.param.scheduler_fname.path = data_dir
+        # if pn.state.location is not None:
+        #     pn.state.location.sync(
+        #         scheduler,
+        #         {
+        #             "nside": "nside",
+        #             "url_mjd": "mjd",
+        #         },
+        #     )
 
     if date_time is not None:
         scheduler.widget_datetime = date_time
@@ -1672,6 +1676,12 @@ def parse_arguments():
         help="The base directory for data files.",
     )
 
+    parser.add_argument(
+        "--data_from_urls",
+        action="store_true",
+        help="Let the user specify URLs from which to load data. THIS IS NOT SECURE.",
+    )
+
     args = parser.parse_args()
 
     if len(glob(args.data_dir)) == 0 and not args.data_from_urls:
@@ -1695,7 +1705,7 @@ def main():
     assets_dir = os.path.join(importlib.resources.files("schedview"), "app", "scheduler_dashboard", "assets")
 
     def scheduler_app_with_params():
-        return scheduler_app(data_dir=commandline_args["data_dir"])
+        return scheduler_app(**commandline_args)
 
     pn.serve(
         scheduler_app_with_params,
