@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 import bokeh.io
 import bokeh.plotting
 import pandas as pd
+import rubin_sim.site_models
 from astropy.time import Time
 from pandas import Timestamp
 from panel.widgets import Tabulator
@@ -130,6 +131,21 @@ class TestSchedulerDashboard(unittest.TestCase):
         self.assertIsInstance(survey_maps, OrderedDict)
         self.assertIn("reward", survey_maps)
         self.assertIn("g_sky", survey_maps)
+
+    def test_site_models(self):
+        wind_speed = 4
+        wind_direction = 25
+        fiducial_seeing = 0.69
+        wind_data = rubin_sim.site_models.ConstantWindData(
+            wind_speed=wind_speed,
+            wind_direction=wind_direction,
+        )
+        seeing_data = rubin_sim.site_models.ConstantSeeingData(fiducial_seeing)
+        self.assertIsInstance(wind_data, rubin_sim.site_models.ConstantWindData)
+        self.assertIsInstance(seeing_data, rubin_sim.site_models.ConstantSeeingData)
+        self.assertEqual(wind_data.wind_speed, wind_speed)
+        self.assertEqual(wind_data.wind_direction, wind_direction)
+        self.assertEqual(seeing_data.fwhm_500, fiducial_seeing)
 
 
 if __name__ == "__main__":

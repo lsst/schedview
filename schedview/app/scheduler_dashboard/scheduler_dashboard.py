@@ -584,17 +584,6 @@ class Scheduler(param.Parameterized):
                     seeing_data=seeing_data,
                 )
 
-            # Code for tickets/PREOPS-4817
-            # else:
-            #     # Update current MO with weather conditions.
-            #     s = rubin_sim.site_models.ConstantSeeingData(self.seeing)
-            #     self._model_observatory.seeing_data = s
-            #     w = rubin_sim.site_models.ConstantWindData(
-            #         wind_speed=self.wind_speed,
-            #         wind_direction=np.radians(self.wind_direction),
-            #     )
-            #     self._model_observatory.wind_data = w
-
             self._model_observatory.mjd = self._mjd
             self._conditions = self._model_observatory.return_conditions()
             self._scheduler.update_conditions(self._conditions)
