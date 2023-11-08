@@ -2,6 +2,17 @@ name: base
 channels:
  - conda-forge
 dependencies:
- - param < 2.0.0
- - schedview
- - curl
+ - holoviews
+ - hvplot
+ - colorcet
+ - numpy
+ - pandas
+ - astropy >= 5.3
+ - rubin-sim >= 1.3.0
+ - uranography >= 1.1.0
+ - bokeh >= 3.1.1
+ - panel >= 1.1.0
+ - uranography
+ - param
+ - git
+ - pip
