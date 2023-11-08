@@ -34,6 +34,7 @@ import bokeh
 import numpy as np
 import panel as pn
 import param
+import rubin_sim.site_models
 from astropy.time import Time
 from bokeh.models import ColorBar, LinearColorMapper
 from bokeh.models.widgets.tables import BooleanFormatter, HTMLTemplateFormatter
@@ -568,14 +569,23 @@ class Scheduler(param.Parameterized):
                 not hasattr(self, "_model_observatory")
                 or self._model_observatory.nside != self._scheduler.nside
             ):
+                # Get weather conditions from pickle.
+                wind_data = rubin_sim.site_models.ConstantWindData(
+                    wind_speed=self._conditions.wind_speed,
+                    wind_direction=self._conditions.wind_direction,
+                )
+                # Set seeing to fiducial site seeing.
+                seeing_data = rubin_sim.site_models.ConstantSeeingData(0.69)
+                # Create new MO instance.
                 self._model_observatory = ModelObservatory(
                     nside=self._scheduler.nside,
                     init_load_length=1,
+                    wind_data=wind_data,
+                    seeing_data=seeing_data,
                 )
 
             self._model_observatory.mjd = self._mjd
             self._conditions = self._model_observatory.return_conditions()
-
             self._scheduler.update_conditions(self._conditions)
 
             self._debugging_message = "Finished updating Conditions object."
