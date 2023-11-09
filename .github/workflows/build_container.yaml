@@ -9,6 +9,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    # See https://lsstc.slack.com/archives/C2JP8GGVC/p1698782669757349?thread_ts=1698779230.846079&cid=C2JP8GGVC
+    permissions:
+      contents: read
+      packages: write
+
     steps:
       - uses: actions/checkout@v3
 
