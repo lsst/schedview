@@ -1,5 +1,6 @@
 import copy
 import datetime
+import inspect
 import lzma
 import numbers
 import pickle
@@ -8,7 +9,7 @@ import numpy as np
 import pandas as pd
 from astropy.time import Time
 from astropy.timeseries import TimeSeries
-from rubin_sim.scheduler import sim_runner
+from rubin_sim.scheduler import sim_runner, surveys
 from rubin_sim.scheduler.example import example_scheduler
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 from rubin_sim.scheduler.utils import SchemaConverter, empty_observation
@@ -380,9 +381,12 @@ def make_scheduler_summary_df(scheduler, conditions, reward_df=None):
 
     summary_df["survey_name_with_id"] = summary_df.apply(get_survey_name, axis=1)
 
+    standard_surveys = [c[0] for c in inspect.getmembers(surveys)]
+
     def get_survey_url(row):
-        if isinstance(row.survey_class, str):
-            survey_url = f"https://rubin-sim.lsst.io/api/{row.survey_class}.html#{row.survey_class}"
+        if isinstance(row.survey_class, str) and row.survey_class in standard_surveys:
+            url_base = "https://rubin-sim.lsst.io/api/rubin_sim.scheduler.surveys"
+            survey_url = f"{url_base}.{row.survey_class}.html#{row.survey_class}"
         else:
             survey_url = ""
         return survey_url
