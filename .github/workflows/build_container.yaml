@@ -9,12 +9,71 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    if: >
-      startsWith(github.ref, 'refs/tags/')
-      || startsWith(github.head_ref, 'tickets/')
+    # See https://lsstc.slack.com/archives/C2JP8GGVC/p1698782669757349?thread_ts=1698779230.846079&cid=C2JP8GGVC
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - uses: actions/checkout@v3
+
+      # We need to install schedview in this workflow to get the data
+      # for rubin_sim, as download by rs_download_data or cached by github.
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+          auto-update-conda: true
+          channels: conda-forge,defaults
+          miniforge-variant: Mambaforge
+          use-mamba: true
+          channel-priority: strict
+          show-channel-urls: true
+
+      - name: configure conda and install requirements
+        id: rs-install
+        shell: bash -l {0}
+        run: |
+          mamba install --quiet --file=requirements.txt
+          mamba install --quiet --file=test-requirements.txt
+          mamba list rubin-sim | grep -v "#" | awk '{print $2}' > ${{ github.workspace }}/rs_version
+          echo "rs-version" `cat ${{ github.workspace }}/rs_version`
+          echo "rs-version=`cat ${{ github.workspace }}/rs_version`" >> $GITHUB_OUTPUT
+
+      - name: Access rubin-sim-data cache
+        id: cache-rs
+        uses: actions/cache@v3
+        env:
+          cache-name: cached-rubin-sim-data
+        with:
+          path: ${{ github.workspace }}/rubin_sim_data
+          key: ${{ env.cache-name }}-v${{ steps.rs-install.outputs.rs-version }}
+          restore-keys: |
+            ${{ env.cache-name }}-v
+
+      - if: ${{ steps.cache-rs.outputs.cache-hit == 'true' }}
+        name: List cache contents.
+        shell: bash -l {0}
+        run: |
+          export RUBIN_SIM_DATA_DIR=${{ github.workspace }}/rubin_sim_data
+          echo $RUBIN_SIM_DATA_DIR
+          ls $RUBIN_SIM_DATA_DIR
+          echo "__contents of versions.txt__"
+          cat $RUBIN_SIM_DATA_DIR/versions.txt
+
+      - if: ${{ steps.cache-rs.outputs.cache-hit != 'true' }}
+        name: Download data.
+        shell: bash -l {0}
+        run: |
+          export RUBIN_SIM_DATA_DIR=${{ github.workspace }}/rubin_sim_data
+          rs_download_data --force --dirs scheduler,site_models,skybrightness_pre,throughputs,tests --tdqm_disable
+
+      - name: report environment
+        shell: bash -l {0}
+        run: |
+          echo pwd is `pwd`
+          echo python is `which python`
+          echo github.workspace is ${{ github.workspace }}
+          find ${{ github.workspace }} -maxdepth 2
 
       - uses: lsst-sqre/build-and-push-to-ghcr@v1
         id: build
