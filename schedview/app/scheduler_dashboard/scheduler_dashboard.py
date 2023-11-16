@@ -29,7 +29,7 @@ import logging
 import os
 import traceback
 
-# Filter the astropy warnings swamping the terminal
+# Filter the astropy warnings swamping the terminal.
 import warnings
 from datetime import datetime
 from glob import glob
@@ -48,7 +48,7 @@ from pandas import Timestamp
 from panel.io.loading import start_loading_spinner, stop_loading_spinner
 from pytz import timezone
 
-# For the conditions.mjd bugfix
+# For the conditions.mjd bugfix.
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 
 import schedview
@@ -1576,10 +1576,6 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         scheduler,
         parameters=["scheduler_fname", "widget_datetime", "widget_tier"],
         widgets={
-            "scheduler_fname": {
-                # "widget_type": pn.widgets.TextInput,
-                "placeholder": "filepath or URL of pickle",
-            },
             "widget_datetime": pn.widgets.DatetimePicker,
         },
         name="Select pickle file, date and tier.",
