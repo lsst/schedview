@@ -1514,8 +1514,8 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     if scheduler_pickle is not None:
         scheduler.scheduler_fname = scheduler_pickle
 
-    from_urls = kwargs["data_from_urls"]
-    data_dir = kwargs["data_dir"]
+    from_urls = kwargs["data_from_urls"] if "data_from_urls" in kwargs.keys() else ""
+    data_dir = kwargs["data_dir"] if "data_dir" in kwargs.keys() else ""
 
     # Accept pickle files from url or any path.
     if from_urls:
@@ -1535,7 +1535,6 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
             )
     # Restrict files to data_directory.
     else:
-        pn.state.location.reload = False
         scheduler = RestrictedFilesScheduler(data_dir=data_dir)
         # This line is already in RestrictedFilesScheduler.__init__
         # but the selector path doesn't update without calling it here.
