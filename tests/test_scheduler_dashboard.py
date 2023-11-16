@@ -70,7 +70,7 @@ class TestSchedulerDashboard(unittest.TestCase):
         bokeh.io.reset_output()
 
     def test_scheduler_app(self):
-        sched_app = scheduler_app(date_time=TEST_DATE, scheduler_pickle=TEST_PICKLE)
+        sched_app = scheduler_app(date_time=TEST_DATE, scheduler_pickle=TEST_PICKLE, data_from_urls=True)
         sched_app_bokeh_model = sched_app.get_root()
         with TemporaryDirectory() as scheduler_dir:
             sched_out_path = Path(scheduler_dir)

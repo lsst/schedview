@@ -1514,7 +1514,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     if scheduler_pickle is not None:
         scheduler.scheduler_fname = scheduler_pickle
 
-    from_urls = kwargs["data_from_urls"] if "data_from_urls" in kwargs.keys() else ""
+    from_urls = kwargs["data_from_urls"] if "data_from_urls" in kwargs.keys() else False
     data_dir = kwargs["data_dir"] if "data_dir" in kwargs.keys() else ""
 
     # Accept pickle files from url or any path.
