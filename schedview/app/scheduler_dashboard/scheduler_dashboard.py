@@ -58,7 +58,7 @@ import schedview.compute.survey
 import schedview.param
 import schedview.plot.survey
 
-# filter astropy warning that's filling the terminal with every update
+# filter astropy warning that's filling the terminal with every update.
 warnings.filterwarnings("ignore", category=AstropyWarning)
 
 DEFAULT_CURRENT_TIME = Time.now()
@@ -1287,7 +1287,7 @@ class Scheduler(param.Parameterized):
 
 class RestrictedFilesScheduler(Scheduler):
     """A Parametrized container for parameters, data, and panel objects for the
-    scheduler dashboard.
+    scheduler dashboard with restricted pickle file selection.
     """
 
     # Param parameters that are modifiable by user actions.
@@ -1509,21 +1509,21 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     ).servable()
 
     scheduler = Scheduler()
-    # read scheduler_pickle if provided to the function in a notebook
-    # it will be overriden if the dashboard runs in an app
+    # read scheduler_pickle if provided to the function in a notebook.
+    # it will be overriden if the dashboard runs in an app.
     if scheduler_pickle is not None:
         scheduler.scheduler_fname = scheduler_pickle
 
     from_urls = kwargs["data_from_urls"]
     data_dir = kwargs["data_dir"]
 
-    # accept pickle files from url or any path
+    # Accept pickle files from url or any path.
     if from_urls:
-        # add placeholder text if the widget is a text input
-        # this cannot be done for a FileSelector parameter
+        # Add placeholder text if the widget is a text input.
+        # This cannot be done for a FileSelector parameter.
         pn.Param(scheduler, widgets={"scheduler_fname": {"placeholder": "filepath or URL of pickle"}})
 
-        # sync url parameters only if the files aren't restricted
+        # Sync url parameters only if the files aren't restricted.
         if pn.state.location is not None:
             pn.state.location.sync(
                 scheduler,
@@ -1533,18 +1533,18 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
                     "url_mjd": "mjd",
                 },
             )
-    # restrict files to data_directory
+    # Restrict files to data_directory.
     else:
         pn.state.location.reload = False
         scheduler = RestrictedFilesScheduler(data_dir=data_dir)
-        # this line is already in RestrictedFilesScheduler.__init__
-        # but the selector path doesn't update without calling it here
+        # This line is already in RestrictedFilesScheduler.__init__
+        # but the selector path doesn't update without calling it here.
         scheduler.param.scheduler_fname.path = data_dir
 
     if date_time is not None:
         scheduler.widget_datetime = date_time
 
-    # show dashboard as busy when scheduler.show_loading_spinner is True
+    # Show dashboard as busy when scheduler.show_loading_spinner is True.
     @pn.depends(loading=scheduler.param.show_loading_indicator, watch=True)
     def update_loading(loading):
         start_loading_spinner(sched_app) if loading else stop_loading_spinner(sched_app)
@@ -1648,9 +1648,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
 
 
 def parse_arguments():
-    """
-    Parse commandline arguments to read data directory if provided
-    """
+    """Parse commandline arguments to read data directory if provided."""
     parser = argparse.ArgumentParser(description="On-the-fly Rubin Scheduler dashboard")
     default_data_dir = f"{USDF_DATA_DIR}/*" if os.path.exists(USDF_DATA_DIR) else PACKAGE_DATA_DIR
 
