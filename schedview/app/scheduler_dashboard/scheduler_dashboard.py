@@ -1522,6 +1522,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         del kwargs["data_dir"]
 
     scheduler = None
+    data_loading_widgets = {}
     # Accept pickle files from url or any path.
     if from_urls:
         scheduler = Scheduler()
@@ -1543,9 +1544,21 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
                     "url_mjd": "mjd",
                 },
             )
+
+        data_loading_widgets = {
+            "scheduler_fname": {
+                # "widget_type": pn.widgets.TextInput,
+                "placeholder": "filepath or URL of pickle",
+            },
+            "widget_datetime": pn.widgets.DatetimePicker,
+        }
+
     # Restrict files to data_directory.
     else:
         scheduler = RestrictedFilesScheduler(data_dir=data_dir)
+        data_loading_widgets = {
+            "widget_datetime": pn.widgets.DatetimePicker,
+        }
 
     # Show dashboard as busy when scheduler.show_loading_spinner is True.
     @pn.depends(loading=scheduler.param.show_loading_indicator, watch=True)
@@ -1578,15 +1591,10 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     sched_app[8:33, 0:21] = pn.Param(
         scheduler,
         parameters=["scheduler_fname", "widget_datetime", "widget_tier"],
-        widgets={
-            # "scheduler_fname": {
-            #     # "widget_type": pn.widgets.TextInput,
-            #     "placeholder": "filepath or URL of pickle",
-            # },
-            "widget_datetime": pn.widgets.DatetimePicker,
-        },
+        widgets=data_loading_widgets,
         name="Select pickle file, date and tier.",
     )
+
     # Survey rewards table and header.
     sched_app[8:33, 21:67] = pn.Row(
         pn.Spacer(width=10),
