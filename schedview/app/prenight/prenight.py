@@ -1125,12 +1125,16 @@ def main():
     def prenight_app_with_params():
         return prenight_app(**prenight_app_parameters)
 
+    app_dict = {"dashboard": prenight_app_with_params}
+    prefix = "/schedview-prenight"
+    print(f"prefix: {prefix}, app_dict keys = {list(app_dict.keys())}")
+
     pn.serve(
-        prenight_app_with_params,
+        app_dict,
         port=prenight_port,
         title="Prenight Dashboard",
         show=show,
-        prefix="/schedview-prenight",
+        prefix=prefix,
         start=True,
         autoreload=True,
         threaded=True,
