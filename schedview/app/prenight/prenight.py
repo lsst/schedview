@@ -918,10 +918,10 @@ class RestrictedInputPrenight(Prenight):
 
         # make a dictionary of refereneces to the param paths, so that
         # they can be updated by key.
-        path_for_kwargs = {
-            "opsim_db": self.param["opsim_output_fname"].path,
-            "scheduler": self.param["scheduler_fname"].path,
-            "reward": self.param["rewards_fname"].path,
+        fname_params = {
+            "opsim_db": self.param["opsim_output_fname"],
+            "scheduler": self.param["scheduler_fname"],
+            "reward": self.param["rewards_fname"],
         }
 
         # In cases where the caller has not specified a value, set
@@ -935,11 +935,11 @@ class RestrictedInputPrenight(Prenight):
             }
 
         # Actually assign the names or globs to the path references.
-        for arg_name in path_for_kwargs:
+        for arg_name in fname_params:
             if arg_name in kwargs:
-                path_for_kwargs[arg_name] = kwargs[arg_name]
+                fname_params[arg_name].update(path=kwargs[arg_name])
             elif data_dir is not None:
-                path_for_kwargs[arg_name] = fname_glob[arg_name]
+                fname_params[arg_name].update(path=fname_glob[arg_name])
 
 
 def prenight_app(*args, **kwargs):
@@ -1125,7 +1125,7 @@ def main():
         return prenight_app(**prenight_app_parameters)
 
     pn.serve(
-        prenight_app_with_params,
+        {"schedview-prenight": prenight_app_with_params},
         port=prenight_port,
         title="Prenight Dashboard",
         show=show,

@@ -1,9 +1,12 @@
 # Subclasses of param.Parameter for use in schedview.
 
 import glob
+import os
+import pathlib
 
 import pandas as pd
 import param
+from param import Undefined
 
 
 class Series(param.Parameter):
@@ -88,11 +91,16 @@ class FileSelectorWithEmptyOption(param.FileSelector):
     Like param.FileSelector, but allows None to be deliberately selected.
     """
 
-    def update(self, path=None):
-        if path is not None and path != self.path:
-            self.path = path
-
-        self.objects = [""] + sorted(glob.glob(self.path))
+    def update(self, path=Undefined):
+        if path is Undefined:
+            path = self.path
+        if path == "":
+            self.objects = []
+        else:
+            # Convert using os.fspath and pathlib.Path to handle ensure
+            # the path separators are consistent (on Windows in particular)
+            pathpattern = os.fspath(pathlib.Path(path))
+            self.objects = [""] + sorted(glob.glob(pathpattern))
         if self.default in self.objects:
             return
         self.default = self.objects[0] if self.objects else None
