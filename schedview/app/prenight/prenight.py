@@ -1126,15 +1126,16 @@ def main():
         return prenight_app(**prenight_app_parameters)
 
     pn.serve(
-        {"schedview-prenight": prenight_app_with_params},
+        prenight_app_with_params,
         port=prenight_port,
         title="Prenight Dashboard",
         show=show,
+        prefix="/schedview-prenight",
         start=True,
         autoreload=True,
         threaded=True,
         admin=True,
-        profiler=True,
+        profiler=False,
     )
 
 
