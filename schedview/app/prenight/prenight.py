@@ -1091,6 +1091,7 @@ def parse_prenight_args():
 
 def main():
     print("Starting prenight dashboard")
+    print(f'BOKEH_ALLOW_WS_ORIGIN: {os.environ.get("BOKEH_ALLOW_WS_ORIGIN")}')
 
     prenight_app_parameters = parse_prenight_args()
 
