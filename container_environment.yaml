@@ -16,3 +16,4 @@ dependencies:
  - param
  - git
  - pip
+ - wget
