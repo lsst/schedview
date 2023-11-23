@@ -1,4 +1,4 @@
 holoviews
 hvplot
-rubin-sim
+rubin-scheduler
 uranography

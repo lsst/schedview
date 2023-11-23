@@ -2,9 +2,9 @@ import unittest
 from collections import OrderedDict
 
 import pandas as pd
-from rubin_sim.scheduler.example import example_scheduler
-from rubin_sim.scheduler.model_observatory import ModelObservatory
-from rubin_sim.utils import survey_start_mjd
+from rubin_scheduler.scheduler.example import example_scheduler
+from rubin_scheduler.scheduler.model_observatory import ModelObservatory
+from rubin_scheduler.utils import survey_start_mjd
 
 from schedview.compute.survey import compute_maps, make_survey_reward_df
 

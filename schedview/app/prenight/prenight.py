@@ -14,10 +14,10 @@ import numpy as np
 import pandas as pd
 import panel as pn
 import param
-import rubin_sim.scheduler.example
+import rubin_scheduler.scheduler.example
 from astropy.time import Time
-from rubin_sim.scheduler.model_observatory import ModelObservatory
-from rubin_sim.utils import survey_start_mjd
+from rubin_scheduler.scheduler.model_observatory import ModelObservatory
+from rubin_scheduler.utils import survey_start_mjd
 
 import schedview.collect.footprint
 import schedview.collect.opsim
@@ -97,10 +97,10 @@ class Prenight(param.Parameterized):
 
     scheduler_fname_doc = """URL or file name of the scheduler pickle file.
 Such a pickle file can either be of an instance of a subclass of
-rubin_sim.scheduler.schedulers.CoreScheduler, or a tuple of the form
+rubin_scheduler.scheduler.schedulers.CoreScheduler, or a tuple of the form
 (scheduler, conditions), where scheduler is an instance of a subclass of
-rubin_sim.scheduler.schedulers.CoreScheduler, and conditions is an
-instance of rubin_sim.scheduler.conditions.Conditions."""
+rubin_scheduler.scheduler.schedulers.CoreScheduler, and conditions is an
+instance of rubin_scheduler.scheduler.conditions.Conditions."""
     scheduler_fname = param.String(
         doc=scheduler_fname_doc,
         label="URL or file name of scheduler pickle file",
@@ -170,12 +170,12 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
     # and communication overhead is reduced.
     _visits_cds = param.Parameter()
 
-    # An instance of rubin_sim.scheduler.schedulers.CoreScheduler
+    # An instance of rubin_scheduler.scheduler.schedulers.CoreScheduler
     _scheduler = param.Parameter()
 
     _almanac_events = schedview.param.DataFrame(
         None,
-        doc="Events from the rubin_sim alamanc",
+        doc="Events from the rubin_scheduler alamanc",
         columns={"MJD": float, "LST": float, "UTC": pd.Timestamp},
     )
 
@@ -437,7 +437,7 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             self.logger.error(f"Could not load scheduler from {self.scheduler_fname} {e}")
             if USE_EXAMPLE_SCHEDULER:
                 self.logger.info("Starting to load example scheduler.")
-                self._scheduler = rubin_sim.scheduler.example.example_scheduler(nside=self._nside)
+                self._scheduler = rubin_scheduler.scheduler.example.example_scheduler(nside=self._nside)
                 self.logger.info("Finished loading example scheduler.")
 
     @param.depends(

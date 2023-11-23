@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 import pytz
 from astropy.time import Time
-from rubin_sim.scheduler.model_observatory import ModelObservatory
-from rubin_sim.site_models.almanac import Almanac
+from rubin_scheduler.scheduler.model_observatory import ModelObservatory
+from rubin_scheduler.site_models.almanac import Almanac
 
 
 @cache

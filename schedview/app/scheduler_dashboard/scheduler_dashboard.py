@@ -39,7 +39,7 @@ import bokeh
 import numpy as np
 import panel as pn
 import param
-import rubin_sim.site_models
+import rubin_scheduler.site_models
 from astropy.time import Time
 from astropy.utils.exceptions import AstropyWarning
 from bokeh.models import ColorBar, LinearColorMapper
@@ -49,7 +49,7 @@ from panel.io.loading import start_loading_spinner, stop_loading_spinner
 from pytz import timezone
 
 # For the conditions.mjd bugfix
-from rubin_sim.scheduler.model_observatory import ModelObservatory
+from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 
 import schedview
 import schedview.collect.scheduler_pickle
@@ -116,10 +116,10 @@ class Scheduler(param.Parameterized):
     # Param parameters that are modifiable by user actions.
     scheduler_fname_doc = """URL or file name of the scheduler pickle file.
     Such a pickle file can either be of an instance of a subclass of
-    rubin_sim.scheduler.schedulers.CoreScheduler, or a tuple of the form
+    rubin_scheduler.scheduler.schedulers.CoreScheduler, or a tuple of the form
     (scheduler, conditions), where scheduler is an instance of a subclass of
-    rubin_sim.scheduler.schedulers.CoreScheduler, and conditions is an
-    instance of rubin_sim.scheduler.conditions.Conditions.
+    rubin_scheduler.scheduler.schedulers.CoreScheduler, and conditions is an
+    instance of rubin_scheduler.scheduler.conditions.Conditions.
     """
     scheduler_fname = param.String(
         default="",
@@ -582,12 +582,12 @@ class Scheduler(param.Parameterized):
                 or self._model_observatory.nside != self._scheduler.nside
             ):
                 # Get weather conditions from pickle.
-                wind_data = rubin_sim.site_models.ConstantWindData(
+                wind_data = rubin_scheduler.site_models.ConstantWindData(
                     wind_speed=self._conditions.wind_speed,
                     wind_direction=self._conditions.wind_direction,
                 )
                 # Set seeing to fiducial site seeing.
-                seeing_data = rubin_sim.site_models.ConstantSeeingData(0.69)
+                seeing_data = rubin_scheduler.site_models.ConstantSeeingData(0.69)
                 # Create new MO instance.
                 self._model_observatory = ModelObservatory(
                     nside=self._scheduler.nside,
@@ -1294,10 +1294,10 @@ class RestrictedFilesScheduler(Scheduler):
     # Param parameters that are modifiable by user actions.
     scheduler_fname_doc = """URL or file name of the scheduler pickle file.
     Such a pickle file can either be of an instance of a subclass of
-    rubin_sim.scheduler.schedulers.CoreScheduler, or a tuple of the form
+    rubin_scheduler.scheduler.schedulers.CoreScheduler, or a tuple of the form
     (scheduler, conditions), where scheduler is an instance of a subclass of
-    rubin_sim.scheduler.schedulers.CoreScheduler, and conditions is an
-    instance of rubin_sim.scheduler.conditions.Conditions.
+    rubin_scheduler.scheduler.schedulers.CoreScheduler, and conditions is an
+    instance of rubin_scheduler.scheduler.conditions.Conditions.
     """
     scheduler_fname = schedview.param.FileSelectorWithEmptyOption(
         path=f"{PACKAGE_DATA_DIR}/*scheduler*.p*",

@@ -5,8 +5,8 @@ import pandas as pd
 from astropy.time import Time
 
 # Imported to help sphinx make the link
-from rubin_sim.scheduler.model_observatory.model_observatory import ModelObservatory
-from rubin_sim.scheduler.schedulers import CoreScheduler  # noqa F401
+from rubin_scheduler.scheduler.model_observatory.model_observatory import ModelObservatory
+from rubin_scheduler.scheduler.schedulers import CoreScheduler  # noqa F401
 from uranography.api import ArmillarySphere, Planisphere, split_healpix_by_resolution
 
 import schedview.collect.scheduler_pickle
@@ -56,7 +56,7 @@ def plot_visit_skymaps(
 
     footprint : `numpy.array`
         A healpix map of the footprint.
-    conditions : `rubin_sim.scheduler.features.conditions.Conditions`
+    conditions : `rubin_scheduler.scheduler.features.conditions.Conditions`
         The conditions for the night, which determines the start and end
         times covered by the map.
     hatch : `bool`
@@ -263,7 +263,7 @@ def plot_visit_planisphere(
 
     footprint : `numpy.array`
         A healpix map of the footprint.
-    conditions : `rubin_sim.scheduler.features.conditions.Conditions`
+    conditions : `rubin_scheduler.scheduler.features.conditions.Conditions`
         The conditions for the night, which determines the start and end
         times covered by the map.
     hatch : `bool`
