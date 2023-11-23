@@ -20,8 +20,3 @@ def start_app(app_name):
 def sched_maps():
     """Start the sched_maps app."""
     start_app("sched_maps")
-
-
-def metric_maps():
-    """Start the metric_maps app."""
-    start_app("metric_maps")
