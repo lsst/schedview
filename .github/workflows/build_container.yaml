@@ -1,4 +1,4 @@
-name: build docker image
+name: Build docker image
 
 "on":
   workflow_dispatch:
@@ -8,20 +8,16 @@ name: build docker image
 jobs:
   build:
     runs-on: ubuntu-latest
-
     # See https://lsstc.slack.com/archives/C2JP8GGVC/p1698782669757349?thread_ts=1698779230.846079&cid=C2JP8GGVC
     permissions:
       contents: read
       packages: write
 
     steps:
-      - uses: actions/checkout@v3
-
-      # We need to install schedview in this workflow to get the data
-      # for rubin_sim, as download by rs_download_data or cached by github.
+      - uses: actions/checkout@v4
       - uses: conda-incubator/setup-miniconda@v2
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.11"
           auto-update-conda: true
           channels: conda-forge,defaults
           miniforge-variant: Mambaforge
@@ -64,11 +60,20 @@ jobs:
           echo github.workspace is ${{ github.workspace }}
           find ${{ github.workspace }} -maxdepth 2
 
-      - uses: lsst-sqre/build-and-push-to-ghcr@v1
+      - uses: lsst-sqre/build-and-push-to-ghcr@tickets/DM-41857
         id: build
         with:
           image: ${{ github.repository }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           dockerfile: Dockerfile
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
 
       - run: echo Pushed ghcr.io/${{ github.repository }}:${{ steps.build.outputs.tag }}
+
+
+
+
+
+
+
