@@ -4,7 +4,7 @@ from inspect import getmembers
 
 import healpy as hp
 import numpy as np
-import rubin_sim.scheduler.basis_functions
+import rubin_scheduler.scheduler.basis_functions
 
 
 def make_survey_reward_df(survey, conditions, reward_df=None):
@@ -12,9 +12,9 @@ def make_survey_reward_df(survey, conditions, reward_df=None):
 
     Parameters
     ----------
-    survey : `rubin_sim.scheduler.surveys.BaseSurvey`
+    survey : `rubin_scheduler.scheduler.surveys.BaseSurvey`
         The survey to summarize.
-    conditions : `rubin_sim.scheduler.features.conditions.Conditions`
+    conditions : `rubin_scheduler.scheduler.features.Conditions`
         The conditions to use for the summary.
     reward_df : `pandas.DataFrame`, optional
         A dataframe with the columns "basis_function", "basis_function_class",
@@ -84,9 +84,9 @@ def compute_maps(survey, conditions, nside=None):
 
     Parameters
     ----------
-    survey : `rubin_sim.scheduler.surveys.BaseSurvey`
+    survey : `rubin_scheduler.scheduler.surveys.BaseSurvey`
         The survey to summarize.
-    conditions : `rubin_sim.scheduler.features.conditions.Conditions`
+    conditions : `rubin_scheduler.scheduler.features.Conditions`
         The conditions to use for the summary.
     nside : int, optional
         The nside to use for the returned healpix maps. If not provided, the

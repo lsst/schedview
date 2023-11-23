@@ -5,8 +5,8 @@ from tempfile import TemporaryDirectory
 
 import bokeh
 import pandas as pd
-from rubin_sim.scheduler.model_observatory import ModelObservatory
-from rubin_sim.scheduler.utils import SchemaConverter
+from rubin_scheduler.scheduler.model_observatory import ModelObservatory
+from rubin_scheduler.scheduler.utils import SchemaConverter
 
 import schedview
 import schedview.plot.nightly

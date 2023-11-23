@@ -3,8 +3,8 @@ import re
 import astropy
 import bokeh
 import numpy as np
-import rubin_sim.scheduler.features.conditions
-import rubin_sim.scheduler.surveys  # noqa: F401
+import rubin_scheduler.scheduler.features
+import rubin_scheduler.scheduler.surveys  # noqa: F401
 from astropy.time import Time
 from uranography.api import HorizonMap, make_zscale_linear_cmap
 
@@ -45,11 +45,11 @@ def map_survey_healpix(
         The scale to use for the cmap.  Defaults to "full", which uses the full
         range of values in the healpix map.  Alternatively, "zscale" can be
         used to use a zscale cmap.
-    conditions : `rubin_sim.scheduler.features.conditions.Conditions`, optional
+    conditions : `rubin_scheduler.scheduler.features.Conditions`, optional
         Default is None.
         The observing conditions at which to map the survey, used to determine
         telescope pointing. If None, do not mark telescope pointing.
-    survey : `rubin_sim.scheduler.surveys.BaseSurvey`, optional
+    survey : `rubin_scheduler.scheduler.surveys.BaseSurvey`, optional
         Default is None.
         The survey with fields to mark on the map.
         If None or an unsuitable survey type, do not mark survey fields.

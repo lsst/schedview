@@ -2,7 +2,7 @@ import unittest
 
 import healpy as hp
 import numpy as np
-from rubin_sim.utils import survey_start_mjd
+from rubin_scheduler.utils import survey_start_mjd
 from uranography.api import SphereMap
 
 from schedview.plot.survey import map_survey_healpix

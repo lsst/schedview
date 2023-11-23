@@ -12,7 +12,7 @@ import astropy.units as u
 from astropy.time import Time, TimeDelta
 from lsst.resources import ResourcePath
 from lsst_efd_client import EfdClient
-from rubin_sim.utils import Site
+from rubin_scheduler.utils import Site
 
 LOCAL_ROOT_URI = {"usdf": "s3://rubin:", "summit": "https://s3.cp.lsst.org/"}
 

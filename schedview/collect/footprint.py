@@ -1,5 +1,5 @@
 import numpy as np
-from rubin_sim.scheduler.utils.sky_area import SkyAreaGenerator
+from rubin_scheduler.scheduler.utils.sky_area import EuclidOverlapFootprint
 
 
 def get_footprint(scheduler=None):
@@ -25,7 +25,8 @@ def get_footprint(scheduler=None):
                                 footprint += np.sum(basis_function.footprint.footprints, axis=0)
 
     if footprint is None:
-        sky_area_generator = SkyAreaGenerator(nside=nside)
+        # Load up a default footprint from rubin_scheduler
+        sky_area_generator = EuclidOverlapFootprint(nside=nside)
         band_footprints, _ = sky_area_generator.return_maps()
         footprint = np.sum(band_footprints[b] for b in band_footprints.dtype.fields.keys())
 

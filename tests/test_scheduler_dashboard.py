@@ -8,17 +8,17 @@ from zoneinfo import ZoneInfo
 import bokeh.io
 import bokeh.plotting
 import pandas as pd
-import rubin_sim.site_models
+import rubin_scheduler.site_models
 from astropy.time import Time
 from pandas import Timestamp
 from panel.widgets import Tabulator
-from rubin_sim.scheduler.example import example_scheduler
-from rubin_sim.scheduler.features.conditions import Conditions
-from rubin_sim.scheduler.model_observatory import ModelObservatory
+from rubin_scheduler.scheduler.example import example_scheduler
+from rubin_scheduler.scheduler.features.conditions import Conditions
+from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 
 # Objects to test instances against
-from rubin_sim.scheduler.schedulers.core_scheduler import CoreScheduler
-from rubin_sim.utils import survey_start_mjd
+from rubin_scheduler.scheduler.schedulers.core_scheduler import CoreScheduler
+from rubin_scheduler.utils import survey_start_mjd
 
 import schedview
 from schedview.app.scheduler_dashboard.scheduler_dashboard import Scheduler, scheduler_app
@@ -136,13 +136,13 @@ class TestSchedulerDashboard(unittest.TestCase):
         wind_speed = 4
         wind_direction = 25
         fiducial_seeing = 0.69
-        wind_data = rubin_sim.site_models.ConstantWindData(
+        wind_data = rubin_scheduler.site_models.ConstantWindData(
             wind_speed=wind_speed,
             wind_direction=wind_direction,
         )
-        seeing_data = rubin_sim.site_models.ConstantSeeingData(fiducial_seeing)
-        self.assertIsInstance(wind_data, rubin_sim.site_models.ConstantWindData)
-        self.assertIsInstance(seeing_data, rubin_sim.site_models.ConstantSeeingData)
+        seeing_data = rubin_scheduler.site_models.ConstantSeeingData(fiducial_seeing)
+        self.assertIsInstance(wind_data, rubin_scheduler.site_models.ConstantWindData)
+        self.assertIsInstance(seeing_data, rubin_scheduler.site_models.ConstantSeeingData)
         self.assertEqual(wind_data.wind_speed, wind_speed)
         self.assertEqual(wind_data.wind_direction, wind_direction)
         self.assertEqual(seeing_data.fwhm_500, fiducial_seeing)

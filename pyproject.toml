@@ -22,31 +22,33 @@ classifiers = [
 urls = {documentation = "https://schedview.lsst.io", repository = "https://github.com/lsst/schedview"}
 dynamic = [ "version" ]
 dependencies = [
-    "numpy",
-    "pandas",
-    "pytz",
-    "param",
+    "astropy >= 5.3",
+    "colorcet",
+    "bokeh >= 3.1.1",
+    "healpy",
     "holoviews",
     "hvplot",
-    "astropy >= 5.3",
-    "healpy",
-    "uranography >= 1.1.0 ",
-    "rubin-sim < 2",
-    "bokeh >= 3.1.1",
+    "numpy",
+    "pandas",
     "panel >= 1.1.0",
-    "colorcet",
+    "param",
+    "pytz",
+    "rubin-scheduler",
+    "uranography >= 1.1.0 ",
 ]
 
 [project.optional-dependencies]
 test = [
     "pytest",
     "black",
+    "isort",
     "ruff",
     "pytest-cov",
     "pytest-black",
+    "geckodriver"
 ]
 dev = [
-  "documenteer[pipelines]",
+  "documenteer[guide]",
 ]
 
 [project.scripts]
