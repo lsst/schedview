@@ -97,7 +97,7 @@ def localize_scheduler_url(scheduler_url, site="usdf"):
     scheduler_url : `str`
         The localized URL of the scheduler.
     """
-    # If we don't have a cannonical root for the site, just return
+    # If we don't have a canonical root for the site, just return
     # the original
     if site not in LOCAL_ROOT_URI:
         return scheduler_url
@@ -132,7 +132,6 @@ def get_scheduler(scheduler_url, destination=None):
     This function sets the environment variable
     `LSST_DISABLE_BUCKET_VALIDATION` to "1".
     """
-
     os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
     scheduler_resource_path = ResourcePath(scheduler_url)
     scheduler_pickle_bytes = scheduler_resource_path.read()
@@ -182,7 +181,10 @@ async def get_scheduler_at_time(desired_time, destination=None, efd="usdf_efd"):
         Otherwise, the file path of the saved scheduler is returned.
     """
     these_scheduler_references = await query_schedulers_in_window(desired_time, efd)
-    this_url = these_scheduler_references.url[0]
+    if len(these_scheduler_references) == 0:
+        print(f"No scheduler snapshots found at {desired_time}")
+        return None
+    this_url = these_scheduler_references.url.iloc[0]
     site = efd.removesuffix("_efd")
     this_url = localize_scheduler_url(this_url, site=site)
     result = get_scheduler(this_url, destination)
@@ -210,6 +212,9 @@ async def get_scheduler_on_night(night, row_number, destination, efd="usdf_efd")
         The scheduler for the given night.
     """
     these_scheduler_references = await query_night_schedulers(night, efd=efd)
+    if len(these_scheduler_references) == 0:
+        print(f"No scheduler snapshots found on night {night}")
+        return None
     this_url = these_scheduler_references.url.iloc[row_number]
     site = efd.removesuffix("_efd")
     this_url = localize_scheduler_url(this_url, site=site)
