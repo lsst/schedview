@@ -3,10 +3,10 @@ import pickle
 import unittest
 from tempfile import TemporaryDirectory
 
-from rubin_sim.scheduler.example import example_scheduler
-from rubin_sim.scheduler.features.conditions import Conditions
-from rubin_sim.scheduler.schedulers.core_scheduler import CoreScheduler
-from rubin_sim.utils import survey_start_mjd
+from rubin_scheduler.scheduler.example import example_scheduler
+from rubin_scheduler.scheduler.features.conditions import Conditions
+from rubin_scheduler.scheduler.schedulers.core_scheduler import CoreScheduler
+from rubin_scheduler.utils import survey_start_mjd
 
 from schedview.collect.scheduler_pickle import read_scheduler
 

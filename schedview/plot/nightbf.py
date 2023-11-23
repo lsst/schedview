@@ -3,7 +3,7 @@ import itertools
 import bokeh
 import numpy as np
 from astropy.time import Time
-from rubin_sim.scheduler.model_observatory import ModelObservatory
+from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 
 
 def _extract_night(df, mjd_column, night, observatory=None):

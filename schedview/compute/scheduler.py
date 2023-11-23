@@ -9,10 +9,10 @@ import numpy as np
 import pandas as pd
 from astropy.time import Time
 from astropy.timeseries import TimeSeries
-from rubin_sim.scheduler import sim_runner, surveys
-from rubin_sim.scheduler.example import example_scheduler
-from rubin_sim.scheduler.model_observatory import ModelObservatory
-from rubin_sim.scheduler.utils import SchemaConverter, empty_observation
+from rubin_scheduler.scheduler import sim_runner, surveys
+from rubin_scheduler.scheduler.example import example_scheduler
+from rubin_scheduler.scheduler.model_observatory import ModelObservatory
+from rubin_scheduler.scheduler.utils import SchemaConverter, empty_observation
 
 
 def _make_observation_from_record(record):
@@ -80,7 +80,7 @@ def replay_visits(scheduler, visits):
 
     Parameters
     ----------
-    scheduler : `rubin_sim.scheduler.CoreScheduler`
+    scheduler : `rubin_scheduler.scheduler.CoreScheduler`
         An instance of the scheduler to update
     visits : `pandas.DataFrame`
         A table of visits to add.
@@ -218,11 +218,11 @@ def create_example(
 
     Returns
     -------
-    scheduler : `rubin_sim.scheduler.schedulers.CoreScheduler`
+    scheduler : `rubin_scheduler.scheduler.schedulers.CoreScheduler`
         The scheduler instance.
-    observatory : `rubin_sim.models.ModelObservatory`
+    observatory : `rubin_scheduler.models.ModelObservatory`
         The observatory instance.
-    conditions : `rubin_sim.scheduler.utils.observatory.ObservingConditions`
+    conditions : `rubin_scheduler.scheduler.features.Conditions`
         The conditions at the current time.
     observations : `pd.DataFrame`
         The observations from the simulation.
@@ -292,7 +292,7 @@ def make_unique_survey_name(scheduler, survey_index=None):
 
     Parameters
     ----------
-    scheduler : `rubin_sim.scheduler.schedulers.CoreScheduler`
+    scheduler : `rubin_scheduler.scheduler.schedulers.CoreScheduler`
         The scheduler instance.
     survey_index : `list` of `int`
         The index of the survey to name. If None, use the current survey.
@@ -333,9 +333,9 @@ def make_scheduler_summary_df(scheduler, conditions, reward_df=None):
 
     Parameters
     ----------
-    scheduler : `rubin_sim.scheduler.schedulers.CoreScheduler`
+    scheduler : `rubin_scheduler.scheduler.schedulers.CoreScheduler`
         The scheduler instance.
-    conditions : `rubin_sim.scheduler.features.conditions.Conditions`
+    conditions : `rubin_scheduler.scheduler.features.conditions.Conditions`
         The conditions for which to summarize the reward.
     reward_df : `pandas.DataFrame`
         The table with rewards for each survey. If None, calculate it.
