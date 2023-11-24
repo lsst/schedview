@@ -6,7 +6,7 @@ name: Build docker image
 # Follows https://github.com/lsst-sqre/build-and-push-to-ghcr
 
 jobs:
-  build:
+  build_container:
     runs-on: ubuntu-latest
     # See https://lsstc.slack.com/archives/C2JP8GGVC/p1698782669757349?thread_ts=1698779230.846079&cid=C2JP8GGVC
     permissions:
@@ -25,7 +25,7 @@ jobs:
           channel-priority: strict
           show-channel-urls: true
 
-      - name: configure conda and install requirements
+      - name: Configure conda and install requirements
         id: rs-install
         shell: bash -l {0}
         run: |
@@ -52,7 +52,7 @@ jobs:
           export RUBIN_SIM_DATA_DIR=~/rubin_sim_data
           scheduler_download_data --update --tdqm_disable
 
-      - name: report environment
+      - name: Report environment
         shell: bash -l {0}
         run: |
           echo pwd is `pwd`
@@ -69,7 +69,12 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
 
-      - run: echo Pushed ghcr.io/${{ github.repository }}:${{ steps.build.outputs.tag }}
+      - name: Report build outputs
+        shell: bash -l {0}
+        run: |
+          echo Pushed ghcr.io/${{ github.repository }}:${{ steps.build.outputs.tag }}
+          echo Fully qualified image digest: ${{ steps.build.outputs.fully_qualified_image_digest }}
+          echo Tag of the image: ${{ steps.build.outputs.tag }}
 
 
 
