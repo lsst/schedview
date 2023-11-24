@@ -23,7 +23,7 @@ jobs:
           channel-priority: strict
           show-channel-urls: true
 
-      - name: configure and install requirements and documenteer
+      - name: Configure and install requirements and documenteer
         shell: bash -l {0}
         run: |
           conda config --set always_yes yes
@@ -31,24 +31,24 @@ jobs:
           conda install --quiet pip
           pip install "documenteer[guide]"
 
-      - name: install schedview
+      - name: Install schedview
         shell: bash -l {0}
         run: |
           echo `pwd`
           python -m pip install .
 
-      - name: check conda and documenteer
+      - name: Check conda and documenteer
         shell: bash -l {0}
         run: |
           conda list
 
-      - name: build docs
+      - name: Build docs
         shell: bash -l {0}
         run: |
           cd docs
           package-docs build
 
-      - name: upload documentation
+      - name: Upload documentation
         uses: lsst-sqre/ltd-upload@v1
         with:
           project: "schedview"
