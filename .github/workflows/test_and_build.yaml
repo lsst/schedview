@@ -36,7 +36,7 @@ jobs:
           channel-priority: strict
           show-channel-urls: true
 
-      - name: configure conda and install requirements
+      - name: Configure conda and install requirements
         id: rs-install
         shell: bash -l {0}
         run: |
@@ -63,17 +63,17 @@ jobs:
           export RUBIN_SIM_DATA_DIR=~/rubin_sim_data
           scheduler_download_data --update --tdqm_disable
 
-      - name: install schedview
+      - name: Install schedview
         shell: bash -l {0}
         run: |
           echo `pwd`
           python -m pip install . --no-deps
 
-      - name: conda list
+      - name: Conda list
         shell: bash -l {0}
         run: conda list
 
-      - name: run unit tests
+      - name: Run unit tests
         shell: bash -l {0}
         run: |
           export RUBIN_SIM_DATA_DIR=~/rubin_sim_data
