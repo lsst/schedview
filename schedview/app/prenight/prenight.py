@@ -1091,6 +1091,7 @@ def parse_prenight_args():
 
 def main():
     print("Starting prenight dashboard")
+    print(f'BOKEH_ALLOW_WS_ORIGIN: {os.environ.get("BOKEH_ALLOW_WS_ORIGIN")}')
 
     prenight_app_parameters = parse_prenight_args()
 
@@ -1124,16 +1125,21 @@ def main():
     def prenight_app_with_params():
         return prenight_app(**prenight_app_parameters)
 
+    app_dict = {"dashboard": prenight_app_with_params}
+    prefix = "/schedview-prenight"
+    print(f"prefix: {prefix}, app_dict keys = {list(app_dict.keys())}")
+
     pn.serve(
-        {"schedview-prenight": prenight_app_with_params},
+        app_dict,
         port=prenight_port,
         title="Prenight Dashboard",
         show=show,
+        prefix=prefix,
         start=True,
         autoreload=True,
         threaded=True,
         admin=True,
-        profiler=True,
+        profiler=False,
     )
 
 
