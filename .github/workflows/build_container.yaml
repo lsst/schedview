@@ -33,7 +33,7 @@ jobs:
           mamba install --quiet --file=test-requirements.txt
           mamba list rubin-scheduler | grep -v "#" | awk '{print $2}' > ${{ github.workspace }}/rs_version
           echo "rs-version" `cat ${{ github.workspace }}/rs_version`
-          echo "rs-version=`cat ${{ github.workspace }}/rs_version`" >> $GITHUB_OUTPUT   
+          echo "rs-version=`cat ${{ github.workspace }}/rs_version`" >> $GITHUB_OUTPUT
 
       - name: Access rubin-sched-data cache
         id: cache-rs
@@ -58,6 +58,7 @@ jobs:
           echo pwd is `pwd`
           echo python is `which python`
           echo github.workspace is ${{ github.workspace }}
+          echo RUBIN_SIM_DATA_DIR is `readlink -f ~/rubin_sim_data`
           find ${{ github.workspace }} -maxdepth 2
 
       - uses: lsst-sqre/build-and-push-to-ghcr@tickets/DM-41857
@@ -75,10 +76,3 @@ jobs:
           echo Pushed ghcr.io/${{ github.repository }}:${{ steps.build.outputs.tag }}
           echo Fully qualified image digest: ${{ steps.build.outputs.fully_qualified_image_digest }}
           echo Tag of the image: ${{ steps.build.outputs.tag }}
-
-
-
-
-
-
-
