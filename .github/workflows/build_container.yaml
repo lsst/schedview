@@ -41,7 +41,7 @@ jobs:
         env:
           cache-name: cached-rubin-sched-data
         with:
-          path: /tmp/rubin_sim_data
+          path: ~/rubin_sim_data
           key: ${{ env.cache-name }}-v${{ steps.rs-install.outputs.rs-version }}
           restore-keys: |
             ${{ env.cache-name }}-v
@@ -49,8 +49,9 @@ jobs:
       - name: Check and update cache contents.
         shell: bash -l {0}
         run: |
-          export RUBIN_SIM_DATA_DIR=/tmp/rubin_sim_data
+          export RUBIN_SIM_DATA_DIR=~/rubin_sim_data
           scheduler_download_data --update --tdqm_disable
+          cp -r ~/rubin_sim_data ${{ github.workspace }}/rubin_sim_data
 
       - name: Report environment
         shell: bash -l {0}
@@ -58,7 +59,6 @@ jobs:
           echo pwd is `pwd`
           echo python is `which python`
           echo github.workspace is ${{ github.workspace }}
-          echo RUBIN_SIM_DATA_DIR is `readlink -f /tmp/rubin_sim_data`
           find ${{ github.workspace }} -maxdepth 2
 
       - uses: lsst-sqre/build-and-push-to-ghcr@tickets/DM-41857
