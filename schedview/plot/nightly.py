@@ -274,7 +274,19 @@ def plot_alt_vs_time(
     else:
         visits_ds = bokeh.models.ColumnDataSource(visits)
 
-    ha_color_mapper = bokeh.models.LinearColorMapper(low=-5, high=5, palette=colorcet.palette["bkr"])
+    note_values = np.unique(visits_ds.data["note"])
+    too_many_note_values = len(note_values) > len(colorcet.palette["glasbey"])
+
+    if not too_many_note_values:
+        note_color_mapper = bokeh.models.CategoricalColorMapper(
+            factors=note_values, palette=colorcet.palette["glasbey"][: len(note_values)], name="note"
+        )
+
+        if "note_and_filter" not in visits_ds.column_names:
+            note_and_filter = tuple(
+                [f"{n} in {f}" for n, f in zip(visits_ds.data["note"], visits_ds.data["filter"])]
+            )
+            visits_ds.add(note_and_filter, "note_and_filter")
 
     filter_marker_mapper = bokeh.models.CategoricalMarkerMapper(
         factors=tuple(band_shapes.keys()),
@@ -283,16 +295,27 @@ def plot_alt_vs_time(
     )
 
     fig.line("start_date", "altitude", source=visits_ds, color="gray")
-    fig.scatter(
-        "start_date",
-        "altitude",
-        source=visits_ds,
-        color={"field": "HA_hours", "transform": ha_color_mapper},
-        marker={"field": "filter", "transform": filter_marker_mapper},
-        size=5,
-        legend_field="filter",
-        name="visit_altitude",
-    )
+    if too_many_note_values:
+        fig.scatter(
+            "start_date",
+            "altitude",
+            source=visits_ds,
+            marker={"field": "filter", "transform": filter_marker_mapper},
+            size=5,
+            legend_field="filter",
+            name="visit_altitude",
+        )
+    else:
+        fig.scatter(
+            "start_date",
+            "altitude",
+            source=visits_ds,
+            color={"field": "note", "transform": note_color_mapper},
+            marker={"field": "filter", "transform": filter_marker_mapper},
+            size=5,
+            legend_field="note_and_filter",
+            name="visit_altitude",
+        )
 
     hover_tool = bokeh.models.HoverTool()
     hover_tool.renderers = fig.select({"name": "visit_altitude"})
@@ -304,10 +327,6 @@ def plot_alt_vs_time(
     fig.xaxis[0].ticker = bokeh.models.DatetimeTicker()
     fig.xaxis[0].formatter = bokeh.models.DatetimeTickFormatter(hours="%H:%M")
 
-    color_bar = bokeh.models.ColorBar(
-        color_mapper=ha_color_mapper, width=8, location=(0, 0), title="H.A. (hours)"
-    )
-    fig.add_layout(color_bar, "left")
     fig.add_layout(fig.legend[0], "left")
 
     fig.yaxis[0].ticker.desired_num_ticks = 10
@@ -460,7 +479,19 @@ def plot_polar_alt_az(visits, band_shapes=BAND_SHAPES, figure=None, legend=True)
     if "zd" not in visits_ds.column_names:
         visits_ds.add(90 - np.array(visits_ds.data["altitude"]), "zd")
 
-    ha_color_mapper = bokeh.models.LinearColorMapper(low=-5, high=5, palette=colorcet.palette["bkr"])
+    note_values = np.unique(visits_ds.data["note"])
+    too_many_note_values = len(note_values) > len(colorcet.palette["glasbey"])
+
+    if not too_many_note_values:
+        note_color_mapper = bokeh.models.CategoricalColorMapper(
+            factors=note_values, palette=colorcet.palette["glasbey"][: len(note_values)], name="note"
+        )
+
+        if "note_and_filter" not in visits_ds.column_names:
+            note_and_filter = tuple(
+                [f"{n} in {f}" for n, f in zip(visits_ds.data["note"], visits_ds.data["filter"])]
+            )
+            visits_ds.add(note_and_filter, "note_and_filter")
 
     filter_marker_mapper = bokeh.models.CategoricalMarkerMapper(
         factors=tuple(band_shapes.keys()),
@@ -473,16 +504,27 @@ def plot_polar_alt_az(visits, band_shapes=BAND_SHAPES, figure=None, legend=True)
     )
 
     fig.line(polar_transform.y, polar_transform.x, source=visits_ds, color="gray")
-    fig.scatter(
-        polar_transform.y,
-        polar_transform.x,
-        source=visits_ds,
-        color={"field": "HA_hours", "transform": ha_color_mapper},
-        marker={"field": "filter", "transform": filter_marker_mapper},
-        size=5,
-        legend_field="filter",
-        name="visit_altitude",
-    )
+    if too_many_note_values:
+        fig.scatter(
+            polar_transform.y,
+            polar_transform.x,
+            source=visits_ds,
+            marker={"field": "filter", "transform": filter_marker_mapper},
+            size=5,
+            legend_field="filter",
+            name="visit_altitude",
+        )
+    else:
+        fig.scatter(
+            polar_transform.y,
+            polar_transform.x,
+            source=visits_ds,
+            color={"field": "note", "transform": note_color_mapper},
+            marker={"field": "filter", "transform": filter_marker_mapper},
+            size=5,
+            legend_field="note_and_filter",
+            name="visit_altitude",
+        )
 
     _add_alt_graticules(fig, polar_transform)
     _add_az_graticules(fig, polar_transform)
@@ -493,11 +535,7 @@ def plot_polar_alt_az(visits, band_shapes=BAND_SHAPES, figure=None, legend=True)
     hover_tool.formatters = {"@start_date": "datetime"}
     fig.add_tools(hover_tool)
 
-    color_bar = bokeh.models.ColorBar(
-        color_mapper=ha_color_mapper, width=8, location=(0, 0), title="H.A. (hours)"
-    )
     if legend:
-        fig.add_layout(color_bar, "left")
         fig.add_layout(fig.legend[0], "left")
     else:
         fig.legend.visible = False
