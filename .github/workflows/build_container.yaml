@@ -51,6 +51,8 @@ jobs:
         run: |
           export RUBIN_SIM_DATA_DIR=~/rubin_sim_data
           scheduler_download_data --update --tdqm_disable
+          # Docker image copies from github.workspace, not ~
+          mv -r ~/rubin_sim_data ${{ github.workspace }}/rubin_sim_data
 
       - name: Report environment
         shell: bash -l {0}
