@@ -1703,11 +1703,16 @@ def main():
     def scheduler_app_with_params():
         return scheduler_app(**commandline_args)
 
+    app_dict = {"dashboard": scheduler_app_with_params}
+    prefix = "/schedview-snapshot"
+    print(f"prefix: {prefix}, app_dict keys = {list(app_dict.keys())}")
+
     pn.serve(
-        scheduler_app_with_params,
+        app_dict,
         port=scheduler_port,
         title="Scheduler Dashboard",
-        show=True,
+        show=False,
+        prefix=prefix,
         start=True,
         autoreload=True,
         threaded=True,
