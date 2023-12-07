@@ -74,14 +74,12 @@ class Prenight(param.Parameterized):
     shown_tabs = param.ListSelector(
         default=[
             "Azimuth and altitude",
-            "Airmass vs. time",
             "Sky maps",
             "Table of visits",
             "Reward plots",
         ],
         objects=[
             "Azimuth and altitude",
-            "Airmass vs. time",
             "Sky maps",
             "Table of visits",
             "Reward plots",
@@ -247,7 +245,6 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
 
         new_objects = [
             "Azimuth and altitude",
-            "Airmass vs. time",
             "Sky maps",
             "Table of visits",
             "Reward plots",
@@ -439,41 +436,6 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                 self.logger.info("Starting to load example scheduler.")
                 self._scheduler = rubin_sim.scheduler.example.example_scheduler(nside=self._nside)
                 self.logger.info("Finished loading example scheduler.")
-
-    @param.depends(
-        "_visits_cds",
-        "_almanac_events",
-    )
-    def airmass_vs_time(self):
-        """Create a plot of airmass vs. time.
-
-        Returns
-        -------
-        fig : `bokeh.plotting.Figure`
-            The bokeh figure.
-        """
-        if self._visits is None:
-            return "No visits loaded"
-
-        if self._almanac_events is None:
-            return "Almanac events not computed yet."
-
-        self.logger.info("Starting to update airmass vs. time plot")
-
-        fig = bokeh.plotting.figure(
-            title="Airmass",
-            x_axis_label="Time (UTC)",
-            y_axis_label="Airmass",
-            frame_height=512,
-            width_policy="max",
-            tools="pan,wheel_zoom,box_zoom,box_select,save,reset,help",
-        )
-
-        fig = schedview.plot.nightly.plot_airmass_vs_time(
-            visits=self._visits_cds, figure=fig, almanac_events=self._almanac_events
-        )
-        self.logger.info("Finished updating airmass vs. time plot")
-        return fig
 
     @param.depends(
         "_visits_cds",
@@ -755,7 +717,6 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                 pn.param.ParamMethod(self.alt_vs_time, loading_indicator=True),
                 pn.param.ParamMethod(self.horizon_map, loading_indicator=True),
             ),
-            "Airmass vs. time": pn.param.ParamMethod(self.airmass_vs_time, loading_indicator=True),
             "Sky maps": pn.param.ParamMethod(self.visit_skymaps, loading_indicator=True),
             "Table of visits": pn.param.ParamMethod(self.visit_table, loading_indicator=True),
             "Reward plots": pn.Column(
@@ -763,7 +724,6 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                 pn.param.ParamMethod(self.reward_plot, loading_indicator=True),
                 pn.param.ParamMethod(self.infeasible_plot, loading_indicator=True),
             ),
-            "Visit explorer": pn.param.ParamMethod(self.visit_explorer, loading_indicator=True),
         }
         self.logger.info("Finished creating initial dict of tab contents.")
         return tab_contents
@@ -1045,7 +1005,6 @@ def parse_prenight_args():
         nargs="+",
         default=[
             "Azimuth and altitude",
-            "Airmass vs. time",
             "Sky maps",
             "Table of visits",
             "Reward plots",
