@@ -14,7 +14,6 @@ import numpy as np
 import pandas as pd
 import panel as pn
 import param
-import rubin_sim.scheduler.example
 from astropy.time import Time
 from rubin_sim.scheduler.model_observatory import ModelObservatory
 from rubin_sim.utils import survey_start_mjd
@@ -40,7 +39,6 @@ AVAILABLE_TIMEZONES = [
 ]
 DEFAULT_TIMEZONE = AVAILABLE_TIMEZONES[0]
 DEFAULT_CURRENT_TIME = Time(max(Time.now().mjd, survey_start_mjd()), format="mjd")
-USE_EXAMPLE_SCHEDULER = False
 DEFAULT_MODEL_OBSERVATORY = ModelObservatory(init_load_length=1)
 DEFAULT_MODEL_OBSERVATORY.sky_model.load_length = 1
 
@@ -91,17 +89,6 @@ class Prenight(param.Parameterized):
     opsim_output_fname = param.String(
         doc="The file name or URL of the OpSim output database.",
         label="OpSim output database path or URL",
-    )
-
-    scheduler_fname_doc = """URL or file name of the scheduler pickle file.
-Such a pickle file can either be of an instance of a subclass of
-rubin_sim.scheduler.schedulers.CoreScheduler, or a tuple of the form
-(scheduler, conditions), where scheduler is an instance of a subclass of
-rubin_sim.scheduler.schedulers.CoreScheduler, and conditions is an
-instance of rubin_sim.scheduler.conditions.Conditions."""
-    scheduler_fname = param.String(
-        doc=scheduler_fname_doc,
-        label="URL or file name of scheduler pickle file",
     )
 
     rewards_fname = param.String(
@@ -167,9 +154,6 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
     # multiple plots, then the plots can be more easily linked, and memory
     # and communication overhead is reduced.
     _visits_cds = param.Parameter()
-
-    # An instance of rubin_sim.scheduler.schedulers.CoreScheduler
-    _scheduler = param.Parameter()
 
     _almanac_events = schedview.param.DataFrame(
         None,
@@ -419,24 +403,6 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
     def custom_hvplot4(self):
         return self.hvplot(4)
 
-    @param.depends("scheduler_fname", watch=True)
-    def _update_scheduler(self):
-        self.logger.info("Starting to update the scheduler.")
-        try:
-            (
-                scheduler,
-                conditions,
-            ) = schedview.collect.scheduler_pickle.read_scheduler(self.scheduler_fname)
-
-            self._scheduler = scheduler
-            self.logger.info("Finished updating the scheduler.")
-        except Exception as e:
-            self.logger.error(f"Could not load scheduler from {self.scheduler_fname} {e}")
-            if USE_EXAMPLE_SCHEDULER:
-                self.logger.info("Starting to load example scheduler.")
-                self._scheduler = rubin_sim.scheduler.example.example_scheduler(nside=self._nside)
-                self.logger.info("Finished loading example scheduler.")
-
     @param.depends(
         "_visits_cds",
         "_almanac_events",
@@ -505,7 +471,6 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         return fig
 
     @param.depends(
-        "_scheduler",
         "_visits",
     )
     def visit_skymaps(self):
@@ -520,14 +485,10 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         if self._visits is None:
             return "No visits are loaded."
 
-        if self._scheduler is None:
-            return "No scheduler is loaded."
-
         self.logger.info("Starting to update visit skymaps")
 
         vmap, vmap_data = schedview.plot.visitmap.create_visit_skymaps(
             visits=self._visits,
-            scheduler=self._scheduler,
             night_date=self.night,
             timezone=self.timezone,
             observatory=self._observatory,
@@ -759,7 +720,6 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         self,
         night_date=None,
         opsim_db=None,
-        scheduler=None,
         rewards=None,
         shown_tabs=None,
         custom_hvplot_tab_settings_file=None,
@@ -772,8 +732,6 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
             The date of the night to display.
         opsim_db : `str`, optional
             Path to the opsim output database file.
-        scheduler : `str`, optional
-            Path to the scheduler pickle file.
         rewards : `str`, optional
             Path to the rewards hdf5 file.
         shown_tabs : `list` [`str`], optional
@@ -793,9 +751,6 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
         """
         if night_date is not None:
             self.night = night_date
-
-        if scheduler is not None:
-            self.scheduler_fname = scheduler
 
         if opsim_db is not None:
             self.opsim_output_fname = opsim_db
@@ -817,7 +772,6 @@ instance of rubin_sim.scheduler.conditions.Conditions."""
                     parameters=[
                         "night",
                         "timezone",
-                        "scheduler_fname",
                         "opsim_output_fname",
                     ],
                     name="<h2>Parameters</h2>",
@@ -856,19 +810,12 @@ class RestrictedInputPrenight(Prenight):
         path=f"{PACKAGE_DATA_DIR}/*opsim*.db", label="OpSim output database", default=None, allow_None=True
     )
 
-    scheduler_fname = schedview.param.FileSelectorWithEmptyOption(
-        path=f"{PACKAGE_DATA_DIR}/*scheduler*.p*",
-        label="Scheduler pickle file",
-        default=None,
-        allow_None=True,
-    )
-
     rewards_fname = schedview.param.FileSelectorWithEmptyOption(
         path=f"{PACKAGE_DATA_DIR}/*rewards*.h5", label="rewards HDF5 file", default=None, allow_None=True
     )
 
     def __init__(self, data_dir=None, **kwargs):
-        # A few arguments (scheduler, opsim_db, rewards) will be used
+        # A few arguments (opsim_db, rewards) will be used
         # later in this method to set the options for parameters, but
         # are not themselves parameters. So, remove them them the
         # params list before calling super().__init__().
@@ -880,7 +827,6 @@ class RestrictedInputPrenight(Prenight):
         # they can be updated by key.
         fname_params = {
             "opsim_db": self.param["opsim_output_fname"],
-            "scheduler": self.param["scheduler_fname"],
             "reward": self.param["rewards_fname"],
         }
 
@@ -890,7 +836,6 @@ class RestrictedInputPrenight(Prenight):
         if data_dir is not None:
             fname_glob = {
                 "opsim_db": f"{data_dir}/*opsim*.db",
-                "scheduler": f"{data_dir}/*scheduler*.p*",
                 "reward": f"{data_dir}/*rewards*.h5",
             }
 
@@ -920,7 +865,7 @@ def prenight_app(*args, **kwargs):
             data_dir = None
 
         specified_data_files = {}
-        data_args = set(["opsim_db", "scheduler", "rewards"]) & set(kwargs.keys())
+        data_args = set(["opsim_db", "rewards"]) & set(kwargs.keys())
         for data_arg in data_args:
             # Fully resolve the path to the file.
             file_path = Path(kwargs[data_arg]).resolve()
@@ -959,14 +904,6 @@ def parse_prenight_args():
         type=str,
         default=None,
         help="The path to the OpSim output database.",
-    )
-
-    parser.add_argument(
-        "--scheduler",
-        "-s",
-        type=str,
-        default=None,
-        help="The path to the scheduler pickle file.",
     )
 
     parser.add_argument(
