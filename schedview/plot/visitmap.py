@@ -394,8 +394,8 @@ def plot_visit_planisphere(
 
 def create_visit_skymaps(
     visits,
-    scheduler,
     night_date,
+    nside=32,
     observatory=None,
     timezone="Chile/Continental",
     planisphere_only=False,
@@ -418,12 +418,11 @@ def create_visit_skymaps(
 
         If a string, the file name of the opsim database from which the
         visits should be loaded.
-    scheduler : `CoreScheduler` or `str`
-        The scheduler from which to extract the footprint, or the name of
-        a file from which such a scheduler should be loaded.
     night_date : `datetime.date`
         The calendar date of the evening of the night for which
         to plot the visits.
+    nside : `int`, optional
+        The healpix nside to use for the map.
     observatory : `ModelObservatory`, optional
         Provides the location of the observatory, used to compute
         night start and end times.
@@ -455,14 +454,11 @@ def create_visit_skymaps(
     if end_time is not None:
         visits.query(f"observationStartMJD <= {Time(end_time).mjd}", inplace=True)
 
-    if isinstance(scheduler, str):
-        scheduler, conditions = schedview.collect.scheduler_pickle.read_scheduler(scheduler)
-
     if observatory is None:
-        observatory = ModelObservatory(nside=scheduler.nside, init_load_length=1)
+        observatory = ModelObservatory(nside=nside, init_load_length=1)
         observatory.sky_model.load_length = 1
 
-    footprint = schedview.collect.footprint.get_footprint(scheduler)
+    footprint = schedview.collect.footprint.get_footprint(nside)
     observatory.mjd = end_time.mjd
     conditions = observatory.return_conditions()
     data = {"visits": visits, "footprint": footprint, "conditions": conditions}
