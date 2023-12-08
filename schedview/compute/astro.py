@@ -99,3 +99,33 @@ def night_events(night_date=None, site=None, timezone="Chile/Continental"):
     time_df.index.name = "event"
 
     return time_df
+
+
+def compute_central_night(visits, site=None, timezone="Chile/Continental"):
+    """Compute the central night of a set of visits.
+
+    Parameters
+    ----------
+    visits : `pandas.DataFrame`
+        A DataFrame of visits.
+    site : `astropy.coordinates.earth.EarthLocation`
+        The observatory location. Defaults to Rubin observatory.
+    timezone: `str`
+        The timezone name. Defaults to 'Chile/Continental'
+
+    Returns
+    -------
+    central_night : `datetime.date`
+        The central night of the visits.
+    """
+    central_mjd = visits["observationStartMJD"].median()
+    candidate_night = Time(central_mjd, format="mjd", scale="utc").datetime.date()
+
+    # The mjd rollover can occur during the night, so the above might be offset
+    # by a night. Make sure the night we have is the one with a central mjd
+    # closest to the median visit mjd.
+    candidate_middle_mjd = night_events(candidate_night, site, timezone).loc["night_middle", "MJD"]
+    mjd_shift = np.round(central_mjd - candidate_middle_mjd)
+    central_night = Time(central_mjd + mjd_shift, format="mjd", scale="utc").datetime.date()
+
+    return central_night
