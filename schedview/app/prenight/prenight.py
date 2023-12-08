@@ -286,6 +286,20 @@ class Prenight(param.Parameterized):
                 Time(self._almanac_events.loc["sunset", "UTC"]),
                 Time(self._almanac_events.loc["sunrise", "UTC"]),
             )
+            if len(visits) == 0:
+                self.logger.info("No visits on requested night, looking for a night with visits.")
+                # read all visits to so we can find a central one
+                visits = schedview.collect.opsim.read_opsim(self.opsim_output_fname)
+                if len(visits) > 0:
+                    self.logger.info("Changing night to one with visits.")
+                    self.night = schedview.compute.astro.compute_central_night(visits)
+                    # Setting night will trigger a call to _update_visits
+                    # by way of _almanac_events, so we should not continue
+                    # this execution..
+                    return
+                else:
+                    self.logger.info("No visits found in this opsim database.")
+
             self._visits = visits
             self.logger.info("Finish updating visits DataFrame.")
             self.logger.info("Starting to update visits ColumnDataSource.")
