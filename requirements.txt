@@ -1,4 +1,13 @@
+astropy
+bokeh
+colorcet
+healpy
 holoviews
 hvplot
-rubin-sim <2.0
+numpy
+pandas
+panel
+param
+pytz
 uranography
+rubin-scheduler

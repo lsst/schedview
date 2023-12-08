@@ -5,7 +5,7 @@ import numpy as np
 from astropy.time import Time
 
 # Imported to help sphinx make the link
-from rubin_sim.scheduler.model_observatory import ModelObservatory  # noqa F401
+from rubin_scheduler.scheduler.model_observatory import ModelObservatory  # noqa F401
 
 import schedview.collect.opsim
 import schedview.collect.scheduler_pickle
@@ -53,7 +53,7 @@ def create_survey_reward_plot(
 
     Parameters
     ----------
-    scheduler : `rubin_sim.scheduler.schedulers.Core_scheduler` or `str`
+    scheduler : `rubin_scheduler.scheduler.schedulers.Core_scheduler` or `str`
         The scheduler with the surveys to evaluate, or the name of a file
         from which such a scheduler should be loaded.
     night_date : `astropy.time.Time`

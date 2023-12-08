@@ -11,7 +11,7 @@ import urllib.request
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from rubin_sim.scheduler.model_observatory import ModelObservatory
+from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 
 try:
     PICKLE_FNAME = os.environ["SCHED_PICKLE"]
@@ -29,10 +29,10 @@ def read_local_scheduler_pickle(file_name):
 
     Returns
     -------
-    scheduler : `rubin_sim.scheduler.schedulers.core_scheduler.CoreScheduler`
-        An instance of a rubin_sim scheduler object.
-    conditions : `rubin_sim.scheduler.features.conditions.Conditions`
-        An instance of a rubin_sim conditions object.
+    scheduler : `rubin_scheduler.scheduler.schedulers.CoreScheduler`
+        An instance of a rubin_scheduler scheduler object.
+    conditions : `rubin_scheduler.scheduler.features.Conditions`
+        An instance of a rubin_scheduler conditions object.
     """
     if file_name is None:
         file_name = PICKLE_FNAME
@@ -75,10 +75,10 @@ def read_scheduler(file_name_or_url=None):
 
     Returns
     -------
-    scheduler : `rubin_sim.scheduler.schedulers.core_scheduler.CoreScheduler`
-        An instance of a rubin_sim scheduler object.
-    conditions : `rubin_sim.scheduler.features.conditions.Conditions`
-        An instance of a rubin_sim conditions object.
+    scheduler : `rubin_scheduler.scheduler.schedulers.CoreScheduler`
+        An instance of a rubin_scheduler scheduler object.
+    conditions : `rubin_scheduler.scheduler.features.Conditions`
+        An instance of a rubin_scheduler conditions object.
     """
     if file_name_or_url is None:
         file_name_or_url = PICKLE_FNAME
@@ -89,7 +89,7 @@ def read_scheduler(file_name_or_url=None):
     if Path(file_name_or_url).is_file():
         scheduler, conditions = read_local_scheduler_pickle(file_name_or_url)
     else:
-        # If we didn't have do decompress it, we could use urlopen instead
+        # If we didn't have to decompress it, we could use urlopen instead
         # of downloading a local copy. But, it can be compressed, so we need
         # to use gzip.open to open it.
         with TemporaryDirectory() as directory:

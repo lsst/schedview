@@ -4,7 +4,7 @@ from inspect import getmembers
 
 import healpy as hp
 import numpy as np
-import rubin_sim.scheduler.basis_functions
+import rubin_scheduler.scheduler.basis_functions
 
 
 def make_survey_reward_df(survey, conditions, reward_df=None):
@@ -12,9 +12,9 @@ def make_survey_reward_df(survey, conditions, reward_df=None):
 
     Parameters
     ----------
-    survey : `rubin_sim.scheduler.surveys.BaseSurvey`
+    survey : `rubin_scheduler.scheduler.surveys.BaseSurvey`
         The survey to summarize.
-    conditions : `rubin_sim.scheduler.features.conditions.Conditions`
+    conditions : `rubin_scheduler.scheduler.features.Conditions`
         The conditions to use for the summary.
     reward_df : `pandas.DataFrame`, optional
         A dataframe with the columns "basis_function", "basis_function_class",
@@ -49,18 +49,20 @@ def make_survey_reward_df(survey, conditions, reward_df=None):
         return float("{:.5g}".format(x))
 
     def _guess_basis_function_doc_url(basis_function_name):
+        url_base = "https://rubin-scheduler.lsst.io/fbs-api.html#"
+
         if not isinstance(basis_function_name, str):
             return ""
 
         root_bf_name = basis_function_name.split()[0]
 
-        standard_basis_functions = dict(getmembers(rubin_sim.scheduler.basis_functions)).keys()
+        standard_basis_functions = dict(getmembers(rubin_scheduler.scheduler.basis_functions)).keys()
         if root_bf_name in standard_basis_functions:
-            url_base = "https://rubin-sim.lsst.io/api/rubin_sim.scheduler.basis_functions"
-            section_base = "rubin_sim.scheduler.basis_functions"
-            url = f"{url_base}.{root_bf_name}.html#{section_base}.{root_bf_name}"
+            section_base = "rubin_scheduler.scheduler.basis_functions"
+            url = f"{url_base}.{section_base}.{root_bf_name}"
         else:
-            url = ""
+            generic_bf = "module-rubin_scheduler.scheduler.basis_functions"
+            url = f"{url_base}.{generic_bf}"
         return url
 
     try:
@@ -84,9 +86,9 @@ def compute_maps(survey, conditions, nside=None):
 
     Parameters
     ----------
-    survey : `rubin_sim.scheduler.surveys.BaseSurvey`
+    survey : `rubin_scheduler.scheduler.surveys.BaseSurvey`
         The survey to summarize.
-    conditions : `rubin_sim.scheduler.features.conditions.Conditions`
+    conditions : `rubin_scheduler.scheduler.features.Conditions`
         The conditions to use for the summary.
     nside : int, optional
         The nside to use for the returned healpix maps. If not provided, the

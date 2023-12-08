@@ -47,17 +47,17 @@ class LsstCameraFootprintPerimeter(object):
 
         Returns
         -------
-        ra : `numpy.ndarray`
+        ra : `np.ndarray`
             An array of the R.A. of the vertices of the polygon surrounding
             the camera footprint (degrees).
-        decl : `numpy.ndarray`
+        decl : `np.ndarray`
             An array of the declinations of the vertices of the polygon
             surrounding the camera footprint (degrees).
         """
         center = SkyCoord(ra, decl, unit="deg")
 
         # rotation matches the sense used by
-        # rubin_sim.utils.camera_footprint.LsstCameraFootprint
+        # rubin_scheduler.utils.camera_footprint.LsstCameraFootprint
         eq_vertices = center.directional_offset_by(
             (self.vertices.angle.values + rotation) * u.deg,
             self.vertices.r.values * u.deg,
@@ -80,10 +80,10 @@ class LsstCameraFootprintPerimeter(object):
 
         Returns
         -------
-        ra : `numpy.ndarray`
+        ra : `np.ndarray`
             An array of the R.A. of the vertices of the polygon surrounding
             the camera footprints (degrees).
-        decl : `numpy.ndarray`
+        decl : `np.ndarray`
             An array of the declinations of the vertices of the polygon
             surrounding the camera footprints (degrees).
         """

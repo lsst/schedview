@@ -5,11 +5,11 @@ import warnings
 
 import numpy as np
 from astropy.time import Time
-from rubin_sim.scheduler import sim_runner
-from rubin_sim.scheduler.example import example_scheduler
-from rubin_sim.scheduler.model_observatory import ModelObservatory
-from rubin_sim.scheduler.utils import SchemaConverter
-from rubin_sim.utils import survey_start_mjd
+from rubin_scheduler.scheduler import sim_runner
+from rubin_scheduler.scheduler.example import example_scheduler
+from rubin_scheduler.scheduler.model_observatory import ModelObservatory
+from rubin_scheduler.scheduler.utils import SchemaConverter
+from rubin_scheduler.utils import survey_start_mjd
 
 DEFAULT_DATE = Time(survey_start_mjd(), format="mjd").iso[:10]
 
@@ -38,12 +38,12 @@ warnings.filterwarnings(
 )
 warnings.filterwarnings(
     "ignore",
-    module="rubin_sim",
+    module="rubin_scheduler",
     message="invalid value encountered in arcsin",
 )
 warnings.filterwarnings(
     "ignore",
-    module="rubin_sim",
+    module="rubin_scheduler",
     message="All-NaN slice encountered",
 )
 

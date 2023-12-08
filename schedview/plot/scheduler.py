@@ -10,15 +10,15 @@ import bokeh.plotting
 import healpy as hp
 import numpy as np
 import pandas as pd
-import rubin_sim.scheduler.basis_functions
-import rubin_sim.scheduler.example
-import rubin_sim.scheduler.schedulers
-import rubin_sim.scheduler.surveys
+import rubin_scheduler.scheduler.basis_functions
+import rubin_scheduler.scheduler.example
+import rubin_scheduler.scheduler.schedulers
+import rubin_scheduler.scheduler.surveys
 from astropy.time import Time
-from rubin_sim.scheduler.features.conditions import Conditions
-from rubin_sim.scheduler.model_observatory import ModelObservatory
-from rubin_sim.scheduler.schedulers.core_scheduler import CoreScheduler as CoreScheduler
-from rubin_sim.utils import survey_start_mjd
+from rubin_scheduler.scheduler.features.conditions import Conditions
+from rubin_scheduler.scheduler.model_observatory import ModelObservatory
+from rubin_scheduler.scheduler.schedulers.core_scheduler import CoreScheduler as CoreScheduler
+from rubin_scheduler.utils import survey_start_mjd
 from uranography.api import ArmillarySphere, HorizonMap, MollweideMap, Planisphere, make_zscale_linear_cmap
 
 from schedview.collect import read_scheduler
@@ -91,7 +91,9 @@ class SchedulerDisplay:
             self.observatory = None
 
         if scheduler is None:
-            scheduler = rubin_sim.scheduler.example.example_scheduler(nside=nside, mjd_start=DEFAULT_MJD)
+            scheduler = rubin_scheduler.scheduler.example.example_scheduler(
+                nside=nside, mjd_start=DEFAULT_MJD
+            )
             if self.observatory is not None:
                 conditions = self.observatory.return_conditions()
             else:
@@ -310,7 +312,7 @@ class SchedulerDisplay:
 
         Parameters
         ----------
-        scheduler : `rubin_sim.scheduler.schedulers.CoreScheduler`
+        scheduler : `rubin_scheduler.scheduler.schedulers.CoreScheduler`
             The new scheduler to visualize
         """
         # Work separated into _set_scheduler so that it can be overriden by
@@ -341,7 +343,7 @@ class SchedulerDisplay:
 
         Parameters
         ----------
-        conditions : `rubin_sim.scheduler.features.conditions.Conditions`
+        conditions : `rubin_scheduler.scheduler.features.conditions.Conditions`
             The new conditions.
         """
         if conditions.nside != self.nside:
@@ -948,7 +950,9 @@ class SchedulerDisplay:
             # Get URLs for survey documentation
             # Flatten the list of lists of surveys into one long list
             surveys = itertools.chain.from_iterable(self.scheduler.survey_lists)
-            survey_class_names = ["rubin_sim.scheduler.surveys." + s.__class__.__name__ for s in surveys]
+            survey_class_names = [
+                "rubin_scheduler.scheduler.surveys." + s.__class__.__name__ for s in surveys
+            ]
             survey_doc_url = [f"https://rubin-sim.lsst.io/api/{cn}.html#{cn}" for cn in survey_class_names]
             survey_name_formatter = bokeh.models.widgets.HTMLTemplateFormatter(
                 template='<a href="<%= doc_url %>" target="_blank"><%= value %></a>'
