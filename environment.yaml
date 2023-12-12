@@ -10,3 +10,6 @@ dependencies:
  - firefox
  - geckodriver
  - build
+ - pip
+ - pip:
+   - lsst.resources
