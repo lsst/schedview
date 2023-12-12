@@ -2,3 +2,4 @@ holoviews
 hvplot
 rubin-sim <2.0
 uranography
+pip
