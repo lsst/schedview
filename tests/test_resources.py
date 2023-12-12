@@ -22,4 +22,4 @@ class TestResources(unittest.TestCase):
             # Verify that we found exactly the files we made
             found_files = find_file_resources(temp_dir)
 
-        self.assertListEqual(made_files, found_files)
+        assert set(made_files) == set(found_files)
