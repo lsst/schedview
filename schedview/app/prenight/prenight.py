@@ -1,10 +1,9 @@
 import argparse
-import importlib.resources
 import json
 import logging
 import os
 import sys
-from glob import glob
+import urllib.parse
 from pathlib import Path
 
 import astropy.utils.iers
@@ -15,11 +14,13 @@ import pandas as pd
 import panel as pn
 import param
 from astropy.time import Time
+from lsst.resources import ResourcePath
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 from rubin_scheduler.utils import survey_start_mjd
 
 import schedview.collect.footprint
 import schedview.collect.opsim
+import schedview.collect.resources
 import schedview.compute.astro
 import schedview.compute.scheduler
 import schedview.param
@@ -42,8 +43,11 @@ DEFAULT_CURRENT_TIME = Time(max(Time.now().mjd, survey_start_mjd()), format="mjd
 DEFAULT_MODEL_OBSERVATORY = ModelObservatory(init_load_length=1)
 DEFAULT_MODEL_OBSERVATORY.sky_model.load_length = 1
 
-PACKAGE_DATA_DIR = importlib.resources.files("schedview.data").as_posix()
-USDF_DATA_DIR = "/sdf/group/rubin/web_data/sim-data/schedview"
+PACKAGE_RESOURCE_URI = "resource://schedview/data"
+USDF_RESOURCE_URI = "file:///sdf/group/rubin/web_data/sim-data/schedview"
+
+# To be changed to an S3 bucket at the USDF, when it's ready
+DEFAULT_RESOURCE_URI = USDF_RESOURCE_URI
 
 astropy.utils.iers.conf.iers_degraded_accuracy = "warn"
 
@@ -278,8 +282,8 @@ class Prenight(param.Parameterized):
 
         self.logger.info("Starting to update visits.")
         try:
-            if not os.path.exists(self.opsim_output_fname):
-                raise FileNotFoundError(f"File not found: {self.opsim_output_fname}")
+            if not ResourcePath(self.opsim_output_fname).exists():
+                raise FileNotFoundError(f"Resource not found: {self.opsim_output_fname}")
 
             visits = schedview.collect.opsim.read_opsim(
                 self.opsim_output_fname,
@@ -523,7 +527,13 @@ class Prenight(param.Parameterized):
         self.logger.info("Starting to update reward dataframe.")
 
         try:
-            reward_df = pd.read_hdf(self.rewards_fname, "reward_df")
+            reward_resource = ResourcePath(self.rewards_fname)
+            if not reward_resource.exists():
+                raise FileNotFoundError(f"Resource not found: {self.rewards_fname}")
+
+            with reward_resource.as_local() as local_resource:
+                local_fname = Path(urllib.parse.urlparse(str(local_resource)).path)
+                reward_df = pd.read_hdf(local_fname, "reward_df")
             self.logger.info("Finished updating reward dataframe.")
         except Exception as e:
             self.logger.error(e)
@@ -584,7 +594,14 @@ class Prenight(param.Parameterized):
 
         self.logger.info("Starting to update obs_rewards.")
         try:
-            obs_rewards = pd.read_hdf(self.rewards_fname, "obs_rewards")
+            reward_resource = ResourcePath(self.rewards_fname)
+            if not reward_resource.exists():
+                raise FileNotFoundError(f"Resource not found: {self.rewards_fname}")
+
+            with reward_resource.as_local() as local_resource:
+                local_fname = Path(urllib.parse.urlparse(str(local_resource)).path)
+                obs_rewards = pd.read_hdf(local_fname, "obs_rewards")
+
             self._obs_rewards = obs_rewards
             self.logger.info("Finished updating obs_rewards.")
         except Exception as e:
@@ -820,15 +837,13 @@ class Prenight(param.Parameterized):
 class RestrictedInputPrenight(Prenight):
     """A pre-night dashboard that restricts the data to files in a dir."""
 
-    opsim_output_fname = schedview.param.FileSelectorWithEmptyOption(
-        path=f"{PACKAGE_DATA_DIR}/*opsim*.db", label="OpSim output database", default=None, allow_None=True
+    opsim_output_fname = param.Selector(
+        objects=[], label="OpSim output database", default=None, allow_None=True
     )
 
-    rewards_fname = schedview.param.FileSelectorWithEmptyOption(
-        path=f"{PACKAGE_DATA_DIR}/*rewards*.h5", label="rewards HDF5 file", default=None, allow_None=True
-    )
+    rewards_fname = param.Selector(objects=[], label="rewards HDF5 file", default=None, allow_None=True)
 
-    def __init__(self, data_dir=None, **kwargs):
+    def __init__(self, resource_uri=DEFAULT_RESOURCE_URI, **kwargs):
         # A few arguments (opsim_db, rewards) will be used
         # later in this method to set the options for parameters, but
         # are not themselves parameters. So, remove them them the
@@ -841,24 +856,24 @@ class RestrictedInputPrenight(Prenight):
         # they can be updated by key.
         fname_params = {
             "opsim_db": self.param["opsim_output_fname"],
-            "reward": self.param["rewards_fname"],
+            "rewards": self.param["rewards_fname"],
         }
 
-        # In cases where the caller has not specified a value, set
-        # the paths to a glob matching the expected file name format
-        # for each type.
-        if data_dir is not None:
-            fname_glob = {
-                "opsim_db": f"{data_dir}/*opsim*.db",
-                "reward": f"{data_dir}/*rewards*.h5",
-            }
+        fname_patterns = {
+            "opsim_db": r".*opsim.*\.db",
+            "rewards": r".*rewards.*\.h5",
+        }
 
-        # Actually assign the names or globs to the path references.
+        # Get the resources available for each file type
         for arg_name in fname_params:
             if arg_name in kwargs:
-                fname_params[arg_name].update(path=kwargs[arg_name])
-            elif data_dir is not None:
-                fname_params[arg_name].update(path=fname_glob[arg_name])
+                matching_resources = [kwargs[arg_name]]
+            else:
+                matching_resources = schedview.collect.resources.find_file_resources(
+                    resource_uri, file_filter=fname_patterns[arg_name]
+                )
+            matching_resources = [None] + matching_resources
+            fname_params[arg_name].objects = matching_resources
 
 
 def prenight_app(*args, **kwargs):
@@ -874,9 +889,9 @@ def prenight_app(*args, **kwargs):
         prenight = Prenight()
     else:
         try:
-            data_dir = kwargs["data_dir"]
+            resource_uri = kwargs["resource_uri"]
         except KeyError:
-            data_dir = None
+            resource_uri = None
 
         specified_data_files = {}
         data_args = set(["opsim_db", "rewards"]) & set(kwargs.keys())
@@ -887,10 +902,10 @@ def prenight_app(*args, **kwargs):
             if data_arg in kwargs:
                 specified_data_files[data_arg] = str(file_path)
 
-        prenight = RestrictedInputPrenight(data_dir=data_dir, **specified_data_files)
+        prenight = RestrictedInputPrenight(resource_uri=resource_uri, **specified_data_files)
 
     try:
-        del kwargs["data_dir"]
+        del kwargs["resource_uri"]
     except KeyError:
         pass
 
@@ -928,13 +943,12 @@ def parse_prenight_args():
         help="The path to the rewards HDF5 file.",
     )
 
-    default_data_dir = f"{USDF_DATA_DIR}/*" if os.path.exists(USDF_DATA_DIR) else PACKAGE_DATA_DIR
     parser.add_argument(
-        "--data_dir",
+        "--resource_uri",
         "-d",
         type=str,
-        default=default_data_dir,
-        help="The base directory for data files.",
+        default=DEFAULT_RESOURCE_URI,
+        help="The base URI for data files.",
     )
 
     parser.add_argument(
@@ -987,8 +1001,8 @@ def parse_prenight_args():
 
     args = parser.parse_args()
 
-    if len(glob(args.data_dir)) == 0 and not args.data_from_urls:
-        args.data_dir = PACKAGE_DATA_DIR
+    if not ResourcePath(args.resource_uri).exists():
+        args.resource_uri = PACKAGE_RESOURCE_URI
 
     if args.night is not None:
         args.night_date = Time(pd.Timestamp(args.night, tz="UTC")).datetime.date()
