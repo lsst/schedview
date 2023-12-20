@@ -312,6 +312,9 @@ class Prenight(param.Parameterized):
 
         except Exception as e:
             self.logger.info("Error updating visits.")
+            print(
+                "FIXME: obs_path.as_local() is failing when loading an S3 resource. See https://stackoverflow.com/questions/67419800/error-cannot-schedule-new-futures-after-interpreter-shutdown-while-working-thr"
+            )
             self.logger.error(e)
             self._visits = None
             self._visits_cds = None
@@ -885,6 +888,49 @@ class RestrictedInputPrenight(Prenight):
             fname_params[arg_name].objects = matching_resources
 
 
+class ArchiveInputPrenight(Prenight):
+    """A pre-night dashboard that restricts the data to files in a dir."""
+
+    opsim_output_fname = param.Selector(
+        objects={None: None}, label="OpSim output database", default=None, allow_None=True
+    )
+
+    rewards_fname = param.Selector(
+        objects={None: None}, label="rewards HDF5 file", default=None, allow_None=True
+    )
+
+    def __init__(self, resource_uri=DEFAULT_RESOURCE_URI, **kwargs):
+        # A few arguments (opsim_db, rewards) will be used
+        # later in this method to set the options for parameters, but
+        # are not themselves parameters. So, remove them them the
+        # params list before calling super().__init__().
+        # Otherwise, param will complain that they are not parameters.
+        params = {k: v for k, v in kwargs.items() if k in self.param}
+        super().__init__(**params)
+
+        # make a dictionary of refereneces to the param paths, so that
+        # they can be updated by key.
+        fname_params = {
+            "opsim_db": self.param["opsim_output_fname"],
+            "rewards": self.param["rewards_fname"],
+        }
+
+        file_keys = {
+            "opsim_db": "observations",
+            "rewards": "rewards",
+        }
+
+        # Get the resources available for each file type
+        for arg_name in fname_params:
+            if arg_name in kwargs:
+                matching_resources = [kwargs[arg_name]]
+            else:
+                matching_resources = schedview.collect.resources.find_archive_resources(
+                    resource_uri, file_key=file_keys[arg_name]
+                )
+            fname_params[arg_name].objects.update(matching_resources)
+
+
 def prenight_app(*args, **kwargs):
     """Create the pre-night briefing app."""
 
@@ -894,8 +940,17 @@ def prenight_app(*args, **kwargs):
     except KeyError:
         data_from_urls = False
 
+    try:
+        data_from_archive = kwargs["data_from_archive"]
+        del kwargs["data_from_archive"]
+    except KeyError:
+        data_from_archive = False
+
     if data_from_urls:
         prenight = Prenight()
+    elif data_from_archive:
+        resource_uri = kwargs["resource_uri"] if "resource_uri" in kwargs else None
+        prenight = ArchiveInputPrenight(resource_uri=resource_uri)
     else:
         try:
             resource_uri = kwargs["resource_uri"]
@@ -964,6 +1019,12 @@ def parse_prenight_args():
         "--data_from_urls",
         action="store_true",
         help="Let the user specify URLs from which to load data. THIS IS NOT SECURE.",
+    )
+
+    parser.add_argument(
+        "--data_from_archive",
+        action="store_true",
+        help="Load data from a simulation archive using archive metadata.",
     )
 
     parser.add_argument(
