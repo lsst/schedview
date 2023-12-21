@@ -21,6 +21,7 @@ from rubin_scheduler.utils import survey_start_mjd
 import schedview.collect.footprint
 import schedview.collect.opsim
 import schedview.collect.resources
+import schedview.collect.rewards
 import schedview.compute.astro
 import schedview.compute.scheduler
 import schedview.param
@@ -183,6 +184,8 @@ class Prenight(param.Parameterized):
         },
     )
     _obs_rewards = schedview.param.Series()
+
+    _autoload_rewards = False
 
     def __init__(self, **params):
         super().__init__(**params)
@@ -523,6 +526,29 @@ class Prenight(param.Parameterized):
         return vmap
 
     @param.depends("rewards_fname", watch=True)
+    def _update_rewards(self):
+        if self.rewards_fname is None or len(self.rewards_fname) < 1:
+            return None
+
+        reward_df, obs_rewards = schedview.collect.rewards.read_rewards(
+            self.rewards_fname,
+            Time(self._almanac_events.loc["sunset", "UTC"]),
+            Time(self._almanac_events.loc["sunrise", "UTC"]),
+        )
+
+        if reward_df is not None:
+            self._reward_df = reward_df
+            self.logger.info("Finished updating reward dataframe.")
+        else:
+            self.logger.warning("Could not update reward dataframe.")
+
+        if obs_rewards is not None:
+            self._obs_rewards = obs_rewards
+            self.logger.info("Finished updating obs_rewards.")
+        else:
+            self.logger.warning("Could not update obs_rewards.")
+
+    #    @param.depends("rewards_fname", watch=True)
     def _update_reward_df(self):
         if self.rewards_fname is None or len(self.rewards_fname) < 1:
             return None
@@ -590,7 +616,7 @@ class Prenight(param.Parameterized):
         self.basis_function = "Total"
         self.logger.info("Finished updating basis function selector.")
 
-    @param.depends("rewards_fname", watch=True)
+    #    @param.depends("rewards_fname", watch=True)
     def _update_obs_rewards(self):
         if self.rewards_fname is None:
             return None
@@ -621,20 +647,28 @@ class Prenight(param.Parameterized):
         """
         self.logger.info("Starting to update reward params.")
         if self._reward_df is None:
-            this_param_set = pn.Param(
-                self.param,
-                parameters=["rewards_fname"],
-            )
-            return this_param_set
+            if self._autoload_rewards:
+                return "No rewards are loaded."
+            else:
+                this_param_set = pn.Param(
+                    self.param,
+                    parameters=["rewards_fname"],
+                )
+                return this_param_set
 
         if len(self.param["surveys"].objects) > 10:
             survey_widget = pn.widgets.CrossSelector
         else:
             survey_widget = pn.widgets.MultiSelect
 
+        if self._autoload_rewards:
+            settable_reward_params = ["tier", "basis_function", "surveys"]
+        else:
+            settable_reward_params = ["rewards_fname", "tier", "basis_function", "surveys"]
+
         this_param_set = pn.Param(
             self.param,
-            parameters=["rewards_fname", "tier", "basis_function", "surveys"],
+            parameters=settable_reward_params,
             default_layout=pn.Row,
             name="",
             widgets={"surveys": survey_widget},
@@ -892,43 +926,24 @@ class ArchiveInputPrenight(Prenight):
     """A pre-night dashboard that restricts the data to files in a dir."""
 
     opsim_output_fname = param.Selector(
-        objects={None: None}, label="OpSim output database", default=None, allow_None=True
+        objects={None: None}, label="OpSim output", default=None, allow_None=True
     )
 
-    rewards_fname = param.Selector(
-        objects={None: None}, label="rewards HDF5 file", default=None, allow_None=True
-    )
+    _autoload_rewards = True
 
     def __init__(self, resource_uri=DEFAULT_RESOURCE_URI, **kwargs):
-        # A few arguments (opsim_db, rewards) will be used
-        # later in this method to set the options for parameters, but
-        # are not themselves parameters. So, remove them them the
-        # params list before calling super().__init__().
-        # Otherwise, param will complain that they are not parameters.
-        params = {k: v for k, v in kwargs.items() if k in self.param}
-        super().__init__(**params)
+        super().__init__(**kwargs)
 
-        # make a dictionary of refereneces to the param paths, so that
-        # they can be updated by key.
-        fname_params = {
-            "opsim_db": self.param["opsim_output_fname"],
-            "rewards": self.param["rewards_fname"],
-        }
+        matching_resources = schedview.collect.resources.find_archive_resources(
+            resource_uri, file_key="observations"
+        )
+        self.param["opsim_output_fname"].objects.update(matching_resources)
 
-        file_keys = {
-            "opsim_db": "observations",
-            "rewards": "rewards",
-        }
-
-        # Get the resources available for each file type
-        for arg_name in fname_params:
-            if arg_name in kwargs:
-                matching_resources = [kwargs[arg_name]]
-            else:
-                matching_resources = schedview.collect.resources.find_archive_resources(
-                    resource_uri, file_key=file_keys[arg_name]
-                )
-            fname_params[arg_name].objects.update(matching_resources)
+    @param.depends("opsim_output_fname", watch=True)
+    def _update_rewards_fname(self):
+        # When loading a new opsim output file, automaticallly load the
+        # corresponding rewards.
+        self.rewards_fname = ResourcePath(self.opsim_output_fname).dirname().geturl()
 
 
 def prenight_app(*args, **kwargs):
