@@ -1,5 +1,6 @@
 import sqlite3
-import urllib
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import numpy as np
 import pandas as pd
@@ -41,10 +42,17 @@ def read_opsim(opsim_uri, start_time="2000-01-01", end_time="2100-01-01"):
         # otherwise, assume we were given the path to the observations file.
         obs_path = original_resource_path
 
-    with obs_path.as_local() as local_obs_path:
-        filename = urllib.parse.urlparse(str(local_obs_path)).path
+    # ResourcePath.as_local runs into threading problems when used with
+    # bokeh/panel, so write the file to a temporary directory and read it
+    # "by hand" here.
+    opsimdb_bytes = obs_path.read()
 
-        with sqlite3.connect(filename) as sim_connection:
+    with TemporaryDirectory() as temp_dir:
+        temp_file = Path(temp_dir).joinpath("opsim.db")
+        with open(temp_file, "wb") as opsimdb_io:
+            opsimdb_io.write(opsimdb_bytes)
+
+        with sqlite3.connect(temp_file) as sim_connection:
             visits = pd.read_sql_query(
                 f"SELECT * FROM observations WHERE observationStartMJD BETWEEN {start_mjd} AND {end_mjd}",
                 sim_connection,
