@@ -39,7 +39,13 @@ def read_rewards(rewards_uri, start_time="2000-01-01", end_time="2100-01-01"):
         # directory, and look up in it what file to load observations from.
         metadata_path = original_resource_path.join("sim_metadata.yaml")
         sim_metadata = yaml.safe_load(metadata_path.read().decode("utf-8"))
-        rewards_basename = sim_metadata["files"]["rewards"]["name"]
+        try:
+            rewards_basename = sim_metadata["files"]["rewards"]["name"]
+        except KeyError:
+            rewards_df = None
+            obs_rewards = None
+            return rewards_df, obs_rewards
+
         rewards_path = original_resource_path.join(rewards_basename)
     else:
         # otherwise, assume we were given the path to the observations file.
