@@ -613,7 +613,6 @@ class Prenight(param.Parameterized):
         self.basis_function = "Total"
         self.logger.info("Finished updating basis function selector.")
 
-    #    @param.depends("rewards_fname", watch=True)
     def _update_obs_rewards(self):
         if self.rewards_fname is None:
             return None
