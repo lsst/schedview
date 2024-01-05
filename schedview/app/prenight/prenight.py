@@ -747,6 +747,13 @@ class Prenight(param.Parameterized):
         self.logger.info("Finished updating tab contents.")
         return detail_tabs
 
+    def reload(self, event=None):
+        if self.opsim_output_fname is not None:
+            self.param.trigger("opsim_output_fname")
+
+        if self.rewards_fname is not None:
+            self.param.trigger("rewards_fname")
+
     def make_app(
         self,
         night_date=None,
@@ -795,18 +802,20 @@ class Prenight(param.Parameterized):
         if shown_tabs is not None:
             self.shown_tabs = shown_tabs
 
+        reload_button = pn.widgets.Button(name="Reload data")
+        pn.bind(self.reload, reload_button, watch=True)
+
         pn_app = pn.Column(
             "<h1>Pre-night briefing</h1>",
             pn.Row(
-                pn.Param(
-                    self,
-                    parameters=[
-                        "night",
-                        "timezone",
-                        "opsim_output_fname",
-                    ],
-                    name="<h2>Parameters</h2>",
-                    widgets={"night": pn.widgets.DatePicker},
+                pn.Column(
+                    pn.Param(
+                        self,
+                        parameters=["night", "timezone", "opsim_output_fname"],
+                        name="<h2>Parameters</h2>",
+                        widgets={"night": pn.widgets.DatePicker},
+                    ),
+                    reload_button,
                 ),
                 pn.Column(
                     "<h2>Astronomical Events</h2>",
