@@ -315,9 +315,6 @@ class Prenight(param.Parameterized):
 
         except Exception as e:
             self.logger.info("Error updating visits.")
-            print(
-                "FIXME: obs_path.as_local() is failing when loading an S3 resource. See https://stackoverflow.com/questions/67419800/error-cannot-schedule-new-futures-after-interpreter-shutdown-while-working-thr"
-            )
             self.logger.error(e)
             self._visits = None
             self._visits_cds = None
