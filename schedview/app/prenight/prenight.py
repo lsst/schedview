@@ -919,7 +919,7 @@ class RestrictedInputPrenight(Prenight):
 
 
 class ArchiveInputPrenight(Prenight):
-    """A pre-night dashboard that restricts the data to files in a dir."""
+    """A pre-night dashboard that read data from an archive."""
 
     opsim_output_fname = param.Selector(
         objects={None: None}, label="OpSim output", default=None, allow_None=True
