@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import sys
-import urllib.parse
 from pathlib import Path
 
 import astropy.utils.iers
@@ -545,7 +544,6 @@ class Prenight(param.Parameterized):
         else:
             self.logger.warning("Could not update obs_rewards.")
 
-    #    @param.depends("rewards_fname", watch=True)
     def _update_reward_df(self):
         if self.rewards_fname is None or len(self.rewards_fname) < 1:
             return None
@@ -558,8 +556,7 @@ class Prenight(param.Parameterized):
                 raise FileNotFoundError(f"Resource not found: {self.rewards_fname}")
 
             with reward_resource.as_local() as local_resource:
-                local_fname = Path(urllib.parse.urlparse(str(local_resource)).path)
-                reward_df = pd.read_hdf(local_fname, "reward_df")
+                reward_df = pd.read_hdf(local_resource.ospath, "reward_df")
             self.logger.info("Finished updating reward dataframe.")
         except Exception as e:
             self.logger.error(e)
@@ -624,8 +621,7 @@ class Prenight(param.Parameterized):
                 raise FileNotFoundError(f"Resource not found: {self.rewards_fname}")
 
             with reward_resource.as_local() as local_resource:
-                local_fname = Path(urllib.parse.urlparse(str(local_resource)).path)
-                obs_rewards = pd.read_hdf(local_fname, "obs_rewards")
+                obs_rewards = pd.read_hdf(local_resource.ospath, "obs_rewards")
 
             self._obs_rewards = obs_rewards
             self.logger.info("Finished updating obs_rewards.")
@@ -946,12 +942,16 @@ def prenight_app(*args, **kwargs):
     """Create the pre-night briefing app."""
 
     try:
+        # Let the user write URL for specific data files directely into
+        # the dashboard.
         data_from_urls = kwargs["data_from_urls"]
         del kwargs["data_from_urls"]
     except KeyError:
         data_from_urls = False
 
     try:
+        # Provide a URI for an anchive that contains the data from
+        # which a user may choose.
         data_from_archive = kwargs["data_from_archive"]
         del kwargs["data_from_archive"]
     except KeyError:
@@ -1023,7 +1023,7 @@ def parse_prenight_args():
         "-d",
         type=str,
         default=DEFAULT_RESOURCE_URI,
-        help="The base URI for data files.",
+        help="The base URI for the archive containing the data.",
     )
 
     parser.add_argument(

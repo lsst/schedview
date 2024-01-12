@@ -1,6 +1,3 @@
-from pathlib import Path
-from tempfile import TemporaryDirectory
-
 import numpy as np
 import pandas as pd
 import yaml
@@ -51,24 +48,15 @@ def read_rewards(rewards_uri, start_time="2000-01-01", end_time="2100-01-01"):
         # otherwise, assume we were given the path to the observations file.
         rewards_path = original_resource_path
 
-    # ResourcePath.as_local runs into threading problems when used with
-    # bokeh/panel, so write the file to a temporary directory and read it
-    # "by hand" here.
-    rewards_bytes = rewards_path.read()
-
-    with TemporaryDirectory() as temp_dir:
-        temp_file = Path(temp_dir).joinpath("rewards.h5")
-        with open(temp_file, "wb") as rewards_io:
-            rewards_io.write(rewards_bytes)
-
+    with rewards_path.as_local() as local_rewards_path:
         try:
-            rewards_df = pd.read_hdf(temp_file, key="reward_df")
+            rewards_df = pd.read_hdf(local_rewards_path.ospath, key="reward_df")
             rewards_df.query(f"{start_mjd} <= queue_start_mjd <= {end_mjd}", inplace=True)
         except KeyError:
             rewards_df = None
 
         try:
-            obs_rewards = pd.read_hdf(temp_file, key="obs_rewards")
+            obs_rewards = pd.read_hdf(local_rewards_path.ospath, key="obs_rewards")
             obs_rewards = obs_rewards.loc[start_mjd:end_mjd]
         except KeyError:
             obs_rewards = None
