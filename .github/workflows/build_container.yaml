@@ -35,6 +35,7 @@ jobs:
         run: |
           mamba install --quiet --file=requirements.txt
           mamba install --quiet --file=test-requirements.txt
+          pip install lsst.resources
           mamba list rubin-sim | grep -v "#" | awk '{print $2}' > ${{ github.workspace }}/rs_version
           echo "rs-version" `cat ${{ github.workspace }}/rs_version`
           echo "rs-version=`cat ${{ github.workspace }}/rs_version`" >> $GITHUB_OUTPUT
@@ -81,5 +82,12 @@ jobs:
           image: ${{ github.repository }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           dockerfile: Dockerfile
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
 
-      - run: echo Pushed ghcr.io/${{ github.repository }}:${{ steps.build.outputs.tag }}
+      - name: Report build outputs
+        shell: bash -l {0}
+        run: |
+          echo Pushed ghcr.io/${{ github.repository }}:${{ steps.build.outputs.tag }}
+          echo Fully qualified image digest: ${{ steps.build.outputs.fully_qualified_image_digest }}
+          echo Tag of the image: ${{ steps.build.outputs.tag }}

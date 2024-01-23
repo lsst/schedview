@@ -25,7 +25,7 @@ jobs:
         os: ["ubuntu-latest", "macos-latest"]
         python-version: ["3.11"]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: conda-incubator/setup-miniconda@v2
         with:
           python-version: ${{ matrix.python-version }}
@@ -42,9 +42,10 @@ jobs:
         run: |
           mamba install --quiet --file=requirements.txt
           mamba install --quiet --file=test-requirements.txt
+          pip install lsst.resources
           mamba list rubin-sim | grep -v "#" | awk '{print $2}' > ${{ github.workspace }}/rs_version
           echo "rs-version" `cat ${{ github.workspace }}/rs_version`
-          echo "rs-version=`cat ${{ github.workspace }}/rs_version`" >> $GITHUB_OUTPUT   
+          echo "rs-version=`cat ${{ github.workspace }}/rs_version`" >> $GITHUB_OUTPUT
 
       - name: Access rubin-sim-data cache
         id: cache-rs
@@ -62,7 +63,7 @@ jobs:
         shell: bash -l {0}
         run: |
           export RUBIN_SIM_DATA_DIR=~/rubin_sim_data
-          echo $RUBIN_SIM_DATA_DIR 
+          echo $RUBIN_SIM_DATA_DIR
           ls $RUBIN_SIM_DATA_DIR
           echo "__contents of versions.txt__"
           cat $RUBIN_SIM_DATA_DIR/versions.txt
@@ -71,7 +72,7 @@ jobs:
         name: Download data.
         shell: bash -l {0}
         run: |
-          export RUBIN_SIM_DATA_DIR=~/rubin_sim_data       
+          export RUBIN_SIM_DATA_DIR=~/rubin_sim_data
           rs_download_data --force --dirs scheduler,site_models,skybrightness_pre,throughputs,tests --tdqm_disable
 
       - name: install schedview

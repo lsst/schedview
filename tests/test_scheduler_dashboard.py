@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 import bokeh.io
 import bokeh.plotting
 import pandas as pd
+import rubin_sim
 import rubin_sim.site_models
 from astropy.time import Time
 from pandas import Timestamp
@@ -132,6 +133,7 @@ class TestSchedulerDashboard(unittest.TestCase):
         self.assertIn("reward", survey_maps)
         self.assertIn("g_sky", survey_maps)
 
+    @unittest.skipIf(rubin_sim.__version__ == "1.3.2", "wind and seeing not supported by rubin_sim 1.3.2")
     def test_site_models(self):
         wind_speed = 4
         wind_direction = 25

@@ -15,5 +15,7 @@ dependencies:
  - uranography
  - param
  - git
- - pip
  - wget
+ - pip
+ - pip:
+   - lsst.resources

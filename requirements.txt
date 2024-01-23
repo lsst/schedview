@@ -1,4 +1,5 @@
 holoviews
 hvplot
-rubin-sim <2.0
+rubin-sim = 1.3.2
 uranography
+pip
