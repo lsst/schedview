@@ -911,6 +911,21 @@ class Scheduler(param.Parameterized):
             )
             self._sky_map_base.plot.add_layout(color_bar, "below")
             self._sky_map_base.plot.below[1].visible = False
+            self._sky_map_base.plot.toolbar.autohide = True  # show toolbar only when mouseover plot
+            self._sky_map_base.plot.title.text = ""  # remove 'Horizon' title
+            self._sky_map_base.plot.legend.propagate_hover = True  # hover tool works over in-plot legend
+            self._sky_map_base.plot.legend.title = "Key"
+            self._sky_map_base.plot.legend.title_text_font_style = "bold"
+            self._sky_map_base.plot.legend.border_line_color = "#048b8c"
+            self._sky_map_base.plot.legend.border_line_width = 3
+            self._sky_map_base.plot.legend.border_line_alpha = 1
+            self._sky_map_base.plot.legend.label_standoff = 10  # gap between images and text
+            self._sky_map_base.plot.legend.padding = 15  # space around inside edge
+            self._sky_map_base.plot.legend.title_standoff = 10  # space between title and items
+            self._sky_map_base.plot.legend.click_policy = "hide"  # hide elements when clicked
+            self._sky_map_base.plot.add_layout(self._sky_map_base.plot.legend[0], "right")
+            self._sky_map_base.plot.right[0].location = "center_right"
+
             self._debugging_message = "Finished creating sky map base."
 
         except Exception:
@@ -1313,178 +1328,6 @@ class RestrictedFilesScheduler(Scheduler):
             self.param["scheduler_fname"].update(path=f"{data_dir}/*scheduler*.p*")
 
 
-# --------------------------------------------------------------- Key functions
-
-
-def generate_array_for_key(number_of_columns=4):
-    """Create a dictionary of data for the key.
-
-    Parameters
-    ----------
-    number_of_columns : 'int', optional
-        The number of columns to display key objects in. The default is 4.
-
-    Returns
-    -------
-    data : 'dict'
-        Coordinate, styling and text data for key.
-    """
-    return {
-        # x,y coordinates for glyphs (lines, circles and text).
-        "x_title": np.array([7]),  # Title x coord
-        "y_title": np.array([5.75]),  # Title y coord
-        "x_circles": np.tile(8, number_of_columns),  # Circle centre coords
-        "x_text_1": np.tile(2.5, number_of_columns),  # Text in colunn 1
-        "x_text_2": np.tile(8.75, number_of_columns),  # Text in column 2
-        "x0_lines": np.tile(0.75, number_of_columns),  # Start lines
-        "x1_lines": np.tile(2, number_of_columns),  # End lines
-        "y": np.arange(number_of_columns, 0, -1),  # y coords for all items except title
-        # Colours and sizes of images.
-        "line_colours": np.array(["black", "red", "#1f8f20", "#110cff"]),
-        "circle_colours": np.array(["#ffa500", "brown", "black", "#1f8f20"]),
-        "circle_fill_alpha": np.array([1, 1, 0, 0.5]),
-        "circle_sizes": np.tile(10, number_of_columns),
-        # Text for title and key items.
-        "title_text": np.array(["Key"]),
-        "text_1": np.array(["Horizon", "ZD=70 degrees", "Ecliptic", "Galactic plane"]),
-        "text_2": np.array(["Moon position", "Sun position", "Survey field(s)", "Telescope pointing"]),
-    }
-
-
-def generate_key():
-    """Populate a Bokeh plot with glyphs of key objects.
-
-    Returns
-    -------
-    key : 'bokeh.models.Plot'
-        A key for the dashboard map.
-    """
-    data_array = generate_array_for_key()
-
-    # Assign data to relevant data source (to be used in glyph creation below).
-    title_source = bokeh.models.ColumnDataSource(
-        dict(
-            x=data_array["x_title"],
-            y=data_array["y_title"],
-            text=data_array["title_text"],
-        )
-    )
-    text1_source = bokeh.models.ColumnDataSource(
-        dict(
-            x=data_array["x_text_1"],
-            y=data_array["y"],
-            text=data_array["text_1"],
-        )
-    )
-    text2_source = bokeh.models.ColumnDataSource(
-        dict(
-            x=data_array["x_text_2"],
-            y=data_array["y"],
-            text=data_array["text_2"],
-        )
-    )
-    circle_source = bokeh.models.ColumnDataSource(
-        dict(
-            x=data_array["x_circles"],
-            y=data_array["y"],
-            sizes=data_array["circle_sizes"],
-            colours=data_array["circle_colours"],
-            fill_alpha=data_array["circle_fill_alpha"],
-        )
-    )
-    line_source = bokeh.models.ColumnDataSource(
-        dict(
-            x0=data_array["x0_lines"],
-            y0=data_array["y"],
-            x1=data_array["x1_lines"],
-            y1=data_array["y"],
-            colours=data_array["line_colours"],
-        )
-    )
-
-    # Create glyphs.
-    border_glyph = bokeh.models.Rect(
-        x=7,
-        y=3.25,
-        width=14,
-        height=6.5,
-        line_color="#048b8c",
-        fill_color=None,
-        line_width=3,
-    )
-    header_glyph = bokeh.models.Rect(
-        x=7,
-        y=5.75,
-        width=14,
-        height=1.5,
-        line_color=None,
-        fill_color="#048b8c",
-    )
-    title_glyph = bokeh.models.Text(
-        x="x",
-        y="y",
-        text="text",
-        text_font_size="15px",
-        text_color="white",
-        text_baseline="middle",
-        text_font={"value": "verdana"},
-        text_align="center",
-    )
-    text1_glyph = bokeh.models.Text(
-        x="x",
-        y="y",
-        text="text",
-        text_font_size="10px",
-        text_color="black",
-        text_baseline="middle",
-        text_font={"value": "verdana"},
-    )
-    text2_glyph = bokeh.models.Text(
-        x="x",
-        y="y",
-        text="text",
-        text_font_size="10px",
-        text_color="black",
-        text_baseline="middle",
-        text_font={"value": "verdana"},
-    )
-    circle_glyph = bokeh.models.Circle(
-        x="x",
-        y="y",
-        size="sizes",
-        line_color="colours",
-        fill_color="colours",
-        fill_alpha="fill_alpha",
-    )
-    line_glyph = bokeh.models.Segment(
-        x0="x0",
-        y0="y0",
-        x1="x1",
-        y1="y1",
-        line_color="colours",
-        line_width=2,
-        line_cap="round",
-    )
-
-    key = bokeh.models.Plot(
-        title=None,
-        width=300,
-        height=150,
-        min_border=0,
-        toolbar_location=None,
-    )
-
-    key.add_glyph(border_glyph)
-    key.add_glyph(header_glyph)
-    key.add_glyph(title_source, title_glyph)
-    key.add_glyph(text1_source, text1_glyph)
-    key.add_glyph(text2_source, text2_glyph)
-    key.add_glyph(circle_source, circle_glyph)
-    key.add_glyph(line_source, line_glyph)
-
-    return key
-
-
 # ------------------------------------------------------------ Create dashboard
 
 
@@ -1623,7 +1466,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         pn.Spacer(width=10),
     )
     # Map display and header.
-    sched_app[8:59, 67:100] = pn.Column(
+    sched_app[8:67, 67:100] = pn.Column(
         pn.Spacer(height=10),
         pn.Row(
             scheduler.map_title,
@@ -1631,16 +1474,17 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         ),
         pn.param.ParamMethod(scheduler.publish_sky_map, loading_indicator=True),
     )
-    # Key.
-    sched_app[66:87, 67:87] = pn.Column(
-        pn.Spacer(height=32),
-        pn.pane.Bokeh(generate_key()),
-    )
     # Map display parameters (map, nside, color palette).
-    sched_app[66:87, 87:100] = pn.Param(
+    sched_app[74:87, 67:100] = pn.Param(
         scheduler,
+        widgets={
+            "survey_map": {"type": pn.widgets.Select, "width": 250},
+            "nside": {"type": pn.widgets.Select, "width": 150},
+            "color_palette": {"type": pn.widgets.Select, "width": 100},
+        },
         parameters=["survey_map", "nside", "color_palette"],
         show_name=False,
+        default_layout=pn.Row,
     )
     # Debugging collapsable card.
     sched_app[87:100, :] = pn.Card(
