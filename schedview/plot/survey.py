@@ -98,25 +98,6 @@ def map_survey_healpix(
         name="hpix_renderer",
     )
 
-    sky_map.add_horizon_graticules()
-    sky_map.add_ecliptic()
-    sky_map.add_galactic_plane()
-
-    sky_map.add_marker(
-        sun_coords.ra.deg,
-        sun_coords.dec.deg,
-        name="Sun",
-        glyph_size=15,
-        circle_kwargs={"color": "brown"},
-    )
-    sky_map.add_marker(
-        moon_coords.ra.deg,
-        moon_coords.dec.deg,
-        name="Moon",
-        glyph_size=15,
-        circle_kwargs={"color": "orange"},
-    )
-
     # Add the hovertool
     hpix_datasource = sky_map.plot.select(name="hpix_ds")[0]
     hpix_renderer = sky_map.plot.select(name="hpix_renderer")[0]
@@ -128,41 +109,7 @@ def map_survey_healpix(
         ("Declination (deg)", "@center_decl"),
     ]
 
-    if conditions is not None and conditions.tel_az is not None and conditions.tel_alt is not None:
-        telescope_marker_data_source = bokeh.models.ColumnDataSource(
-            data={
-                "az": [np.degrees(conditions.tel_az)],
-                "alt": [np.degrees(conditions.tel_alt)],
-                "name": ["telescope_pointing"],
-                "glyph_size": [20],
-            },
-            name="telescope_pointing",
-        )
-
-        sky_map.add_marker(
-            data_source=telescope_marker_data_source,
-            name="telescope_pointing_marker",
-            circle_kwargs={"color": "green", "fill_alpha": 0.5},
-        )
-
-    if survey is not None:
-        try:
-            survey_field_data_source = bokeh.models.ColumnDataSource(
-                data={
-                    "ra": list(survey.ra_deg),
-                    "decl": list(survey.dec_deg),
-                    "name": ["survey_pointing {i}" for i, ra in enumerate(list(survey.ra_deg))],
-                    "glyph_size": [20] * len(list(survey.ra_deg)),
-                },
-                name="survey_pointings",
-            )
-            sky_map.add_marker(
-                data_source=survey_field_data_source,
-                name="survey_field_marker",
-                circle_kwargs={"color": "black", "fill_alpha": 0},
-            )
-        except AttributeError:
-            pass
+    sky_map.add_horizon_graticules()
 
     # If we have alt/az coordinates, include them
     if "x_hz" in shown_hpix_data.keys() and "y_hz" in shown_hpix_data.keys():
@@ -196,8 +143,76 @@ def map_survey_healpix(
             shown_hpix_data["airmass"] = airmass
             tooltips.append(("airmass", "@airmass"))
 
-        sky_map.add_horizon(89.99, line_kwargs={"color": "black", "line_width": 2})
-        sky_map.add_horizon(70, line_kwargs={"color": "red", "line_width": 2})
+        sky_map.add_horizon(
+            89.99, line_kwargs={"color": "#000000", "line_width": 2, "legend_label": "Horizon"}
+        )
+        sky_map.add_horizon(
+            70, line_kwargs={"color": "#D55E00", "line_width": 2, "legend_label": "ZD = 70 degrees"}
+        )
+
+    # "line_dash": "dashed"
+    sky_map.add_ecliptic(legend_label="Ecliptic", line_width=2, color="#009E73", line_dash="dashed")
+    sky_map.add_galactic_plane(
+        legend_label="Galactic plane", color="#0072B2", line_width=2, line_dash="dotted"
+    )
+
+    sky_map.add_marker(
+        sun_coords.ra.deg,
+        sun_coords.dec.deg,
+        name="Sun",
+        glyph_size=15,
+        circle_kwargs={
+            "color": "brown",
+            "legend_label": "Sun position",
+        },
+    )
+    sky_map.add_marker(
+        moon_coords.ra.deg,
+        moon_coords.dec.deg,
+        name="Moon",
+        glyph_size=15,
+        circle_kwargs={
+            "color": "orange",
+            "legend_label": "Moon position",
+            "tags": ["circle", "orange"],
+        },
+    )
+
+    if conditions is not None and conditions.tel_az is not None and conditions.tel_alt is not None:
+        telescope_marker_data_source = bokeh.models.ColumnDataSource(
+            data={
+                "az": [np.degrees(conditions.tel_az)],
+                "alt": [np.degrees(conditions.tel_alt)],
+                "name": ["telescope_pointing"],
+                "glyph_size": [20],
+            },
+            name="telescope_pointing",
+        )
+
+        sky_map.add_marker(
+            data_source=telescope_marker_data_source,
+            name="telescope_pointing_marker",
+            circle_kwargs={"color": "green", "fill_alpha": 0.5, "legend_label": "Telescope pointing"},
+        )
+
+    if survey is not None:
+        try:
+            survey_field_data_source = bokeh.models.ColumnDataSource(
+                data={
+                    "ra": list(survey.ra_deg),
+                    "decl": list(survey.dec_deg),
+                    "name": ["survey_pointing {i}" for i, ra in enumerate(list(survey.ra_deg))],
+                    "glyph_size": [20] * len(list(survey.ra_deg)),
+                },
+                name="survey_pointings",
+            )
+            sky_map.add_marker(
+                data_source=survey_field_data_source,
+                name="survey_field_marker",
+                circle_kwargs={"color": "black", "fill_alpha": 0, "legend_label": "Survey field(s)"},
+            )
+        except AttributeError:
+            pass
 
     for key in hpix_data:
         column_name = key.replace(" ", "_").replace(".", "_").replace("@", "_")
