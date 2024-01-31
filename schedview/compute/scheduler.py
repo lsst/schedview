@@ -317,12 +317,16 @@ def make_unique_survey_name(scheduler, survey_index=None):
     except AttributeError:
         survey_name = str(survey)
 
-    if hasattr(survey, "observations") and (survey.survey_name != survey.observations["note"][0]):
+    if (
+        hasattr(survey, "observations")
+        and ("note" in survey.observations)
+        and (survey.survey_name != survey.observations["note"][0])
+    ):
         survey_name = f"{survey.observations['note'][0]}"
 
     survey_name = f"{survey_index[1]}: {survey_name}"
 
-    # Bekeh tables have problems with < and >
+    # Bokeh tables have problems with < and >
     survey_name = survey_name.replace("<", "").replace(">", "")
 
     return survey_name
