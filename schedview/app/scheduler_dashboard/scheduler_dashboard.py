@@ -50,6 +50,7 @@ from pytz import timezone
 
 # For the conditions.mjd bugfix
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
+from rubin_scheduler.skybrightness_pre.sky_model_pre import SkyModelPre
 
 import schedview
 import schedview.collect.scheduler_pickle
@@ -86,6 +87,13 @@ stylesheet = """
 --mono-font: Helvetica;
 }
 """
+
+# Load available datetime range from SkyBrightness_Pre files
+sky_model = SkyModelPre()
+DATE_BOUNDS = (
+    Time(sky_model.mjd_left.min(), format="mjd").to_datetime(),
+    Time(sky_model.mjd_right.max(), format="mjd").to_datetime(),
+)
 
 
 def url_formatter(dataframe_row, name_column, url_column):
@@ -127,9 +135,7 @@ class Scheduler(param.Parameterized):
         doc=scheduler_fname_doc,
     )
     widget_datetime = param.Date(
-        default=DEFAULT_CURRENT_TIME.datetime.date(),
-        label="Date and time (UTC)",
-        doc="",
+        default=DEFAULT_CURRENT_TIME.datetime.date(), label="Date and time (UTC)", doc="", bounds=DATE_BOUNDS
     )
     url_mjd = param.Number(default=None)
     widget_tier = param.Selector(
