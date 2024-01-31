@@ -505,6 +505,7 @@ class Scheduler(param.Parameterized):
         self._survey_reward_df = None
         self._sky_map_base = None
         self._display_dashboard_data = False
+        self.reward_widget = None
 
         self.param.trigger("_publish_summary_widget")
         self.param.trigger("_publish_reward_widget")
@@ -1431,15 +1432,27 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         styles={"background": "#048b8c"},
     )
     # Parameter inputs (pickle, widget_datetime, tier).
-    sched_app[8:33, 0:21] = pn.Param(
+    sched_app[8:32, 0:21] = pn.Param(
         scheduler,
         parameters=["scheduler_fname", "widget_datetime", "widget_tier"],
         widgets=data_loading_widgets,
         name="Select pickle file, date and tier.",
     )
+    # reset dashboard to loading conditions
+    reset_button = pn.widgets.Button(icon="restore", name="Restore Loading Conditions")
+
+    def handle_reload_pickle(event):
+        if scheduler.scheduler_fname == "":
+            scheduler.clear_dashboard()
+        else:
+            scheduler._update_scheduler_fname()
+
+    reset_button.on_click(handle_reload_pickle)
+
+    sched_app[32:36, 3:15] = pn.Row(reset_button)
 
     # Survey rewards table and header.
-    sched_app[8:33, 21:67] = pn.Row(
+    sched_app[8:36, 21:67] = pn.Row(
         pn.Spacer(width=10),
         pn.Column(
             pn.Spacer(height=10),
@@ -1453,7 +1466,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         sizing_mode="stretch_height",
     )
     # Reward table and header.
-    sched_app[33:87, 0:67] = pn.Row(
+    sched_app[36:87, 0:67] = pn.Row(
         pn.Spacer(width=10),
         pn.Column(
             pn.Spacer(height=10),
