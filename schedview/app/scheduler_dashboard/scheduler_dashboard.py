@@ -505,6 +505,7 @@ class Scheduler(param.Parameterized):
         self._survey_reward_df = None
         self._sky_map_base = None
         self._display_dashboard_data = False
+        self.reward_widget = None
 
         self.param.trigger("_publish_summary_widget")
         self.param.trigger("_publish_reward_widget")
