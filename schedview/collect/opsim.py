@@ -1,8 +1,8 @@
 import sqlite3
-import urllib
 
 import numpy as np
 import pandas as pd
+import yaml
 from astropy.time import Time
 from lsst.resources import ResourcePath
 
@@ -28,10 +28,20 @@ def read_opsim(opsim_uri, start_time="2000-01-01", end_time="2100-01-01"):
     end_mjd = Time(end_time).mjd
 
     original_resource_path = ResourcePath(opsim_uri)
-    with original_resource_path.as_local() as local_resource_path:
-        filename = urllib.parse.urlparse(str(local_resource_path)).path
 
-        with sqlite3.connect(filename) as sim_connection:
+    if original_resource_path.isdir():
+        # If we were given a directory, look for a metadata file in the
+        # directory, and look up in it what file to load observations from.
+        metadata_path = original_resource_path.join("sim_metadata.yaml")
+        sim_metadata = yaml.safe_load(metadata_path.read().decode("utf-8"))
+        obs_basename = sim_metadata["files"]["observations"]["name"]
+        obs_path = original_resource_path.join(obs_basename)
+    else:
+        # otherwise, assume we were given the path to the observations file.
+        obs_path = original_resource_path
+
+    with obs_path.as_local() as local_obs_path:
+        with sqlite3.connect(local_obs_path.ospath) as sim_connection:
             visits = pd.read_sql_query(
                 f"SELECT * FROM observations WHERE observationStartMJD BETWEEN {start_mjd} AND {end_mjd}",
                 sim_connection,

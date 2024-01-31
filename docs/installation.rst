@@ -63,3 +63,34 @@ Building the documentation requires the installation of ``documenteer[guide]``:
  $ package-docs build
 
 The root of the local documentation will then be ``docs/_build/html/index.html``.
+
+Using the schedview S3 bucket
+-----------------------------
+
+If a user has appropriate credentials, ``schedview`` can read data from an
+``S3`` bucket. To have the ``prenight`` dashboard read data from as ``S3``
+bucket, a few steps are needed to prepare the environment in which the
+dashboard will be run.
+
+First, the bucket credentials with access to the the endpoint and bucket
+in which the archive resides need to be added to ``.lsst/aws-credentials.ini``
+file in the account that will be running the dashboard.
+
+For the pre-night ``S3`` bucket at the USDF, the endpoint is
+``https://s3dfrgw.slac.stanford.edu/`` and the bucket name is
+``rubin-scheduler-prenight``. Access to this bucket must be
+coordinated with the USDF administrators and the Rubin Observatory
+survey scheduling team.
+
+For example, if the USDF ``S3`` bucket is to be used anth the section with
+the ``aws_access_key_id`` and ``aws_secret_access_key`` with access to this
+endpoint and bucket is ``prenight``, then the following environment variables
+need to be set in the process running the dashboard:
+
+::
+
+     $ export S3_ENDPOINT_URL='https://s3dfrgw.slac.stanford.edu/'
+     $ export AWS_PROFILE=prenight
+
+The first of these (``S3_ENDPOINT_URL``) might have been set up automatically
+for you if you are running on the USDF.

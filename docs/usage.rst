@@ -25,7 +25,7 @@ Activate the conda environment and start the app:
 
 The app will then give you the URL at which you can find the app.
 
-By default, the app will allow the user to select ``opsim`` databas, pickles of
+By default, the app will allow the user to select ``opsim`` database, pickles of
 scheduler instances, and rewards data from ``/sdf/group/rubin/web_data/sim-data/schedview``
 (if it is being run at the USDF) or the samples directory (elsewhere).
 The data directory from which a user can select files can be set on startup:
@@ -34,7 +34,30 @@ The data directory from which a user can select files can be set on startup:
 
     $ prenight --data_dir /path/to/data/files
 
-Alternately, the user can be allowed to enter arbitrary URLs for these files.
+Alternately, ``prenight`` can be set to look at an archive of simulation
+output in an S3 bucket:
+
+::
+
+    $ export S3_ENDPOINT_URL='https://s3dfrgw.slac.stanford.edu/'
+    $ export AWS_PROFILE=prenight_aws_profile
+    $ prenight --resource_uri='s3://rubin-scheduler-prenight/opsim/' --data_from_archive
+
+where ``prenight_aws_profile`` should be replaced by whatever section of
+the ``~/.lsst/aws-credentials.ini`` file has the credentials needed for
+access to the ``rubin-scheduler-prenight`` bucket.
+
+The ``resources-uri`` can also be set to a local directory tree with the same
+layout as the above S3 bucket, in which case filesystem access is needed to
+that directory tree, but the environment variables above are not. For example:
+
+::
+
+    $ prenight --resource-uri='file:///where/my/data/is/' --data_from_archive
+
+Note that the trailing ``/`` in the ``resource-uri`` value is required.
+
+Finally, the user can be allowed to enter arbitrary URLs for these files.
 (Note that this is not secure, because it will allow the user to upload
 malicious pickles. So, it should only be done when public access to the
 dashboard is not possible.) Such a dashboard can be started thus:

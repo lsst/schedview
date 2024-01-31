@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import sys
-import urllib.parse
 from pathlib import Path
 
 import astropy.utils.iers
@@ -21,6 +20,7 @@ from rubin_scheduler.utils import survey_start_mjd
 import schedview.collect.footprint
 import schedview.collect.opsim
 import schedview.collect.resources
+import schedview.collect.rewards
 import schedview.compute.astro
 import schedview.compute.scheduler
 import schedview.param
@@ -183,6 +183,8 @@ class Prenight(param.Parameterized):
         },
     )
     _obs_rewards = schedview.param.Series()
+
+    _autoload_rewards = False
 
     def __init__(self, **params):
         super().__init__(**params)
@@ -520,6 +522,28 @@ class Prenight(param.Parameterized):
         return vmap
 
     @param.depends("rewards_fname", watch=True)
+    def _update_rewards(self):
+        if self.rewards_fname is None or len(self.rewards_fname) < 1:
+            return None
+
+        reward_df, obs_rewards = schedview.collect.rewards.read_rewards(
+            self.rewards_fname,
+            Time(self._almanac_events.loc["sunset", "UTC"]),
+            Time(self._almanac_events.loc["sunrise", "UTC"]),
+        )
+
+        if reward_df is not None:
+            self._reward_df = reward_df
+            self.logger.info("Finished updating reward dataframe.")
+        else:
+            self.logger.warning("Could not update reward dataframe.")
+
+        if obs_rewards is not None:
+            self._obs_rewards = obs_rewards
+            self.logger.info("Finished updating obs_rewards.")
+        else:
+            self.logger.warning("Could not update obs_rewards.")
+
     def _update_reward_df(self):
         if self.rewards_fname is None or len(self.rewards_fname) < 1:
             return None
@@ -532,8 +556,7 @@ class Prenight(param.Parameterized):
                 raise FileNotFoundError(f"Resource not found: {self.rewards_fname}")
 
             with reward_resource.as_local() as local_resource:
-                local_fname = Path(urllib.parse.urlparse(str(local_resource)).path)
-                reward_df = pd.read_hdf(local_fname, "reward_df")
+                reward_df = pd.read_hdf(local_resource.ospath, "reward_df")
             self.logger.info("Finished updating reward dataframe.")
         except Exception as e:
             self.logger.error(e)
@@ -587,7 +610,6 @@ class Prenight(param.Parameterized):
         self.basis_function = "Total"
         self.logger.info("Finished updating basis function selector.")
 
-    @param.depends("rewards_fname", watch=True)
     def _update_obs_rewards(self):
         if self.rewards_fname is None:
             return None
@@ -599,8 +621,7 @@ class Prenight(param.Parameterized):
                 raise FileNotFoundError(f"Resource not found: {self.rewards_fname}")
 
             with reward_resource.as_local() as local_resource:
-                local_fname = Path(urllib.parse.urlparse(str(local_resource)).path)
-                obs_rewards = pd.read_hdf(local_fname, "obs_rewards")
+                obs_rewards = pd.read_hdf(local_resource.ospath, "obs_rewards")
 
             self._obs_rewards = obs_rewards
             self.logger.info("Finished updating obs_rewards.")
@@ -618,20 +639,28 @@ class Prenight(param.Parameterized):
         """
         self.logger.info("Starting to update reward params.")
         if self._reward_df is None:
-            this_param_set = pn.Param(
-                self.param,
-                parameters=["rewards_fname"],
-            )
-            return this_param_set
+            if self._autoload_rewards:
+                return "No rewards are loaded."
+            else:
+                this_param_set = pn.Param(
+                    self.param,
+                    parameters=["rewards_fname"],
+                )
+                return this_param_set
 
         if len(self.param["surveys"].objects) > 10:
             survey_widget = pn.widgets.CrossSelector
         else:
             survey_widget = pn.widgets.MultiSelect
 
+        if self._autoload_rewards:
+            settable_reward_params = ["tier", "basis_function", "surveys"]
+        else:
+            settable_reward_params = ["rewards_fname", "tier", "basis_function", "surveys"]
+
         this_param_set = pn.Param(
             self.param,
-            parameters=["rewards_fname", "tier", "basis_function", "surveys"],
+            parameters=settable_reward_params,
             default_layout=pn.Row,
             name="",
             widgets={"surveys": survey_widget},
@@ -885,17 +914,54 @@ class RestrictedInputPrenight(Prenight):
             fname_params[arg_name].objects = matching_resources
 
 
+class ArchiveInputPrenight(Prenight):
+    """A pre-night dashboard that read data from an archive."""
+
+    opsim_output_fname = param.Selector(
+        objects={None: None}, label="OpSim output", default=None, allow_None=True
+    )
+
+    _autoload_rewards = True
+
+    def __init__(self, resource_uri=DEFAULT_RESOURCE_URI, **kwargs):
+        super().__init__(**kwargs)
+
+        matching_resources = schedview.collect.resources.find_archive_resources(
+            resource_uri, file_key="observations"
+        )
+        self.param["opsim_output_fname"].objects.update(matching_resources)
+
+    @param.depends("opsim_output_fname", watch=True)
+    def _update_rewards_fname(self):
+        # When loading a new opsim output file, automaticallly load the
+        # corresponding rewards.
+        self.rewards_fname = ResourcePath(self.opsim_output_fname).dirname().geturl()
+
+
 def prenight_app(*args, **kwargs):
     """Create the pre-night briefing app."""
 
     try:
+        # Let the user write URL for specific data files directely into
+        # the dashboard.
         data_from_urls = kwargs["data_from_urls"]
         del kwargs["data_from_urls"]
     except KeyError:
         data_from_urls = False
 
+    try:
+        # Provide a URI for an anchive that contains the data from
+        # which a user may choose.
+        data_from_archive = kwargs["data_from_archive"]
+        del kwargs["data_from_archive"]
+    except KeyError:
+        data_from_archive = False
+
     if data_from_urls:
         prenight = Prenight()
+    elif data_from_archive:
+        resource_uri = kwargs["resource_uri"] if "resource_uri" in kwargs else None
+        prenight = ArchiveInputPrenight(resource_uri=resource_uri)
     else:
         try:
             resource_uri = kwargs["resource_uri"]
@@ -957,13 +1023,19 @@ def parse_prenight_args():
         "-d",
         type=str,
         default=DEFAULT_RESOURCE_URI,
-        help="The base URI for data files.",
+        help="The base URI for the archive containing the data.",
     )
 
     parser.add_argument(
         "--data_from_urls",
         action="store_true",
         help="Let the user specify URLs from which to load data. THIS IS NOT SECURE.",
+    )
+
+    parser.add_argument(
+        "--data_from_archive",
+        action="store_true",
+        help="Load data from a simulation archive using archive metadata.",
     )
 
     parser.add_argument(

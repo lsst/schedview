@@ -2,7 +2,12 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import pandas as pd
+from lsst.resources import ResourcePath
+
+from schedview.collect.opsim import read_opsim
 from schedview.collect.resources import find_file_resources
+from schedview.collect.rewards import read_rewards
 
 
 class TestResources(unittest.TestCase):
@@ -23,3 +28,21 @@ class TestResources(unittest.TestCase):
             found_files = find_file_resources(temp_dir)
 
         assert set(made_files) == set(found_files)
+
+
+class TestCollectOpsim(unittest.TestCase):
+    def test_read_opsim(self):
+        resource_path = ResourcePath("resource://schedview/data/")
+        visits = read_opsim(resource_path)
+        self.assertTrue("airmass" in visits.columns)
+        self.assertGreater(len(visits), 0)
+
+
+class TestCollectRewards(unittest.TestCase):
+    def test_read_opsim(self):
+        resource_path = ResourcePath("resource://schedview/data/")
+        rewards_df, obs_rewards = read_rewards(resource_path)
+        self.assertGreater(len(rewards_df), 0)
+        self.assertGreater(len(obs_rewards), 0)
+        self.assertTrue("survey_reward" in rewards_df.columns)
+        self.assertTrue(isinstance(obs_rewards, pd.Series))

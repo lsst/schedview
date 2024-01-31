@@ -1,0 +1,5 @@
+files:
+  observations:
+    name: 'sample_opsim.db'
+  rewards:
+    name: 'sample_rewards.h5'
