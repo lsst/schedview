@@ -90,9 +90,11 @@ stylesheet = """
 
 # Load available datetime range from SkyBrightness_Pre files
 sky_model = SkyModelPre()
+MIN_DATE = Time(sky_model.mjd_left.min(), format="mjd")
+MAX_DATE = Time(sky_model.mjd_right.max(), format="mjd")
 DATE_BOUNDS = (
-    Time(sky_model.mjd_left.min(), format="mjd").to_datetime(),
-    Time(sky_model.mjd_right.max(), format="mjd").to_datetime(),
+    MIN_DATE.to_datetime(),
+    MAX_DATE.to_datetime(),
 )
 
 
@@ -135,7 +137,10 @@ class Scheduler(param.Parameterized):
         doc=scheduler_fname_doc,
     )
     widget_datetime = param.Date(
-        default=DEFAULT_CURRENT_TIME.datetime.date(), label="Date and time (UTC)", doc="", bounds=DATE_BOUNDS
+        default=DEFAULT_CURRENT_TIME.datetime.date(),
+        label="Date and time (UTC)",
+        doc=f"Select dates between {MIN_DATE.iso} and {MAX_DATE.iso}",
+        bounds=DATE_BOUNDS,
     )
     url_mjd = param.Number(default=None)
     widget_tier = param.Selector(
