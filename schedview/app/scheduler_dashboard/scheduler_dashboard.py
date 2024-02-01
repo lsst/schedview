@@ -92,8 +92,8 @@ stylesheet = """
 def get_sky_brightness_date_bounds():
     """Load available datetime range from SkyBrightness_Pre files"""
     sky_model = SkyModelPre()
-    min_date = Time(sky_model.mjd_left.min(), format="mjd").to_datetime()
-    max_date = Time(sky_model.mjd_right.max(), format="mjd").to_datetime()
+    min_date = Time(sky_model.mjd_left.min(), format="mjd")
+    max_date = Time(sky_model.mjd_right.max(), format="mjd")
     return (min_date, max_date)
 
 
@@ -131,7 +131,8 @@ class Scheduler(param.Parameterized):
     instance of rubin_scheduler.scheduler.conditions.Conditions.
     """
 
-    _date_bounds = get_sky_brightness_date_bounds()
+    (mjd_min, mjd_max) = get_sky_brightness_date_bounds()
+    date_bounds = (mjd_min.to_datetime(), mjd_max.to_datetime())
 
     scheduler_fname = param.String(
         default="",
@@ -141,8 +142,8 @@ class Scheduler(param.Parameterized):
     widget_datetime = param.Date(
         default=DEFAULT_CURRENT_TIME.datetime.date(),
         label="Date and time (UTC)",
-        doc=f"Select dates between {_date_bounds[0]} and {_date_bounds[1]}",
-        bounds=_date_bounds,
+        doc=f"Select dates between {date_bounds[0]} and {date_bounds[1]}",
+        bounds=date_bounds,
     )
     url_mjd = param.Number(default=None)
     widget_tier = param.Selector(
