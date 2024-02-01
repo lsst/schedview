@@ -18,10 +18,13 @@ from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 
 # Objects to test instances against
 from rubin_scheduler.scheduler.schedulers.core_scheduler import CoreScheduler
-from rubin_scheduler.utils import survey_start_mjd
 
 import schedview
-from schedview.app.scheduler_dashboard.scheduler_dashboard import Scheduler, scheduler_app
+from schedview.app.scheduler_dashboard.scheduler_dashboard import (
+    Scheduler,
+    get_sky_brightness_date_bounds,
+    scheduler_app,
+)
 
 # Schedview methods
 from schedview.compute.scheduler import make_scheduler_summary_df
@@ -48,14 +51,14 @@ Tests I usually perform:
 
 
 Notes
------
 
     - Unit tests are not supposed to rely on each other.
     - Unit tests are run in alphabetical order.
 
 """
+
 TEST_PICKLE = str(importlib.resources.files(schedview).joinpath("data", "sample_scheduler.pickle.xz"))
-MJD_START = survey_start_mjd()
+MJD_START = get_sky_brightness_date_bounds()[0]
 TEST_DATE = Time(MJD_START + 0.2, format="mjd").datetime
 DEFAULT_TIMEZONE = "America/Santiago"
 
