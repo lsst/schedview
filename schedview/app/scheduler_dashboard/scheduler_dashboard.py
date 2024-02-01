@@ -140,7 +140,7 @@ class Scheduler(param.Parameterized):
         doc=scheduler_fname_doc,
     )
     widget_datetime = param.Date(
-        default=DEFAULT_CURRENT_TIME.datetime.date(),
+        default=date_bounds[0],
         label="Date and time (UTC)",
         doc=f"Select dates between {date_bounds[0]} and {date_bounds[1]}",
         bounds=date_bounds,
