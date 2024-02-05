@@ -840,10 +840,10 @@ class Scheduler(param.Parameterized):
             "basis_function_class": "Class",
             "feasible": "Feasible",
             "max_basis_reward": "Max Reward",
-            "basis_area": "Area",
+            "basis_area": "Area (deg<sup>2</sup>)",
             "basis_weight": "Weight",
             "max_accum_reward": "Max Accumulated Reward",
-            "accum_area": "Accumulated Area",
+            "accum_area": "Accumulated Area (deg<sup>2</sup>)",
         }
         reward_widget = pn.widgets.Tabulator(
             self._survey_reward_df[columns],
