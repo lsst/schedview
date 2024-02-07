@@ -50,6 +50,7 @@ from pytz import timezone
 
 # For the conditions.mjd bugfix
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
+from rubin_scheduler.skybrightness_pre.sky_model_pre import SkyModelPre
 
 import schedview
 import schedview.collect.scheduler_pickle
@@ -88,6 +89,14 @@ stylesheet = """
 """
 
 
+def get_sky_brightness_date_bounds():
+    """Load available datetime range from SkyBrightness_Pre files"""
+    sky_model = SkyModelPre()
+    min_date = Time(sky_model.mjd_left.min(), format="mjd")
+    max_date = Time(sky_model.mjd_right.max(), format="mjd")
+    return (min_date, max_date)
+
+
 def url_formatter(dataframe_row, name_column, url_column):
     """Format survey name as a HTML href to survey URL (if URL exists).
 
@@ -121,15 +130,20 @@ class Scheduler(param.Parameterized):
     rubin_scheduler.scheduler.schedulers.CoreScheduler, and conditions is an
     instance of rubin_scheduler.scheduler.conditions.Conditions.
     """
+
+    (mjd_min, mjd_max) = get_sky_brightness_date_bounds()
+    date_bounds = (mjd_min.to_datetime(), mjd_max.to_datetime())
+
     scheduler_fname = param.String(
         default="",
         label="Scheduler pickle file",
         doc=scheduler_fname_doc,
     )
     widget_datetime = param.Date(
-        default=DEFAULT_CURRENT_TIME.datetime.date(),
+        default=date_bounds[0],
         label="Date and time (UTC)",
-        doc="",
+        doc=f"Select dates between {date_bounds[0]} and {date_bounds[1]}",
+        bounds=date_bounds,
     )
     url_mjd = param.Number(default=None)
     widget_tier = param.Selector(
