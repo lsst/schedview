@@ -888,9 +888,9 @@ class SchedulerDisplay:
         if "displayed_value_metadata" in self.bokeh_models:
             tier = f"tier {self.survey_index[0]}"
             survey = self._unique_survey_name()
-            self.bokeh_models[
-                "displayed_value_metadata"
-            ].text = f"<p>Displayed value: {self.map_key} from {tier}, {survey}</p>"
+            self.bokeh_models["displayed_value_metadata"].text = (
+                f"<p>Displayed value: {self.map_key} from {tier}, {survey}</p>"
+            )
 
     def make_time_display(self):
         """Create the bokeh model showing what time is being represented."""

@@ -1,7 +1,6 @@
-pytest<8.0.0
-black>=23.0.0,<24.0.0
+pytest
+black
 ruff
 pytest-cov
-pytest-black
 firefox
 geckodriver
