@@ -16,6 +16,8 @@ dependencies:
  - param
  - git
  - wget
+ - boto3
+ - botocore
  - pip
  - pip:
    - lsst.resources
