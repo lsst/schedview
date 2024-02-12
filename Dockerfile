@@ -16,4 +16,5 @@ RUN mkdir -p ${TEST_DATA_DIR} && \
 
 # Container execution
 ENV RUBIN_SIM_DATA_DIR=/home/${MAMBA_USER}/schedview/rubin_sim_data
-CMD prenight --port 8080
+ENV LSST_S3_USE_THREADS=False
+CMD prenight --port 8080 --data_from_archive --resource_uri=s3://rubin-scheduler-prenight/opsim/
