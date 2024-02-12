@@ -43,7 +43,7 @@ import rubin_scheduler.site_models
 from astropy.time import Time
 from astropy.utils.exceptions import AstropyWarning
 from bokeh.models import ColorBar, LinearColorMapper
-from bokeh.models.widgets.tables import BooleanFormatter, HTMLTemplateFormatter
+from bokeh.models.widgets.tables import BooleanFormatter, HTMLTemplateFormatter, NumberFormatter
 from pandas import Timestamp
 from panel.io.loading import start_loading_spinner, stop_loading_spinner
 from pytz import timezone
@@ -114,7 +114,7 @@ def url_formatter(dataframe_row, name_column, url_column):
         return dataframe_row[name_column]
     else:
         return f'<a href="{dataframe_row[url_column]}" target="_blank"> \
-            {dataframe_row[name_column]}</a>'
+            <i class="fa fa-link"></i></a>'
 
 
 class Scheduler(param.Parameterized):
@@ -694,28 +694,42 @@ class Scheduler(param.Parameterized):
         self._debugging_message = "Starting to create summary widget."
         tabulator_formatter = {"survey_name_with_id": HTMLTemplateFormatter(template="<%= value %>")}
         columns = [
-            "tier",
             "survey_index",
-            "survey_name_with_id",
-            "reward",
             "survey",
+            "reward",
+            "survey_name_with_id",
+            "tier",
             "survey_url",
         ]
         titles = {
             "survey_index": "Index",
-            "survey_name_with_id": "Survey",
+            "survey": "Survey",
             "reward": "Reward",
+            "survey_name_with_id": "Docs",
+        }
+        widths = {
+            "survey_index": "10%",
+            "survey": "50%",
+            "reward": "30%",
+            "survey_name_with_id": "10%",
+        }
+        text_align = {
+            "survey_index": "left",
+            "survey": "left",
+            "reward": "right",
+            "survey_name_with_id": "center",
         }
         summary_widget = pn.widgets.Tabulator(
             self._scheduler_summary_df[self._scheduler_summary_df["tier"] == self._tier][columns],
-            widths={"survey_index": "10%", "survey_name_with_id": "60%", "reward": "30%"},
-            text_align={"survey_index": "left", "survey_name": "left", "reward": "right"},
+            titles=titles,
+            widths=widths,
+            text_align=text_align,
+            sortable={"survey_name_with_id": False},
             show_index=False,
             formatters=tabulator_formatter,
-            titles=titles,
             disabled=True,
             selectable=1,
-            hidden_columns=["tier", "survey", "survey_url"],
+            hidden_columns=["tier", "survey_url"],
             pagination="remote",
             page_size=4,
             sizing_mode="stretch_width",
@@ -727,11 +741,11 @@ class Scheduler(param.Parameterized):
         """Update data for survey Tabulator widget."""
         self._debugging_message = "Starting to update summary widget."
         columns = [
-            "tier",
             "survey_index",
-            "survey_name_with_id",
-            "reward",
             "survey",
+            "reward",
+            "survey_name_with_id",
+            "tier",
             "survey_url",
         ]
         self.summary_widget._update_data(
@@ -794,6 +808,8 @@ class Scheduler(param.Parameterized):
                     self._conditions,
                     self._reward_df.loc[[(int(self._tier[-1]), self._survey)], :],
                 )
+                # Create accumulation order column.
+                survey_reward_df["accum_order"] = range(len(survey_reward_df))
                 # Duplicate column and apply
                 # URL formatting to one of the columns.
                 survey_reward_df["basis_function_href"] = survey_reward_df.loc[:, "basis_function"]
@@ -822,38 +838,64 @@ class Scheduler(param.Parameterized):
         tabulator_formatter = {
             "basis_function_href": HTMLTemplateFormatter(template="<%= value %>"),
             "feasible": BooleanFormatter(),
+            "basis_area": NumberFormatter(format="0.00"),
+            "accum_area": NumberFormatter(format="0.00"),
+            "max_basis_reward": NumberFormatter(format="0.000"),
+            "max_accum_reward": NumberFormatter(format="0.000"),
+            "basis_weight": NumberFormatter(format="0.0"),
         }
         columns = [
-            "basis_function_href",
+            "basis_function",
             "basis_function_class",
+            "basis_function_href",
             "feasible",
             "max_basis_reward",
             "basis_area",
             "basis_weight",
+            "accum_order",
             "max_accum_reward",
             "accum_area",
             "doc_url",
-            "basis_function",
         ]
         titles = {
-            "basis_function_href": "Basis Function",
+            "basis_function": "Basis Function",
             "basis_function_class": "Class",
+            "basis_function_href": "Docs",
             "feasible": "Feasible",
-            "max_basis_reward": "Max Reward",
-            "basis_area": "Area",
+            "max_basis_reward": "Max. Reward",
+            "basis_area": "Area (deg<sup>2</sup>)",
             "basis_weight": "Weight",
-            "max_accum_reward": "Max Accumulated Reward",
-            "accum_area": "Accumulated Area",
+            "accum_order": "Accum. Order",
+            "max_accum_reward": "Max. Accum. Reward",
+            "accum_area": "Accum. Area (deg<sup>2</sup>)",
+        }
+        text_align = {
+            "basis_function": "left",
+            "basis_function_class": "left",
+            "basis_function_href": "center",
+            "feasible": "center",
+            "max_basis_reward": "right",
+            "basis_area": "right",
+            "basis_weight": "right",
+            "accum_order": "right",
+            "max_accum_reward": "right",
+            "accum_area": "right",
+        }
+        sortable = {
+            "feasible": False,
+            "basis_function_href": False,
         }
         reward_widget = pn.widgets.Tabulator(
             self._survey_reward_df[columns],
             titles=titles,
-            layout="fit_data",
+            text_align=text_align,
+            sortable=sortable,
+            layout="fit_data_stretch",
             show_index=False,
             formatters=tabulator_formatter,
             disabled=True,
-            frozen_columns=["basis_function_href"],
-            hidden_columns=["basis_function", "doc_url"],
+            frozen_columns=["basis_function"],
+            hidden_columns=["doc_url"],
             selectable=1,
             pagination="remote",
             page_size=13,
@@ -862,23 +904,24 @@ class Scheduler(param.Parameterized):
         self._debugging_message = "Finished making reward widget."
 
     def update_reward_widget_data(self):
-        """Update Treward abulator widget data."""
+        """Update Reward Tabulator widget data."""
         if self._survey_reward_df is None:
             return
 
         self._debugging_message = "Starting to update reward widget data."
         self.reward_widget.selection = []
         columns = [
-            "basis_function_href",
+            "basis_function",
             "basis_function_class",
+            "basis_function_href",
             "feasible",
             "max_basis_reward",
             "basis_area",
             "basis_weight",
+            "accum_order",
             "max_accum_reward",
             "accum_area",
             "doc_url",
-            "basis_function",
         ]
         self.reward_widget._update_data(self._survey_reward_df[columns])
         self._debugging_message = "Finished updating reward widget data."
@@ -1207,9 +1250,9 @@ class Scheduler(param.Parameterized):
             Lists the survey name if data is displayed; else a general title.
         """
         if not self._display_dashboard_data:
-            return "Rewards"
+            return "Basis functions & rewards"
         else:
-            return f"Rewards for survey {self._survey_name}"
+            return f"Basis functions & rewards for survey {self._survey_name}"
 
     def generate_map_heading(self):
         """Select the map heading based on whether a survey or reward map
