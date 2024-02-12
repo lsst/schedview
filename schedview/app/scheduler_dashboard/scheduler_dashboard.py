@@ -115,8 +115,6 @@ def url_formatter(dataframe_row, name_column, url_column):
     else:
         return f'<a href="{dataframe_row[url_column]}" target="_blank"> \
             <i class="fa fa-link"></i></a>'
-        # return f'<a href="{dataframe_row[url_column]}" target="_blank"> \
-        #     {dataframe_row[name_column]}</a>'
 
 
 class Scheduler(param.Parameterized):
