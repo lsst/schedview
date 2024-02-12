@@ -31,6 +31,7 @@ jobs:
         run: |
           mamba install --quiet --file=requirements.txt
           mamba install --quiet --file=test-requirements.txt
+          mamba install --yes botocore boto3
           pip install lsst.resources
           mamba list rubin-scheduler | grep -v "#" | awk '{print $2}' > ${{ github.workspace }}/rs_version
           echo "rs-version" `cat ${{ github.workspace }}/rs_version`
