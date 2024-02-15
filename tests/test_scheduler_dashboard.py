@@ -1,4 +1,7 @@
 import importlib.resources
+import re
+import subprocess
+import time
 import unittest
 from collections import OrderedDict
 from pathlib import Path
@@ -12,6 +15,7 @@ import rubin_scheduler.site_models
 from astropy.time import Time
 from pandas import Timestamp
 from panel.widgets import Tabulator
+from playwright.sync_api import expect, sync_playwright
 from rubin_scheduler.scheduler.example import example_scheduler
 from rubin_scheduler.scheduler.features.conditions import Conditions
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
@@ -149,6 +153,66 @@ class TestSchedulerDashboard(unittest.TestCase):
         self.assertEqual(wind_data.wind_speed, wind_speed)
         self.assertEqual(wind_data.wind_direction, wind_direction)
         self.assertEqual(seeing_data.fwhm_500, fiducial_seeing)
+
+
+class TestDashboardE2E(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.playwright = sync_playwright().start()
+        cls.browser = cls.playwright.chromium.launch()
+        cls.dashboard_process = subprocess.Popen(
+            ["python", "../schedview/app/scheduler_dashboard/scheduler_dashboard.py"]
+        )
+        time.sleep(10)  # TODO: replace this with better method
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls.browser.close()
+        cls.playwright.stop()
+
+        if hasattr(cls, "dashboard_process") and cls.dashboard_process:
+            cls.dashboard_process.terminate()
+            cls.dashboard_process.wait()
+
+    def test_without_data(self):
+        page = self.browser.new_page()
+        page.goto("http://localhost:8080/schedview-snapshot/dashboard")
+        # Check page title.
+        expect(page).to_have_title(re.compile("Scheduler Dashboard"))
+        # Check logo.
+        img_src = page.get_by_role("img").get_attribute("src")
+        page_img = self.browser.new_page()
+        page_img.goto(f"http://localhost:8080{img_src}")
+        expect(page_img).not_to_have_title("404: Not Found")
+        page_img.close()
+        # Check 'no data' messages.
+        expect(page.get_by_text("No summary available.")).to_be_visible()
+        expect(page.get_by_text("No scheduler loaded.")).to_be_visible()
+        expect(page.get_by_text("No rewards available.")).to_be_visible()
+
+    def test_with_data(self):
+        page = self.browser.new_page()
+        page.goto("http://localhost:8080/schedview-snapshot/dashboard")
+        # page.set_default_timeout(30000)
+        # Load data from pickle.
+        page.get_by_role("combobox").first.select_option(value=TEST_PICKLE)
+        time.sleep(30)  # TODO: replace this with better method
+        # wait for element state
+        # page.wait_for_load_state('load')
+        # with expect(page.get_by_role("grid")) as grid:
+        # Check two tables.
+        expect(page.get_by_role("grid")).to_have_count(2)
+
+        # Check docs link
+        # Get page after a specific action (e.g. clicking a link)
+        # with self.browser.expect_page() as new_page_info:
+        #     page.get_by_text("open new tab").click() # Opens a new tab
+        #     new_page = new_page_info.value
+        # new_page.wait_for_load_state()
+        # print(new_page.title())
 
 
 if __name__ == "__main__":
