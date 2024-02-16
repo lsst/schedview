@@ -165,7 +165,8 @@ class TestDashboardE2E(unittest.TestCase):
         cls.dashboard_process = subprocess.Popen(
             ["python", "../schedview/app/scheduler_dashboard/scheduler_dashboard.py"]
         )
-        time.sleep(10)  # TODO: replace this with better method
+        time.sleep(20)  # TODO: replace this with better method
+        # Wait for terminal to have "Launching server at http://localhost:8080/schedview-snapshot"?
 
     @classmethod
     def tearDownClass(cls):
@@ -196,23 +197,48 @@ class TestDashboardE2E(unittest.TestCase):
     def test_with_data(self):
         page = self.browser.new_page()
         page.goto("http://localhost:8080/schedview-snapshot/dashboard")
-        # page.set_default_timeout(30000)
+
         # Load data from pickle.
         page.get_by_role("combobox").first.select_option(value=TEST_PICKLE)
-        time.sleep(30)  # TODO: replace this with better method
-        # wait for element state
-        # page.wait_for_load_state('load')
-        # with expect(page.get_by_role("grid")) as grid:
+        page.wait_for_selector("text=Scheduler summary for tier 0")
+
         # Check two tables.
         expect(page.get_by_role("grid")).to_have_count(2)
 
-        # Check docs link
-        # Get page after a specific action (e.g. clicking a link)
-        # with self.browser.expect_page() as new_page_info:
-        #     page.get_by_text("open new tab").click() # Opens a new tab
-        #     new_page = new_page_info.value
-        # new_page.wait_for_load_state()
-        # print(new_page.title())
+        # Check docs link works.
+        with page.expect_popup() as page_docs_info:
+            row = page.get_by_role("row", name="0 0: ScriptedSurvey")
+            link = row.get_by_role("link")
+            link.click()
+        page_docs = page_docs_info.value
+        # TODO: Check something about docs page
+        page_docs.close()
+
+        # Change date.
+        page.get_by_role("textbox").click()  # open date picker
+        page.get_by_label("May 3,").click()  # choose day
+        page.locator(".flatpickr-time > div > .arrowUp").first.click()  # change hour
+        page.locator("div:nth-child(3) > .arrowUp").click()  # change minute
+        page.locator("div:nth-child(5) > .arrowUp").click()  # change second
+        page.get_by_text("::").press("Enter")  # submit
+
+        # Check pop-ups.
+        page.wait_for_selector("text=Updating Conditions object...")
+        expect(page.get_by_text("Updating Conditions object...").first).to_be_visible()
+        expect(page.get_by_text("Scheduler summary dataframe updated successfully")).to_be_visible()
+        page.wait_for_selector("text=Scheduler summary for tier 0")
+
+        # Reset loading conditions.
+        page.get_by_role("button", name="﫽 Restore Loading Conditions").click()
+        # Check info pop-ups appear.
+        expect(page.get_by_text("Making scheduler summary").first).to_be_visible()
+        expect(page.get_by_text("Scheduler pickle loaded")).to_be_visible()
+        page.wait_for_selector("text=Scheduler summary for tier 0")
+
+        # Check conditions are reset.
+        expect(page.get_by_role("textbox")).to_have_value("2025-05-02 10:19:45")
+        expect(page.get_by_role("combobox").nth(1)).to_have_value("tier 0")
+        # TODO: What other conditions do we expect to be reset?
 
 
 if __name__ == "__main__":
