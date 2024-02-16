@@ -64,7 +64,7 @@ warnings.filterwarnings("ignore", category=AstropyWarning)
 
 DEFAULT_CURRENT_TIME = Time.now()
 DEFAULT_TIMEZONE = "UTC"  # "America/Santiago"
-LOGO = "/assets/lsst_white_logo.png"
+LOGO = "/schedview-snapshot/assets/lsst_white_logo.png"
 COLOR_PALETTES = [color for color in bokeh.palettes.__palettes__ if "256" in color]
 PACKAGE_DATA_DIR = importlib.resources.files("schedview.data").as_posix()
 USDF_DATA_DIR = "/sdf/group/rubin/web_data/sim-data/schedview"
@@ -93,7 +93,7 @@ def get_sky_brightness_date_bounds():
     """Load available datetime range from SkyBrightness_Pre files"""
     sky_model = SkyModelPre()
     min_date = Time(sky_model.mjd_left.min(), format="mjd")
-    max_date = Time(sky_model.mjd_right.max(), format="mjd")
+    max_date = Time(sky_model.mjd_right.max(), format="mjd") - 0.001
     return (min_date, max_date)
 
 
@@ -709,7 +709,7 @@ class Scheduler(param.Parameterized):
         }
         widths = {
             "survey_index": "10%",
-            "survey": "50%",
+            "survey": "48%",
             "reward": "30%",
             "survey_name_with_id": "10%",
         }
@@ -730,9 +730,10 @@ class Scheduler(param.Parameterized):
             disabled=True,
             selectable=1,
             hidden_columns=["tier", "survey_url"],
-            pagination="remote",
-            page_size=4,
+            # pagination="remote",
+            # page_size=4,
             sizing_mode="stretch_width",
+            height=220,
         )
         self.summary_widget = summary_widget
         self._debugging_message = "Finished making summary widget."
@@ -846,7 +847,6 @@ class Scheduler(param.Parameterized):
         }
         columns = [
             "basis_function",
-            "basis_function_class",
             "basis_function_href",
             "feasible",
             "max_basis_reward",
@@ -859,7 +859,6 @@ class Scheduler(param.Parameterized):
         ]
         titles = {
             "basis_function": "Basis Function",
-            "basis_function_class": "Class",
             "basis_function_href": "Docs",
             "feasible": "Feasible",
             "max_basis_reward": "Max. Reward",
@@ -871,7 +870,6 @@ class Scheduler(param.Parameterized):
         }
         text_align = {
             "basis_function": "left",
-            "basis_function_class": "left",
             "basis_function_href": "center",
             "feasible": "center",
             "max_basis_reward": "right",
@@ -885,20 +883,31 @@ class Scheduler(param.Parameterized):
             "feasible": False,
             "basis_function_href": False,
         }
+        widths = {
+            "basis_function": "14%",
+            "basis_function_href": "5%",
+            "feasible": "6%",
+            "max_basis_reward": "10%",
+            "basis_area": "12%",
+            "basis_weight": "8%",
+            "accum_order": "13%",
+            "max_accum_reward": "15%",
+            "accum_area": "15%",
+        }
+
         reward_widget = pn.widgets.Tabulator(
             self._survey_reward_df[columns],
             titles=titles,
             text_align=text_align,
             sortable=sortable,
-            layout="fit_data_stretch",
             show_index=False,
             formatters=tabulator_formatter,
             disabled=True,
             frozen_columns=["basis_function"],
             hidden_columns=["doc_url"],
             selectable=1,
-            pagination="remote",
-            page_size=13,
+            height=400,
+            widths=widths,
         )
         self.reward_widget = reward_widget
         self._debugging_message = "Finished making reward widget."
@@ -912,7 +921,7 @@ class Scheduler(param.Parameterized):
         self.reward_widget.selection = []
         columns = [
             "basis_function",
-            "basis_function_class",
+            # "basis_function_class",
             "basis_function_href",
             "feasible",
             "max_basis_reward",
@@ -1518,9 +1527,10 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
                 styles={"background": "#048b8c"},
             ),
             pn.param.ParamMethod(scheduler.publish_summary_widget, loading_indicator=True),
+            # scroll=True
         ),
         pn.Spacer(width=10),
-        sizing_mode="stretch_height",
+        # sizing_mode="stretch_height",
     )
     # Reward table and header.
     sched_app[36:87, 0:67] = pn.Row(
