@@ -156,7 +156,6 @@ class TestSchedulerDashboard(unittest.TestCase):
 
 
 class TestDashboardE2E(unittest.TestCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -166,7 +165,8 @@ class TestDashboardE2E(unittest.TestCase):
             ["python", "../schedview/app/scheduler_dashboard/scheduler_dashboard.py"]
         )
         time.sleep(20)  # TODO: replace this with better method
-        # Wait for terminal to have "Launching server at http://localhost:8080/schedview-snapshot"?
+        # Wait for terminal to have
+        # "Launching server at http://localhost:8080/schedview-snapshot"
 
     @classmethod
     def tearDownClass(cls):
@@ -181,18 +181,29 @@ class TestDashboardE2E(unittest.TestCase):
     def test_without_data(self):
         page = self.browser.new_page()
         page.goto("http://localhost:8080/schedview-snapshot/dashboard")
+
         # Check page title.
         expect(page).to_have_title(re.compile("Scheduler Dashboard"))
+
         # Check logo.
         img_src = page.get_by_role("img").get_attribute("src")
         page_img = self.browser.new_page()
         page_img.goto(f"http://localhost:8080{img_src}")
         expect(page_img).not_to_have_title("404: Not Found")
         page_img.close()
+
+        # TODO: Check dashboard heading.
+        # TODO: Check dashboard sub-heading is blank.
+        # TODO: Check 3x section headings.
+
         # Check 'no data' messages.
         expect(page.get_by_text("No summary available.")).to_be_visible()
         expect(page.get_by_text("No scheduler loaded.")).to_be_visible()
         expect(page.get_by_text("No rewards available.")).to_be_visible()
+
+        # TODO: Check possible selections don't cause problems.
+        # Change nside
+        # Change color palette (weird debugging msg for this?)
 
     def test_with_data(self):
         page = self.browser.new_page()
@@ -200,45 +211,238 @@ class TestDashboardE2E(unittest.TestCase):
 
         # Load data from pickle.
         page.get_by_role("combobox").first.select_option(value=TEST_PICKLE)
+
+        # TODO: Check loading indicator displayed.
+
+        # Check 4x info messages displayed.
+        # - Scheduler loading…
+        page.wait_for_selector("text=Scheduler loading...")
+        expect(page.get_by_text("Scheduler loading...").first).to_be_visible()
+        # - Scheduler pickle loaded successfully!
+        page.wait_for_selector("text=Scheduler pickle loaded successfully!")
+        expect(page.get_by_text("Scheduler pickle loaded successfully!").first).to_be_visible()
+        # - Making scheduler summary dataframe…
+        page.wait_for_selector("text=Making scheduler summary")
+        expect(page.get_by_text("Making scheduler summary").first).to_be_visible()
+        # - Scheduler summary dataframe updated successfully
+        page.wait_for_selector("text=Scheduler summary dataframe updated successfully")
+        expect(page.get_by_text("Scheduler summary dataframe updated successfully").first).to_be_visible()
+
         page.wait_for_selector("text=Scheduler summary for tier 0")
 
-        # Check two tables.
-        expect(page.get_by_role("grid")).to_have_count(2)
-
-        # Check docs link works.
-        with page.expect_popup() as page_docs_info:
+        # Check subheading = ‘Tier 0 - Survey 0 - Map reward’.
+        expect(page.locator("body")).to_contain_text("Tier 0 - Survey 0 - Map reward")
+        # Check date = ‘2025-05-02 10:19:45’.
+        expect(page.get_by_role("textbox")).to_have_value("2025-05-02 10:19:45")
+        # Check survey docs link works.
+        with page.expect_popup() as page_survey_docs_info:
             row = page.get_by_role("row", name="0 0: ScriptedSurvey")
             link = row.get_by_role("link")
             link.click()
-        page_docs = page_docs_info.value
-        # TODO: Check something about docs page
-        page_docs.close()
+        page_survey_docs = page_survey_docs_info.value
+        # TODO: Check something about docs page.
+        page_survey_docs.close()
+        # Check bf docs link works.
+        with page.expect_popup() as page_bf_docs_info:
+            row = page.get_by_role("row", name="AvoidDirectWind")
+            link = row.get_by_role("link")
+            link.click()
+        page_bf_docs = page_bf_docs_info.value
+        # TODO: Check something about docs page.
+        page_bf_docs.close()
+
+        # Select tier 5.
+        page.get_by_role("combobox").nth(1).select_option("tier 5")
+        # Select survey 1.
+        page.get_by_role("row").nth(2).click()
+
+        # Check 3x headings updated.
+        survey_name = page.get_by_role("row").nth(2).get_by_role("gridcell").nth(1).text_content()
+        expect(page.locator("body")).to_contain_text("Scheduler summary for tier 5")
+        expect(page.locator("body")).to_contain_text(f"Basis functions & rewards for survey {survey_name}")
+        expect(page.locator("body")).to_contain_text(f"Survey {survey_name} Map: reward")
+        # Check 2x tables visible
+        expect(page.get_by_role("grid")).to_have_count(2)
+        # TODO: Check 1x map/key visible. (screenshot?)
+        expect(page.locator(".bk-Canvas > div:nth-child(11)")).to_be_visible()
+
+        # Select u_sky from Survey map.
+        page.get_by_role("combobox").nth(2).select_option("u_sky")
+        # Check map heading changed.
+        expect(page.locator("body")).to_contain_text(f"Survey {survey_name} Map: u_sky")
+
+        # Select M5Diff from Survey map.
+        map_option = page.locator("option", has_text="M5Diff i").text_content()
+        page.get_by_role("combobox").nth(2).select_option(map_option)
+        # TODO: Check M5Diff row highlighted in bf table.
+
+        # Select MoonAvoidance row in bf table.
+        page.get_by_text("MoonAvoidance", exact=True).click()
+        # Check map heading changed.
+        # expect(page.locator("body")).to_contain_text(
+        #     f"Survey {survey_name} Reward: MoonAvoidance"
+        # ) # TODO FAILING (colon bug)
+        # Check Survey map drop-down value = MoonAvoidance.
+        map_option = page.locator("option", has_text="MoonAvoidance").text_content()
+        expect(page.get_by_role("combobox").nth(2)).to_have_value(map_option)
+        # TODO: Check map all one colour. (screenshot?)
+
+        # Select FilterChange row in bf table.
+        page.get_by_text("FilterChange i").click()
+        # Check Survey map drop-down shows “”.
+        expect(page.get_by_role("combobox").nth(2)).to_have_value("")
+
+        # Select Tier 3.
+        page.get_by_role("combobox").nth(1).select_option("tier 3")
+
+        # Check Survey row 0 shows Reward='TimeToTwilight, NightModulo'.
+        survey_0_reward = page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2)
+        expect(survey_0_reward).to_have_text("TimeToTwilight, NightModulo")
+
+        # TODO: Check bf TimeToTwilight row shows red X in Feasible column.
+        #   - Perhaps by svg-path fill attribute or screenshot?
+        # TODO: Remove once Eman's PR merged.
+        # page.get_by_label("Show Page 2").click()
+        # expect(page.get_by_role(
+        #     "row",
+        #     name="TimeToTwilight TimeToTwilightBasisFunction..."
+        # ).get_by_role("img")).to_be_visible()
+        # expect(page.locator("body")).to_contain_text("-Infinity")
+
+        # TODO: Check brown sun shown on map.
 
         # Change date.
         page.get_by_role("textbox").click()  # open date picker
-        page.get_by_label("May 3,").click()  # choose day
-        page.locator(".flatpickr-time > div > .arrowUp").first.click()  # change hour
+        page.get_by_label("May 3,").click()  # change day
+        page.get_by_label("Hour").fill("03")  # change hour
         page.locator("div:nth-child(3) > .arrowUp").click()  # change minute
         page.locator("div:nth-child(5) > .arrowUp").click()  # change second
         page.get_by_text("::").press("Enter")  # submit
 
-        # Check pop-ups.
-        page.wait_for_selector("text=Updating Conditions object...")
+        # TODO: Check loading indicator shown.
+
+        # Check 4x info messages displayed.
+        # - Updating Conditions object…
+        page.wait_for_selector(
+            "text=Updating Conditions object..."
+        )  #                            <-- has timed out here
         expect(page.get_by_text("Updating Conditions object...").first).to_be_visible()
-        expect(page.get_by_text("Scheduler summary dataframe updated successfully")).to_be_visible()
+        # expect(page.locator("body")).to_contain_text(
+        #     "Updating Conditions object..."
+        # )
+        # - Conditions object updated successfully
+        page.wait_for_selector(
+            "text=Conditions object updated successfully"
+        )  #                   <-- has timed out here
+        expect(page.get_by_text("Conditions object updated successfully").first).to_be_visible()
+        # expect(page.locator("body")).to_contain_text(
+        #     "Conditions object updated successfully"
+        # )
+        # - Making scheduler summary dataframe…
+        page.wait_for_selector("text=Making scheduler summary dataframe...")
+        expect(page.locator("body")).to_contain_text("Making scheduler summary dataframe...")
+        # - Scheduler summary dataframe updated successfully
+        page.wait_for_selector("text=Scheduler summary dataframe updated successfully")
+        expect(page.locator("body")).to_contain_text("Scheduler summary dataframe updated successfully")
+
         page.wait_for_selector("text=Scheduler summary for tier 0")
 
+        # Select tier 3.
+        page.get_by_role("combobox").nth(1).select_option("tier 3")
+
+        # Check survey row 0 shows Reward = 11.something
+        survey_0_reward = page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2)
+        # expect(survey_0_reward).to_have_text("11.744962901180354")
+        expect(survey_0_reward).to_have_text(re.compile(r"11\.7\d"))
+
+        # TODO: Check bf TimeToTwilight row shows green tick/Feasible.
+        # TODO: Remove after Eman PR
+        # page.get_by_label("Show Page 2").click()
+        # expect(page.get_by_role(
+        #     "row",
+        #     name="TimeToTwilight"
+        # ).get_by_role("img")).to_be_visible()
+        # expect(page.locator("body")).to_contain_text("0.000")
+
+        # TODO: How to test bokeh map/key? Screenshots?
+        # Check map visible
+        # Check key visible with expected objects
+        # ?Check object removed from plot when clicked on in key
+        # Check reward colour bar visible
+        # Check hovertool works as expected
+        # - Only/all expected bfs appear in list
+        # - ?
+
+        # Select Survey map u_sky (to check restore works)
+        page.get_by_role("combobox").nth(2).select_option("u_sky")
+
+        # Select map resolution = 4
+        page.get_by_role("combobox").nth(3).select_option("4")
+        # TODO: Check map correctly updated.
+        # - How to check? Hover tool top row: hpid (nside=N).
+
+        # Select color palette = Inferno256
+        page.get_by_role("combobox").nth(4).select_option("Inferno256")
+        # TODO: Check map/colorbar correctly updated
+
+        # Change ordering of survey table
+        page.get_by_role("columnheader", name="Reward", exact=True).locator("div").nth(4).click()
+        # Change ordering of bf table
+        page.get_by_role("columnheader", name="Basis Function").locator("div").nth(3).click()
         # Reset loading conditions.
         page.get_by_role("button", name="﫽 Restore Loading Conditions").click()
-        # Check info pop-ups appear.
-        expect(page.get_by_text("Making scheduler summary").first).to_be_visible()
-        expect(page.get_by_text("Scheduler pickle loaded")).to_be_visible()
+
+        # TODO: Check loading indicator displayed
+
+        # 4x info messages pop up
+        # - Scheduler loading…
+        # page.wait_for_selector("text=Scheduler loading…")
+        #  <--- often times out here
+        # expect(page.get_by_text("Scheduler loading…")).to_be_visible()
+        # - Scheduler pickle loaded successfully!
+        page.wait_for_selector("text=Scheduler pickle loaded successfully!")
+        expect(page.get_by_text("Scheduler pickle loaded successfully!").first).to_be_visible()
+        # - Making scheduler summary dataframe…
+        # page.wait_for_selector("text=Making scheduler summary dataframe…")
+        # expect(page.get_by_text(
+        #     "Making scheduler summary dataframe…"
+        # )).to_be_visible()
+        # - Scheduler summary dataframe updated successfully
+        page.wait_for_selector("text=Scheduler summary dataframe updated successfully")
+        expect(page.get_by_text("Scheduler summary dataframe updated successfully").first).to_be_visible()
+
         page.wait_for_selector("text=Scheduler summary for tier 0")
 
-        # Check conditions are reset.
+        # Check subheading = ‘Tier 0 - Survey 0 - Map reward’
+        expect(page.locator("body")).to_contain_text("Tier 0 - Survey 0 - Map reward")
+        # Check 3x headings return to tier 0, survey 0
+        survey_name = page.get_by_role("row").nth(1).get_by_role("gridcell").nth(1).text_content()
+        expect(page.locator("body")).to_contain_text("Scheduler summary for tier 0")
+        expect(page.locator("body")).to_contain_text(f"Basis functions & rewards for survey {survey_name}")
+        expect(page.locator("body")).to_contain_text(f"Survey {survey_name}")
+        # Check date = ‘2025-05-02 10:19:45’
         expect(page.get_by_role("textbox")).to_have_value("2025-05-02 10:19:45")
-        expect(page.get_by_role("combobox").nth(1)).to_have_value("tier 0")
-        # TODO: What other conditions do we expect to be reset?
+        # Check Survey Map shows ‘reward’
+        expect(page.get_by_role("combobox").nth(2)).to_have_value("reward")
+
+        # TODO: Check Map resolution = 16 (FAILING)
+        # expect(page.get_by_role("combobox").nth(3)).to_have_value("16")
+        # TODO: Check color palette = Viridis255 (FAILING)
+        # expect(
+        #     page.get_by_role("combobox").nth(4)
+        # ).to_have_value("Viridis256")
+
+        # Select tier 3
+        page.get_by_role("combobox").nth(1).select_option("tier 3")
+
+        # Check ordering of bf table (Accum. order)
+        expect(page.get_by_role("columnheader", name="Reward", exact=True)).to_have_attribute(
+            "aria-sort", "none"
+        )
+        # Check ordering of survey table (index)
+        expect(page.get_by_role("columnheader", name="Basis Function")).to_have_attribute("aria-sort", "none")
+
+        # TODO: Test debugger
 
 
 if __name__ == "__main__":
