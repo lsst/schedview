@@ -29,10 +29,10 @@ jobs:
         id: rs-install
         shell: bash -l {0}
         run: |
-          mamba install --quiet rubin-scheduler     
+          mamba install --quiet rubin-scheduler
           mamba list rubin-scheduler | grep -v "#" | awk '{print $2}' > ${{ github.workspace }}/rs_version
           echo "rs-version" `cat ${{ github.workspace }}/rs_version`
-          echo "rs-version=`cat ${{ github.workspace }}/rs_version`" >> $GITHUB_OUTPUT          
+          echo "rs-version=`cat ${{ github.workspace }}/rs_version`" >> $GITHUB_OUTPUT
 
       - name: Access rubin-sched-data cache
         id: cache-rs
@@ -59,7 +59,7 @@ jobs:
         name: Update/Download data.
         shell: bash -l {0}
         run: |
-          export RUBIN_SIM_DATA_DIR=~/rubin_sim_data       
+          export RUBIN_SIM_DATA_DIR=~/rubin_sim_data
           scheduler_download_data --update --tdqm_disable
 
       - name: Check data
@@ -72,6 +72,3 @@ jobs:
           cat $RUBIN_SIM_DATA_DIR/versions.txt
           echo "is it in sync?"
           scheduler_download_data --versions
-  
-  
-

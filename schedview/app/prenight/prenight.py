@@ -287,12 +287,20 @@ class Prenight(param.Parameterized):
             if not ResourcePath(self.opsim_output_fname).exists():
                 raise FileNotFoundError(f"Resource not found: {self.opsim_output_fname}")
 
-            visits = schedview.collect.opsim.read_opsim(
-                self.opsim_output_fname,
-                Time(self._almanac_events.loc["sunset", "UTC"]),
-                Time(self._almanac_events.loc["sunrise", "UTC"]),
-            )
-            if len(visits) == 0:
+            try:
+                visits = schedview.collect.opsim.read_opsim(
+                    self.opsim_output_fname,
+                    Time(self._almanac_events.loc["sunset", "UTC"]),
+                    Time(self._almanac_events.loc["sunrise", "UTC"]),
+                )
+                no_data_found = len(visits) == 0
+            except UserWarning as user_warning:
+                if user_warning.args[0].startswith("No data found matching"):
+                    no_data_found = True
+                else:
+                    raise user_warning
+
+            if no_data_found:
                 self.logger.info("No visits on requested night, looking for a night with visits.")
                 # read all visits to so we can find a central one
                 visits = schedview.collect.opsim.read_opsim(self.opsim_output_fname)

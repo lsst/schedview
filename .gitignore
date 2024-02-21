@@ -146,3 +146,7 @@ util/sample_data/sample_rewards.h5
 util/sample_data/sample_scheduler.pickle.xz
 notebooks/de421.bsp
 notebooks/MPCORB.DAT.gz
+
+# Other temporary files
+tmp/*
+util/tmp/*
