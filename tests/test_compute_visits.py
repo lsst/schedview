@@ -34,3 +34,8 @@ class TestComputeVisits(unittest.TestCase):
             self.visits, maf.TeffMetric(), "teff", self.visit_db_fname, constraint, "fiveSigmaDepth"
         )
         self.assertIn("teff", visits.columns)
+
+    def test_add_overhead(self):
+        visits = schedview.compute.visits.add_overhead(self.visits)
+        self.assertIn("overhead", visits.columns)
+        self.assertIn("previous_filter", visits.columns)

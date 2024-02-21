@@ -77,3 +77,32 @@ def add_maf_metric(visits, metric, column_name, visit_resource_path, constraint=
     value = schedview.compute.compute_metric_by_visit(visit_resource_path, metric, constraint)
     visits.insert(col_index, column_name, value)
     return visits
+
+
+def add_overhead(visits):
+    """Add columns with overhead between exposures to a visits DataFrame.
+
+    Parameter
+    ---------
+    `visits` : `pandas.DataFrame`
+        The DataFrame of visits to which to add day_obs columns
+
+    Returns
+    -------
+    `visits` : `pandas.DataFrame`
+        The modified DataFRame with additonal columns: overhead (in seconds)
+        and previous_filter.
+    """
+    overhead = (
+        visits["observationStartMJD"].diff() * 24 * 60 * 60
+        - visits["visitTime"].shift(1)
+        + visits["visitTime"]
+        - visits["visitExposureTime"]
+    )
+    slew_time_col_index = tuple(visits.columns).index("slewTime")
+    visits.insert(slew_time_col_index + 1, "overhead", overhead)
+
+    filter_col_index = tuple(visits.columns).index("filter")
+    previous_filter = visits["filter"].shift(1)
+    visits.insert(filter_col_index + 1, "previous_filter", previous_filter)
+    return visits
