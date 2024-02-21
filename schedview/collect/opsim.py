@@ -7,7 +7,7 @@ from astropy.time import Time
 from lsst.resources import ResourcePath
 
 
-def read_opsim(opsim_uri, start_time="2000-01-01", end_time="2100-01-01"):
+def read_opsim(opsim_uri, start_time="2000-01-01", end_time="2100-01-01", query=None):
     """Read visits from an opsim database.
 
     Parameters
@@ -18,6 +18,8 @@ def read_opsim(opsim_uri, start_time="2000-01-01", end_time="2100-01-01"):
         The start time for visits to be loaded
     end_time : `str`, `astropy.time.Time`
         The end time for visits ot be loaded
+    query : `str`, None
+        Query for which visits to load.
 
     Returns
     -------
@@ -26,6 +28,7 @@ def read_opsim(opsim_uri, start_time="2000-01-01", end_time="2100-01-01"):
     """
     start_mjd = Time(start_time).mjd
     end_mjd = Time(end_time).mjd
+    query = "TRUE" if query is None else query
 
     original_resource_path = ResourcePath(opsim_uri)
 
@@ -43,7 +46,8 @@ def read_opsim(opsim_uri, start_time="2000-01-01", end_time="2100-01-01"):
     with obs_path.as_local() as local_obs_path:
         with sqlite3.connect(local_obs_path.ospath) as sim_connection:
             visits = pd.read_sql_query(
-                f"SELECT * FROM observations WHERE observationStartMJD BETWEEN {start_mjd} AND {end_mjd}",
+                f"""SELECT * FROM observations WHERE
+                {query} AND observationStartMJD BETWEEN {start_mjd} AND {end_mjd}""",
                 sim_connection,
                 index_col="observationId",
             )
