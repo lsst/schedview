@@ -3,6 +3,8 @@ import datetime
 import numpy as np
 from astropy.time import Time
 
+import schedview.compute
+
 
 def add_day_obs(visits):
     """Add day_obs columns to a visits DataFrame.
@@ -43,4 +45,35 @@ def add_coords_tuple(visits):
     """
     coord_column = max(tuple(visits.columns).index("fieldRA"), tuple(visits.columns).index("fieldDec")) + 1
     visits.insert(coord_column, "coords", list(zip(visits["fieldRA"], visits["fieldDec"])))
+    return visits
+
+
+def add_maf_metric(visits, metric, column_name, visit_resource_path, constraint=None, nighbor_column=None):
+    """Add a t_eff column to a visits DataFrame.
+
+    Parameter
+    ---------
+    `visits` : `pandas.DataFrame`
+        The DataFrame of visits to which to add day_obs columns
+    `metric` : `rubin_sim.maf.metrics.BaseMetric`
+        The metric to compute.
+    `column_name` : `str`
+        The name for the column with the metric value.
+    `visits_resource_path` : `lsst.resources.ResourcePath`
+        The location of the resources database.
+    `constraint` : `str`
+        The conditions used to load the visits.
+
+    Returns
+    -------
+    `visits` : `pandas.DataFrame`
+        The modified DataFrame with a t_eff column.
+    """
+    if nighbor_column is None:
+        col_index = len(visits.columns)
+    else:
+        col_index = tuple(visits.columns).index(nighbor_column)
+
+    value = schedview.compute.compute_metric_by_visit(visit_resource_path, metric, constraint)
+    visits.insert(col_index, column_name, value)
     return visits
