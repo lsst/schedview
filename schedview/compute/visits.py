@@ -26,3 +26,21 @@ def add_day_obs(visits):
     visits.insert(2, "day_obs_date", day_obs_date)
     visits.insert(3, "day_obs_iso8601", day_obs_iso8601)
     return visits
+
+
+def add_coords_tuple(visits):
+    """Add a coord tuple to a visits DataFrame.
+
+    Parameter
+    ---------
+    `visits` : `pandas.DataFrame`
+        The DataFrame of visits to which to add day_obs columns
+
+    Returns
+    -------
+    `visits` : `pandas.DataFrame`
+        The modified DataFrame with a 'coords' column that has an RA, dec tuple
+    """
+    coord_column = max(tuple(visits.columns).index("fieldRA"), tuple(visits.columns).index("fieldDec")) + 1
+    visits.insert(coord_column, "coords", list(zip(visits["fieldRA"], visits["fieldDec"])))
+    return visits

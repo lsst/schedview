@@ -22,3 +22,7 @@ class TestComputeVisits(unittest.TestCase):
         self.assertEqual(visits.columns[1], "day_obs_mjd")
         self.assertEqual(visits.columns[2], "day_obs_date")
         self.assertEqual(visits.columns[3], "day_obs_iso8601")
+
+    def test_add_coords_tuple(self):
+        visits = schedview.compute.visits.add_coords_tuple(self.visits)
+        self.assertEqual(len(visits["coords"].iloc[0]), 2)
