@@ -79,7 +79,9 @@ def add_maf_metric(visits, metric, column_name, visit_resource_path, constraint=
     return visits
 
 
-def add_overhead(visits):
+def add_overhead(
+    visits,
+):
     """Add columns with overhead between exposures to a visits DataFrame.
 
     Parameter
@@ -106,3 +108,44 @@ def add_overhead(visits):
     previous_filter = visits["filter"].shift(1)
     visits.insert(filter_col_index + 1, "previous_filter", previous_filter)
     return visits
+
+
+def compute_overhead_summary(visits, sun_n12_setting, sun_n12_rising):
+    """Create a dictionary of overhead summary stats.
+
+    Parameters
+    ----------
+    `visits` : `pandas.DataFrame`
+        The table of visits, with overhead data (see add_overhead)
+    `sun_n12_setting`: `float`
+        The MJD of evening twilight.
+    `sun_n12_rising`: `float`
+        The MJD of morning twilight.
+
+    Returns
+    -------
+    `summary` : `dict`
+        A dictionary of summary statistics
+    """
+    visit_start = visits["observationStartMJD"]
+    visit_end = visit_start + visits["visitTime"] / (24 * 60 * 60)
+
+    relative_start_time = (visit_start.min() - sun_n12_setting) * 60 * 24
+    relative_end_time = (visit_end.max() - sun_n12_rising) * 60 * 24
+    total_time = (visit_end.max() - visit_start.min()) * 24
+    num_exposures = len(visits)
+    total_exptime = visits.visitExposureTime.sum() / (60 * 60)
+    mean_gap_time = 60 * 60 * (total_time - total_exptime) / (num_exposures - 1)
+    median_gap_time = visits.overhead.median()
+
+    summary = {
+        "relative_start_time": relative_start_time,
+        "relative_end_time": relative_end_time,
+        "total_time": total_time,
+        "num_exposures": num_exposures,
+        "total_exptime": total_exptime,
+        "mean_gap_time": mean_gap_time,
+        "median_gap_time": median_gap_time,
+    }
+
+    return summary

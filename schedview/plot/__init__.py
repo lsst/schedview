@@ -17,10 +17,17 @@ __all__ = [
     "create_visit_skymaps",
     "plot_visits",
     "create_visit_explorer",
+    "create_overhead_summary_table",
+    "create_overhead_histogram",
+    "plot_overhead_vs_slew_distance",
+    "PLOT_FILTER_COLORS",
+    "PLOT_FILTER_CMAP",
 ]
 
+from .colors import PLOT_FILTER_CMAP, PLOT_FILTER_COLORS
 from .nightbf import plot_infeasible, plot_rewards
 from .nightly import plot_airmass_vs_time, plot_alt_vs_time, plot_polar_alt_az
+from .overhead import create_overhead_histogram, create_overhead_summary_table, plot_overhead_vs_slew_distance
 from .rewards import create_survey_reward_plot, plot_survey_rewards
 from .scheduler import (
     BadConditionsError,
