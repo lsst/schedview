@@ -260,7 +260,7 @@ class TestDashboardE2E(unittest.TestCase):
 
         page.wait_for_selector("text=Tier 5 - Survey 1 - Map reward")
 
-        # Check 3x headings updated. # <----- Fails here
+        # Check 3x headings updated.
         survey_name = page.get_by_role("row").nth(2).get_by_role("gridcell").nth(1).text_content()
         expect(page.locator("pre").nth(2)).to_contain_text("Scheduler summary for tier 5")
         expect(page.locator("pre").nth(3)).to_contain_text(
