@@ -43,8 +43,8 @@ DEFAULT_TIMEZONE = "America/Santiago"
 Potentially still need to test:
 
     Map, key, colour bar, hovertool
-    Loading indicator
     Loading two pickles, one after the other
+    Loading invalid pickle
     url mode
 
 """
@@ -144,10 +144,6 @@ class TestDashboardE2E(unittest.TestCase):
         super().setUpClass()
         cls.playwright = sync_playwright().start()
         cls.browser = cls.playwright.chromium.launch()
-        # cls.browser = cls.playwright.chromium.launch(
-        #     headless=False,
-        #     slow_mo=100
-        # ) # When debugging tests
         cls.dashboard_process = subprocess.Popen(
             ["python", "../schedview/app/scheduler_dashboard/scheduler_dashboard.py"]
         )
@@ -195,7 +191,7 @@ class TestDashboardE2E(unittest.TestCase):
 
         # Check tier drop down is empty.
         expect(page.get_by_role("combobox").nth(1)).to_be_empty()
-        # Check date is as expected
+        # Check date is as expected.
         initial_date = MJD_START.to_datetime().strftime("%Y-%m-%d %H:%M:%S")
         expect(page.get_by_role("textbox")).to_have_value(initial_date)
         # Check map drop-down has (only) reward.
@@ -223,7 +219,9 @@ class TestDashboardE2E(unittest.TestCase):
         # Load data from pickle.
         page.get_by_role("combobox").first.select_option(value=TEST_PICKLE)
 
-        # TODO: Check loading indicator displayed.
+        # Check loading indicator.
+        indicator_div = page.locator("div").filter(has_text="Scheduler Dashboard").nth(1)
+        expect(indicator_div).to_have_attribute("class", "bk-GridBox pn-loading pn-arc")
 
         # Check 4x info messages displayed.
         expect(page.get_by_text("Scheduler loading...").first).to_be_visible()
@@ -254,10 +252,11 @@ class TestDashboardE2E(unittest.TestCase):
 
         # Select tier 5.
         page.get_by_role("combobox").nth(1).select_option("tier 5")
+        # Wait for update to complete.
         page.wait_for_selector("text=Tier 5 - Survey 0 - Map reward")
         # Select survey 1.
         page.get_by_role("row").nth(2).click()
-
+        # Wait for update to complete.
         page.wait_for_selector("text=Tier 5 - Survey 1 - Map reward")
 
         # Check 3x headings updated.
@@ -292,7 +291,7 @@ class TestDashboardE2E(unittest.TestCase):
         # Check Survey map drop-down value = MoonAvoidance.
         map_option = page.locator("option", has_text="MoonAvoidance").text_content()
         expect(page.get_by_role("combobox").nth(2)).to_have_value(map_option)
-        # TODO: Check map all one colour. (screenshot?)
+        # TODO: Check map all one colour.
 
         # Select FilterChange row in bf table.
         page.get_by_text("FilterChange i").click()
@@ -323,7 +322,9 @@ class TestDashboardE2E(unittest.TestCase):
         page.locator("div:nth-child(5) > .arrowUp").click()  # change second
         page.get_by_text("::").press("Enter")  # submit
 
-        # TODO: Check loading indicator shown.
+        # Check loading indicator.
+        indicator_div = page.locator("div").filter(has_text="Scheduler Dashboard").nth(1)
+        expect(indicator_div).to_have_attribute("class", "bk-GridBox pn-loading pn-arc")
 
         # Check 4x info messages displayed.
         expect(page.get_by_text("Updating Conditions object...").first).to_be_visible()
@@ -336,7 +337,6 @@ class TestDashboardE2E(unittest.TestCase):
 
         # Check survey row 0 shows Reward = 11.something
         survey_0_reward = page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2)
-        # expect(survey_0_reward).to_have_text("11.744962901180354")
         expect(survey_0_reward).to_have_text(re.compile(r"11\.7\d"))
 
         # Check TimeToTwilight feasiblility displayed correctly.
@@ -363,10 +363,13 @@ class TestDashboardE2E(unittest.TestCase):
         page.get_by_role("columnheader", name="Reward", exact=True).locator("div").nth(4).click()
         # Change ordering of bf table
         page.get_by_role("columnheader", name="Basis Function").locator("div").nth(3).click()
+
         # Reset loading conditions.
         page.get_by_role("button", name="﫽 Restore Loading Conditions").click()
 
-        # TODO: Check loading indicator displayed
+        # Check loading indicator.
+        indicator_div = page.locator("div").filter(has_text="Scheduler Dashboard").nth(1)
+        expect(indicator_div).to_have_attribute("class", "bk-GridBox pn-loading pn-arc")
 
         # 4x info messages pop up
         expect(page.get_by_text("Scheduler loading...").first).to_be_visible()
