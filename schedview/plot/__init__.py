@@ -16,6 +16,7 @@ __all__ = [
     "plot_visit_planisphere",
     "create_visit_skymaps",
     "plot_visits",
+    "plot_visit_param_vs_time",
     "create_visit_explorer",
     "create_overhead_summary_table",
     "create_overhead_histogram",
@@ -38,4 +39,4 @@ from .scheduler import (
 )
 from .survey import map_survey_healpix
 from .visitmap import create_visit_skymaps, plot_visit_planisphere, plot_visit_skymaps
-from .visits import create_visit_explorer, plot_visits
+from .visits import create_visit_explorer, plot_visit_param_vs_time, plot_visits
