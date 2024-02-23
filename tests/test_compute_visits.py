@@ -1,5 +1,6 @@
 import unittest
 
+import numpy as np
 from astropy.time import Time
 from rubin_scheduler.utils import survey_start_mjd
 from rubin_sim import maf
@@ -31,7 +32,7 @@ class TestComputeVisits(unittest.TestCase):
     def test_add_maf_metric(self):
         constraint = None
         visits = schedview.compute.visits.add_maf_metric(
-            self.visits, maf.TeffMetric(), "teff", self.visit_db_fname, constraint, "fiveSigmaDepth"
+            self.visits, maf.TeffMetric(), "teff", constraint, "fiveSigmaDepth"
         )
         self.assertIn("teff", visits.columns)
 
@@ -39,3 +40,9 @@ class TestComputeVisits(unittest.TestCase):
         visits = schedview.compute.visits.add_overhead(self.visits)
         self.assertIn("overhead", visits.columns)
         self.assertIn("previous_filter", visits.columns)
+
+    def test_add_instrumental_fwhm(self):
+        visits = schedview.compute.visits.add_instrumental_fwhm(self.visits)
+        self.assertTrue(np.all(visits.seeingFwhmEff > visits.inst_fwhm))
+        self.assertTrue(np.all(visits.inst_fwhm > 0))
+        self.assertIn("inst_fwhm", visits.columns)
