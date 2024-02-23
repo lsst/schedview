@@ -2,6 +2,7 @@ import datetime
 
 import numpy as np
 from astropy.time import Time
+from rubin_scheduler.site_models import SeeingModel
 
 import schedview.compute
 
@@ -79,9 +80,7 @@ def add_maf_metric(visits, metric, column_name, visit_resource_path, constraint=
     return visits
 
 
-def add_overhead(
-    visits,
-):
+def add_overhead(visits):
     """Add columns with overhead between exposures to a visits DataFrame.
 
     Parameter
@@ -92,7 +91,7 @@ def add_overhead(
     Returns
     -------
     `visits` : `pandas.DataFrame`
-        The modified DataFRame with additonal columns: overhead (in seconds)
+        The modified DataFrame with additonal columns: overhead (in seconds)
         and previous_filter.
     """
     overhead = (
@@ -149,3 +148,36 @@ def compute_overhead_summary(visits, sun_n12_setting, sun_n12_rising):
     }
 
     return summary
+
+
+def add_instrumental_fwhm(visits):
+    """Add columns with overhead between exposures to a visits DataFrame.
+
+    Parameter
+    ---------
+    `visits` : `pandas.DataFrame`
+        The DataFrame of visits to which to add day_obs columns
+
+    Returns
+    -------
+    `visits` : `pandas.DataFrame`
+        The modified DataFRame with additonal columns: overhead (in seconds)
+        and previous_filter.
+    """
+    # Get a seeing model that applies atmospheric and wavelength corrections,
+    # but not instrumental contributions.
+    seeing_model = SeeingModel(telescope_seeing=0.0, optical_design_seeing=0.0, camera_seeing=0.0)
+    seeing_indx_dict = {b: i for i, b in enumerate(seeing_model.filter_list)}
+
+    noninst_seeing = np.array(
+        tuple(
+            seeing_model(v.seeingFwhm500, v.airmass)["fwhmEff"][seeing_indx_dict[v["filter"]]].item()
+            for i, v in visits.iterrows()
+        )
+    )
+
+    inst_fwhm = np.sqrt(visits["seeingFwhmEff"] ** 2 - noninst_seeing**2)
+    seeing_col_index = tuple(visits.columns).index("seeingFwhmEff")
+    visits.insert(seeing_col_index, "inst_fwhm", inst_fwhm)
+
+    return visits
