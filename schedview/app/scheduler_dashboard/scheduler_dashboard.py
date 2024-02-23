@@ -1281,7 +1281,7 @@ class Scheduler(param.Parameterized):
         elif not self._display_reward and self.survey_map not in maps:
             return f"Survey {self._survey_name}\nReward: {self._map_name}"
         else:
-            return f"Survey {self._survey_name}\nReward {self._reward_name}"
+            return f"Survey {self._survey_name}\nReward: {self._reward_name}"
 
     @param.depends("_update_headings")
     def dashboard_subtitle(self):
