@@ -93,7 +93,11 @@ def get_sky_brightness_date_bounds():
     """Load available datetime range from SkyBrightness_Pre files"""
     sky_model = SkyModelPre()
     min_date = Time(sky_model.mjd_left.min(), format="mjd")
+<<<<<<< HEAD
     max_date = Time(sky_model.mjd_right.max(), format="mjd") - 0.001
+=======
+    max_date = Time(sky_model.mjd_right.max() - 0.01, format="mjd")
+>>>>>>> Move upper date bound back by 0.01 MJD to prevent error at upper bound.
     return (min_date, max_date)
 
 
