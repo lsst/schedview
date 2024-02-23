@@ -49,7 +49,7 @@ def add_coords_tuple(visits):
     return visits
 
 
-def add_maf_metric(visits, metric, column_name, visit_resource_path, constraint=None, nighbor_column=None):
+def add_maf_metric(visits, metric, column_name, constraint=None, nighbor_column=None):
     """Add a t_eff column to a visits DataFrame.
 
     Parameter
@@ -60,8 +60,6 @@ def add_maf_metric(visits, metric, column_name, visit_resource_path, constraint=
         The metric to compute.
     `column_name` : `str`
         The name for the column with the metric value.
-    `visits_resource_path` : `lsst.resources.ResourcePath`
-        The location of the resources database.
     `constraint` : `str`
         The conditions used to load the visits.
 
@@ -75,7 +73,7 @@ def add_maf_metric(visits, metric, column_name, visit_resource_path, constraint=
     else:
         col_index = tuple(visits.columns).index(nighbor_column)
 
-    value = schedview.compute.compute_metric_by_visit(visit_resource_path, metric, constraint)
+    value = schedview.compute.compute_metric_by_visit(visits, metric, constraint)
     visits.insert(col_index, column_name, value)
     return visits
 
