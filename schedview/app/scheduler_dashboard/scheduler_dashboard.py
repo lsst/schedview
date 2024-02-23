@@ -66,6 +66,8 @@ DEFAULT_CURRENT_TIME = Time.now()
 DEFAULT_TIMEZONE = "UTC"  # "America/Santiago"
 LOGO = "/schedview-snapshot/assets/lsst_white_logo.png"
 COLOR_PALETTES = [color for color in bokeh.palettes.__palettes__ if "256" in color]
+DEFAULT_COLOR_PALETTE = "Viridis256"
+DEFAULT_NSIDE = 16
 PACKAGE_DATA_DIR = importlib.resources.files("schedview.data").as_posix()
 USDF_DATA_DIR = "/sdf/group/rubin/web_data/sim-data/schedview"
 
@@ -162,12 +164,12 @@ class Scheduler(param.Parameterized):
         doc="Sky brightness maps, non-scalar rewards and survey reward map.",
     )
     nside = param.ObjectSelector(
-        default=16,
-        objects=[2, 4, 16, 32, 64],
+        default=DEFAULT_NSIDE,
+        objects=[2, 4, 8, 16, 32, 64],
         label="Map resolution (nside)",
         doc="",
     )
-    color_palette = param.Selector(default="Viridis256", objects=COLOR_PALETTES, doc="")
+    color_palette = param.Selector(default=DEFAULT_COLOR_PALETTE, objects=COLOR_PALETTES, doc="")
     summary_widget = param.Parameter(default=None, doc="")
     reward_widget = param.Parameter(default=None, doc="")
     show_loading_indicator = param.Boolean(default=False)
@@ -1479,6 +1481,27 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     def update_loading(loading):
         start_loading_spinner(sched_app) if loading else stop_loading_spinner(sched_app)
 
+    # Define reset button.
+    reset_button = pn.widgets.Button(
+        name="Restore Loading Conditions",
+        icon="restore",
+        icon_size="16px",
+        description=" Restore initial date, table ordering and map properties.",
+    )
+
+    # Reset dashboard to loading conditions.
+    def handle_reload_pickle(event):
+        scheduler.nside = 16
+        scheduler.color_palette = "Viridis256"
+        if scheduler.scheduler_fname == "":
+            scheduler.clear_dashboard()
+        else:
+            scheduler._update_scheduler_fname()
+
+    # Set function trigger.
+    reset_button.on_click(handle_reload_pickle)
+
+    # ------------------------------------------------------ Dashboard layout
     # Dashboard title.
     sched_app[0:8, :] = pn.Row(
         pn.Column(
@@ -1502,25 +1525,14 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         styles={"background": "#048b8c"},
     )
     # Parameter inputs (pickle, widget_datetime, tier).
-    sched_app[8:32, 0:21] = pn.Param(
+    sched_app[8:30, 0:21] = pn.Param(
         scheduler,
         parameters=["scheduler_fname", "widget_datetime", "widget_tier"],
         widgets=data_loading_widgets,
         name="Select pickle file, date and tier.",
     )
-    # reset dashboard to loading conditions
-    reset_button = pn.widgets.Button(icon="restore", name="Restore Loading Conditions")
-
-    def handle_reload_pickle(event):
-        if scheduler.scheduler_fname == "":
-            scheduler.clear_dashboard()
-        else:
-            scheduler._update_scheduler_fname()
-
-    reset_button.on_click(handle_reload_pickle)
-
-    sched_app[32:36, 3:15] = pn.Row(reset_button)
-
+    # Reset button.
+    sched_app[30:36, 3:15] = pn.Row(reset_button)
     # Survey rewards table and header.
     sched_app[8:36, 21:67] = pn.Row(
         pn.Spacer(width=10),
