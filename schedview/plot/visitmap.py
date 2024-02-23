@@ -1,10 +1,8 @@
 import bokeh
-import colorcet
 import healpy as hp
 import numpy as np
 import pandas as pd
 from astropy.time import Time
-from astropy.visualization import ZScaleInterval
 
 # Imported to help sphinx make the link
 from rubin_scheduler.scheduler.model_observatory.model_observatory import ModelObservatory
@@ -470,76 +468,3 @@ def create_visit_skymaps(
         vmap = schedview.plot.visitmap.plot_visit_skymaps(**data)
 
     return vmap, data
-
-
-def map_visits_over_hpix(
-    visits, conditions, map_hpix, plot=None, scale_limits=None, palette=colorcet.blues, map_class=Planisphere
-):
-    camera_perimeter = LsstCameraFootprintPerimeter()
-
-    if plot is None:
-        plot = bokeh.plotting.figure(frame_width=256, frame_height=256, match_aspect=True)
-
-    sphere_map = map_class(mjd=conditions.mjd, plot=plot)
-
-    if scale_limits is None:
-        scale_limits = ZScaleInterval().get_limits(map_hpix[~map_hpix.mask])
-
-    cmap = bokeh.transform.linear_cmap("value", palette, scale_limits[0], scale_limits[1])
-    sphere_map.add_healpix(map_hpix, nside=hp.npix2nside(len(map_hpix)), cmap=cmap)
-
-    if len(visits) > 0:
-        ras, decls = camera_perimeter(visits.fieldRA, visits.fieldDec, visits.rotSkyPos)
-
-        perimeter_df = pd.DataFrame(
-            {
-                "ra": ras,
-                "decl": decls,
-            }
-        )
-        sphere_map.add_patches(
-            perimeter_df, patches_kwargs={"fill_color": None, "line_color": "black", "line_width": 1}
-        )
-
-    sphere_map.decorate()
-
-    sphere_map.add_marker(
-        ra=np.degrees(conditions.sun_ra),
-        decl=np.degrees(conditions.sun_dec),
-        name="Sun",
-        glyph_size=8,
-        circle_kwargs={"color": "yellow", "fill_alpha": 1},
-    )
-
-    sphere_map.add_marker(
-        ra=np.degrees(conditions.moon_ra),
-        decl=np.degrees(conditions.moon_dec),
-        name="Moon",
-        glyph_size=8,
-        circle_kwargs={"color": "orange", "fill_alpha": 0.8},
-    )
-
-    return plot
-
-
-def create_hpix_visit_map_grid(hpix_maps, visits, conditions):
-    visit_map = {}
-    for band in hpix_maps:
-        visit_map[band] = map_visits_over_hpix(
-            visits.query(f"filter == '{band}'"),
-            conditions,
-            hpix_maps[band],
-        )
-
-    # Convert the dictionary of maps into a list of lists,
-    # corresponding to the rows of the grid.
-    num_cols = 3
-    map_lists = []
-    for band_idx, band in enumerate(hpix_maps):
-        if band_idx % num_cols == 0:
-            map_lists.append([visit_map[band]])
-        else:
-            map_lists[-1].append(visit_map[band])
-
-    map_grid = bokeh.layouts.gridplot(map_lists)
-    return map_grid

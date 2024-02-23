@@ -2,11 +2,16 @@ import re
 
 import astropy
 import bokeh
+import colorcet
+import healpy as hp
 import numpy as np
+import pandas as pd
 import rubin_scheduler.scheduler.features
 import rubin_scheduler.scheduler.surveys  # noqa: F401
 from astropy.time import Time
-from uranography.api import HorizonMap, make_zscale_linear_cmap
+from uranography.api import HorizonMap, Planisphere, make_zscale_linear_cmap
+
+from schedview.compute.camera import LsstCameraFootprintPerimeter
 
 
 def map_survey_healpix(
@@ -225,3 +230,129 @@ def map_survey_healpix(
     sky_map.plot.tools.append(hover_tool)
 
     return sky_map
+
+
+def map_visits_over_hpix(
+    visits, conditions, map_hpix, plot=None, scale_limits=None, palette=colorcet.blues, map_class=Planisphere
+):
+    """Plot visit locations over a healpix map.
+
+    Parameters
+    ----------
+    visits : `pd.DataFrame`
+        The table of visits to plot, with columns matching the opsim database
+        definitions.
+    conditions : `rubin_scheduler.scheduler.features.Conditions`
+        An instance of a rubin_scheduler conditions object.
+    map_hpix : `numpy.array`
+        An array of healpix values
+    plot : `bokeh.models.plots.Plot` or `None`
+        The bokeh plot on which to make the plot. None creates a new plot.
+        None by default.
+    scale_limits : `list` of `float` or `None`
+        The scale limits for the healpix values. If None, use zscale to set
+        the scale.
+    palette : `str`
+        The bokeh palette to use for the healpix map.
+    map_class : `class`, optional
+        The class of map to use.  Defaults to uranography.Planisphere.
+
+    Returns
+    -------
+    plot : `bokeh.models.plots.Plot`
+        The plot with the map
+    """
+    camera_perimeter = LsstCameraFootprintPerimeter()
+
+    if plot is None:
+        plot = bokeh.plotting.figure(frame_width=256, frame_height=256, match_aspect=True)
+
+    sphere_map = map_class(mjd=conditions.mjd, plot=plot)
+
+    if scale_limits is None:
+        try:
+            good_values = map_hpix[~map_hpix.mask]
+        except AttributeError:
+            good_values = map_hpix
+
+        cmap = make_zscale_linear_cmap(good_values, palette=palette)
+    else:
+        cmap = bokeh.transform.linear_cmap("value", palette, scale_limits[0], scale_limits[1])
+
+    sphere_map.add_healpix(map_hpix, nside=hp.npix2nside(len(map_hpix)), cmap=cmap)
+
+    if len(visits) > 0:
+        ras, decls = camera_perimeter(visits.fieldRA, visits.fieldDec, visits.rotSkyPos)
+
+        perimeter_df = pd.DataFrame(
+            {
+                "ra": ras,
+                "decl": decls,
+            }
+        )
+        sphere_map.add_patches(
+            perimeter_df, patches_kwargs={"fill_color": None, "line_color": "black", "line_width": 1}
+        )
+
+    sphere_map.decorate()
+
+    sphere_map.add_marker(
+        ra=np.degrees(conditions.sun_ra),
+        decl=np.degrees(conditions.sun_dec),
+        name="Sun",
+        glyph_size=8,
+        circle_kwargs={"color": "yellow", "fill_alpha": 1},
+    )
+
+    sphere_map.add_marker(
+        ra=np.degrees(conditions.moon_ra),
+        decl=np.degrees(conditions.moon_dec),
+        name="Moon",
+        glyph_size=8,
+        circle_kwargs={"color": "orange", "fill_alpha": 0.8},
+    )
+
+    return plot
+
+
+def create_hpix_visit_map_grid(hpix_maps, visits, conditions, **kwargs):
+    """Create a grid of healpix maps with visits overplotted.
+
+    Notes
+    -----
+    Additional keyword args are passed to map_visits_over_hpix.
+
+    Parameters
+    ----------
+    map_hpix : `numpy.array`
+        An array of healpix values
+    visits : `pd.DataFrame`
+        The table of visits to plot, with columns matching the opsim database
+        definitions.
+    conditions : `rubin_scheduler.scheduler.features.Conditions`
+        An instance of a rubin_scheduler conditions object.
+
+    Returns
+    -------
+    plot : `bokeh.models.plots.Plot`
+        The plot with the map
+    """
+    visit_map = {}
+    for band in hpix_maps:
+        visit_map[band] = map_visits_over_hpix(
+            visits.query(f"filter == '{band}'"), conditions, hpix_maps[band], **kwargs
+        )
+        visit_map[band].title = band
+
+    # Convert the dictionary of maps into a list of lists,
+    # corresponding to the rows of the grid.
+    num_cols = 3
+    map_lists = []
+    for band_idx, band in enumerate(hpix_maps):
+        if band_idx % num_cols == 0:
+            map_lists.append([visit_map[band]])
+        else:
+            map_lists[-1].append(visit_map[band])
+
+    map_grid = bokeh.layouts.gridplot(map_lists)
+    return map_grid

@@ -39,12 +39,6 @@ from .scheduler import (
     SchedulerNotebookDisplay,
     make_logger,
 )
-from .survey import map_survey_healpix
-from .visitmap import (
-    create_hpix_visit_map_grid,
-    create_visit_skymaps,
-    map_visits_over_hpix,
-    plot_visit_planisphere,
-    plot_visit_skymaps,
-)
+from .survey import create_hpix_visit_map_grid, map_survey_healpix, map_visits_over_hpix
+from .visitmap import create_visit_skymaps, plot_visit_planisphere, plot_visit_skymaps
 from .visits import create_visit_explorer, plot_visit_param_vs_time, plot_visits
