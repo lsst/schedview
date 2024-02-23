@@ -84,9 +84,28 @@ logging.basicConfig(
 )
 
 # Change styles using CSS variables.
-stylesheet = """
+h1_stylesheet = """
 :host {
---mono-font: Helvetica;
+  --mono-font: Helvetica;
+  color: white;
+  font-size: 16pt;
+  font-weight: 500;
+}
+"""
+h2_stylesheet = """
+:host {
+  --mono-font: Helvetica;
+  color: white;
+  font-size: 14pt;
+  font-weight: 300;
+}
+"""
+h3_stylesheet = """
+:host {
+  --mono-font: Helvetica;
+  color: white;
+  font-size: 13pt;
+  font-weight: 300;
 }
 """
 
@@ -1210,7 +1229,12 @@ class Scheduler(param.Parameterized):
             self.debug_pane = pn.pane.Str(
                 self._debug_string,
                 height=200,
-                styles={"font-size": "9pt", "color": "black", "overflow": "scroll"},
+                styles={
+                    "font-size": "9pt",
+                    "color": "black",
+                    "overflow": "scroll",
+                    "background": "#EDEDED",
+                },
             )
         else:
             self.debug_pane.object = self._debug_string
@@ -1300,8 +1324,7 @@ class Scheduler(param.Parameterized):
             self.dashboard_subtitle_pane = pn.pane.Str(
                 title_string,
                 height=20,
-                styles={"font-size": "14pt", "font-weight": "300", "color": "white"},
-                stylesheets=[stylesheet],
+                stylesheets=[h2_stylesheet],
             )
         else:
             self.dashboard_subtitle_pane.object = title_string
@@ -1321,8 +1344,7 @@ class Scheduler(param.Parameterized):
         if self.summary_table_heading_pane is None:
             self.summary_table_heading_pane = pn.pane.Str(
                 title_string,
-                styles={"font-size": "13pt", "font-weight": "300", "color": "white"},
-                stylesheets=[stylesheet],
+                stylesheets=[h3_stylesheet],
             )
         else:
             self.summary_table_heading_pane.object = title_string
@@ -1341,9 +1363,7 @@ class Scheduler(param.Parameterized):
         if self.reward_table_heading_pane is None:
             self.reward_table_heading_pane = pn.pane.Str(
                 title_string,
-                styles={"font-size": "13pt", "font-weight": "300", "color": "white"},
-                stylesheets=[stylesheet],
-                css_classes=["title"],
+                stylesheets=[h3_stylesheet],
             )
         else:
             self.reward_table_heading_pane.object = title_string
@@ -1362,8 +1382,7 @@ class Scheduler(param.Parameterized):
         if self.map_title_pane is None:
             self.map_title_pane = pn.pane.Str(
                 title_string,
-                styles={"font-size": "13pt", "font-weight": "300", "color": "white"},
-                stylesheets=[stylesheet],
+                stylesheets=[h3_stylesheet],
             )
         else:
             self.map_title_pane.object = title_string
@@ -1505,8 +1524,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
             pn.pane.Str(
                 "Scheduler Dashboard",
                 height=20,
-                styles={"font-size": "16pt", "font-weight": "500", "color": "white"},
-                stylesheets=[stylesheet],
+                stylesheets=[h1_stylesheet],
             ),
             scheduler.dashboard_subtitle,
         ),
@@ -1580,15 +1598,12 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     )
     # Debugging collapsable card.
     sched_app[87:100, :] = pn.Card(
-        pn.Column(
-            scheduler._debugging_messages,
-            styles={"background": "#EDEDED"},
-        ),
-        title="Debugging",
-        header_background="white",
-        styles={"background": "#048b8c"},
+        scheduler._debugging_messages,
+        header=pn.pane.Str("Debugging", stylesheets=[h2_stylesheet]),
+        header_color="white",
+        header_background="#048b8c",
         sizing_mode="stretch_width",
-        collapsed=True,
+        collapsed=False,
     )
 
     return sched_app
