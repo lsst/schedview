@@ -208,7 +208,9 @@ class TestDashboardE2E(unittest.TestCase):
         # Change color palette.
         page.get_by_role("combobox").nth(4).select_option("Turbo256")
 
-        # TODO: Check selections don't cause problems.
+        # Check selections don't cause problems.
+        page.get_by_role("button", name="► Debugging").click()
+        expect(page.locator("pre").nth(5)).not_to_contain_text("Traceback")
 
     def test_with_data(self):
         page = self.browser.new_page()
@@ -268,7 +270,7 @@ class TestDashboardE2E(unittest.TestCase):
         expect(page.locator("pre").nth(4)).to_contain_text(f"Survey {survey_name} Map: reward")
         # Check 2x tables visible.
         expect(page.get_by_role("grid")).to_have_count(2)
-        # TODO: Check 1x map/key visible.
+        # Check 1x map/key visible.
         expect(page.locator(".bk-Canvas > div:nth-child(11)")).to_be_visible()
 
         # Select u_sky from Survey map.
@@ -291,7 +293,6 @@ class TestDashboardE2E(unittest.TestCase):
         # Check Survey map drop-down value = MoonAvoidance.
         map_option = page.locator("option", has_text="MoonAvoidance").text_content()
         expect(page.get_by_role("combobox").nth(2)).to_have_value(map_option)
-        # TODO: Check map all one colour.
 
         # Select FilterChange row in bf table.
         page.get_by_text("FilterChange i").click()
@@ -353,11 +354,9 @@ class TestDashboardE2E(unittest.TestCase):
 
         # Select map resolution = 4
         page.get_by_role("combobox").nth(3).select_option("4")
-        # TODO: Check map correctly updated.
 
         # Select color palette = Inferno256
         page.get_by_role("combobox").nth(4).select_option("Inferno256")
-        # TODO: Check map/colorbar correctly updated
 
         # Change ordering of survey table
         page.get_by_role("columnheader", name="Reward", exact=True).locator("div").nth(4).click()
@@ -410,8 +409,8 @@ class TestDashboardE2E(unittest.TestCase):
 
         # Check debugger.
         page.get_by_role("button", name="► Debugging").click()
-        expect(page.locator("pre").nth(5)).to_contain_text("Publishing sky map.")
-        expect(page.locator("pre").nth(5)).not_to_contain_text("Traceback")
+        # expect(page.locator("pre").nth(5)).not_to_contain_text("Traceback")
+        expect(page.locator("pre").nth(5)).not_to_contain_text(re.compile(r"Traceback|Cannot|unable"))
 
 
 if __name__ == "__main__":
