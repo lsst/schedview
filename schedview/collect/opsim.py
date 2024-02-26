@@ -1,13 +1,98 @@
 import sqlite3
 
-import numpy as np
 import pandas as pd
 import yaml
 from astropy.time import Time
 from lsst.resources import ResourcePath
+from rubin_sim import maf
+
+DEFAULT_VISITS_COLUMNS = [
+    "observationId",
+    "fieldRA",
+    "fieldDec",
+    "observationStartMJD",
+    "flush_by_mjd",
+    "visitExposureTime",
+    "filter",
+    "rotSkyPos",
+    "rotSkyPos_desired",
+    "numExposures",
+    "airmass",
+    "seeingFwhm500",
+    "seeingFwhmEff",
+    "seeingFwhmGeom",
+    "skyBrightness",
+    "night",
+    "slewTime",
+    "visitTime",
+    "slewDistance",
+    "fiveSigmaDepth",
+    "altitude",
+    "azimuth",
+    "paraAngle",
+    "cloud",
+    "moonAlt",
+    "sunAlt",
+    "note",
+    "target",
+    "fieldId",
+    "proposalId",
+    "block_id",
+    "observationStartLST",
+    "rotTelPos",
+    "rotTelPos_backup",
+    "moonAz",
+    "sunAz",
+    "sunRA",
+    "sunDec",
+    "moonRA",
+    "moonDec",
+    "moonDistance",
+    "solarElong",
+    "moonPhase",
+    "cummTelAz",
+    "scripted_id",
+]
 
 
-def read_opsim(opsim_uri, start_time="2000-01-01", end_time="2100-01-01", constraint=None):
+class StartDateStacker(maf.BaseStacker):
+    """Add the start date."""
+
+    cols_added = ["start_date"]
+
+    def __init__(self, start_mjd_col="observationStartMJD"):
+        self.units = "ns"
+        self.cols_req = [start_mjd_col]
+        self.start_mjd_col = start_mjd_col
+
+    def _run(self, sim_data, cols_present=False):
+        """The start date as a datetime."""
+        if cols_present:
+            # Column already present in data; assume it is correct and does not
+            # need recalculating.
+            return sim_data
+        if len(sim_data) == 0:
+            return sim_data
+
+        sim_data["start_date"] = pd.to_datetime(
+            sim_data[self.start_mjd_col] + 2400000.5, origin="julian", unit="D", utc=True
+        )
+
+        return sim_data
+
+
+DEFAULT_STACKERS = [maf.HourAngleStacker(), StartDateStacker()]
+
+
+def read_opsim(
+    opsim_uri,
+    start_time=None,
+    end_time=None,
+    constraint=None,
+    dbcols=DEFAULT_VISITS_COLUMNS,
+    stackers=DEFAULT_STACKERS,
+    **kwargs,
+):
     """Read visits from an opsim database.
 
     Parameters
@@ -20,16 +105,34 @@ def read_opsim(opsim_uri, start_time="2000-01-01", end_time="2100-01-01", constr
         The end time for visits ot be loaded
     constraint : `str`, None
         Query for which visits to load.
+    dbcols : `list` [`str`]
+        Columns required from the database.
+    stackers : `list` [`rubin_sim.maf.stackers`], optional
+        Stackers to be used to generate additional columns.
 
     Returns
     -------
     visits : `pandas.DataFrame`
         The visits and their parameters.
     """
-    start_mjd = Time(start_time).mjd
-    end_mjd = Time(end_time).mjd
-    date_conditions = f"observationStartMJD BETWEEN {start_mjd} AND {end_mjd}"
-    constraint = date_conditions if constraint is None else f"{constraint} AND {date_conditions}"
+
+    # Add constraints corresponding to quested start and end times
+    if (start_time is not None) or (end_time is not None):
+        if constraint is None:
+            constraint = ""
+
+        if start_time is not None:
+            if len(constraint) > 0:
+                constraint += " AND "
+            constraint += f"(observationStartMJD >= {Time(start_time).mjd})"
+
+        if end_time is not None:
+            if len(constraint) > 0:
+                constraint += " AND "
+            constraint += f"(observationStartMJD <= {Time(end_time).mjd})"
+
+    if stackers is not None and len(stackers) > 0:
+        kwargs["stackers"] = stackers
 
     original_resource_path = ResourcePath(opsim_uri)
 
@@ -46,18 +149,9 @@ def read_opsim(opsim_uri, start_time="2000-01-01", end_time="2100-01-01", constr
 
     with obs_path.as_local() as local_obs_path:
         with sqlite3.connect(local_obs_path.ospath) as sim_connection:
-            visits = pd.read_sql_query(
-                f"""SELECT * FROM observations WHERE {constraint}""",
-                sim_connection,
-                index_col="observationId",
-            )
+            visits = pd.DataFrame(maf.get_sim_data(sim_connection, constraint, dbcols, **kwargs))
 
-    visits["start_date"] = pd.to_datetime(
-        visits["observationStartMJD"] + 2400000.5, origin="julian", unit="D", utc=True
-    )
-
-    if "HA_hours" not in visits.columns:
-        visits["HA_hours"] = (visits.observationStartLST - visits.fieldRA) * 24.0 / 360.0
-        visits["HA_hours"] = np.mod(visits["HA_hours"] + 12.0, 24) - 12
+    if "start_date" in visits:
+        visits["start_date"] = pd.to_datetime(visits.start_date, unit="ns", utc=True)
 
     return visits

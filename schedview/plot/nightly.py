@@ -467,14 +467,14 @@ def plot_polar_alt_az(visits, band_shapes=BAND_SHAPES, figure=None, legend=True)
     else:
         visits_ds = bokeh.models.ColumnDataSource(visits)
 
-    if "HA_hours" not in visits_ds.column_names:
+    if "HA" not in visits_ds.column_names:
         hour_angle = (
             (np.array(visits_ds.data["observationStartLST"]) - np.array(visits_ds.data["fieldRA"]))
             * 24.0
             / 360.0
         )
         hour_angle = np.mod(hour_angle + 12.0, 24) - 12
-        visits_ds.add(hour_angle, "HA_hours")
+        visits_ds.add(hour_angle, "HA")
 
     if "zd" not in visits_ds.column_names:
         visits_ds.add(90 - np.array(visits_ds.data["altitude"]), "zd")

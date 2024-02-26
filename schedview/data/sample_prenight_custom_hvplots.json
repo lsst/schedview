@@ -30,7 +30,7 @@
         "settings": {
             "by": "note",
             "kind": "scatter",
-            "x": "HA_hours",
+            "x": "HA",
             "y": "airmass",
             "bins": 15,
             "bin_range": [1, 2.5],
