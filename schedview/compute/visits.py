@@ -3,6 +3,7 @@ import datetime
 import numpy as np
 from astropy.time import Time
 from rubin_scheduler.site_models import SeeingModel
+from rubin_sim import maf
 
 import schedview.compute
 
@@ -179,3 +180,23 @@ def add_instrumental_fwhm(visits):
     visits.insert(seeing_col_index, "inst_fwhm", inst_fwhm)
 
     return visits
+
+
+def accum_teff_by_night(visits):
+    day_obs_col = "day_obs_iso8601"
+    teff_col = "teff"
+
+    if day_obs_col not in visits:
+        visits = add_day_obs(visits.copy())
+
+    if teff_col not in visits:
+        visits = add_maf_metric(visits.copy(), maf.TeffMetric(), "teff")
+
+    nightly_teff = visits.groupby(["target", day_obs_col, "filter"])[teff_col].sum().reset_index()
+    nightly_teff = (
+        nightly_teff.pivot(index=["target", day_obs_col], columns="filter", values=teff_col)
+        .fillna(0.0)
+        .reset_index()
+        .set_index("target")
+    )
+    return nightly_teff

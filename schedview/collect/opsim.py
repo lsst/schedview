@@ -4,6 +4,7 @@ import pandas as pd
 import yaml
 from astropy.time import Time
 from lsst.resources import ResourcePath
+from rubin_scheduler.utils import ddf_locations
 from rubin_sim import maf
 
 DEFAULT_VISITS_COLUMNS = [
@@ -154,4 +155,48 @@ def read_opsim(
     if "start_date" in visits:
         visits["start_date"] = pd.to_datetime(visits.start_date, unit="ns", utc=True)
 
+    visits.set_index("observationId", inplace=True)
+
+    return visits
+
+
+def read_ddf_visits(
+    opsim_uri,
+    start_time=None,
+    end_time=None,
+    dbcols=DEFAULT_VISITS_COLUMNS,
+    stackers=DEFAULT_STACKERS,
+    **kwargs,
+):
+    """Read DDF visits from an opsim database.
+
+    Parameters
+    ----------
+    opsim_uri : `str`
+        The uri from which to load visits
+    start_time : `str`, `astropy.time.Time`
+        The start time for visits to be loaded
+    end_time : `str`, `astropy.time.Time`
+        The end time for visits ot be loaded
+    dbcols : `list` [`str`]
+        Columns required from the database.
+    stackers : `list` [`rubin_sim.maf.stackers`], optional
+        Stackers to be used to generate additional columns.
+
+    Returns
+    -------
+    visits : `pandas.DataFrame`
+        The visits and their parameters.
+    """
+    ddf_field_names = tuple(ddf_locations().keys())
+    constraint = f"target IN {tuple(field_name for field_name in ddf_field_names)}"
+    visits = read_opsim(
+        opsim_uri,
+        start_time=start_time,
+        end_time=end_time,
+        constraint=constraint,
+        dbcols=dbcols,
+        stackers=stackers,
+        **kwargs,
+    )
     return visits
