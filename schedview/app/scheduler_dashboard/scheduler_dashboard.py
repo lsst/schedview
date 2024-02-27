@@ -940,7 +940,6 @@ class Scheduler(param.Parameterized):
         self.reward_widget.selection = []
         columns = [
             "basis_function",
-            # "basis_function_class",
             "basis_function_href",
             "feasible",
             "max_basis_reward",
