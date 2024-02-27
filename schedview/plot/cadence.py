@@ -33,7 +33,7 @@ def create_cadence_plot(
 
     Returns
     -------
-    full_cadence_figure : `bokeh.something`
+    full_cadence_figure : `bokeh.models.layouts.LayoutDOM`
         The bokeh plot with cadence plots for all targets.
     """
     if targets is None:
