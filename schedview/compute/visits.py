@@ -183,6 +183,31 @@ def add_instrumental_fwhm(visits):
 
 
 def accum_teff_by_night(visits):
+    """Create a DataFrame of accumulated t_eff by target/band/night.
+
+    Parameters
+    ----------
+    visits : `pandas.DataFrame`
+        A DataFrame of visits with (at least) the following columns:
+
+        ``"day_obs_iso8601"``
+            The day_obs (as defined in SITCOMTN-32) in YYYY-MM-DD format
+            (`str`),
+        ``"teff"``
+            The effective exposure time (`float`).
+        ``"filter"``
+            The filter (`str`).
+        ``"target"``
+            The target name (`str`).
+
+    Returns
+    -------
+    nightly_teff : `pandas.DataFrame`
+        A `pandas.DataFrame` with the `target` as its index, `day_obs_iso8601`
+        as its first column, and filter names for its remaining columns.
+        Values for the columns with filter names are the total effective
+        exposure times for all exposures with that target on that night.
+    """
     day_obs_col = "day_obs_iso8601"
     teff_col = "teff"
 
@@ -197,6 +222,6 @@ def accum_teff_by_night(visits):
         nightly_teff.pivot(index=["target", day_obs_col], columns="filter", values=teff_col)
         .fillna(0.0)
         .reset_index()
-        .set_index("target")
+        .set_index(["target", "day_obs_iso8601"])
     )
     return nightly_teff
