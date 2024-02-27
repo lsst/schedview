@@ -751,8 +751,6 @@ class Scheduler(param.Parameterized):
             disabled=True,
             selectable=1,
             hidden_columns=["tier", "survey_url"],
-            # pagination="remote",
-            # page_size=4,
             sizing_mode="stretch_width",
             height=220,
         )
