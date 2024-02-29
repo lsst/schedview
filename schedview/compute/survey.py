@@ -49,7 +49,7 @@ def make_survey_reward_df(survey, conditions, reward_df=None):
         return float("{:.5g}".format(x))
 
     def _guess_basis_function_doc_url(basis_function_name):
-        url_base = "https://rubin-scheduler.lsst.io/fbs-api.html#"
+        url_base = "https://rubin-scheduler.lsst.io/fbs-api-basis-functions.html"
 
         if not isinstance(basis_function_name, str):
             return ""
@@ -59,10 +59,10 @@ def make_survey_reward_df(survey, conditions, reward_df=None):
         standard_basis_functions = dict(getmembers(rubin_scheduler.scheduler.basis_functions)).keys()
         if root_bf_name in standard_basis_functions:
             section_base = "rubin_scheduler.scheduler.basis_functions"
-            url = f"{url_base}.{section_base}.{root_bf_name}"
+            url = f"{url_base}#{section_base}.{root_bf_name}"
         else:
-            generic_bf = "module-rubin_scheduler.scheduler.basis_functions"
-            url = f"{url_base}.{generic_bf}"
+            generic_bf = "rubin_scheduler.scheduler.basis_functions.BaseBasisFunction"
+            url = f"{url_base}#{generic_bf}"
         return url
 
     try:
