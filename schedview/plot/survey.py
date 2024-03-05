@@ -324,7 +324,6 @@ def map_visits_over_hpix(
             dw=width_hpxy,
             dh=height_hpxy,
             color_mapper=cmap.transform,
-            #            palette="Viridis256",
             level="image",
         )
     else:
