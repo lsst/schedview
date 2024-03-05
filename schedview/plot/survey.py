@@ -1,4 +1,5 @@
 import re
+from functools import partial
 
 import astropy
 import bokeh
@@ -233,7 +234,14 @@ def map_survey_healpix(
 
 
 def map_visits_over_hpix(
-    visits, conditions, map_hpix, plot=None, scale_limits=None, palette=colorcet.blues, map_class=Planisphere
+    visits,
+    conditions,
+    map_hpix,
+    plot=None,
+    scale_limits=None,
+    palette=colorcet.blues,
+    map_class=Planisphere,
+    prerender_hpix=True,
 ):
     """Plot visit locations over a healpix map.
 
@@ -256,6 +264,8 @@ def map_visits_over_hpix(
         The bokeh palette to use for the healpix map.
     map_class : `class`, optional
         The class of map to use.  Defaults to uranography.Planisphere.
+    prerender_hpix : `bool`, optional
+        Pre-render the healpix map? Defaults to True
 
     Returns
     -------
@@ -279,7 +289,46 @@ def map_visits_over_hpix(
     else:
         cmap = bokeh.transform.linear_cmap("value", palette, scale_limits[0], scale_limits[1])
 
-    sphere_map.add_healpix(map_hpix, nside=hp.npix2nside(len(map_hpix)), cmap=cmap)
+    if prerender_hpix:
+        # Convert the healpix map into an image raster, and send that instead
+        # the full healpix map (sent as one polygon for each healpixel).
+        # An high nside, this should reduce the data sent to the browser.
+        # However, it will not be responsive to controls.
+        if not map_class == Planisphere:
+            raise NotImplementedError()
+        if not plot.frame_width == plot.frame_height:
+            raise NotImplementedError()
+
+        xsize = plot.frame_width
+        ysize = plot.frame_height
+        # For Lambert Azimuthal Equal Area, projection space is 4 radians wide
+        # and high, so projection units per pixel is 4 radians/xsize.
+        # reso is in units of arcmin, though.
+        reso = 60 * np.degrees(4.0 / xsize)
+        projector = hp.projector.AzimuthalProj(
+            rot=sphere_map.laea_rot, xsize=xsize, ysize=ysize, reso=reso, lamb=True
+        )
+        map_raster = projector.projmap(map_hpix, partial(hp.vec2pix, hp.npix2nside(len(map_hpix))))
+
+        # Set area outside projection to nan, not -inf, so bokeh does not
+        # try coloring it.
+        map_raster[np.isneginf(map_raster)] = np.nan
+
+        reso_radians = np.radians(projector.arrayinfo["reso"] / 60)
+        width_hpxy = reso_radians * map_raster.shape[0]
+        height_hpxy = reso_radians * map_raster.shape[1]
+        sphere_map.plot.image(
+            [map_raster],
+            x=-width_hpxy / 2,
+            y=-height_hpxy / 2,
+            dw=width_hpxy,
+            dh=height_hpxy,
+            color_mapper=cmap.transform,
+            #            palette="Viridis256",
+            level="image",
+        )
+    else:
+        sphere_map.add_healpix(map_hpix, nside=hp.npix2nside(len(map_hpix)), cmap=cmap)
 
     if len(visits) > 0:
         ras, decls = camera_perimeter(visits.fieldRA, visits.fieldDec, visits.rotSkyPos)
