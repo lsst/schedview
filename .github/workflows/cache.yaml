@@ -14,7 +14,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install conda
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: "3.11"
           auto-update-conda: true
@@ -36,7 +36,7 @@ jobs:
 
       - name: Access rubin-sched-data cache
         id: cache-rs
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         env:
           cache-name: cached-rubin-sched-data
         with:
@@ -61,6 +61,7 @@ jobs:
         run: |
           export RUBIN_SIM_DATA_DIR=~/rubin_sim_data
           scheduler_download_data --update --tdqm_disable
+          rs_download_data --update --dirs sim-baseline
 
       - name: Check data
         shell: bash -l {0}
@@ -72,3 +73,4 @@ jobs:
           cat $RUBIN_SIM_DATA_DIR/versions.txt
           echo "is it in sync?"
           scheduler_download_data --versions
+          rs_download_data --versions
