@@ -11,4 +11,5 @@ param
 pytz
 uranography
 rubin-scheduler
+rubin-sim
 pip

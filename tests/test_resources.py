@@ -3,9 +3,11 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pandas as pd
+from astropy.time import Time
 from lsst.resources import ResourcePath
+from rubin_scheduler.data import get_baseline
 
-from schedview.collect.opsim import read_opsim
+from schedview.collect.opsim import read_ddf_visits, read_opsim
 from schedview.collect.resources import find_file_resources
 from schedview.collect.rewards import read_rewards
 
@@ -35,6 +37,14 @@ class TestCollectOpsim(unittest.TestCase):
         resource_path = ResourcePath("resource://schedview/data/")
         visits = read_opsim(resource_path)
         self.assertTrue("airmass" in visits.columns)
+        self.assertGreater(len(visits), 0)
+
+    def test_read_ddf(self):
+        # Need to use the baseline, because the sample might be on a date
+        # range that does not include DDFs.
+        resource_path = ResourcePath(get_baseline())
+        visits = read_ddf_visits(resource_path, Time("2026-11-01"), Time("2026-12-01"))
+        self.assertTrue("target" in visits.columns)
         self.assertGreater(len(visits), 0)
 
 

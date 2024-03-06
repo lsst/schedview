@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: conda-incubator/setup-miniconda@v2
+      - uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
           python-version: "3.11"
@@ -46,7 +46,7 @@ jobs:
         shell: bash -l {0}
         run: |
           cd docs
-          package-docs build
+          make html
 
       - name: Upload documentation
         uses: lsst-sqre/ltd-upload@v1
