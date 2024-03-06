@@ -388,13 +388,13 @@ def make_scheduler_summary_df(scheduler, conditions, reward_df=None):
     standard_surveys = [c[0] for c in inspect.getmembers(surveys)]
 
     def get_survey_url(row):
-        url_base = "https://rubin-scheduler.lsst.io/fbs-api.html#"
+        url_base = "https://rubin-scheduler.lsst.io/fbs-api-surveys.html"
         if isinstance(row.survey_class, str) and row.survey_class in standard_surveys:
             section_base = "rubin_scheduler.scheduler.surveys"
-            survey_url = f"{url_base}.{section_base}.{row.survey_class}"
+            survey_url = f"{url_base}#{section_base}.{row.survey_class}"
         else:
-            generic_survey = "module-rubin_scheduler.scheduler.surveys"
-            survey_url = f"{url_base}.{generic_survey}"
+            generic_survey = "rubin_scheduler.scheduler.surveys.BaseSurvey"
+            survey_url = f"{url_base}#{generic_survey}"
         return survey_url
 
     summary_df["survey_url"] = summary_df.apply(get_survey_url, axis=1)
