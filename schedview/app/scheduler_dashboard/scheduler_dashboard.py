@@ -154,12 +154,14 @@ class Scheduler(param.Parameterized):
         default="",
         label="Scheduler pickle file",
         doc=scheduler_fname_doc,
+        precedence=2,
     )
     widget_datetime = param.Date(
         default=date_bounds[0],
         label="Date and time (UTC)",
         doc=f"Select dates between {date_bounds[0]} and {date_bounds[1]}",
         bounds=date_bounds,
+        precedence=3,
     )
     url_mjd = param.Number(default=None)
     widget_tier = param.Selector(
@@ -167,6 +169,7 @@ class Scheduler(param.Parameterized):
         objects=[""],
         label="Tier",
         doc="The label for the first index into the CoreScheduler.survey_lists.",
+        precedence=4,
     )
     survey_map = param.Selector(
         default="reward",
@@ -179,6 +182,7 @@ class Scheduler(param.Parameterized):
         label="Map resolution (nside)",
         doc="",
     )
+
     color_palette = param.Selector(default=DEFAULT_COLOR_PALETTE, objects=COLOR_PALETTES, doc="")
     summary_widget = param.Parameter(default=None, doc="")
     reward_widget = param.Parameter(default=None, doc="")
@@ -1449,6 +1453,27 @@ class RestrictedFilesScheduler(Scheduler):
             self.param["scheduler_fname"].update(path=f"{data_dir}/*scheduler*.p*")
 
 
+class USDFScheduler(Scheduler):
+    """A Parametrized container for parameters, data, and panel objects for the
+    scheduler dashboard.
+    """
+
+    # Param parameters that are modifiable by user actions.
+    scheduler_fname_doc = """Recent pickles from USDF
+    """
+
+    scheduler_fname = param.Selector(
+        default="file1", objects=["file1", "file2"], doc=scheduler_fname_doc, precedence=2
+    )
+
+    pickles_date = param.Date(
+        default=datetime.now(), label="Pickles Date", doc="Select date to load pickles for", precedence=1
+    )
+
+    def __init__(self):
+        super().__init__()
+
+
 # ------------------------------------------------------------ Create dashboard
 
 
@@ -1476,6 +1501,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
 
     from_urls = False
     data_dir = None
+    from_usdf = False
 
     if "data_from_urls" in kwargs.keys():
         from_urls = kwargs["data_from_urls"]
@@ -1485,8 +1511,14 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         data_dir = kwargs["data_dir"]
         del kwargs["data_dir"]
 
+    if "usdf" in kwargs.keys():
+        from_usdf = kwargs["usdf"]
+        del kwargs["usdf"]
+
     scheduler = None
     data_loading_widgets = {}
+    data_loading_parameters = ["scheduler_fname", "widget_datetime", "widget_tier"]
+
     # Accept pickle files from url or any path.
     if from_urls:
         scheduler = Scheduler()
@@ -1514,6 +1546,14 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
                 # "widget_type": pn.widgets.TextInput,
                 "placeholder": "filepath or URL of pickle",
             },
+            "widget_datetime": pn.widgets.DatetimePicker,
+        }
+    # Load pickles from USDF S3 bucket
+    elif from_usdf:
+        scheduler = USDFScheduler()
+        data_loading_parameters = ["scheduler_fname", "pickles_date", "widget_datetime", "widget_tier"]
+        data_loading_widgets = {
+            "pickles_date": pn.widgets.DatetimePicker,
             "widget_datetime": pn.widgets.DatetimePicker,
         }
 
@@ -1578,16 +1618,16 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         styles={"background": "#048b8c"},
     )
     # Parameter inputs (pickle, widget_datetime, tier).
-    sched_app[8:30, 0:21] = pn.Param(
+    sched_app[8:36, 0:21] = pn.Param(
         scheduler,
-        parameters=["scheduler_fname", "widget_datetime", "widget_tier"],
+        parameters=data_loading_parameters,
         widgets=data_loading_widgets,
         name="Select pickle file, date and tier.",
     )
     # Reset button.
-    sched_app[30:36, 3:15] = pn.Row(reset_button)
+    sched_app[36:42, 3:15] = pn.Row(reset_button)
     # Survey rewards table and header.
-    sched_app[8:36, 21:67] = pn.Row(
+    sched_app[8:42, 21:67] = pn.Row(
         pn.Spacer(width=10),
         pn.Column(
             pn.Spacer(height=10),
@@ -1602,7 +1642,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         # sizing_mode="stretch_height",
     )
     # Reward table and header.
-    sched_app[36:87, 0:67] = pn.Row(
+    sched_app[42:87, 0:67] = pn.Row(
         pn.Spacer(width=10),
         pn.Column(
             pn.Spacer(height=10),
@@ -1669,9 +1709,18 @@ def parse_arguments():
         help="Let the user specify URLs from which to load data. THIS IS NOT SECURE.",
     )
 
+    parser.add_argument(
+        "--usdf",
+        action="store_true",
+        help="Loads pickle files from the data directory in USDF",
+    )
+
     args = parser.parse_args()
 
     if len(glob(args.data_dir)) == 0 and not args.data_from_urls:
+        args.data_dir = PACKAGE_DATA_DIR
+
+    if args.usdf and len(glob(USDF_DATA_DIR)) == 0:
         args.data_dir = PACKAGE_DATA_DIR
 
     scheduler_app_params = args.__dict__
