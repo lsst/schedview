@@ -23,11 +23,13 @@ urls = {documentation = "https://schedview.lsst.io", repository = "https://githu
 dynamic = [ "version" ]
 dependencies = [
     "astropy >= 5.3",
+    "cartopy",
     "colorcet",
     "bokeh >= 3.1.1",
     "healpy",
     "holoviews",
     "hvplot",
+    "matplotlib",
     "numpy",
     "pandas",
     "panel >= 1.1.0",

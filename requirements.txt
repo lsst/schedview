@@ -1,9 +1,11 @@
 astropy
 bokeh
+cartopy
 colorcet
 healpy
 holoviews
 hvplot
+matplotlib
 numpy
 pandas
 panel
