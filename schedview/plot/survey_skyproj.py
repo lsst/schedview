@@ -139,7 +139,7 @@ def map_visits_over_healpix(visits, map_hpix, model_observatory, night_events, a
     # Night limit horizons
     latitude = model_observatory.site.latitude
     zd = 70
-    evening = compute_circle_points(night_events.loc["sun_n12_setting", "LST"], latitude, zd, 180, 380)
+    evening = compute_circle_points(night_events.loc["sun_n12_setting", "LST"], latitude, zd, 180, 360)
     sky_map.plot(evening.ra, evening.decl, color="red", linestyle="dashed")
     evening = compute_circle_points(night_events.loc["sun_n12_setting", "LST"], latitude, zd, 0, 180)
     sky_map.plot(evening.ra, evening.decl, color="red", linestyle="dotted")
