@@ -35,6 +35,7 @@ dependencies = [
     "panel >= 1.1.0",
     "param",
     "pytz",
+    "skyproj",
     "rubin-scheduler",
     "lsst.resources",
     "uranography >= 1.1.0 ",
