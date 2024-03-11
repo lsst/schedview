@@ -1,6 +1,5 @@
 astropy
 bokeh
-cartopy
 colorcet
 healpy
 holoviews
