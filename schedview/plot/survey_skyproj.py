@@ -155,7 +155,7 @@ def map_visits_over_healpix(visits, map_hpix, model_observatory, night_events, a
     for visit_ras, visit_decls in zip(ras, decls):
         sky_map.draw_polygon(visit_ras, visit_decls, edgecolor="black", linewidth=0.2)
 
-    return axes
+    return sky_map.ax
 
 
 def create_hpix_visit_map_grid(
@@ -208,8 +208,9 @@ def create_hpix_visit_map_grid(
         visits_in_band = visits.query(f"filter == '{band}'")
         axes = fig.add_subplot(num_rows, num_columns, band_idx + 1)
         axes.set_title(band, loc="left")
-        map_visits_over_healpix(
+        new_axes = map_visits_over_healpix(
             visits_in_band, hpix_maps[band], model_observatory, night_events, axes=axes, **kwargs
         )
+        new_axes.set_title(band, loc="left")
 
     return fig
