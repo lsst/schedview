@@ -4,14 +4,24 @@ Usage
 Running ``scheduler_dashboard``
 -------------------------------
 
-Activate the conda environment and start the app:
-
-::
+Begin by activating the conda environment::
 
     $ conda activate schedview
-    $ scheduler_dashboard
 
-The app will then give you the URL at which you can find the app.
+There are two ways to start the dashboard, depending on what you want to use
+as the source of data.
+One way is for users to enter arbitrary URLs or file paths from which to load
+the data. **This is insecure,** because users can point the dashboard to malicious
+snapshots. It is, however, much more flexible in a secure environment::
+
+    $ scheduler_dashboard --data-from-urls
+
+Alternately, the dashboard can be started with a flag to only allow users to
+load data from a pre-specified directory on the host running the dashboard::
+
+    $ scheduler_dashboard --data_dir /where/the/snapshot/pickles/are
+
+In either case, the app will then give you the URL at which you can find the app.
 
 Running ``prenight``
 --------------------
