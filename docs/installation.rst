@@ -11,7 +11,7 @@ If you want to add it to an existing ``conda`` environment::
 
 or, to use a dedicated environment for ``schedview``::
 
-  $ canda create --name schedview -c conda-forge schedview
+  $ conda create --name schedview -c conda-forge schedview
 
 ``conda`` will take care of installing the needed python module dependencies,
 but some of the data needed by some of its dependencies are not installed
