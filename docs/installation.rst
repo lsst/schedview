@@ -1,62 +1,65 @@
 Installation
 ============
 
+Installing with ``conda``
+-------------------------
+
+``schedview`` can be installed using ``conda``.
+If you want to add it to an existing ``conda`` environment::
+
+  $ conda install -c conda-forge schedview
+
+or, to use a dedicated environment for ``schedview``::
+
+  $ conda create --name schedview -c conda-forge schedview
+
+``conda`` will take care of installing the needed python module dependencies,
+but some of the data needed by some of its dependencies are not installed
+automatically by ``conda``.
+To download the necessary data, see the data download pages
+`for rubin_scheduler <https://rubin-scheduler.lsst.io/data-download.html#data-download>`_
+and `for rubin_sim <https://rubin-sim.lsst.io/data-download.html#data-download>`_
+
 Installing with ``pip``
 -----------------------
 
-Begin by installing ``rubin_sim``.
-Note that ``rubin_sim`` is not presently available through ``pypi``, so you will need to use ``conda``, following the instructions on the ``rubin_sim`` documentation:
-
-::
-
- $ conda create -n rubin-sim -c conda-forge rubin_sim # Create a new environment
- $ conda activate rubin-sim
- $ rs_download_data  # Downloads ~2Gb of data to $RUBIN_SIM_DATA_DIR (~/rubin_sim_data if unset)
- $ conda install -c conda-forge jupyter # Optional install of jupyter
-
-Use ``pip`` to install ``schedview`` itself:
-
-::
+``schedview`` can be installed using ``pip``.
+Starting with whatever ``python`` environment you want to use active::
 
  $ pip install schedview
 
-Coming soon: ``conda install -c conda-forge schedview``
+``pip`` will take care of installing the needed python module dependencies,
+but some of the data needed by some of its dependencies are not installed
+automatically by ``pip``.
+To download the necessary data, see the data download pages
+`for rubin_scheduler <https://rubin-scheduler.lsst.io/data-download.html#data-download>`_
+and `for rubin_sim <https://rubin-sim.lsst.io/data-download.html#data-download>`_
+
 
 For developer use
 -----------------
 
-First, get the code by cloning the github project:
-
-::
+First, get the code by cloning the github project::
 
  $ git clone git@github.com:lsst/schedview.git
  $ cd schedview
 
-Create a ``conda`` environment with the appropriate dependencies, and activate it:
+Create a ``conda`` environment with the appropriate dependencies, and activate it::
 
-::
-
- $ conda create -n schedvie
+ $ conda create --name schedview -c conda-forge --only-deps schedview
  $ conda activate schedview
- $ conda install -f requirements.txt
 
-Install the (development) ``schedview`` in your new environment:
-
-::
+Install the (development) ``schedview`` in your new environment::
 
  $ pip install -e .
 
 Some additional packages are required to run the tests.
-To install the tests, install the dependenices, then run the tests:
-
-::
+To install the tests, install the dependenices, then run the tests::
 
  $ conda install -f test-requirements.txt
  $ pytest .
 
-Building the documentation requires the installation of ``documenteer[guide]``:
-
-::
+Building the documentation requires the installation of ``documenteer[guide]``::
 
  $ pip install "documenteer[guide]"
  $ cd docs
