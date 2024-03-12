@@ -4,11 +4,13 @@ colorcet
 healpy
 holoviews
 hvplot
+matplotlib
 numpy
 pandas
 panel
 param
 pytz
+skyproj
 uranography
 rubin-scheduler
 rubin-sim
