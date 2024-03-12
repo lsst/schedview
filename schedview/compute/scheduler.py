@@ -317,11 +317,16 @@ def make_unique_survey_name(scheduler, survey_index=None):
     except AttributeError:
         survey_name = str(survey)
 
-    if (
-        hasattr(survey, "observations")
-        and ("note" in survey.observations)
-        and (survey.survey_name != survey.observations["note"][0])
-    ):
+    # For auxtel, different fields have the same survey_name, but
+    # the interface should show the field name. So, if we're
+    # getting a field name in note, use that instead of the survey_name
+    # attribute.
+    try:
+        observation_note = f"{survey.observations['note'][0]}"
+    except (AttributeError, ValueError, TypeError):
+        observation_note = None
+
+    if (observation_note is not None) and (survey.survey_name != observation_note):
         survey_name = f"{survey.observations['note'][0]}"
 
     survey_name = f"{survey_index[1]}: {survey_name}"
