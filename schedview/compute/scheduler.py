@@ -317,6 +317,10 @@ def make_unique_survey_name(scheduler, survey_index=None):
     except AttributeError:
         survey_name = str(survey)
 
+    # For auxtel, different fields have the same survey_name, but
+    # the interface should show the field name. So, if we're
+    # getting a field name in note, use that instead of the survey_name
+    # attribute.
     try:
         observation_note = f"{survey.observations['note'][0]}"
     except (AttributeError, ValueError, TypeError):
