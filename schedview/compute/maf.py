@@ -6,7 +6,7 @@ import pandas as pd
 from rubin_scheduler.scheduler.utils import SchemaConverter
 from rubin_sim import maf
 
-__all__ = ["compute_metric_by_visit"]
+__all__ = ["compute_metric_by_visit", "StartDateStacker"]
 
 
 def _visits_to_opsim(visits, opsim):
@@ -110,3 +110,29 @@ def compute_hpix_metric_in_bands(visits, metric, constraint="", nside=32):
     metric_values = {b: bundles[b].metric_values for b in bundles if bundles[b].metric_values is not None}
 
     return metric_values
+
+
+class StartDateStacker(maf.BaseStacker):
+    """Add the start date."""
+
+    cols_added = ["start_date"]
+
+    def __init__(self, start_mjd_col="observationStartMJD"):
+        self.units = "ns"
+        self.cols_req = [start_mjd_col]
+        self.start_mjd_col = start_mjd_col
+
+    def _run(self, sim_data, cols_present=False):
+        """The start date as a datetime."""
+        if cols_present:
+            # Column already present in data; assume it is correct and does not
+            # need recalculating.
+            return sim_data
+        if len(sim_data) == 0:
+            return sim_data
+
+        sim_data["start_date"] = pd.to_datetime(
+            sim_data[self.start_mjd_col] + 2400000.5, origin="julian", unit="D", utc=True
+        )
+
+        return sim_data
