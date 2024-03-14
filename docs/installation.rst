@@ -20,6 +20,15 @@ To download the necessary data, see the data download pages
 `for rubin_scheduler <https://rubin-scheduler.lsst.io/data-download.html#data-download>`_
 and `for rubin_sim <https://rubin-sim.lsst.io/data-download.html#data-download>`_
 
+Note: at present, there are some dependencies which are not listed in the
+conda recipe, either because there is no conda package or we are determining
+whether it is safe to include them for installation in an LSST Stack metapackage.
+To add these additional packages, please install the following into your environment::
+
+  $ pip install lsst-resources
+  $ conda install -c conda-forge lsst-efd-client
+
+  
 Installing with ``pip``
 -----------------------
 
@@ -46,12 +55,12 @@ First, get the code by cloning the github project::
 
 Create a ``conda`` environment with the appropriate dependencies, and activate it::
 
- $ conda create --name schedview -c conda-forge --only-deps schedview
+ $ conda create --channel conda-forge --name rubin_sim --file requirements.txt python=3.11
  $ conda activate schedview
 
 Install the (development) ``schedview`` in your new environment::
 
- $ pip install -e .
+ $ pip install -e . --no-deps
 
 Some additional packages are required to run the tests.
 To install the tests, install the dependenices, then run the tests::

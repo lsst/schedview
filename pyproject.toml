@@ -28,6 +28,8 @@ dependencies = [
     "healpy",
     "holoviews",
     "hvplot",
+    "lsst-efd-client",
+    "lsst-resources",
     "matplotlib",
     "numpy",
     "pandas",
@@ -36,7 +38,7 @@ dependencies = [
     "pytz",
     "skyproj",
     "rubin-scheduler",
-    "lsst.resources",
+    "rubin-sim",
     "uranography >= 1.1.0 ",
 ]
 
