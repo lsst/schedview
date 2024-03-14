@@ -55,7 +55,7 @@ First, get the code by cloning the github project::
 
 Create a ``conda`` environment with the appropriate dependencies, and activate it::
 
- $ conda create --name schedview -c conda-forge --only-deps schedview
+ $ conda create --channel conda-forge --name rubin_sim --file requirements.txt python=3.11
  $ conda activate schedview
 
 Install the (development) ``schedview`` in your new environment::
