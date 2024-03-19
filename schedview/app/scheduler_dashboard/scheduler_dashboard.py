@@ -44,6 +44,7 @@ from astropy.time import Time
 from astropy.utils.exceptions import AstropyWarning
 from bokeh.models import ColorBar, LinearColorMapper
 from bokeh.models.widgets.tables import BooleanFormatter, HTMLTemplateFormatter, NumberFormatter
+from lsst.resources import ResourcePath
 from pandas import Timestamp
 from panel.io.loading import start_loading_spinner, stop_loading_spinner
 from pytz import timezone
@@ -608,7 +609,12 @@ class Scheduler(param.Parameterized):
             self._debugging_message = "Starting to load scheduler."
             pn.state.notifications.info("Scheduler loading...", duration=0)
 
-            (scheduler, conditions) = schedview.collect.scheduler_pickle.read_scheduler(self.scheduler_fname)
+            scheduler_resource_path = ResourcePath(self.scheduler_fname)
+            with scheduler_resource_path.as_local() as local_scheduler_resource:
+                (scheduler, conditions) = schedview.collect.scheduler_pickle.read_scheduler(
+                    local_scheduler_resource.ospath
+                )
+
             self._scheduler = scheduler
             self._conditions = conditions
 
