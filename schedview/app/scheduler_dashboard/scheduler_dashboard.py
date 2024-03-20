@@ -78,15 +78,29 @@ pn.extension(
     notifications=True,
 )
 
-logging.basicConfig(
-    format="%(asctime)s %(message)s",
-    level=logging.INFO,
-)
-
 # Change styles using CSS variables.
-stylesheet = """
+h1_stylesheet = """
 :host {
---mono-font: Helvetica;
+  --mono-font: Helvetica;
+  color: white;
+  font-size: 16pt;
+  font-weight: 500;
+}
+"""
+h2_stylesheet = """
+:host {
+  --mono-font: Helvetica;
+  color: white;
+  font-size: 14pt;
+  font-weight: 300;
+}
+"""
+h3_stylesheet = """
+:host {
+  --mono-font: Helvetica;
+  color: white;
+  font-size: 13pt;
+  font-weight: 300;
 }
 """
 
@@ -204,11 +218,41 @@ class Scheduler(param.Parameterized):
     _display_dashboard_data = False
     _do_not_trigger_update = True
 
+    def __init__(self, **params):
+        super().__init__(**params)
+        self.config_logger()
+
+    def config_logger(self, logger_name="schedule-snapshot"):
+        """Configure the logger.
+
+        Parameters
+        ----------
+        logger_name : `str`
+            The name of the logger.
+        """
+
+        self.logger = logging.getLogger(logger_name)
+        self.logger.setLevel(logging.DEBUG)
+
+        log_stream_handler = None
+        if self.logger.hasHandlers():
+            for handler in self.logger.handlers:
+                if isinstance(handler, logging.StreamHandler):
+                    log_stream_handler = handler
+
+        if log_stream_handler is None:
+            log_stream_handler = logging.StreamHandler()
+
+        log_stream_formatter = logging.Formatter("%(asctime)s: %(message)s")
+        log_stream_handler.setFormatter(log_stream_formatter)
+        self.logger.addHandler(log_stream_handler)
+
     # ------------------------------------------------------------ User actions
 
     @param.depends("scheduler_fname", watch=True)
     def _update_scheduler_fname(self):
         """Update the dashboard when a user enters a new filepath/URL."""
+        self.logger.debug("UPDATE: scheduler file")
         self.show_loading_indicator = True
         self.clear_dashboard()
 
@@ -263,6 +307,7 @@ class Scheduler(param.Parameterized):
         if self._do_not_trigger_update:
             return
 
+        self.logger.debug("UPDATE: mjd from date-picker")
         self.show_loading_indicator = True
         self.clear_dashboard()
 
@@ -320,6 +365,7 @@ class Scheduler(param.Parameterized):
         if self._do_not_trigger_update:
             return
 
+        self.logger.debug("UPDATE: mjd from url")
         self.show_loading_indicator = True
         self.clear_dashboard()
 
@@ -371,6 +417,7 @@ class Scheduler(param.Parameterized):
         """Update the dashboard when a user chooses a new tier."""
         if not self._display_dashboard_data:
             return
+        self.logger.debug("UPDATE: tier")
         self._tier = self.widget_tier
         self._survey = 0
         self._survey_name = self._scheduler_summary_df[
@@ -410,6 +457,7 @@ class Scheduler(param.Parameterized):
         if self.summary_widget.selection == [] or self._do_not_trigger_update:
             return
 
+        self.logger.debug("UPDATE: survey")
         self._survey = self.summary_widget.selection[0]
         self._survey_name = self._scheduler_summary_df[
             self._scheduler_summary_df["tier"] == self._tier
@@ -442,6 +490,7 @@ class Scheduler(param.Parameterized):
         if self.reward_widget.selection == [] or self._do_not_trigger_update:
             return
 
+        self.logger.debug("UPDATE: reward")
         self._reward = self.reward_widget.selection[0]
         self._reward_name = self._survey_reward_df["basis_function"][self._reward]
 
@@ -471,6 +520,7 @@ class Scheduler(param.Parameterized):
         if self.survey_map == "":
             return
 
+        self.logger.debug("UPDATE: survey map")
         # If selection is a reward map, reflect in reward table.
         self._do_not_trigger_update = True
         self._map_name = self.survey_map.split("@")[0].strip()
@@ -496,6 +546,7 @@ class Scheduler(param.Parameterized):
         if not self._display_dashboard_data:
             return
 
+        self.logger.debug("UPDATE: nside")
         self.compute_survey_maps()
 
         self.create_sky_map_base()
@@ -505,6 +556,7 @@ class Scheduler(param.Parameterized):
     @param.depends("color_palette", watch=True)
     def _update_color_palette(self):
         """Update the dashboard when a user chooses a new color palette."""
+        self.logger.debug("UPDATE: color palette")
         if self._display_reward:
             self.update_sky_map_with_reward()
         else:
@@ -732,8 +784,6 @@ class Scheduler(param.Parameterized):
             disabled=True,
             selectable=1,
             hidden_columns=["tier", "survey_url"],
-            # pagination="remote",
-            # page_size=4,
             sizing_mode="stretch_width",
             height=220,
         )
@@ -923,7 +973,6 @@ class Scheduler(param.Parameterized):
         self.reward_widget.selection = []
         columns = [
             "basis_function",
-            # "basis_function_class",
             "basis_function_href",
             "feasible",
             "max_basis_reward",
@@ -1206,11 +1255,19 @@ class Scheduler(param.Parameterized):
         timestamp = datetime.now(timezone("America/Santiago")).strftime("%Y-%m-%d %H:%M:%S")
         self._debug_string = f"\n {timestamp} - {self._debugging_message}" + self._debug_string
 
+        # Send messages to stderr.
+        self.logger.debug(self._debugging_message)
+
         if self.debug_pane is None:
             self.debug_pane = pn.pane.Str(
                 self._debug_string,
                 height=200,
-                styles={"font-size": "9pt", "color": "black", "overflow": "scroll"},
+                styles={
+                    "font-size": "9pt",
+                    "color": "black",
+                    "overflow": "scroll",
+                    "background": "#EDEDED",
+                },
             )
         else:
             self.debug_pane.object = self._debug_string
@@ -1300,8 +1357,7 @@ class Scheduler(param.Parameterized):
             self.dashboard_subtitle_pane = pn.pane.Str(
                 title_string,
                 height=20,
-                styles={"font-size": "14pt", "font-weight": "300", "color": "white"},
-                stylesheets=[stylesheet],
+                stylesheets=[h2_stylesheet],
             )
         else:
             self.dashboard_subtitle_pane.object = title_string
@@ -1321,8 +1377,7 @@ class Scheduler(param.Parameterized):
         if self.summary_table_heading_pane is None:
             self.summary_table_heading_pane = pn.pane.Str(
                 title_string,
-                styles={"font-size": "13pt", "font-weight": "300", "color": "white"},
-                stylesheets=[stylesheet],
+                stylesheets=[h3_stylesheet],
             )
         else:
             self.summary_table_heading_pane.object = title_string
@@ -1341,9 +1396,7 @@ class Scheduler(param.Parameterized):
         if self.reward_table_heading_pane is None:
             self.reward_table_heading_pane = pn.pane.Str(
                 title_string,
-                styles={"font-size": "13pt", "font-weight": "300", "color": "white"},
-                stylesheets=[stylesheet],
-                css_classes=["title"],
+                stylesheets=[h3_stylesheet],
             )
         else:
             self.reward_table_heading_pane.object = title_string
@@ -1362,8 +1415,7 @@ class Scheduler(param.Parameterized):
         if self.map_title_pane is None:
             self.map_title_pane = pn.pane.Str(
                 title_string,
-                styles={"font-size": "13pt", "font-weight": "300", "color": "white"},
-                stylesheets=[stylesheet],
+                stylesheets=[h3_stylesheet],
             )
         else:
             self.map_title_pane.object = title_string
@@ -1475,7 +1527,12 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     # Show dashboard as busy when scheduler.show_loading_spinner is True.
     @pn.depends(loading=scheduler.param.show_loading_indicator, watch=True)
     def update_loading(loading):
-        start_loading_spinner(sched_app) if loading else stop_loading_spinner(sched_app)
+        if loading:
+            scheduler.logger.debug("DASHBOARD START LOADING")
+            start_loading_spinner(sched_app)
+        else:
+            scheduler.logger.debug("DASHBOARD STOP LOADING")
+            stop_loading_spinner(sched_app)
 
     # Define reset button.
     reset_button = pn.widgets.Button(
@@ -1487,6 +1544,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
 
     # Reset dashboard to loading conditions.
     def handle_reload_pickle(event):
+        scheduler.logger.debug("RELOAD PICKLE")
         scheduler.nside = 16
         scheduler.color_palette = "Viridis256"
         if scheduler.scheduler_fname == "":
@@ -1505,8 +1563,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
             pn.pane.Str(
                 "Scheduler Dashboard",
                 height=20,
-                styles={"font-size": "16pt", "font-weight": "500", "color": "white"},
-                stylesheets=[stylesheet],
+                stylesheets=[h1_stylesheet],
             ),
             scheduler.dashboard_subtitle,
         ),
@@ -1580,15 +1637,12 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     )
     # Debugging collapsable card.
     sched_app[87:100, :] = pn.Card(
-        pn.Column(
-            scheduler._debugging_messages,
-            styles={"background": "#EDEDED"},
-        ),
-        title="Debugging",
-        header_background="white",
-        styles={"background": "#048b8c"},
+        scheduler._debugging_messages,
+        header=pn.pane.Str("Debugging", stylesheets=[h2_stylesheet]),
+        header_color="white",
+        header_background="#048b8c",
         sizing_mode="stretch_width",
-        collapsed=True,
+        collapsed=False,
     )
 
     return sched_app
