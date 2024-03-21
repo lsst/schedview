@@ -3,14 +3,20 @@ import unittest
 import numpy as np
 from rubin_scheduler.data import get_baseline
 from rubin_scheduler.utils import survey_start_mjd
-from rubin_sim import maf
 
 from schedview.collect import read_opsim
-from schedview.compute import compute_hpix_metric_in_bands, compute_metric_by_visit
+
+try:
+    from rubin_sim import maf
+
+    from schedview.compute import compute_hpix_metric_in_bands, compute_metric_by_visit
+except ModuleNotFoundError:
+    pass
 
 
 class TestComputeMAF(unittest.TestCase):
 
+    @unittest.skipUnless("maf" in locals(), "No maf installation")
     def test_compute_metric_by_visit(self):
         visits = read_opsim(get_baseline())
         mjd_start = survey_start_mjd()
@@ -21,6 +27,7 @@ class TestComputeMAF(unittest.TestCase):
         self.assertGreater(np.min(values), 0.0)
         self.assertLess(np.max(values), 300)
 
+    @unittest.skipUnless("maf" in locals(), "No maf installation")
     def test_compute_hpix_metric_in_bands(self):
         visits = read_opsim(get_baseline())
         mjd_start = survey_start_mjd()
