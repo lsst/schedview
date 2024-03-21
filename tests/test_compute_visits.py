@@ -48,7 +48,13 @@ class TestComputeVisits(unittest.TestCase):
         self.assertIn("inst_fwhm", visits.columns)
 
     def test_accum_teff_by_night(self):
-        visits = schedview.collect.read_ddf_visits(self.visit_db_fname)
+        stackers = [
+            maf.stackers.ObservationStartDatetime64Stacker(),
+            maf.stackers.TeffStacker(),
+            maf.stackers.DayObsISOStacker(),
+        ]
+
+        visits = schedview.collect.read_ddf_visits(self.visit_db_fname, stackers=stackers)
         night_teff = schedview.compute.visits.accum_teff_by_night(visits)
         self.assertEqual(night_teff.index.names[0], "target")
         self.assertEqual(night_teff.index.names[1], "day_obs_iso8601")
