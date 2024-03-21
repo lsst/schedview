@@ -1,17 +1,23 @@
+import unittest
 from unittest import TestCase
 
 import bokeh.models.layouts
 import numpy as np
 from rubin_scheduler.data import get_baseline
-from rubin_sim import maf
 
 import schedview.collect
 import schedview.compute.visits
 from schedview.plot import create_cadence_plot
 
+try:
+    from rubin_sim import maf
+except ModuleNotFoundError:
+    pass
+
 
 class TestPlotCadence(TestCase):
 
+    @unittest.skipUnless("maf" in locals(), "No rubin_sim.maf installation")
     def test_create_cadence_plot(self):
         stackers = [
             maf.stackers.ObservationStartDatetime64Stacker(),

@@ -137,8 +137,15 @@ def read_opsim(
                 else:
                     raise e
 
-    if "observationStartDatetime64" in visits:
-        visits["start_date"] = pd.to_datetime(visits.observationStartDatetime64, unit="ns", utc=True)
+            if "start_date" not in visits:
+                if "observationStartDatetime64" in visits:
+                    visits["start_date"] = pd.to_datetime(
+                        visits.observationStartDatetime64, unit="ns", utc=True
+                    )
+                elif "observationStartMJD" in visits:
+                    visits["start_date"] = pd.to_datetime(
+                        visits.observationStartMJD + 2400000.5, origin="julian", unit="D", utc=True
+                    )
 
     visits.set_index("observationId", inplace=True)
 
