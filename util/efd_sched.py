@@ -3,6 +3,7 @@
 
 import argparse
 import asyncio
+import logging
 import lzma
 import os
 import pickle
@@ -15,6 +16,8 @@ from lsst_efd_client import EfdClient
 from rubin_scheduler.utils import Site
 
 LOCAL_ROOT_URI = {"usdf": "s3://rubin:", "summit": "https://s3.cp.lsst.org/"}
+logging.basicConfig(level=logging.INFO)
+LOGGER = logging.getLogger("efd_sched")
 
 
 async def query_schedulers_in_window(desired_time, efd="usdf_efd", time_window=TimeDelta(2 * u.second)):
@@ -132,6 +135,8 @@ def get_scheduler(scheduler_url, destination=None):
     This function sets the environment variable
     `LSST_DISABLE_BUCKET_VALIDATION` to "1".
     """
+    LOGGER.info(f"getting scheduler from {scheduler_url}")
+
     os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
     scheduler_resource_path = ResourcePath(scheduler_url)
     scheduler_pickle_bytes = scheduler_resource_path.read()
