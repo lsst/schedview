@@ -1,13 +1,6 @@
-import argparse
-import asyncio
-import lzma
-import os
-import pickle
-import re
-
 import astropy.units as u
-from astropy.time import Time, TimeDelta
 import pandas as pd
+from astropy.time import Time, TimeDelta
 from lsst.resources import ResourcePath
 from lsst_efd_client import EfdClient
 from rubin_scheduler.utils import Site
@@ -78,6 +71,7 @@ async def query_night_schedulers(night, efd="usdf_efd"):
     scheduler_urls = await query_schedulers_in_window(local_midnight, efd=efd, time_window=time_window)
     return scheduler_urls
 
+
 def localize_scheduler_url(scheduler_url, site="usdf"):
     """Localizes the scheduler URL for a given site.
 
@@ -105,16 +99,40 @@ def localize_scheduler_url(scheduler_url, site="usdf"):
     scheduler_url = f"{root_uri}{scheduler_path}"
     return scheduler_url
 
-def mock_schedulers_df():
-    data = [['2024-03-12 00:30:40.565731+00:00', 'https://s3.cp.lsst.org/rubinobs-lfa-cp/Scheduler:1/Scheduler:1/2024/03/11/Scheduler:1_Scheduler:1_2024-03-12T00:31:16.956.p'],
-            ['2024-03-12 00:32:29.309646+00:00', 'https://s3.cp.lsst.org/rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T00:33:05.127.p'],
-            ['2024-03-12 00:57:23.035425+00:00', 'https://s3.cp.lsst.org/rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T00:57:58.876.p'],
-            ['2024-03-12 01:06:34.583256+00:00', 'https://s3.cp.lsst.org/rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T01:07:10.474.p'],
-            ['2024-03-12 01:15:09.624082+00:00', 'https://s3.cp.lsst.org/rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T01:15:45.472.p'],
-            ['2024-03-12 01:22:38.678879+00:00', 'https://s3.cp.lsst.org/rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T01:23:14.427.p'],
-            ['2024-03-12 01:34:39.499348+00:00', 'https://s3.cp.lsst.org/rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T01:35:15.393.p']]
 
-    df = pd.DataFrame(data, columns=['time', 'url'])
+def mock_schedulers_df():
+    data = [
+        [
+            "2024-03-12 00:30:40.565731+00:00",
+            "https://s3.cp.lsst.org/rubinobs-lfa-cp/Scheduler:1/Scheduler:1/2024/03/11/Scheduler:1_Scheduler:1_2024-03-12T00:31:16.956.p",
+        ],
+        [
+            "2024-03-12 00:32:29.309646+00:00",
+            "https://s3.cp.lsst.org/rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T00:33:05.127.p",
+        ],
+        [
+            "2024-03-12 00:57:23.035425+00:00",
+            "https://s3.cp.lsst.org/rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T00:57:58.876.p",
+        ],
+        [
+            "2024-03-12 01:06:34.583256+00:00",
+            "https://s3.cp.lsst.org/rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T01:07:10.474.p",
+        ],
+        [
+            "2024-03-12 01:15:09.624082+00:00",
+            "https://s3.cp.lsst.org/rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T01:15:45.472.p",
+        ],
+        [
+            "2024-03-12 01:22:38.678879+00:00",
+            "https://s3.cp.lsst.org/rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T01:23:14.427.p",
+        ],
+        [
+            "2024-03-12 01:34:39.499348+00:00",
+            "https://s3.cp.lsst.org/rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T01:35:15.393.p",
+        ],
+    ]
+
+    df = pd.DataFrame(data, columns=["time", "url"])
     df = df.sort_index(ascending=False)
-    df['url'] = df['url'].apply(lambda x: localize_scheduler_url(x))
+    df["url"] = df["url"].apply(lambda x: localize_scheduler_url(x))
     return df
