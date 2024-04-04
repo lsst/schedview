@@ -10,6 +10,7 @@ import urllib
 import urllib.request
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from lsst.resources import ResourcePath
 
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 
@@ -80,34 +81,38 @@ def read_scheduler(file_name_or_url=None):
     conditions : `rubin_scheduler.scheduler.features.Conditions`
         An instance of a rubin_scheduler conditions object.
     """
-    if file_name_or_url is None:
-        file_name_or_url = PICKLE_FNAME
+    # if file_name_or_url is None:
+    #     file_name_or_url = PICKLE_FNAME
 
-    if file_name_or_url is None:
-        file_name_or_url = sample_pickle()
+    # if file_name_or_url is None:
+    #     file_name_or_url = sample_pickle()
 
-    if Path(file_name_or_url).is_file():
-        scheduler, conditions = read_local_scheduler_pickle(file_name_or_url)
-    else:
-        # If we didn't have to decompress it, we could use urlopen instead
-        # of downloading a local copy. But, it can be compressed, so we need
-        # to use gzip.open to open it.
-        with TemporaryDirectory() as directory:
-            with urllib.request.urlopen(file_name_or_url) as url_io:
-                content = url_io.read()
+    # if Path(file_name_or_url).is_file():
+    #     scheduler, conditions = read_local_scheduler_pickle(file_name_or_url)
+    # else:
+    #     # If we didn't have to decompress it, we could use urlopen instead
+    #     # of downloading a local copy. But, it can be compressed, so we need
+    #     # to use gzip.open to open it.
+    #     with TemporaryDirectory() as directory:
+    #         with urllib.request.urlopen(file_name_or_url) as url_io:
+    #             content = url_io.read()
 
-            # Infer a file name
-            parsed_url = urllib.parse.urlparse(file_name_or_url)
-            origin_path = Path(parsed_url.path)
-            origin_name = origin_path.name
-            name = origin_name if len(origin_name) > 0 else "scheduler.pickle"
-            path = Path(directory).joinpath(name)
+    #         # Infer a file name
+    #         parsed_url = urllib.parse.urlparse(file_name_or_url)
+    #         origin_path = Path(parsed_url.path)
+    #         origin_name = origin_path.name
+    #         name = origin_name if len(origin_name) > 0 else "scheduler.pickle"
+    #         path = Path(directory).joinpath(name)
 
-            with open(path, "wb") as file_io:
-                file_io.write(content)
+    #         with open(path, "wb") as file_io:
+    #             file_io.write(content)
 
-            scheduler, conditions = read_local_scheduler_pickle(str(path))
-
+    #         scheduler, conditions = read_local_scheduler_pickle(str(path))
+    scheduler_resource_path = ResourcePath(file_name_or_url)
+    with scheduler_resource_path.as_local() as local_scheduler_resource:
+        (scheduler, conditions) = read_local_scheduler_pickle(
+            local_scheduler_resource.ospath
+        )
     return scheduler, conditions
 
 

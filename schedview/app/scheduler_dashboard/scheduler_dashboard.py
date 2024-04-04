@@ -34,24 +34,27 @@ import warnings
 from datetime import datetime
 from glob import glob
 from zoneinfo import ZoneInfo
+from concurrent.futures import ThreadPoolExecutor
 
 import bokeh
 import numpy as np
 import panel as pn
 import param
 import rubin_scheduler.site_models
-from astropy.time import Time
+from astropy.time import Time, TimeDelta
 from astropy.utils.exceptions import AstropyWarning
 from bokeh.models import ColorBar, LinearColorMapper
 from bokeh.models.widgets.tables import BooleanFormatter, HTMLTemplateFormatter, NumberFormatter
-from lsst.resources import ResourcePath
 from pandas import Timestamp
 from panel.io.loading import start_loading_spinner, stop_loading_spinner
 from pytz import timezone
+import astropy.units as u
 
 # For the conditions.mjd bugfix
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 from rubin_scheduler.skybrightness_pre.sky_model_pre import SkyModelPre
+from lsst_efd_client import EfdClient
+from lsst.resources import ResourcePath
 
 import schedview
 import schedview.collect.scheduler_pickle
@@ -59,6 +62,8 @@ import schedview.compute.scheduler
 import schedview.compute.survey
 import schedview.param
 import schedview.plot.survey
+from util.efd_sched import localize_scheduler_url, query_night_schedulers
+from schedview.app.scheduler_dashboard.utils import mock_schedulers_df
 
 # Filter astropy warning that's filling the terminal with every update.
 warnings.filterwarnings("ignore", category=AstropyWarning)
@@ -70,7 +75,7 @@ COLOR_PALETTES = [color for color in bokeh.palettes.__palettes__ if "256" in col
 DEFAULT_COLOR_PALETTE = "Viridis256"
 DEFAULT_NSIDE = 16
 PACKAGE_DATA_DIR = importlib.resources.files("schedview.data").as_posix()
-USDF_DATA_DIR = "/sdf/group/rubin/web_data/sim-data/schedview"
+USDF_DATA_DIR = "s3://rubin:"
 
 
 pn.extension(
@@ -609,7 +614,10 @@ class Scheduler(param.Parameterized):
             self._debugging_message = "Starting to load scheduler."
             pn.state.notifications.info("Scheduler loading...", duration=0)
 
+            os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
             scheduler_resource_path = ResourcePath(self.scheduler_fname)
+            scheduler_resource_path.use_threads = False
+            assert not scheduler_resource_path._environ_use_threads
             with scheduler_resource_path.as_local() as local_scheduler_resource:
                 (scheduler, conditions) = schedview.collect.scheduler_pickle.read_scheduler(
                     local_scheduler_resource.ospath
@@ -1469,7 +1477,7 @@ class USDFScheduler(Scheduler):
     """
 
     scheduler_fname = param.Selector(
-        default="file1", objects=["file1", "file2"], doc=scheduler_fname_doc, precedence=2
+        default="", objects=["", "s3://rubin:rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T01:23:14.427.p"], doc=scheduler_fname_doc, precedence=2
     )
 
     pickles_date = param.Date(
@@ -1480,6 +1488,25 @@ class USDFScheduler(Scheduler):
         super().__init__()
 
 
+    async def query_schedulers(self, selected_time):
+        print(f"{selected_time.date()}")
+        # time_window=TimeDelta(2 * u.second)
+        # desired_time = Time(selected_time)
+        # start_time = desired_time - (time_window / 2)
+        # end_time = desired_time + (time_window / 2)
+
+        # print(f"start time {start_time}")
+        # print(f"end time {end_time}")
+
+        # efd_client = EfdClient("usdf_efd")
+        # topic = "lsst.sal.Scheduler.logevent_largeFileObjectAvailable"
+        # fields = ["url"]
+        # scheduler_urls = await efd_client.select_time_series(topic, fields, start_time, end_time)
+        # scheduler_urls.index.name = "time"
+        # scheduler_urls = scheduler_urls.reset_index()
+        # scheduler_urls = await query_night_schedulers(str(selected_time.date()))
+        scheduler_urls = mock_schedulers_df()
+        return scheduler_urls
 # ------------------------------------------------------------ Create dashboard
 
 
@@ -1562,6 +1589,13 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
             "pickles_date": pn.widgets.DatetimePicker,
             "widget_datetime": pn.widgets.DatetimePicker,
         }
+
+        @pn.depends(selected_time=scheduler.param.pickles_date, watch=True)
+        async def get_scheduler_list(selected_time):
+            os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
+            schedulers = await scheduler.query_schedulers(selected_time)
+            scheduler.param["scheduler_fname"].objects = schedulers['url']
+            # scheduler.scheduler_fname = schedulers[0] # "s3://rubin:rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T01:23:14.427.p"
 
     # Restrict files to data_directory.
     else:
