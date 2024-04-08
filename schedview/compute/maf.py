@@ -103,7 +103,7 @@ def compute_hpix_metric_in_bands(visits, metric, constraint="", nside=32):
         this_constraint = f"filter == '{this_filter}'"
         if len(constraint) > 0:
             this_constraint += f" AND {constraint}"
-        slicer = maf.HealpixSlicer(nside=nside)
+        slicer = maf.HealpixSlicer(nside=nside, verbose=False)
         bundles[this_filter] = maf.MetricBundle(metric, slicer, this_constraint)
 
     compute_metric(visits, bundles)
