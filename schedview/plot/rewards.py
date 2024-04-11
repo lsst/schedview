@@ -1,5 +1,7 @@
 import warnings
 
+import bokeh
+import colorcet
 import holoviews as hv
 import numpy as np
 from astropy.time import Time
@@ -106,3 +108,68 @@ def create_survey_reward_plot(
     data = {"rewards": rewards}
     reward_plot = hv.render(plot_survey_rewards(**data))
     return reward_plot, data
+
+
+def reward_timeline_for_tier(rewards_df, tier, day_obs_mjd, **figure_kwargs):
+    rewards_df = rewards_df.query(
+        f'tier_label == "tier {tier}" and floor(queue_start_mjd-0.5)=={day_obs_mjd}'
+    ).copy()
+    rewards_df["tier_survey_bf"] = list(
+        zip(rewards_df.tier_label, rewards_df.survey_label, rewards_df.basis_function)
+    )
+    factor_range = bokeh.models.FactorRange(
+        *[tuple(c) for c in rewards_df["tier_survey_bf"].drop_duplicates().values]
+    )
+
+    rewards_ds = bokeh.models.ColumnDataSource(rewards_df)
+
+    plot = bokeh.plotting.figure(
+        title="Maximum values of basis functions",
+        x_axis_label="MJD",
+        y_axis_label="Basis function",
+        y_range=factor_range,
+    )
+
+    finite_rewards = np.isfinite(rewards_df.max_basis_reward)
+    min_finite_reward, max_finite_reward = rewards_df[finite_rewards].max_basis_reward.describe()[
+        ["min", "max"]
+    ]
+    cmap = bokeh.transform.linear_cmap(
+        "max_basis_reward",
+        list(reversed(colorcet.palette["CET_I3"])),
+        low=min_finite_reward,
+        high=max_finite_reward,
+        low_color="red",
+        nan_color="red",
+        high_color="black",
+    )
+
+    scatter = plot.scatter(x="queue_start_mjd", y="tier_survey_bf", color=cmap, source=rewards_ds)
+
+    plot.yaxis.group_label_orientation = "horizontal"
+
+    colorbar = scatter.construct_color_bar()
+    plot.add_layout(colorbar, "below")
+
+    color_limit_selector = bokeh.models.RangeSlider(
+        title="color limits",
+        width_policy="max",
+        start=min_finite_reward,
+        end=max_finite_reward,
+        step=(max_finite_reward - min_finite_reward) / 100.0,
+        value=(min_finite_reward, max_finite_reward),
+    )
+
+    color_limit_select_jscode = """
+        const min_value = limit_select.value[0];
+        const max_value = limit_select.value[1];
+        color_map.transform.low = min_value;
+        color_map.transform.high = max_value;
+    """
+    color_limit_change_callback = bokeh.models.CustomJS(
+        args={"color_map": cmap, "limit_select": color_limit_selector}, code=color_limit_select_jscode
+    )
+    color_limit_selector.js_on_change("value", color_limit_change_callback)
+
+    col = bokeh.layouts.column([plot, color_limit_selector])
+    return col
