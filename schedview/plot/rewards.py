@@ -4,6 +4,7 @@ import bokeh
 import colorcet
 import holoviews as hv
 import numpy as np
+import pandas as pd
 from astropy.time import Time
 
 # Imported to help sphinx make the link
@@ -123,6 +124,7 @@ def make_timeline_bars(
 
     # Make the data source
     data_source = bokeh.models.ColumnDataSource(df)
+    data_source.data["datetime"] = pd.to_datetime(df.queue_start_mjd + 2400000.5, origin="julian", unit="D")
 
     # Make the figure
     if "y_range" not in user_plot_kwargs:
@@ -133,11 +135,14 @@ def make_timeline_bars(
         factor_range = user_plot_kwargs["y_range"]
 
     plot_kwargs = {
-        "x_axis_label": "MJD",
+        "x_axis_label": "Time",
+        "x_axis_type": "datetime",
         "y_range": factor_range,
     }
     plot_kwargs.update(user_plot_kwargs)
     plot = bokeh.plotting.figure(**plot_kwargs)
+
+    plot.xaxis[0].formatter = bokeh.models.DatetimeTickFormatter(hours="%H:%M")
 
     # Make the reward limit range slider
     values = df[value_column].values
@@ -205,7 +210,7 @@ def make_timeline_bars(
 
     # Put rectangles on the plot
     rect_kwargs = dict(
-        x="queue_start_mjd",
+        x="datetime",
         y=factor_column,
         width=30.0 / (24 * 60 * 60),
         height=height_map,
@@ -220,7 +225,7 @@ def make_timeline_bars(
         infeasible = np.logical_or(infeasible, np.logical_not(df.feasible))
 
     plot.scatter(
-        x="queue_start_mjd",
+        x="datetime",
         y=factor_column,
         marker="x",
         color="red",
@@ -230,7 +235,7 @@ def make_timeline_bars(
     )
 
     plot.scatter(
-        x="queue_start_mjd",
+        x="datetime",
         y=factor_column,
         marker="triangle",
         color="black",
