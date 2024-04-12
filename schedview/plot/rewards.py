@@ -134,14 +134,23 @@ def make_timeline_bars(
     else:
         factor_range = user_plot_kwargs["y_range"]
 
+    hover_tool = bokeh.models.HoverTool(
+        tooltips=[
+            ("Time", "@datetime{%Y-%m-%d %H:%M:%S}"),
+            ("MJD", "@queue_start_mjd{00000.000}"),
+            (value_column, f"@{value_column}"),
+        ],
+        formatters={"@datetime": "datetime"},
+    )
+
     plot_kwargs = {
         "x_axis_label": "Time",
         "x_axis_type": "datetime",
         "y_range": factor_range,
+        "tools": ["pan", "wheel_zoom", "box_zoom", "save", "reset", "help", hover_tool],
     }
     plot_kwargs.update(user_plot_kwargs)
     plot = bokeh.plotting.figure(**plot_kwargs)
-
     plot.xaxis[0].formatter = bokeh.models.DatetimeTickFormatter(hours="%H:%M")
 
     # Make the reward limit range slider
@@ -212,7 +221,7 @@ def make_timeline_bars(
     rect_kwargs = dict(
         x="datetime",
         y=factor_column,
-        width=30.0 / (24 * 60 * 60),
+        width=pd.Timedelta(30, unit="s"),
         height=height_map,
         color=cmap,
         source=data_source,
