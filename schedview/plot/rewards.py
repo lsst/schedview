@@ -110,49 +110,44 @@ def create_survey_reward_plot(
     return reward_plot, data
 
 
-def reward_timeline_for_tier(rewards_df, tier, day_obs_mjd, **figure_kwargs):
-    rewards_df = rewards_df.query(
-        f'tier_label == "tier {tier}" and floor(queue_start_mjd-0.5)=={day_obs_mjd}'
-    ).copy()
-    rewards_df.loc[~rewards_df.feasible, "max_basis_reward"] = np.nan
-    rewards_df["tier_survey_bf"] = list(
-        zip(rewards_df.tier_label, rewards_df.survey_label, rewards_df.basis_function)
-    )
-    plot = make_timeline_bars(rewards_df, "tier_survey_bf", "max_basis_reward")
-    return plot
-
-
 def make_timeline_bars(
     df,
     factor_column,
     value_column,
     value_range_min=-np.inf,
     value_range_max=np.inf,
-    plot=None,
-    cmap=None,
+    user_plot_kwargs={},
     user_rect_dict={},
+    cmap=None,
 ):
 
     # Make the data source
     data_source = bokeh.models.ColumnDataSource(df)
 
     # Make the figure
-    if plot is None:
+    if "y_range" not in user_plot_kwargs:
         factor_range = bokeh.models.FactorRange(
             *[tuple(c) for c in df[factor_column].drop_duplicates().values]
         )
-        plot = bokeh.plotting.figure(
-            title="Maximum values of basis functions",
-            x_axis_label="MJD",
-            y_axis_label="Basis function",
-            y_range=factor_range,
-        )
+    else:
+        factor_range = user_plot_kwargs["y_range"]
+
+    plot_kwargs = {
+        "x_axis_label": "MJD",
+        "y_range": factor_range,
+    }
+    plot_kwargs.update(user_plot_kwargs)
+    plot = bokeh.plotting.figure(**plot_kwargs)
 
     # Make the reward limit range slider
     values = df[value_column].values
     values_in_range = values[np.isfinite(values) & (values >= value_range_min) & (values <= value_range_max)]
     value_range_min = np.min(values_in_range)
     value_range_max = np.max(values_in_range)
+    if value_range_max == value_range_min:
+        value_range_max = value_range_min + 1
+        value_range_min = value_range_max - 2
+
     value_limit_selector = bokeh.models.RangeSlider(
         title="limits",
         width_policy="max",
@@ -220,6 +215,31 @@ def make_timeline_bars(
     rect_kwargs.update(user_rect_dict)
     rectangles = plot.rect(**rect_kwargs)
 
+    infeasible = np.isneginf(df[value_column])
+    if "feasible" in df:
+        infeasible = np.logical_or(infeasible, np.logical_not(df.feasible))
+
+    plot.scatter(
+        x="queue_start_mjd",
+        y=factor_column,
+        marker="x",
+        color="red",
+        size=10,
+        source=data_source,
+        view=bokeh.models.CDSView(filter=bokeh.models.BooleanFilter(infeasible)),
+    )
+
+    plot.scatter(
+        x="queue_start_mjd",
+        y=factor_column,
+        marker="triangle",
+        color="black",
+        alpha=0.5,
+        size=10,
+        source=data_source,
+        view=bokeh.models.CDSView(filter=bokeh.models.BooleanFilter(np.isposinf(df[value_column]))),
+    )
+
     plot.yaxis.group_label_orientation = "horizontal"
 
     # Add the color bar
@@ -229,3 +249,54 @@ def make_timeline_bars(
     # Combine the range selection slider and the plot
     col = bokeh.layouts.column([plot, value_limit_selector])
     return col
+
+
+def reward_timeline_for_tier(rewards_df, tier, day_obs_mjd, **figure_kwargs):
+    rewards_df = rewards_df.query(
+        f'tier_label == "tier {tier}" and floor(queue_start_mjd-0.5)=={day_obs_mjd}'
+    ).copy()
+    rewards_df.loc[~rewards_df.feasible, "max_basis_reward"] = np.nan
+    rewards_df["tier_survey_bf"] = list(
+        zip(rewards_df.tier_label, rewards_df.survey_label, rewards_df.basis_function)
+    )
+    rewards_df.sort_index(ascending=False, inplace=True)
+
+    plot_kwargs = {
+        "title": "Maximum values of basis functions",
+        "y_axis_label": "basis function",
+        "height": max(256, 15 * len(rewards_df.tier_survey_bf.unique())),
+        "width": 1024,
+    }
+    plot = make_timeline_bars(rewards_df, "tier_survey_bf", "max_basis_reward", user_plot_kwargs=plot_kwargs)
+    return plot
+
+
+def reward_timeline_for_surveys(rewards_df, day_obs_mjd, **figure_kwargs):
+    survey_rewards_df = (
+        rewards_df.groupby(["list_index", "survey_index", "queue_start_mjd", "queue_fill_mjd_ns"])
+        .agg(
+            {
+                "tier_label": "first",
+                "survey_label": "first",
+                "survey_class": "first",
+                "survey_reward": "first",
+                "feasible": "all",
+            }
+        )
+        .loc[:, ["tier_label", "survey_label", "survey_class", "survey_reward", "feasible"]]
+        .reset_index(level=["queue_start_mjd", "queue_fill_mjd_ns"])
+        .query(f"floor(queue_start_mjd-0.5)=={day_obs_mjd}")
+        .sort_index(ascending=False)
+    )
+    survey_rewards_df.loc[~survey_rewards_df.feasible, "survey_reward"] = np.nan
+    survey_rewards_df["tier_survey"] = list(zip(survey_rewards_df.tier_label, survey_rewards_df.survey_label))
+    plot_kwargs = {
+        "title": "Survey rewards",
+        "y_axis_label": "survey",
+        "height": max(256, 20 * len(survey_rewards_df.tier_survey.unique())),
+        "width": 1024,
+    }
+    plot = make_timeline_bars(
+        survey_rewards_df, "tier_survey", "survey_reward", value_range_max=100, user_plot_kwargs=plot_kwargs
+    )
+    return plot
