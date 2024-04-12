@@ -122,8 +122,10 @@ def reward_timeline_for_tier(rewards_df, tier, day_obs_mjd, **figure_kwargs):
         *[tuple(c) for c in rewards_df["tier_survey_bf"].drop_duplicates().values]
     )
 
+    # Make the data source
     rewards_ds = bokeh.models.ColumnDataSource(rewards_df)
 
+    # Make the figure
     plot = bokeh.plotting.figure(
         title="Maximum values of basis functions",
         x_axis_label="MJD",
@@ -131,32 +133,11 @@ def reward_timeline_for_tier(rewards_df, tier, day_obs_mjd, **figure_kwargs):
         y_range=factor_range,
     )
 
+    # Make the reward limit range slider
     finite_rewards = np.isfinite(rewards_df.max_basis_reward)
     min_finite_reward, max_finite_reward = rewards_df[finite_rewards].max_basis_reward.describe()[
         ["min", "max"]
     ]
-    cmap = bokeh.transform.linear_cmap(
-        "max_basis_reward",
-        list(reversed(colorcet.palette["CET_I3"])),
-        low=min_finite_reward,
-        high=max_finite_reward,
-        nan_color="red",
-    )
-
-    points = plot.rect(
-        x="queue_start_mjd",
-        y="tier_survey_bf",
-        width=30.0 / (24 * 60 * 60),
-        height="max_basis_reward",
-        color=cmap,
-        source=rewards_ds,
-    )
-
-    plot.yaxis.group_label_orientation = "horizontal"
-
-    colorbar = points.construct_color_bar()
-    plot.add_layout(colorbar, "below")
-
     reward_limit_selector = bokeh.models.RangeSlider(
         title="reward limits",
         width_policy="max",
@@ -166,6 +147,16 @@ def reward_timeline_for_tier(rewards_df, tier, day_obs_mjd, **figure_kwargs):
         value=(min_finite_reward, max_finite_reward),
     )
 
+    # Make the color map
+    cmap = bokeh.transform.linear_cmap(
+        "max_basis_reward",
+        list(reversed(colorcet.palette["CET_I3"])),
+        low=min_finite_reward,
+        high=max_finite_reward,
+        nan_color="red",
+    )
+
+    # Update the color map when the range slider changes
     reward_limit_select_jscode = """
         const min_value = limit_select.value[0];
         const max_value = limit_select.value[1];
@@ -177,5 +168,43 @@ def reward_timeline_for_tier(rewards_df, tier, day_obs_mjd, **figure_kwargs):
     )
     reward_limit_selector.js_on_change("value", reward_limit_change_callback)
 
+    # Map the reward to the height
+    height_transform_jscode = """
+        const height = new Float64Array(xs.length);
+        const low = limit_selector.value[0]
+        const high = limit_selector.value[1]
+        for (let i = 0; i < xs.length; i++) {
+            if (xs[i] < low) {
+                height[i] = min_height;
+            } else if (xs[i] > high) {
+                height[i] = max_height;
+            } else {
+                height[i] = min_height +  (xs[i]-low) * (max_height-min_height)/(high-low)
+            }
+        }
+        return height
+    """
+    height_transform = bokeh.models.CustomJSTransform(
+        args={"limit_selector": reward_limit_selector, "min_height": 0.1, "max_height": 1.0},
+        v_func=height_transform_jscode,
+    )
+    height_map = bokeh.transform.transform("max_basis_reward", height_transform)
+
+    # Put rectangles on the plot
+    points = plot.rect(
+        x="queue_start_mjd",
+        y="tier_survey_bf",
+        width=30.0 / (24 * 60 * 60),
+        height=height_map,
+        color=cmap,
+        source=rewards_ds,
+    )
+    plot.yaxis.group_label_orientation = "horizontal"
+
+    # Add the color bar
+    colorbar = points.construct_color_bar()
+    plot.add_layout(colorbar, "below")
+
+    # Combine the range selection slider and the plot
     col = bokeh.layouts.column([plot, reward_limit_selector])
     return col
