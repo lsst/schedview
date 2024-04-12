@@ -122,7 +122,16 @@ def reward_timeline_for_tier(rewards_df, tier, day_obs_mjd, **figure_kwargs):
     return plot
 
 
-def make_timeline_bars(df, factor_column, value_column, plot=None, cmap=None, user_rect_dict={}):
+def make_timeline_bars(
+    df,
+    factor_column,
+    value_column,
+    value_range_min=-np.inf,
+    value_range_max=np.inf,
+    plot=None,
+    cmap=None,
+    user_rect_dict={},
+):
 
     # Make the data source
     data_source = bokeh.models.ColumnDataSource(df)
@@ -140,15 +149,17 @@ def make_timeline_bars(df, factor_column, value_column, plot=None, cmap=None, us
         )
 
     # Make the reward limit range slider
-    finite_values = np.isfinite(df[value_column])
-    min_finite_reward, max_finite_reward = df.loc[finite_values, value_column].describe()[["min", "max"]]
-    reward_limit_selector = bokeh.models.RangeSlider(
+    values = df[value_column].values
+    values_in_range = values[np.isfinite(values) & (values >= value_range_min) & (values <= value_range_max)]
+    value_range_min = np.min(values_in_range)
+    value_range_max = np.max(values_in_range)
+    value_limit_selector = bokeh.models.RangeSlider(
         title="limits",
         width_policy="max",
-        start=min_finite_reward,
-        end=max_finite_reward,
-        step=(max_finite_reward - min_finite_reward) / 100.0,
-        value=(min_finite_reward, max_finite_reward),
+        start=value_range_min,
+        end=value_range_max,
+        step=(value_range_max - value_range_min) / 100.0,
+        value=(value_range_min, value_range_max),
     )
 
     # Make the color map
@@ -156,22 +167,24 @@ def make_timeline_bars(df, factor_column, value_column, plot=None, cmap=None, us
         cmap = bokeh.transform.linear_cmap(
             field_name=value_column,
             palette=list(reversed(colorcet.palette["CET_I3"])),
-            low=min_finite_reward,
-            high=max_finite_reward,
+            low=value_range_min,
+            high=value_range_max,
+            low_color="red",
+            high_color="black",
             nan_color="red",
         )
 
     # Update the color map when the range slider changes
-    reward_limit_select_jscode = """
+    value_limit_select_jscode = """
         const min_value = limit_select.value[0];
         const max_value = limit_select.value[1];
         color_map.transform.low = min_value;
         color_map.transform.high = max_value;
     """
-    reward_limit_change_callback = bokeh.models.CustomJS(
-        args={"color_map": cmap, "limit_select": reward_limit_selector}, code=reward_limit_select_jscode
+    value_limit_change_callback = bokeh.models.CustomJS(
+        args={"color_map": cmap, "limit_select": value_limit_selector}, code=value_limit_select_jscode
     )
-    reward_limit_selector.js_on_change("value", reward_limit_change_callback)
+    value_limit_selector.js_on_change("value", value_limit_change_callback)
 
     # Map the reward to the height
     height_transform_jscode = """
@@ -190,7 +203,7 @@ def make_timeline_bars(df, factor_column, value_column, plot=None, cmap=None, us
         return height
     """
     height_transform = bokeh.models.CustomJSTransform(
-        args={"limit_selector": reward_limit_selector, "min_height": 0.1, "max_height": 1.0},
+        args={"limit_selector": value_limit_selector, "min_height": 0.1, "max_height": 1.0},
         v_func=height_transform_jscode,
     )
     height_map = bokeh.transform.transform(value_column, height_transform)
@@ -203,7 +216,8 @@ def make_timeline_bars(df, factor_column, value_column, plot=None, cmap=None, us
         height=height_map,
         color=cmap,
         source=data_source,
-    ).update(user_rect_dict)
+    )
+    rect_kwargs.update(user_rect_dict)
     rectangles = plot.rect(**rect_kwargs)
 
     plot.yaxis.group_label_orientation = "horizontal"
@@ -213,5 +227,5 @@ def make_timeline_bars(df, factor_column, value_column, plot=None, cmap=None, us
     plot.add_layout(colorbar, "below")
 
     # Combine the range selection slider and the plot
-    col = bokeh.layouts.column([plot, reward_limit_selector])
+    col = bokeh.layouts.column([plot, value_limit_selector])
     return col
