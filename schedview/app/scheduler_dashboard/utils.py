@@ -9,7 +9,7 @@ from rubin_scheduler.utils import Site
 LOCAL_ROOT_URI = {"usdf": "s3://rubin:", "summit": "https://s3.cp.lsst.org/"}
 
 
-async def query_night_schedulers(reference_time_utc, efd="usdf_efd"):
+async def query_night_schedulers(reference_time_utc, selected_telescope=None, efd="usdf_efd"):
     """Query the EFD for the night schedulers till reference time
 
     Parameters
@@ -40,7 +40,9 @@ async def query_night_schedulers(reference_time_utc, efd="usdf_efd"):
     efd_client = EfdClient(efd)
     topic = "lsst.sal.Scheduler.logevent_largeFileObjectAvailable"
     fields = ["url"]
-    scheduler_urls = await efd_client.select_time_series(topic, fields, start_time, end_time)
+    scheduler_urls = await efd_client.select_time_series(
+        topic, fields, start_time, end_time, index=selected_telescope
+    )
     if not scheduler_urls.empty:
         scheduler_urls.index.name = "time"
         scheduler_urls = scheduler_urls.reset_index()

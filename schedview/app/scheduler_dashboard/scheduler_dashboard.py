@@ -156,14 +156,14 @@ class Scheduler(param.Parameterized):
         default="",
         label="Scheduler pickle file",
         doc=scheduler_fname_doc,
-        precedence=2,
+        precedence=3,
     )
     widget_datetime = param.Date(
         default=date_bounds[0],
         label="Date and time (UTC)",
         doc=f"Select dates between {date_bounds[0]} and {date_bounds[1]}",
         bounds=date_bounds,
-        precedence=3,
+        precedence=4,
     )
     url_mjd = param.Number(default=None)
     widget_tier = param.Selector(
@@ -171,7 +171,7 @@ class Scheduler(param.Parameterized):
         objects=[""],
         label="Tier",
         doc="The label for the first index into the CoreScheduler.survey_lists.",
-        precedence=4,
+        precedence=5,
     )
     survey_map = param.Selector(
         default="reward",
@@ -1476,17 +1476,21 @@ class USDFScheduler(Scheduler):
         default="",
         objects=[],
         doc=scheduler_fname_doc,
-        precedence=2,
+        precedence=3,
     )
 
     pickles_date = param.Date(
         default=datetime.now(), label="Pickles Date", doc="Select date to load pickles for", precedence=1
     )
 
+    telescope = param.Selector(
+        default=None, objects={"All": None, "Auxtel": 1, "Main": 2}, doc="Source Telescope", precedence=2
+    )
+
     def __init__(self):
         super().__init__()
 
-    async def query_schedulers(self, selected_time):
+    async def query_schedulers(self, selected_time, selected_tel):
         selected_time = Time(
             Timestamp(
                 selected_time,
@@ -1494,7 +1498,7 @@ class USDFScheduler(Scheduler):
             )
         )
         self.show_loading_indicator = True
-        scheduler_urls = await query_night_schedulers(selected_time)
+        scheduler_urls = await query_night_schedulers(selected_time, selected_tel)
         self.show_loading_indicator = False
         return scheduler_urls
 
@@ -1576,16 +1580,24 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     # Load pickles from USDF S3 bucket
     elif from_usdf:
         scheduler = USDFScheduler()
-        data_loading_parameters = ["scheduler_fname", "pickles_date", "widget_datetime", "widget_tier"]
+        data_loading_parameters = [
+            "scheduler_fname",
+            "pickles_date",
+            "telescope",
+            "widget_datetime",
+            "widget_tier",
+        ]
         data_loading_widgets = {
             "pickles_date": pn.widgets.DatetimePicker,
             "widget_datetime": pn.widgets.DatetimePicker,
         }
 
-        @pn.depends(selected_time=scheduler.param.pickles_date, watch=True)
-        async def get_scheduler_list(selected_time):
+        @pn.depends(
+            selected_time=scheduler.param.pickles_date, selected_tel=scheduler.param.telescope, watch=True
+        )
+        async def get_scheduler_list(selected_time, selected_tel):
             os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
-            schedulers = await scheduler.query_schedulers(selected_time)
+            schedulers = await scheduler.query_schedulers(selected_time, selected_tel)
             scheduler.param["scheduler_fname"].objects = schedulers
 
     # Restrict files to data_directory.
