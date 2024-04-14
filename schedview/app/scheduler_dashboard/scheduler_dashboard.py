@@ -1474,10 +1474,7 @@ class USDFScheduler(Scheduler):
 
     scheduler_fname = param.Selector(
         default="",
-        objects=[
-            "",
-            "s3://rubin:rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T01:23:14.427.p",
-        ],
+        objects=[],
         doc=scheduler_fname_doc,
         precedence=2,
     )
@@ -1499,7 +1496,6 @@ class USDFScheduler(Scheduler):
         self.show_loading_indicator = True
         scheduler_urls = await query_night_schedulers(selected_time)
         self.show_loading_indicator = False
-        # scheduler_urls = await get_top_n_schedulers()
         return scheduler_urls
 
 

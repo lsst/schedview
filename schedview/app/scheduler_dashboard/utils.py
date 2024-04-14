@@ -10,12 +10,12 @@ LOCAL_ROOT_URI = {"usdf": "s3://rubin:", "summit": "https://s3.cp.lsst.org/"}
 
 
 async def query_night_schedulers(reference_time_utc, efd="usdf_efd"):
-    """Query the EFD for the night schedulers
+    """Query the EFD for the night schedulers till reference time
 
     Parameters
     ----------
-    selected_time : `str`, 'float', or `astropy.time.Time`
-        The night to query, in YYYY-MM-DD format
+    reference_time_utc : `astropy.time.Time`
+        selected reference time in UTC
     efd : `str`
         The name of the EFD to query, usdf_efd or summit_efd
         Defaults to usdf_efd
@@ -25,27 +25,18 @@ async def query_night_schedulers(reference_time_utc, efd="usdf_efd"):
     schedulers : `list`
         A list of the schedulers for the night
     """
-
-    # reference_time_utc = Time(selected_time)
-    # print(f"reference_time_utc {reference_time_utc}")
-    # tz = timezone('Etc/GMT+12')
-    # reference_timestamp_utc_12 =
-    # Timestamp(reference_time_utc.to_datetime(timezone=tz))
-    # reference_date_utc_12 = reference_timestamp_utc_12.date()
-    # print(f"reference_date_utc_12 {reference_date_utc_12}")
-    # print(f"reference_timestamp_utc_12 {reference_timestamp_utc_12}")
-    # end_time = Time(str(reference_timestamp_utc_12))
-    # start_time = Time(Timestamp(str(reference_date_utc_12)))
-
+    # Get the night by converting the UTC time to timezone UTC-12
     tz = timezone("Etc/GMT+12")
     reference_time_utc_12 = Timestamp(reference_time_utc.to_datetime(timezone=tz))
     night = Time(str(reference_time_utc_12.date()))
+    # The offset by longitude moves to local solar time.
+    # The offset of 1 makes the night specificed refer to the
+    # local date corresponding to sunset.
     local_midnight = Time(night.mjd + 1 - Site("LSST").longitude / 360, format="mjd")
-    print(f"local midnight {local_midnight.to_datetime()}")
+    # Offset by half a jd to get the start of the night
     start_time = local_midnight - TimeDelta(0.5, format="jd")
+    # set the end time to the selected time
     end_time = reference_time_utc
-    print(f"star_time {start_time.to_datetime()}")
-    print(f"end_time {end_time}")
     efd_client = EfdClient(efd)
     topic = "lsst.sal.Scheduler.logevent_largeFileObjectAvailable"
     fields = ["url"]
