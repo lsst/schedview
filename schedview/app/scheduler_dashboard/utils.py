@@ -1,49 +1,20 @@
-import astropy.units as u
 import pandas as pd
 from astropy.time import Time, TimeDelta
 from lsst.resources import ResourcePath
 from lsst_efd_client import EfdClient
+from pandas import Timestamp
+from pytz import timezone
 from rubin_scheduler.utils import Site
 
 LOCAL_ROOT_URI = {"usdf": "s3://rubin:", "summit": "https://s3.cp.lsst.org/"}
 
 
-async def query_schedulers_in_window(desired_time, efd="usdf_efd", time_window=TimeDelta(2 * u.second)):
-    """Query the EFD for scheduler URLs within a given time window.
-
-    Parameters
-    ----------
-    desired_time : `astropy.time.Time`
-        The central time to query the event service.
-    efd : `str`, optional
-        The name of the EFD to connect to (default is 'usdf_efd').
-    time_window : `astropy.time.TimeDelta`, optional
-        The size of the time window to search for scheduler URLs
-        (default is 2 seconds).
-
-    Returns
-    -------
-    scheduler_urls : `pandas.DataFrame`
-        A DataFrame containing the scheduler snapshot times URLs.
-    """
-    start_time = desired_time - (time_window / 2)
-    end_time = desired_time + (time_window / 2)
-
-    efd_client = EfdClient(efd)
-    topic = "lsst.sal.Scheduler.logevent_largeFileObjectAvailable"
-    fields = ["url"]
-    scheduler_urls = await efd_client.select_time_series(topic, fields, start_time, end_time)
-    scheduler_urls.index.name = "time"
-    scheduler_urls = scheduler_urls.reset_index()
-    return scheduler_urls
-
-
-async def query_night_schedulers(night, efd="usdf_efd"):
+async def query_night_schedulers(reference_time_utc, efd="usdf_efd"):
     """Query the EFD for the night schedulers
 
     Parameters
     ----------
-    night : `str`, 'float', or `astropy.time.Time`
+    selected_time : `str`, 'float', or `astropy.time.Time`
         The night to query, in YYYY-MM-DD format
     efd : `str`
         The name of the EFD to query, usdf_efd or summit_efd
@@ -55,21 +26,37 @@ async def query_night_schedulers(night, efd="usdf_efd"):
         A list of the schedulers for the night
     """
 
-    try:
-        reference_time = Time(night)
-    except ValueError:
-        if isinstance(night, int):
-            reference_time = Time(night, format="mjd")
-        else:
-            raise ValueError("night must be a valid date in YYYY-MM-DD format")
+    # reference_time_utc = Time(selected_time)
+    # print(f"reference_time_utc {reference_time_utc}")
+    # tz = timezone('Etc/GMT+12')
+    # reference_timestamp_utc_12 =
+    # Timestamp(reference_time_utc.to_datetime(timezone=tz))
+    # reference_date_utc_12 = reference_timestamp_utc_12.date()
+    # print(f"reference_date_utc_12 {reference_date_utc_12}")
+    # print(f"reference_timestamp_utc_12 {reference_timestamp_utc_12}")
+    # end_time = Time(str(reference_timestamp_utc_12))
+    # start_time = Time(Timestamp(str(reference_date_utc_12)))
 
-    # The offset by longitude moves to local solar time.
-    # The offset of 1 makes the night specificed refer to the
-    # local date corresponding to sunset.
-    local_midnight = Time(reference_time.mjd + 1 - Site("LSST").longitude / 360, format="mjd")
-    time_window = TimeDelta(1, format="jd")
-    scheduler_urls = await query_schedulers_in_window(local_midnight, efd=efd, time_window=time_window)
-    return scheduler_urls
+    tz = timezone("Etc/GMT+12")
+    reference_time_utc_12 = Timestamp(reference_time_utc.to_datetime(timezone=tz))
+    night = Time(str(reference_time_utc_12.date()))
+    local_midnight = Time(night.mjd + 1 - Site("LSST").longitude / 360, format="mjd")
+    print(f"local midnight {local_midnight.to_datetime()}")
+    start_time = local_midnight - TimeDelta(0.5, format="jd")
+    end_time = reference_time_utc
+    print(f"star_time {start_time.to_datetime()}")
+    print(f"end_time {end_time}")
+    efd_client = EfdClient(efd)
+    topic = "lsst.sal.Scheduler.logevent_largeFileObjectAvailable"
+    fields = ["url"]
+    scheduler_urls = await efd_client.select_time_series(topic, fields, start_time, end_time)
+    if not scheduler_urls.empty:
+        scheduler_urls.index.name = "time"
+        scheduler_urls = scheduler_urls.reset_index()
+        scheduler_urls = scheduler_urls.sort_index(ascending=False)
+        scheduler_urls["url"] = scheduler_urls["url"].apply(lambda x: localize_scheduler_url(x))
+        return scheduler_urls["url"]
+    return []
 
 
 def localize_scheduler_url(scheduler_url, site="usdf"):
@@ -135,4 +122,17 @@ def mock_schedulers_df():
     df = pd.DataFrame(data, columns=["time", "url"])
     df = df.sort_index(ascending=False)
     df["url"] = df["url"].apply(lambda x: localize_scheduler_url(x))
-    return df
+    return df["url"]
+
+
+async def get_top_n_schedulers(efd="usdf_efd"):
+    sync_client = EfdClient(efd, db_name="efd")
+    topic = "lsst.sal.Scheduler.logevent_largeFileObjectAvailable"
+    fields = ["url"]
+    scheduler_urls = await sync_client.select_top_n(topic, fields, 10)
+    scheduler_urls.index.name = "time"
+    scheduler_urls = scheduler_urls.reset_index()
+
+    scheduler_urls = scheduler_urls.sort_index(ascending=False)
+    scheduler_urls["url"] = scheduler_urls["url"].apply(lambda x: localize_scheduler_url(x))
+    return scheduler_urls["url"]

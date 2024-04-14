@@ -59,7 +59,7 @@ import schedview.compute.scheduler
 import schedview.compute.survey
 import schedview.param
 import schedview.plot.survey
-from schedview.app.scheduler_dashboard.utils import mock_schedulers_df
+from schedview.app.scheduler_dashboard.utils import query_night_schedulers
 
 # Filter astropy warning that's filling the terminal with every update.
 warnings.filterwarnings("ignore", category=AstropyWarning)
@@ -1490,7 +1490,16 @@ class USDFScheduler(Scheduler):
         super().__init__()
 
     async def query_schedulers(self, selected_time):
-        scheduler_urls = mock_schedulers_df()
+        selected_time = Time(
+            Timestamp(
+                selected_time,
+                tzinfo=ZoneInfo(DEFAULT_TIMEZONE),
+            )
+        )
+        self.show_loading_indicator = True
+        scheduler_urls = await query_night_schedulers(selected_time)
+        self.show_loading_indicator = False
+        # scheduler_urls = await get_top_n_schedulers()
         return scheduler_urls
 
 
@@ -1581,8 +1590,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         async def get_scheduler_list(selected_time):
             os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
             schedulers = await scheduler.query_schedulers(selected_time)
-            scheduler.param["scheduler_fname"].objects = schedulers["url"]
-            # scheduler.scheduler_fname = schedulers[0] # "s3://rubin:rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T01:23:14.427.p"
+            scheduler.param["scheduler_fname"].objects = schedulers
 
     # Restrict files to data_directory.
     else:
@@ -1762,7 +1770,7 @@ def main():
     if "SCHEDULER_PORT" in os.environ:
         scheduler_port = int(os.environ["SCHEDULER_PORT"])
     else:
-        scheduler_port = 8080
+        scheduler_port = 8888
 
     assets_dir = os.path.join(importlib.resources.files("schedview"), "app", "scheduler_dashboard", "assets")
 
@@ -1781,7 +1789,7 @@ def main():
         prefix=prefix,
         start=True,
         autoreload=True,
-        threaded=True,
+        # threaded=True,
         static_dirs={"assets": assets_dir},
     )
 
