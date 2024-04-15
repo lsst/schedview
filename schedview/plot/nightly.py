@@ -257,6 +257,9 @@ def plot_alt_vs_time(
     fig : `bokeh.plotting.Figure`
         Bokeh figure object
     """
+    for time_column in "start_date", "observationStartDatetime64":
+        if time_column in visits:
+            break
 
     if figure is None:
         fig = bokeh.plotting.figure(
@@ -294,10 +297,10 @@ def plot_alt_vs_time(
         name="filter",
     )
 
-    fig.line("start_date", "altitude", source=visits_ds, color="gray")
+    fig.line(time_column, "altitude", source=visits_ds, color="gray")
     if too_many_note_values:
         fig.scatter(
-            "start_date",
+            time_column,
             "altitude",
             source=visits_ds,
             marker={"field": "filter", "transform": filter_marker_mapper},
@@ -307,7 +310,7 @@ def plot_alt_vs_time(
         )
     else:
         fig.scatter(
-            "start_date",
+            time_column,
             "altitude",
             source=visits_ds,
             color={"field": "note", "transform": note_color_mapper},
