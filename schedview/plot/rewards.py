@@ -116,14 +116,51 @@ def make_timeline_bars(
     factor_column,
     value_column,
     value_range_min=-np.inf,
+    value_range_max=np.inf,
     user_infeasible_kwargs=None,
     user_max_kwargs=None,
-    value_range_max=np.inf,
     user_plot_kwargs={},
     user_rect_dict={},
     cmap=None,
 ):
+    """Create a stacked set of timelines with vertical colored bars.
 
+    Parameters
+    ----------
+    df : `pandas.DataFrame`
+        The table of the data to plot.
+    factor_column : `str`
+        The name of the column determining the horizontal line on which
+        values will be plotted.
+    value_column : `str`
+        The name of the column to map to bar height and color.
+    value_range_min : `float`
+        The low extreme value for height and color mapping.
+        Defaults to `-numpy.inf`.
+    value_range_max : `float`
+        The high extreme value for height and color mapping.
+        Defaults to `-numpy.inf`.
+    user_infeasible_kwargs : `dict` or `None`
+        Keyword arguments passed to `bokeh.plotting.figure.scatter` for
+        points flagged infeasible. Defaults to `None`.
+    user_max_kwargs : `dict` or `None`
+        Keyword arguments passed to `bokeh.plotting.figure.scatter` for
+        points with values higher than the range.
+        Defaults to `None`.
+    user_plot_kwargs : `dict` or `None`
+        Keyword arguments passed to `bokeh.plotting.figure` when creating
+        the instantiating it.
+    user_rect_kwargs : `dict` or `None`
+        Keyword arguments passed to `bokeh.plotting.figure.rect` for
+        points within range.
+    cmap : `Sequence` [`bokeh.colors.ColorLike`]
+        The color map to use to color the rectangles.
+
+    Returns
+    -------
+    `plot` : `bokeh.models.layouts.LayoutDOM`
+        The plot that can be shown or saved.
+    """
     # Make the data source
     data_source = bokeh.models.ColumnDataSource(df)
     data_source.data["datetime"] = pd.to_datetime(df.queue_start_mjd + 2400000.5, origin="julian", unit="D")
@@ -300,6 +337,27 @@ def make_timeline_bars(
 
 
 def reward_timeline_for_tier(rewards_df, tier, day_obs_mjd, show=True, **figure_kwargs):
+    """Plot the reward timeline for basis functions in a specified tier.
+
+    Parameters
+    ----------
+    rewards_df : `pandas.DataFrame`
+        The table of rewards data.
+    tier : `int`
+        The tier index, corresponding to the index of
+        `rubin_scheduler.scheduler.schedulers.CoreScheduler.survey_lists`.
+    day_obs_mjd : `int`
+        The MJD of the day_obs of the night to plot.
+    show : `bool`
+        Actually show the plot? Defaults to `True`.
+    **figure_kwargs
+        Keyword arguments passed to `bokeh.plotting.figure`.
+
+    Returns
+    -------
+    `plot` : `bokeh.models.layouts.LayoutDOM`
+        The plot that can be shown or saved.
+    """
     rewards_df = rewards_df.query(
         f'tier_label == "tier {tier}" and floor(queue_start_mjd-0.5)=={day_obs_mjd}'
     ).copy()
@@ -330,6 +388,27 @@ def reward_timeline_for_tier(rewards_df, tier, day_obs_mjd, show=True, **figure_
 
 
 def area_timeline_for_tier(rewards_df, tier, day_obs_mjd, show=True, **figure_kwargs):
+    """Plot the feasible area timeline for basis funcs in a specified tier.
+
+    Parameters
+    ----------
+    rewards_df : `pandas.DataFrame`
+        The table of rewards data.
+    tier : `int`
+        The tier index, corresponding to the index of
+        `rubin_scheduler.scheduler.schedulers.CoreScheduler.survey_lists`.
+    day_obs_mjd : `int`
+        The MJD of the day_obs of the night to plot.
+    show : `bool`
+        Actually show the plot? Defaults to `True`.
+    **figure_kwargs
+        Keyword arguments passed to `bokeh.plotting.figure`.
+
+    Returns
+    -------
+    `plot` : `bokeh.models.layouts.LayoutDOM`
+        The plot that can be shown or saved.
+    """
     rewards_df = rewards_df.query(
         f'tier_label == "tier {tier}" and floor(queue_start_mjd-0.5)=={day_obs_mjd}'
     ).copy()
@@ -373,6 +452,24 @@ def area_timeline_for_tier(rewards_df, tier, day_obs_mjd, show=True, **figure_kw
 
 
 def reward_timeline_for_surveys(rewards_df, day_obs_mjd, show=True, **figure_kwargs):
+    """Plot the reward timeline for all surveys.
+
+    Parameters
+    ----------
+    rewards_df : `pandas.DataFrame`
+        The table of rewards data.
+    day_obs_mjd : `int`
+        The MJD of the day_obs of the night to plot.
+    show : `bool`
+        Actually show the plot? Defaults to `True`.
+    **figure_kwargs
+        Keyword arguments passed to `bokeh.plotting.figure`.
+
+    Returns
+    -------
+    `plot` : `bokeh.models.layouts.LayoutDOM`
+        The plot that can be shown or saved.
+    """
     survey_rewards_df = (
         rewards_df.groupby(["list_index", "survey_index", "queue_start_mjd", "queue_fill_mjd_ns"])
         .agg(
