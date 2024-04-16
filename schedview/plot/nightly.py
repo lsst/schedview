@@ -1,6 +1,7 @@
 """Plots that summarize a night's visits and other parameters."""
 
 import bokeh
+import bokeh.models
 import colorcet
 import numpy as np
 
@@ -258,8 +259,12 @@ def plot_alt_vs_time(
         Bokeh figure object
     """
     for time_column in "start_date", "observationStartDatetime64":
-        if time_column in visits:
-            break
+        if isinstance(visits, bokeh.models.ColumnDataSource):
+            if time_column in visits.data:
+                break
+        else:
+            if time_column in visits:
+                break
 
     if figure is None:
         fig = bokeh.plotting.figure(
