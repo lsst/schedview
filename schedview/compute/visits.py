@@ -3,7 +3,6 @@ import datetime
 import numpy as np
 from astropy.time import Time
 from rubin_scheduler.site_models import SeeingModel
-from rubin_sim import maf
 
 import schedview.compute
 
@@ -209,19 +208,23 @@ def accum_teff_by_night(visits):
         exposure times for all exposures with that target on that night.
     """
     day_obs_col = "day_obs_iso8601"
-    teff_col = "teff"
+    teff_col = "t_eff"
 
     if day_obs_col not in visits:
-        visits = add_day_obs(visits.copy())
+        raise ValueError(
+            f"{day_obs_col} column not found for visits; use the rubin_sim.maf.stackers.DayObsISOStacker."
+        )
 
     if teff_col not in visits:
-        visits = add_maf_metric(visits.copy(), maf.TeffMetric(), "teff")
+        raise ValueError(
+            f"{teff_col} column not found for visits; use the rubin_sim.maf.stackers.TeffStacker."
+        )
 
     nightly_teff = visits.groupby(["target", day_obs_col, "filter"])[teff_col].sum().reset_index()
     nightly_teff = (
         nightly_teff.pivot(index=["target", day_obs_col], columns="filter", values=teff_col)
         .fillna(0.0)
         .reset_index()
-        .set_index(["target", "day_obs_iso8601"])
+        .set_index(["target", day_obs_col])
     )
     return nightly_teff

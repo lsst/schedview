@@ -17,7 +17,6 @@ __all__ = [
 
 from .astro import convert_evening_date_to_night_of_survey, night_events
 from .camera import LsstCameraFootprintPerimeter
-from .maf import compute_hpix_metric_in_bands, compute_metric_by_visit
 from .scheduler import (
     compute_basis_function_reward_at_time,
     compute_basis_function_rewards,
@@ -27,3 +26,9 @@ from .scheduler import (
     replay_visits,
 )
 from .survey import compute_maps, make_survey_reward_df
+
+try:
+    from .maf import compute_hpix_metric_in_bands, compute_metric_by_visit
+except ModuleNotFoundError as e:
+    if not e.args == ("No module named 'rubin_sim'",):
+        raise e

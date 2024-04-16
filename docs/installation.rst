@@ -28,7 +28,7 @@ To add these additional packages, please install the following into your environ
   $ pip install lsst-resources
   $ conda install -c conda-forge lsst-efd-client
 
-  
+
 Installing with ``pip``
 -----------------------
 

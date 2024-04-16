@@ -5,7 +5,11 @@ import yaml
 from astropy.time import Time
 from lsst.resources import ResourcePath
 from rubin_scheduler.utils import ddf_locations
-from rubin_sim import maf
+
+try:
+    from rubin_sim import maf
+except ModuleNotFoundError:
+    pass
 
 DEFAULT_VISITS_COLUMNS = [
     "observationId",
@@ -56,42 +60,12 @@ DEFAULT_VISITS_COLUMNS = [
 ]
 
 
-class StartDateStacker(maf.BaseStacker):
-    """Add the start date."""
-
-    cols_added = ["start_date"]
-
-    def __init__(self, start_mjd_col="observationStartMJD"):
-        self.units = "ns"
-        self.cols_req = [start_mjd_col]
-        self.start_mjd_col = start_mjd_col
-
-    def _run(self, sim_data, cols_present=False):
-        """The start date as a datetime."""
-        if cols_present:
-            # Column already present in data; assume it is correct and does not
-            # need recalculating.
-            return sim_data
-        if len(sim_data) == 0:
-            return sim_data
-
-        sim_data["start_date"] = pd.to_datetime(
-            sim_data[self.start_mjd_col] + 2400000.5, origin="julian", unit="D", utc=True
-        )
-
-        return sim_data
-
-
-DEFAULT_STACKERS = [maf.HourAngleStacker(), StartDateStacker()]
-
-
 def read_opsim(
     opsim_uri,
     start_time=None,
     end_time=None,
     constraint=None,
     dbcols=DEFAULT_VISITS_COLUMNS,
-    stackers=DEFAULT_STACKERS,
     **kwargs,
 ):
     """Read visits from an opsim database.
@@ -108,8 +82,8 @@ def read_opsim(
         Query for which visits to load.
     dbcols : `list` [`str`]
         Columns required from the database.
-    stackers : `list` [`rubin_sim.maf.stackers`], optional
-        Stackers to be used to generate additional columns.
+    **kwargs
+        Passed to `maf.get_sim_data`, if `rubin_sim` is available.
 
     Returns
     -------
@@ -132,9 +106,6 @@ def read_opsim(
                 constraint += " AND "
             constraint += f"(observationStartMJD <= {Time(end_time).mjd})"
 
-    if stackers is not None and len(stackers) > 0:
-        kwargs["stackers"] = stackers
-
     original_resource_path = ResourcePath(opsim_uri)
 
     if original_resource_path.isdir():
@@ -150,10 +121,31 @@ def read_opsim(
 
     with obs_path.as_local() as local_obs_path:
         with sqlite3.connect(local_obs_path.ospath) as sim_connection:
-            visits = pd.DataFrame(maf.get_sim_data(sim_connection, constraint, dbcols, **kwargs))
+            try:
+                visits = pd.DataFrame(maf.get_sim_data(sim_connection, constraint, dbcols, **kwargs))
+            except NameError as e:
+                if e.name == "maf" and e.args == ("name 'maf' is not defined",):
+                    if len(kwargs) > 0:
+                        raise NotImplementedError(
+                            f"Argument {list(kwargs)[0]} not supported without rubin_sim installed"
+                        )
 
-    if "start_date" in visits:
-        visits["start_date"] = pd.to_datetime(visits.start_date, unit="ns", utc=True)
+                    query = f'SELECT {", ".join(dbcols)} FROM observations'
+                    if constraint:
+                        query += f" WHERE {constraint}"
+                    visits = pd.read_sql(query, sim_connection)
+                else:
+                    raise e
+
+            if "start_date" not in visits:
+                if "observationStartDatetime64" in visits:
+                    visits["start_date"] = pd.to_datetime(
+                        visits.observationStartDatetime64, unit="ns", utc=True
+                    )
+                elif "observationStartMJD" in visits:
+                    visits["start_date"] = pd.to_datetime(
+                        visits.observationStartMJD + 2400000.5, origin="julian", unit="D", utc=True
+                    )
 
     visits.set_index("observationId", inplace=True)
 
@@ -165,7 +157,6 @@ def read_ddf_visits(
     start_time=None,
     end_time=None,
     dbcols=DEFAULT_VISITS_COLUMNS,
-    stackers=DEFAULT_STACKERS,
     **kwargs,
 ):
     """Read DDF visits from an opsim database.
@@ -196,7 +187,6 @@ def read_ddf_visits(
         end_time=end_time,
         constraint=constraint,
         dbcols=dbcols,
-        stackers=stackers,
         **kwargs,
     )
     return visits
