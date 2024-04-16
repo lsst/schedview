@@ -230,6 +230,14 @@ def make_timeline_bars(
     # Put rectangles on the plot
     # Do not show infinite or infeasible values; the get their own symbols
     # implemented later on.
+
+    rect_filter_data = ~np.logical_or(np.isposinf(df[value_column]), infeasible)
+    if bokeh.__version__.startswith("3.3"):
+        # Work around a bug in bokeh 3.3.x: https://github.com/bokeh/bokeh/issues/13660
+        rect_filter_data = rect_filter_data.tolist()
+    rect_filter = bokeh.models.BooleanFilter(rect_filter_data)
+    rect_view = bokeh.models.CDSView(filter=rect_filter)
+
     rect_kwargs = dict(
         x="datetime",
         y=factor_column,
@@ -237,32 +245,45 @@ def make_timeline_bars(
         height=height_map,
         color=cmap,
         source=data_source,
-        view=bokeh.models.CDSView(
-            filter=bokeh.models.BooleanFilter(~np.logical_or(np.isposinf(df[value_column]), infeasible))
-        ),
+        view=rect_view,
     )
     rect_kwargs.update(user_rect_dict)
     rectangles = plot.rect(**rect_kwargs)
 
-    infeasible_kwargs = {"marker": "x", "color": "red", "size": 10}
+    # Mark infeasible points
+
+    infeasible_filter_data = infeasible
+    if bokeh.__version__.startswith("3.3"):
+        # Work around a bug in bokeh 3.3.x: https://github.com/bokeh/bokeh/issues/13660
+        infeasible_filter_data = infeasible_filter_data.tolist()
+    infeasible_filter = bokeh.models.BooleanFilter(infeasible_filter_data)
+    infeasible_view = bokeh.models.CDSView(filter=infeasible_filter)
+
+    infeasible_kwargs = {"marker": "x", "color": "red", "size": 10, "view": infeasible_view}
     if user_infeasible_kwargs is not None:
         infeasible_kwargs.update(user_infeasible_kwargs)
     plot.scatter(
         x="datetime",
         y=factor_column,
         source=data_source,
-        view=bokeh.models.CDSView(filter=bokeh.models.BooleanFilter(infeasible)),
         **infeasible_kwargs,
     )
 
-    max_kwargs = {"marker": "triangle", "color": "black", "alpha": 0.5, "size": 10}
+    # Mark infinite points
+    infinite_filter_data = np.isposinf(df[value_column])
+    if bokeh.__version__.startswith("3.3"):
+        # Work around a bug in bokeh 3.3.x: https://github.com/bokeh/bokeh/issues/13660
+        infinite_filter_data = infinite_filter_data.tolist()
+    infinite_filter = bokeh.models.BooleanFilter(infinite_filter_data)
+    infinite_view = bokeh.models.CDSView(filter=infinite_filter)
+
+    max_kwargs = {"marker": "triangle", "color": "black", "alpha": 0.5, "size": 10, "view": infinite_view}
     if user_max_kwargs is not None:
         max_kwargs.update(user_max_kwargs)
     plot.scatter(
         x="datetime",
         y=factor_column,
         source=data_source,
-        view=bokeh.models.CDSView(filter=bokeh.models.BooleanFilter(np.isposinf(df[value_column]))),
         **max_kwargs,
     )
 
@@ -274,6 +295,7 @@ def make_timeline_bars(
 
     # Combine the range selection slider and the plot
     col = bokeh.layouts.column([plot, value_limit_selector])
+
     return col
 
 
