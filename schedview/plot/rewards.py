@@ -15,6 +15,14 @@ import schedview.collect.scheduler_pickle
 import schedview.compute.astro
 import schedview.compute.scheduler
 
+__all__ = [
+    "plot_survey_rewards",
+    "create_survey_reward_plot",
+    "reward_timeline_for_tier",
+    "area_timeline_for_tier",
+    "reward_timeline_for_surveys",
+]
+
 
 def plot_survey_rewards(rewards):
     """Plot survey rewards as a function of time.
