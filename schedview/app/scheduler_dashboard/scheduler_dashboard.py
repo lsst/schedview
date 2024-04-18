@@ -1660,17 +1660,18 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         sizing_mode="stretch_width",
         styles={"background": "#048b8c"},
     )
-    # Parameter inputs (pickle, widget_datetime, tier).
-    sched_app[8:36, 0:21] = pn.Param(
+    # Parameter inputs (pickle, widget_datetime, tier)
+    # as well as pickles date and telescope when running in USDF
+    sched_app[8:42, 0:21] = pn.Param(
         scheduler,
         parameters=data_loading_parameters,
         widgets=data_loading_widgets,
         name="Select pickle file, date and tier.",
     )
     # Reset button.
-    sched_app[36:42, 3:15] = pn.Row(reset_button)
+    sched_app[42:48, 3:15] = pn.Row(reset_button)
     # Survey rewards table and header.
-    sched_app[8:42, 21:67] = pn.Row(
+    sched_app[8:48, 21:67] = pn.Row(
         pn.Spacer(width=10),
         pn.Column(
             pn.Spacer(height=10),
@@ -1685,7 +1686,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         # sizing_mode="stretch_height",
     )
     # Reward table and header.
-    sched_app[42:87, 0:67] = pn.Row(
+    sched_app[48:90, 0:67] = pn.Row(
         pn.Spacer(width=10),
         pn.Column(
             pn.Spacer(height=10),
@@ -1707,7 +1708,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         pn.param.ParamMethod(scheduler.publish_sky_map, loading_indicator=True),
     )
     # Map display parameters (map, nside, color palette).
-    sched_app[74:87, 67:100] = pn.Param(
+    sched_app[74:90, 67:100] = pn.Param(
         scheduler,
         widgets={
             "survey_map": {"type": pn.widgets.Select, "width": 250},
@@ -1719,7 +1720,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         default_layout=pn.Row,
     )
     # Debugging collapsable card.
-    sched_app[87:100, :] = pn.Card(
+    sched_app[90:100, :] = pn.Card(
         scheduler._debugging_messages,
         header=pn.pane.Str("Debugging", stylesheets=[h2_stylesheet]),
         header_color="white",
