@@ -1480,11 +1480,11 @@ class USDFScheduler(Scheduler):
     )
 
     pickles_date = param.Date(
-        default=datetime.now(), label="Pickles Date", doc="Select date to load pickles for", precedence=1
+        default=datetime.now(), label="Snapshot Date", doc="Select date to load pickles for", precedence=1
     )
 
     telescope = param.Selector(
-        default=None, objects={"All": None, "Auxtel": 1, "Main": 2}, doc="Source Telescope", precedence=2
+        default=None, objects={"All": None, "Main": 1, "Auxtel": 2}, doc="Source Telescope", precedence=2
     )
 
     def __init__(self):
@@ -1498,7 +1498,11 @@ class USDFScheduler(Scheduler):
             )
         )
         self.show_loading_indicator = True
+        self._debugging_message = "Starting retrieving snapshots"
+        self.logger.debug("Starting retrieving snapshots")
         scheduler_urls = await query_night_schedulers(selected_time, selected_tel)
+        self.logger.debug("Finished retrieving snapshots")
+        self._debugging_message = "Finished retrieving snapshots"
         self.show_loading_indicator = False
         return scheduler_urls
 
@@ -1596,9 +1600,18 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
             selected_time=scheduler.param.pickles_date, selected_tel=scheduler.param.telescope, watch=True
         )
         async def get_scheduler_list(selected_time, selected_tel):
+            pn.state.notifications.clear()
+            pn.state.notifications.info("Loading snapshots...")
             os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
-            schedulers = await scheduler.query_schedulers(selected_time, selected_tel)
+            # add an empty option to be seleced upon loading snapshot list
+            schedulers = [""]
+            schedulers[1:] = await scheduler.query_schedulers(selected_time, selected_tel)
             scheduler.param["scheduler_fname"].objects = schedulers
+            scheduler.clear_dashboard()
+            if len(schedulers) > 1:
+                pn.state.notifications.success("Snapshots loaded!!")
+            else:
+                pn.state.notifications.info("No snapshots found for selected night!!", duration=0)
 
     # Restrict files to data_directory.
     else:
