@@ -799,7 +799,7 @@ class Scheduler(param.Parameterized):
             selectable=1,
             hidden_columns=["tier", "survey_url"],
             sizing_mode="stretch_width",
-            height=220,
+            height=310,
         )
         self.summary_widget = summary_widget
         self._debugging_message = "Finished making summary widget."
@@ -1680,13 +1680,11 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
                 styles={"background": "#048b8c"},
             ),
             pn.param.ParamMethod(scheduler.publish_summary_widget, loading_indicator=True),
-            # scroll=True
         ),
         pn.Spacer(width=10),
-        # sizing_mode="stretch_height",
     )
     # Reward table and header.
-    sched_app[48:90, 0:67] = pn.Row(
+    sched_app[48:93, 0:67] = pn.Row(
         pn.Spacer(width=10),
         pn.Column(
             pn.Spacer(height=10),
@@ -1708,7 +1706,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         pn.param.ParamMethod(scheduler.publish_sky_map, loading_indicator=True),
     )
     # Map display parameters (map, nside, color palette).
-    sched_app[74:90, 67:100] = pn.Param(
+    sched_app[74:93, 67:100] = pn.Param(
         scheduler,
         widgets={
             "survey_map": {"type": pn.widgets.Select, "width": 250},
@@ -1720,7 +1718,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         default_layout=pn.Row,
     )
     # Debugging collapsable card.
-    sched_app[90:100, :] = pn.Card(
+    sched_app[93:100, :] = pn.Card(
         scheduler._debugging_messages,
         header=pn.pane.Str("Debugging", stylesheets=[h2_stylesheet]),
         header_color="white",
