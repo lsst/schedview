@@ -224,6 +224,7 @@ class Scheduler(param.Parameterized):
     _display_dashboard_data = False
     _do_not_trigger_update = True
     _summary_widget_height = 220
+    _reward_widget_height = 400
 
     def __init__(self, **params):
         super().__init__(**params)
@@ -972,7 +973,7 @@ class Scheduler(param.Parameterized):
             frozen_columns=["basis_function"],
             hidden_columns=["doc_url"],
             selectable=1,
-            height=400,
+            height=self._reward_widget_height,
             widths=widths,
         )
         self.reward_widget = reward_widget
@@ -1487,6 +1488,7 @@ class USDFScheduler(Scheduler):
     )
 
     _summary_widget_height = 310
+    _reward_widget_height = 350
 
     def __init__(self):
         super().__init__()
