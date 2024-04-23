@@ -1553,7 +1553,12 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
 
     scheduler = None
     data_loading_widgets = {}
+    # data loading parameters in both restricted and URL modes
     data_loading_parameters = ["scheduler_fname", "widget_datetime", "widget_tier"]
+    # set the data loading parameter section height in both
+    # restricted and URL modes
+    # this will be used to adjust the layout of other sections
+    # in the grid
     data_params_grid_height = 30
     # Accept pickle files from url or any path.
     if from_urls:
@@ -1576,10 +1581,10 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
                     "url_mjd": "mjd",
                 },
             )
-
+        # set specific widget props for data loading parameters
+        # in URL and restricted modes
         data_loading_widgets = {
             "scheduler_fname": {
-                # "widget_type": pn.widgets.TextInput,
                 "placeholder": "filepath or URL of pickle",
             },
             "widget_datetime": pn.widgets.DatetimePicker,
@@ -1587,6 +1592,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     # Load pickles from USDF S3 bucket
     elif from_usdf:
         scheduler = USDFScheduler()
+        # data loading parameters in USDF mode
         data_loading_parameters = [
             "scheduler_fname",
             "pickles_date",
@@ -1594,10 +1600,13 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
             "widget_datetime",
             "widget_tier",
         ]
+        # set specific widget props for data loading parameters
+        # in USDF mode
         data_loading_widgets = {
             "pickles_date": pn.widgets.DatetimePicker,
             "widget_datetime": pn.widgets.DatetimePicker,
         }
+        # set the data loading parameter section height in USDF mode
         data_params_grid_height = 42
 
         @pn.depends(
@@ -1607,7 +1616,8 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
             pn.state.notifications.clear()
             pn.state.notifications.info("Loading snapshots...")
             os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
-            # add an empty option to be seleced upon loading snapshot list
+            # add an empty option at index 0 to be the default
+            # selection upon loading snapshot list
             schedulers = [""]
             schedulers[1:] = await scheduler.query_schedulers(selected_time, selected_tel)
             scheduler.param["scheduler_fname"].objects = schedulers
