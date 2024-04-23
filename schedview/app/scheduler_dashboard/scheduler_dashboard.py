@@ -1714,7 +1714,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         pn.Spacer(width=10),
     )
     # Map display and header.
-    sched_app[8:67, 67:100] = pn.Column(
+    sched_app[8 : data_params_grid_height + 25, 67:100] = pn.Column(
         pn.Spacer(height=10),
         pn.Row(
             scheduler.map_title,
@@ -1723,7 +1723,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         pn.param.ParamMethod(scheduler.publish_sky_map, loading_indicator=True),
     )
     # Map display parameters (map, nside, color palette).
-    sched_app[74 : data_params_grid_height + 45, 67:100] = pn.Param(
+    sched_app[data_params_grid_height + 32 : data_params_grid_height + 45, 67:100] = pn.Param(
         scheduler,
         widgets={
             "survey_map": {"type": pn.widgets.Select, "width": 250},
