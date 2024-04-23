@@ -614,7 +614,6 @@ class Scheduler(param.Parameterized):
             os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
             scheduler_resource_path = ResourcePath(self.scheduler_fname)
             scheduler_resource_path.use_threads = False
-            assert not scheduler_resource_path._environ_use_threads
             with scheduler_resource_path.as_local() as local_scheduler_resource:
                 (scheduler, conditions) = schedview.collect.scheduler_pickle.read_scheduler(
                     local_scheduler_resource.ospath
