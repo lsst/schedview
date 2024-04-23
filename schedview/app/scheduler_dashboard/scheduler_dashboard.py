@@ -223,6 +223,7 @@ class Scheduler(param.Parameterized):
     _display_reward = False
     _display_dashboard_data = False
     _do_not_trigger_update = True
+    _summary_widget_height = 220
 
     def __init__(self, **params):
         super().__init__(**params)
@@ -572,7 +573,7 @@ class Scheduler(param.Parameterized):
     # ------------------------------------------------------- Internal workings
 
     def clear_dashboard(self):
-        """Clear the dashboard for a new pickle or a new date."""
+        """Clear the dashboard for a new pickle or a new datesummary_widget."""
         self._debugging_message = "Starting to clear dashboard."
 
         self.summary_widget = None
@@ -799,7 +800,7 @@ class Scheduler(param.Parameterized):
             selectable=1,
             hidden_columns=["tier", "survey_url"],
             sizing_mode="stretch_width",
-            height=310,
+            height=self._summary_widget_height,
         )
         self.summary_widget = summary_widget
         self._debugging_message = "Finished making summary widget."
@@ -1487,6 +1488,8 @@ class USDFScheduler(Scheduler):
         default=None, objects={"All": None, "Main": 1, "Auxtel": 2}, doc="Source Telescope", precedence=2
     )
 
+    _summary_widget_height = 310
+
     def __init__(self):
         super().__init__()
 
@@ -1551,7 +1554,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     scheduler = None
     data_loading_widgets = {}
     data_loading_parameters = ["scheduler_fname", "widget_datetime", "widget_tier"]
-
+    data_params_grid_height = 30
     # Accept pickle files from url or any path.
     if from_urls:
         scheduler = Scheduler()
@@ -1595,6 +1598,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
             "pickles_date": pn.widgets.DatetimePicker,
             "widget_datetime": pn.widgets.DatetimePicker,
         }
+        data_params_grid_height = 42
 
         @pn.depends(
             selected_time=scheduler.param.pickles_date, selected_tel=scheduler.param.telescope, watch=True
@@ -1675,16 +1679,16 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     )
     # Parameter inputs (pickle, widget_datetime, tier)
     # as well as pickles date and telescope when running in USDF
-    sched_app[8:42, 0:21] = pn.Param(
+    sched_app[8:data_params_grid_height, 0:21] = pn.Param(
         scheduler,
         parameters=data_loading_parameters,
         widgets=data_loading_widgets,
         name="Select pickle file, date and tier.",
     )
     # Reset button.
-    sched_app[42:48, 3:15] = pn.Row(reset_button)
+    sched_app[data_params_grid_height : data_params_grid_height + 6, 3:15] = pn.Row(reset_button)
     # Survey rewards table and header.
-    sched_app[8:48, 21:67] = pn.Row(
+    sched_app[8 : data_params_grid_height + 6, 21:67] = pn.Row(
         pn.Spacer(width=10),
         pn.Column(
             pn.Spacer(height=10),
@@ -1697,7 +1701,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         pn.Spacer(width=10),
     )
     # Reward table and header.
-    sched_app[48:93, 0:67] = pn.Row(
+    sched_app[data_params_grid_height + 6 : data_params_grid_height + 45, 0:67] = pn.Row(
         pn.Spacer(width=10),
         pn.Column(
             pn.Spacer(height=10),
@@ -1719,7 +1723,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         pn.param.ParamMethod(scheduler.publish_sky_map, loading_indicator=True),
     )
     # Map display parameters (map, nside, color palette).
-    sched_app[74:93, 67:100] = pn.Param(
+    sched_app[74 : data_params_grid_height + 45, 67:100] = pn.Param(
         scheduler,
         widgets={
             "survey_map": {"type": pn.widgets.Select, "width": 250},
@@ -1731,7 +1735,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         default_layout=pn.Row,
     )
     # Debugging collapsable card.
-    sched_app[93:100, :] = pn.Card(
+    sched_app[data_params_grid_height + 45 : data_params_grid_height + 52, :] = pn.Card(
         scheduler._debugging_messages,
         header=pn.pane.Str("Debugging", stylesheets=[h2_stylesheet]),
         header_color="white",
