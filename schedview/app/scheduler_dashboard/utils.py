@@ -44,10 +44,13 @@ async def query_night_schedulers(reference_time_utc, selected_telescope=None, ef
         topic, fields, start_time, end_time, index=selected_telescope
     )
     if not scheduler_urls.empty:
+        # index data by time
         scheduler_urls.index.name = "time"
         scheduler_urls = scheduler_urls.reset_index()
+        # reverse schedulers order to show most recent one first
         scheduler_urls = scheduler_urls.sort_index(ascending=False)
         scheduler_urls["url"] = scheduler_urls["url"].apply(lambda x: localize_scheduler_url(x))
+        # return only URLs
         return scheduler_urls["url"]
     return []
 
@@ -116,16 +119,3 @@ def mock_schedulers_df():
     df = df.sort_index(ascending=False)
     df["url"] = df["url"].apply(lambda x: localize_scheduler_url(x))
     return df["url"]
-
-
-async def get_top_n_schedulers(efd="usdf_efd"):
-    sync_client = EfdClient(efd, db_name="efd")
-    topic = "lsst.sal.Scheduler.logevent_largeFileObjectAvailable"
-    fields = ["url"]
-    scheduler_urls = await sync_client.select_top_n(topic, fields, 10)
-    scheduler_urls.index.name = "time"
-    scheduler_urls = scheduler_urls.reset_index()
-
-    scheduler_urls = scheduler_urls.sort_index(ascending=False)
-    scheduler_urls["url"] = scheduler_urls["url"].apply(lambda x: localize_scheduler_url(x))
-    return scheduler_urls["url"]
