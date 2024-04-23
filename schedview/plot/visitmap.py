@@ -476,11 +476,11 @@ def map_visit_sim_comparison(
     visit_nums,
     conditions,
     footprint=None,
-    fade_scale=2.0 / (24 * 60),
     camera_perimeter="LSST",
     nside_low=8,
     show_stars=False,
     palette=colorcet.bkr,
+    max_abs_diff=None,
 ):
 
     if camera_perimeter == "LSST":
@@ -502,13 +502,16 @@ def map_visit_sim_comparison(
             "diff_nums": visit_nums.diff_nums,
         }
     )
-    max_abs_diff = np.max(np.abs(visit_nums.diff_nums))
-    max_abs_diff = 3
+
+    if max_abs_diff is None:
+        max_abs_diff = np.max(np.abs(visit_nums.diff_nums))
     color_transform = bokeh.transform.linear_cmap("diff_nums", palette, -max_abs_diff, max_abs_diff)
+
     patches_kwargs = dict(
         fill_color=color_transform,
         line_width=0,
         line_alpha=0,
+        name="visit_patches",
     )
 
     visit_ds = asphere.add_patches(
@@ -523,6 +526,12 @@ def map_visit_sim_comparison(
 
     if conditions is not None:
         _plot_conditions(conditions, asphere, psphere, show_stars=show_stars)
+
+    patches = psphere.plot.select(name="visit_patches")
+    color_bar = patches.construct_color_bar(
+        orientation="horizontal", title="Difference in number of visits in filter at pointing."
+    )
+    psphere.plot.add_layout(color_bar, "below")
 
     fig = bokeh.layouts.row(
         asphere.figure,

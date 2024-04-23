@@ -1,33 +1,37 @@
+from functools import partial
+
 import numpy as np
 import pandas as pd
 
 
-def compute_offsets(first_index, second_index, df):
+def compute_offsets(sim_indexes, visits):
     cols = ["observationId", "sim_index", "observationStartMJD"]
-    first_df = df.loc[df.sim_index == first_index, cols].sort_values("observationStartMJD")
-    second_df = df.loc[df.sim_index == second_index, cols].sort_values("observationStartMJD")
+    sim_visits = [
+        visits.loc[visits.sim_index == sim_indexes[0], cols].sort_values("observationStartMJD"),
+        visits.loc[visits.sim_index == sim_indexes[1], cols].sort_values("observationStartMJD"),
+    ]
 
-    if len(first_df) == 0 and len(second_df) == 0:
+    if len(sim_visits[0]) == 0 and len(sim_visits[1]) == 0:
         columns = [
-            f"observationId_{first_index}",
-            f"observationId_{second_index}",
-            f"revisit_id_{first_index}",
-            f"revisit_id_{second_index}",
-            f"sim_index_{first_index}",
-            f"sim_index_{second_index}",
-            f"observationStartMJD_{first_index}",
-            f"observationStartMJD_{second_index}",
+            f"observationId_{sim_indexes[0]}",
+            f"observationId_{sim_indexes[1]}",
+            f"revisit_id_{sim_indexes[0]}",
+            f"revisit_id_{sim_indexes[1]}",
+            f"sim_index_{sim_indexes[0]}",
+            f"sim_index_{sim_indexes[1]}",
+            f"observationStartMJD_{sim_indexes[0]}",
+            f"observationStartMJD_{sim_indexes[1]}",
             "mjd_diff",
         ]
         result = pd.DataFrame(columns=columns)
         result = None
-    elif len(first_df) == 0 or len(second_df) == 0:
-        if len(first_df) == 0:
-            empty_index, content_index = first_index, second_index
-            content_df = second_df
+    elif len(sim_visits[0]) == 0 or len(sim_visits[1]) == 0:
+        if len(sim_visits[0]) == 0:
+            empty_index, content_index = sim_indexes[0], sim_indexes[1]
+            content_df = sim_visits[1]
         else:
-            empty_index, content_index = second_index, first_index
-            content_df = first_df
+            empty_index, content_index = sim_indexes[1], sim_indexes[0]
+            content_df = sim_visits[0]
 
         result = pd.DataFrame(
             {
@@ -42,21 +46,21 @@ def compute_offsets(first_index, second_index, df):
                 "mjd_diff": np.nan,
             }
         )
-    elif len(first_df) == len(second_df):
-        first_df["revisit_id"] = np.arange(len(first_df))
-        second_df["revisit_id"] = np.arange(len(first_df))
-        suffixes = [f"_{first_index}", f"_{second_index}"]
-        result = first_df.merge(second_df, how="left", on="revisit_id", suffixes=suffixes)
+    elif len(sim_visits[0]) == len(sim_visits[1]):
+        sim_visits[0]["revisit_id"] = np.arange(len(sim_visits[0]))
+        sim_visits[1]["revisit_id"] = np.arange(len(sim_visits[1]))
+        suffixes = [f"_{sim_indexes[0]}", f"_{sim_indexes[1]}"]
+        result = sim_visits[0].merge(sim_visits[1], how="left", on="revisit_id", suffixes=suffixes)
         result["mjd_diff"] = (
             result["observationStartMJD" + suffixes[0]] - result["observationStartMJD" + suffixes[1]]
         )
     else:
-        if len(first_df) > len(second_df):
-            longer_index, shorter_index = first_index, second_index
-            longer_df, shorter_df = first_df, second_df
+        if len(sim_visits[0]) > len(sim_visits[1]):
+            longer_index, shorter_index = sim_indexes[0], sim_indexes[1]
+            longer_df, shorter_df = sim_visits[0], sim_visits[1]
         else:
-            longer_index, shorter_index = second_index, first_index
-            longer_df, shorter_df = second_df, first_df
+            longer_index, shorter_index = sim_indexes[1], sim_indexes[0]
+            longer_df, shorter_df = sim_visits[1], sim_visits[0]
 
         suffixes = [f"_{longer_index}", f"_{shorter_index}"]
         unmatched_visits = len(longer_df) - len(shorter_df)
@@ -74,3 +78,48 @@ def compute_offsets(first_index, second_index, df):
                 result = candidate_result
 
     return result
+
+
+def _mean_angle(angles):
+    # We can't just take the mean of angles because of wrapping issues:
+    # the mean of 1 and 359 should be 0, not 180.
+    # So, take the mean position on the x/y plane instead.
+    ang_rad = np.radians(angles)
+    mean_sin = np.mean(np.sin(ang_rad))
+    mean_cos = np.mean(np.cos(ang_rad))
+    mean_angle = np.degrees(np.arctan2(mean_sin, mean_cos))
+    return mean_angle
+
+
+def _count_diff_in_num_of_visits(sim_indexes, visits):
+    counted_visits = visits.sim_index.value_counts()
+
+    # Not all of our indexes are guaranteed to have visits, in which
+    # case the index will not be present at all in the counted_visits
+    # Series. Make sure they are, and are 0.
+    sim_counts = pd.Series({i: 0 for i in sim_indexes})
+    sim_counts[counted_visits.index] = counted_visits
+
+    # We'll need a rotSkyPos to plot, even though we don't match on it,
+    # because they aren't all the same for the same pointing.
+    rot_sky_pos = _mean_angle(visits.rotSkyPos)
+
+    result = pd.Series(
+        {
+            "rotSkyPos": rot_sky_pos,
+            "diff_nums": sim_counts[sim_indexes[0]] - sim_counts[sim_indexes[1]],
+            "most_nums": sim_counts.max(),
+            f"num_{sim_indexes[0]}": sim_counts[sim_indexes[0]],
+            f"num_{sim_indexes[1]}": sim_counts[sim_indexes[1]],
+        }
+    )
+    return result
+
+
+def count_diff_in_num_of_visits_by_pointing(sim_indexes, visits):
+    visit_nums = (
+        visits.groupby(["filter", "fieldRA", "fieldDec"])
+        .apply(partial(_count_diff_in_num_of_visits, sim_indexes))
+        .reset_index(["fieldRA", "fieldDec"])
+    )
+    return visit_nums
