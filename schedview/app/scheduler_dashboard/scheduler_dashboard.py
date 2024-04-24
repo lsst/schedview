@@ -574,7 +574,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
     # ------------------------------------------------------- Internal workings
 
     def clear_dashboard(self):
-        """Clear the dashboard for a new pickle or a new date"""
+        """Clear the dashboard for a new pickle or a new date."""
         self._debugging_message = "Starting to clear dashboard."
 
         self.summary_widget = None
