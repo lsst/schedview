@@ -71,7 +71,7 @@ COLOR_PALETTES = [color for color in bokeh.palettes.__palettes__ if "256" in col
 DEFAULT_COLOR_PALETTE = "Viridis256"
 DEFAULT_NSIDE = 16
 PACKAGE_DATA_DIR = importlib.resources.files("schedview.data").as_posix()
-USDF_DATA_DIR = "s3://rubin:"
+LFA_DATA_DIR = "s3://rubin:"
 
 
 pn.extension(
@@ -135,7 +135,7 @@ def url_formatter(dataframe_row, name_column, url_column):
             <i class="fa fa-link"></i></a>'
 
 
-class Scheduler(param.Parameterized):
+class SchedulerSnapshotDashboard(param.Parameterized):
     """A Parametrized container for parameters, data, and panel objects for the
     scheduler dashboard.
     """
@@ -1437,7 +1437,7 @@ class Scheduler(param.Parameterized):
         return self.map_title_pane
 
 
-class RestrictedFilesScheduler(Scheduler):
+class RestrictedSchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
     """A Parametrized container for parameters, data, and panel objects for the
     scheduler dashboard.
     """
@@ -1464,12 +1464,12 @@ class RestrictedFilesScheduler(Scheduler):
             self.param["scheduler_fname"].update(path=f"{data_dir}/*scheduler*.p*")
 
 
-class USDFScheduler(Scheduler):
+class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
     """A Parametrized container for parameters, data, and panel objects for the
     scheduler dashboard.
     """
 
-    scheduler_fname_doc = """Recent pickles from USDF
+    scheduler_fname_doc = """Recent pickles from LFA
     """
 
     scheduler_fname = param.Selector(
@@ -1540,7 +1540,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
 
     from_urls = False
     data_dir = None
-    from_usdf = False
+    from_lfa = False
 
     if "data_from_urls" in kwargs.keys():
         from_urls = kwargs["data_from_urls"]
@@ -1550,9 +1550,9 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         data_dir = kwargs["data_dir"]
         del kwargs["data_dir"]
 
-    if "usdf" in kwargs.keys():
-        from_usdf = kwargs["usdf"]
-        del kwargs["usdf"]
+    if "lfa" in kwargs.keys():
+        from_lfa = kwargs["lfa"]
+        del kwargs["lfa"]
 
     scheduler = None
     data_loading_widgets = {}
@@ -1565,7 +1565,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     data_params_grid_height = 30
     # Accept pickle files from url or any path.
     if from_urls:
-        scheduler = Scheduler()
+        scheduler = SchedulerSnapshotDashboard()
         # read pickle and time if provided to the function in a notebook
         # it will be overriden if the dashboard runs in an app
         if date_time is not None:
@@ -1592,10 +1592,10 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
             },
             "widget_datetime": pn.widgets.DatetimePicker,
         }
-    # Load pickles from USDF S3 bucket
-    elif from_usdf:
-        scheduler = USDFScheduler()
-        # data loading parameters in USDF mode
+    # Load pickles from S3 bucket
+    elif from_lfa:
+        scheduler = LFASchedulerSnapshotDashboard()
+        # data loading parameters in LFA mode
         data_loading_parameters = [
             "scheduler_fname",
             "pickles_date",
@@ -1604,12 +1604,12 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
             "widget_tier",
         ]
         # set specific widget props for data loading parameters
-        # in USDF mode
+        # in LFA mode
         data_loading_widgets = {
             "pickles_date": pn.widgets.DatetimePicker,
             "widget_datetime": pn.widgets.DatetimePicker,
         }
-        # set the data loading parameter section height in USDF mode
+        # set the data loading parameter section height in LFA mode
         data_params_grid_height = 42
 
         @pn.depends(
@@ -1632,7 +1632,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
 
     # Restrict files to data_directory.
     else:
-        scheduler = RestrictedFilesScheduler(data_dir=data_dir)
+        scheduler = RestrictedSchedulerSnapshotDashboard(data_dir=data_dir)
         data_loading_widgets = {
             "widget_datetime": pn.widgets.DatetimePicker,
         }
@@ -1691,7 +1691,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         styles={"background": "#048b8c"},
     )
     # Parameter inputs (pickle, widget_datetime, tier)
-    # as well as pickles date and telescope when running in USDF
+    # as well as pickles date and telescope when running in LFA
     sched_app[8:data_params_grid_height, 0:21] = pn.Param(
         scheduler,
         parameters=data_loading_parameters,
@@ -1765,7 +1765,7 @@ def parse_arguments():
     Parse commandline arguments to read data directory if provided
     """
     parser = argparse.ArgumentParser(description="On-the-fly Rubin Scheduler dashboard")
-    default_data_dir = f"{USDF_DATA_DIR}/*" if os.path.exists(USDF_DATA_DIR) else PACKAGE_DATA_DIR
+    default_data_dir = f"{LFA_DATA_DIR}/*" if os.path.exists(LFA_DATA_DIR) else PACKAGE_DATA_DIR
 
     parser.add_argument(
         "--data_dir",
@@ -1782,9 +1782,9 @@ def parse_arguments():
     )
 
     parser.add_argument(
-        "--usdf",
+        "--lfa",
         action="store_true",
-        help="Loads pickle files from the data directory in USDF",
+        help="Loads pickle files from S3 buckets in LFA",
     )
 
     args = parser.parse_args()
@@ -1792,7 +1792,7 @@ def parse_arguments():
     if len(glob(args.data_dir)) == 0 and not args.data_from_urls:
         args.data_dir = PACKAGE_DATA_DIR
 
-    if args.usdf and len(glob(USDF_DATA_DIR)) == 0:
+    if args.lfa and len(glob(LFA_DATA_DIR)) == 0:
         args.data_dir = PACKAGE_DATA_DIR
 
     scheduler_app_params = args.__dict__
