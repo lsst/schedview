@@ -174,6 +174,9 @@ def make_timeline_bars(
     data_source.data["datetime"] = pd.to_datetime(df.queue_start_mjd + 2400000.5, origin="julian", unit="D")
 
     # Make the figure
+
+    # If the user does not specify what rows (horizontal lines) should be
+    # present in the plot, use all values in the input data.
     if "y_range" not in user_plot_kwargs:
         factor_range = bokeh.models.FactorRange(
             *[tuple(c) for c in df[factor_column].drop_duplicates().values]
@@ -181,6 +184,7 @@ def make_timeline_bars(
     else:
         factor_range = user_plot_kwargs["y_range"]
 
+    # Show the time and the value being plotted in a hover tool.
     hover_tool = bokeh.models.HoverTool(
         tooltips=[
             ("Time", "@datetime{%Y-%m-%d %H:%M:%S}"),
@@ -190,12 +194,15 @@ def make_timeline_bars(
         formatters={"@datetime": "datetime"},
     )
 
+    # Use time as the horizontal axis and the usual default set of tools,
+    # plus the hover tool.
     plot_kwargs = {
         "x_axis_label": "Time",
         "x_axis_type": "datetime",
         "y_range": factor_range,
         "tools": ["pan", "wheel_zoom", "box_zoom", "save", "reset", "help", hover_tool],
     }
+    # Supplement the plot arguments with anything provided by the user.
     plot_kwargs.update(user_plot_kwargs)
     plot = bokeh.plotting.figure(**plot_kwargs)
     plot.xaxis[0].formatter = bokeh.models.DatetimeTickFormatter(hours="%H:%M")
@@ -222,11 +229,13 @@ def make_timeline_bars(
         value=(value_range_min, value_range_max),
     )
 
-    # Make the color map
+    # Make the color map, if the user has not provided one.
+    # CET-I2 is uniform brightness and doesn't look terrible
+    # in the color-blindness simulators.
     if cmap is None:
         cmap = bokeh.transform.linear_cmap(
             field_name=value_column,
-            palette=list(reversed(colorcet.palette["CET_I3"])),
+            palette=list(reversed(colorcet.palette["CET_I2"])),
             low=value_range_min,
             high=value_range_max,
             low_color="red",
@@ -246,7 +255,7 @@ def make_timeline_bars(
     )
     value_limit_selector.js_on_change("value", value_limit_change_callback)
 
-    # Map the reward to the height
+    # Map the reward to the height.
     height_transform_jscode = """
         const height = new Float64Array(xs.length);
         const low = limit_selector.value[0]
@@ -272,7 +281,7 @@ def make_timeline_bars(
     if "feasible" in df:
         infeasible = np.logical_or(infeasible, np.logical_not(df.feasible))
 
-    # Put rectangles on the plot
+    # Put rectangles on the plot.
     # Do not show infinite or infeasible values; the get their own symbols
     # implemented later on.
 
@@ -366,6 +375,8 @@ def reward_timeline_for_tier(rewards_df, tier, day_obs_mjd, show=True, **figure_
     `plot` : `bokeh.models.layouts.LayoutDOM`
         The plot that can be shown or saved.
     """
+    # Use an 0.5 day offset to match dayobs rollover defined in SITCOMNT-32.
+    # Use .copy() to avoid pandas problems with updates on views.
     rewards_df = rewards_df.query(
         f'tier_label == "tier {tier}" and floor(queue_start_mjd-0.5)=={day_obs_mjd}'
     ).copy()
@@ -382,6 +393,7 @@ def reward_timeline_for_tier(rewards_df, tier, day_obs_mjd, show=True, **figure_
         "width": 1024,
     }
 
+    # If the plot is too big, don't even try.
     if plot_kwargs["height"] <= 4096:
         plot = make_timeline_bars(
             rewards_df, "tier_survey_bf", "max_basis_reward", user_plot_kwargs=plot_kwargs
@@ -417,6 +429,8 @@ def area_timeline_for_tier(rewards_df, tier, day_obs_mjd, show=True, **figure_kw
     `plot` : `bokeh.models.layouts.LayoutDOM`
         The plot that can be shown or saved.
     """
+    # Use an 0.5 day offset to match dayobs rollover defined in SITCOMNT-32.
+    # Use .copy() to avoid pandas problems with updates on views.
     rewards_df = rewards_df.query(
         f'tier_label == "tier {tier}" and floor(queue_start_mjd-0.5)=={day_obs_mjd}'
     ).copy()
