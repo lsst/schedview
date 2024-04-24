@@ -21,7 +21,7 @@ from rubin_scheduler.scheduler.schedulers.core_scheduler import CoreScheduler
 
 import schedview
 from schedview.app.scheduler_dashboard.scheduler_dashboard import (
-    Scheduler,
+    SchedulerSnapshotDashboard,
     get_sky_brightness_date_bounds,
     scheduler_app,
 )
@@ -65,7 +65,7 @@ DEFAULT_TIMEZONE = "America/Santiago"
 
 class TestSchedulerDashboard(unittest.TestCase):
     observatory = ModelObservatory(init_load_length=1)
-    scheduler = Scheduler()
+    scheduler = SchedulerSnapshotDashboard()
     scheduler.scheduler_fname = TEST_PICKLE
     scheduler._mjd = Time(Timestamp(TEST_DATE, tzinfo=ZoneInfo(DEFAULT_TIMEZONE))).mjd
 
@@ -83,7 +83,7 @@ class TestSchedulerDashboard(unittest.TestCase):
         bokeh.io.reset_output()
 
     def test_read_scheduler(self):
-        self.scheduler = Scheduler()
+        self.scheduler = SchedulerSnapshotDashboard()
         self.scheduler.scheduler_fname = TEST_PICKLE
         self.scheduler._mjd = Time(Timestamp(TEST_DATE, tzinfo=ZoneInfo(DEFAULT_TIMEZONE))).mjd
         self.scheduler.read_scheduler()

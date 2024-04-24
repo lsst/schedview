@@ -44,6 +44,7 @@ from astropy.time import Time
 from astropy.utils.exceptions import AstropyWarning
 from bokeh.models import ColorBar, LinearColorMapper
 from bokeh.models.widgets.tables import BooleanFormatter, HTMLTemplateFormatter, NumberFormatter
+from lsst.resources import ResourcePath
 from pandas import Timestamp
 from panel.io.loading import start_loading_spinner, stop_loading_spinner
 from pytz import timezone
@@ -58,6 +59,7 @@ import schedview.compute.scheduler
 import schedview.compute.survey
 import schedview.param
 import schedview.plot.survey
+from schedview.app.scheduler_dashboard.utils import query_night_schedulers
 
 # Filter astropy warning that's filling the terminal with every update.
 warnings.filterwarnings("ignore", category=AstropyWarning)
@@ -69,7 +71,7 @@ COLOR_PALETTES = [color for color in bokeh.palettes.__palettes__ if "256" in col
 DEFAULT_COLOR_PALETTE = "Viridis256"
 DEFAULT_NSIDE = 16
 PACKAGE_DATA_DIR = importlib.resources.files("schedview.data").as_posix()
-USDF_DATA_DIR = "/sdf/group/rubin/web_data/sim-data/schedview"
+LFA_DATA_DIR = "s3://rubin:"
 
 
 pn.extension(
@@ -133,7 +135,7 @@ def url_formatter(dataframe_row, name_column, url_column):
             <i class="fa fa-link"></i></a>'
 
 
-class Scheduler(param.Parameterized):
+class SchedulerSnapshotDashboard(param.Parameterized):
     """A Parametrized container for parameters, data, and panel objects for the
     scheduler dashboard.
     """
@@ -154,12 +156,14 @@ class Scheduler(param.Parameterized):
         default="",
         label="Scheduler pickle file",
         doc=scheduler_fname_doc,
+        precedence=3,
     )
     widget_datetime = param.Date(
         default=date_bounds[0],
         label="Date and time (UTC)",
         doc=f"Select dates between {date_bounds[0]} and {date_bounds[1]}",
         bounds=date_bounds,
+        precedence=4,
     )
     url_mjd = param.Number(default=None)
     widget_tier = param.Selector(
@@ -167,6 +171,7 @@ class Scheduler(param.Parameterized):
         objects=[""],
         label="Tier",
         doc="The label for the first index into the CoreScheduler.survey_lists.",
+        precedence=5,
     )
     survey_map = param.Selector(
         default="reward",
@@ -179,6 +184,7 @@ class Scheduler(param.Parameterized):
         label="Map resolution (nside)",
         doc="",
     )
+
     color_palette = param.Selector(default=DEFAULT_COLOR_PALETTE, objects=COLOR_PALETTES, doc="")
     summary_widget = param.Parameter(default=None, doc="")
     reward_widget = param.Parameter(default=None, doc="")
@@ -217,6 +223,8 @@ class Scheduler(param.Parameterized):
     _display_reward = False
     _display_dashboard_data = False
     _do_not_trigger_update = True
+    _summary_widget_height = 220
+    _reward_widget_height = 400
 
     def __init__(self, **params):
         super().__init__(**params)
@@ -604,7 +612,14 @@ class Scheduler(param.Parameterized):
             self._debugging_message = "Starting to load scheduler."
             pn.state.notifications.info("Scheduler loading...", duration=0)
 
-            (scheduler, conditions) = schedview.collect.scheduler_pickle.read_scheduler(self.scheduler_fname)
+            os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
+            scheduler_resource_path = ResourcePath(self.scheduler_fname)
+            scheduler_resource_path.use_threads = False
+            with scheduler_resource_path.as_local() as local_scheduler_resource:
+                (scheduler, conditions) = schedview.collect.scheduler_pickle.read_scheduler(
+                    local_scheduler_resource.ospath
+                )
+
             self._scheduler = scheduler
             self._conditions = conditions
 
@@ -785,7 +800,7 @@ class Scheduler(param.Parameterized):
             selectable=1,
             hidden_columns=["tier", "survey_url"],
             sizing_mode="stretch_width",
-            height=220,
+            height=self._summary_widget_height,
         )
         self.summary_widget = summary_widget
         self._debugging_message = "Finished making summary widget."
@@ -958,7 +973,7 @@ class Scheduler(param.Parameterized):
             frozen_columns=["basis_function"],
             hidden_columns=["doc_url"],
             selectable=1,
-            height=400,
+            height=self._reward_widget_height,
             widths=widths,
         )
         self.reward_widget = reward_widget
@@ -1422,7 +1437,7 @@ class Scheduler(param.Parameterized):
         return self.map_title_pane
 
 
-class RestrictedFilesScheduler(Scheduler):
+class RestrictedSchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
     """A Parametrized container for parameters, data, and panel objects for the
     scheduler dashboard.
     """
@@ -1447,6 +1462,55 @@ class RestrictedFilesScheduler(Scheduler):
 
         if data_dir is not None:
             self.param["scheduler_fname"].update(path=f"{data_dir}/*scheduler*.p*")
+
+
+class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
+    """A Parametrized container for parameters, data, and panel objects for the
+    scheduler dashboard.
+    """
+
+    scheduler_fname_doc = """Recent pickles from LFA
+    """
+
+    scheduler_fname = param.Selector(
+        default="",
+        objects=[],
+        doc=scheduler_fname_doc,
+        precedence=3,
+    )
+
+    pickles_date = param.Date(
+        default=datetime.now(), label="Snapshot Date", doc="Select date to load pickles for", precedence=1
+    )
+
+    telescope = param.Selector(
+        default=None, objects={"All": None, "Main": 1, "Auxtel": 2}, doc="Source Telescope", precedence=2
+    )
+
+    _summary_widget_height = 310
+    _reward_widget_height = 350
+
+    def __init__(self):
+        super().__init__()
+
+    async def query_schedulers(self, selected_time, selected_tel):
+        """Query snapshots that have a timestamp between the start of the
+        night and selected datetime and generated by selected telescope
+        """
+        selected_time = Time(
+            Timestamp(
+                selected_time,
+                tzinfo=ZoneInfo(DEFAULT_TIMEZONE),
+            )
+        )
+        self.show_loading_indicator = True
+        self._debugging_message = "Starting retrieving snapshots"
+        self.logger.debug("Starting retrieving snapshots")
+        scheduler_urls = await query_night_schedulers(selected_time, selected_tel)
+        self.logger.debug("Finished retrieving snapshots")
+        self._debugging_message = "Finished retrieving snapshots"
+        self.show_loading_indicator = False
+        return scheduler_urls
 
 
 # ------------------------------------------------------------ Create dashboard
@@ -1476,6 +1540,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
 
     from_urls = False
     data_dir = None
+    from_lfa = False
 
     if "data_from_urls" in kwargs.keys():
         from_urls = kwargs["data_from_urls"]
@@ -1485,11 +1550,22 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         data_dir = kwargs["data_dir"]
         del kwargs["data_dir"]
 
+    if "lfa" in kwargs.keys():
+        from_lfa = kwargs["lfa"]
+        del kwargs["lfa"]
+
     scheduler = None
     data_loading_widgets = {}
+    # data loading parameters in both restricted and URL modes
+    data_loading_parameters = ["scheduler_fname", "widget_datetime", "widget_tier"]
+    # set the data loading parameter section height in both
+    # restricted and URL modes
+    # this will be used to adjust the layout of other sections
+    # in the grid
+    data_params_grid_height = 30
     # Accept pickle files from url or any path.
     if from_urls:
-        scheduler = Scheduler()
+        scheduler = SchedulerSnapshotDashboard()
         # read pickle and time if provided to the function in a notebook
         # it will be overriden if the dashboard runs in an app
         if date_time is not None:
@@ -1508,18 +1584,55 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
                     "url_mjd": "mjd",
                 },
             )
-
+        # set specific widget props for data loading parameters
+        # in URL and restricted modes
         data_loading_widgets = {
             "scheduler_fname": {
-                # "widget_type": pn.widgets.TextInput,
                 "placeholder": "filepath or URL of pickle",
             },
             "widget_datetime": pn.widgets.DatetimePicker,
         }
+    # Load pickles from S3 bucket
+    elif from_lfa:
+        scheduler = LFASchedulerSnapshotDashboard()
+        # data loading parameters in LFA mode
+        data_loading_parameters = [
+            "scheduler_fname",
+            "pickles_date",
+            "telescope",
+            "widget_datetime",
+            "widget_tier",
+        ]
+        # set specific widget props for data loading parameters
+        # in LFA mode
+        data_loading_widgets = {
+            "pickles_date": pn.widgets.DatetimePicker,
+            "widget_datetime": pn.widgets.DatetimePicker,
+        }
+        # set the data loading parameter section height in LFA mode
+        data_params_grid_height = 42
+
+        @pn.depends(
+            selected_time=scheduler.param.pickles_date, selected_tel=scheduler.param.telescope, watch=True
+        )
+        async def get_scheduler_list(selected_time, selected_tel):
+            pn.state.notifications.clear()
+            pn.state.notifications.info("Loading snapshots...")
+            os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
+            # add an empty option at index 0 to be the default
+            # selection upon loading snapshot list
+            schedulers = [""]
+            schedulers[1:] = await scheduler.query_schedulers(selected_time, selected_tel)
+            scheduler.param["scheduler_fname"].objects = schedulers
+            scheduler.clear_dashboard()
+            if len(schedulers) > 1:
+                pn.state.notifications.success("Snapshots loaded!!")
+            else:
+                pn.state.notifications.info("No snapshots found for selected night!!", duration=0)
 
     # Restrict files to data_directory.
     else:
-        scheduler = RestrictedFilesScheduler(data_dir=data_dir)
+        scheduler = RestrictedSchedulerSnapshotDashboard(data_dir=data_dir)
         data_loading_widgets = {
             "widget_datetime": pn.widgets.DatetimePicker,
         }
@@ -1577,17 +1690,18 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         sizing_mode="stretch_width",
         styles={"background": "#048b8c"},
     )
-    # Parameter inputs (pickle, widget_datetime, tier).
-    sched_app[8:30, 0:21] = pn.Param(
+    # Parameter inputs (pickle, widget_datetime, tier)
+    # as well as pickles date and telescope when running in LFA
+    sched_app[8:data_params_grid_height, 0:21] = pn.Param(
         scheduler,
-        parameters=["scheduler_fname", "widget_datetime", "widget_tier"],
+        parameters=data_loading_parameters,
         widgets=data_loading_widgets,
         name="Select pickle file, date and tier.",
     )
     # Reset button.
-    sched_app[30:36, 3:15] = pn.Row(reset_button)
+    sched_app[data_params_grid_height : data_params_grid_height + 6, 3:15] = pn.Row(reset_button)
     # Survey rewards table and header.
-    sched_app[8:36, 21:67] = pn.Row(
+    sched_app[8 : data_params_grid_height + 6, 21:67] = pn.Row(
         pn.Spacer(width=10),
         pn.Column(
             pn.Spacer(height=10),
@@ -1596,13 +1710,11 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
                 styles={"background": "#048b8c"},
             ),
             pn.param.ParamMethod(scheduler.publish_summary_widget, loading_indicator=True),
-            # scroll=True
         ),
         pn.Spacer(width=10),
-        # sizing_mode="stretch_height",
     )
     # Reward table and header.
-    sched_app[36:87, 0:67] = pn.Row(
+    sched_app[data_params_grid_height + 6 : data_params_grid_height + 45, 0:67] = pn.Row(
         pn.Spacer(width=10),
         pn.Column(
             pn.Spacer(height=10),
@@ -1615,7 +1727,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         pn.Spacer(width=10),
     )
     # Map display and header.
-    sched_app[8:67, 67:100] = pn.Column(
+    sched_app[8 : data_params_grid_height + 25, 67:100] = pn.Column(
         pn.Spacer(height=10),
         pn.Row(
             scheduler.map_title,
@@ -1624,7 +1736,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         pn.param.ParamMethod(scheduler.publish_sky_map, loading_indicator=True),
     )
     # Map display parameters (map, nside, color palette).
-    sched_app[74:87, 67:100] = pn.Param(
+    sched_app[data_params_grid_height + 32 : data_params_grid_height + 45, 67:100] = pn.Param(
         scheduler,
         widgets={
             "survey_map": {"type": pn.widgets.Select, "width": 250},
@@ -1636,7 +1748,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         default_layout=pn.Row,
     )
     # Debugging collapsable card.
-    sched_app[87:100, :] = pn.Card(
+    sched_app[data_params_grid_height + 45 : data_params_grid_height + 52, :] = pn.Card(
         scheduler._debugging_messages,
         header=pn.pane.Str("Debugging", stylesheets=[h2_stylesheet]),
         header_color="white",
@@ -1653,7 +1765,7 @@ def parse_arguments():
     Parse commandline arguments to read data directory if provided
     """
     parser = argparse.ArgumentParser(description="On-the-fly Rubin Scheduler dashboard")
-    default_data_dir = f"{USDF_DATA_DIR}/*" if os.path.exists(USDF_DATA_DIR) else PACKAGE_DATA_DIR
+    default_data_dir = f"{LFA_DATA_DIR}/*" if os.path.exists(LFA_DATA_DIR) else PACKAGE_DATA_DIR
 
     parser.add_argument(
         "--data_dir",
@@ -1669,9 +1781,18 @@ def parse_arguments():
         help="Let the user specify URLs from which to load data. THIS IS NOT SECURE.",
     )
 
+    parser.add_argument(
+        "--lfa",
+        action="store_true",
+        help="Loads pickle files from S3 buckets in LFA",
+    )
+
     args = parser.parse_args()
 
     if len(glob(args.data_dir)) == 0 and not args.data_from_urls:
+        args.data_dir = PACKAGE_DATA_DIR
+
+    if args.lfa and len(glob(LFA_DATA_DIR)) == 0:
         args.data_dir = PACKAGE_DATA_DIR
 
     scheduler_app_params = args.__dict__
@@ -1686,7 +1807,7 @@ def main():
     if "SCHEDULER_PORT" in os.environ:
         scheduler_port = int(os.environ["SCHEDULER_PORT"])
     else:
-        scheduler_port = 8080
+        scheduler_port = 8888
 
     assets_dir = os.path.join(importlib.resources.files("schedview"), "app", "scheduler_dashboard", "assets")
 
@@ -1705,7 +1826,7 @@ def main():
         prefix=prefix,
         start=True,
         autoreload=True,
-        threaded=True,
+        # threaded=True,
         static_dirs={"assets": assets_dir},
     )
 
