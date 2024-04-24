@@ -6,6 +6,9 @@ __all__ = [
     "plot_polar_alt_az",
     "plot_survey_rewards",
     "create_survey_reward_plot",
+    "reward_timeline_for_tier",
+    "area_timeline_for_tier",
+    "reward_timeline_for_surveys",
     "make_logger",
     "BadSchedulerError",
     "BadConditionsError",
@@ -33,7 +36,13 @@ from .colors import PLOT_FILTER_CMAP, PLOT_FILTER_COLORS
 from .nightbf import plot_infeasible, plot_rewards
 from .nightly import plot_airmass_vs_time, plot_alt_vs_time, plot_polar_alt_az
 from .overhead import create_overhead_histogram, create_overhead_summary_table, plot_overhead_vs_slew_distance
-from .rewards import create_survey_reward_plot, plot_survey_rewards
+from .rewards import (
+    area_timeline_for_tier,
+    create_survey_reward_plot,
+    plot_survey_rewards,
+    reward_timeline_for_surveys,
+    reward_timeline_for_tier,
+)
 from .scheduler import (
     BadConditionsError,
     BadSchedulerError,
