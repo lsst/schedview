@@ -154,7 +154,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
     scheduler_fname = param.String(
         default="",
-        label="Scheduler pickle file",
+        label="Scheduler snapshot file",
         doc=scheduler_fname_doc,
         precedence=3,
     )
@@ -1480,7 +1480,10 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
     )
 
     pickles_date = param.Date(
-        default=datetime.now(), label="Snapshot Date", doc="Select date to load pickles for", precedence=1
+        default=datetime.now(),
+        label="Snapshot Date",
+        doc="Show snapshots that are recent as of this date and time in the scheduler snapshot file dropdown",
+        precedence=1,
     )
 
     telescope = param.Selector(
