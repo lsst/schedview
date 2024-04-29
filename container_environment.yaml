@@ -18,5 +18,6 @@ dependencies:
  - git
  - wget
  - pip
+ - lsst-edf-client
  - pip:
    - lsst.resources
