@@ -18,6 +18,6 @@ dependencies:
  - git
  - wget
  - pip
- - lsst-edf-client
  - pip:
+   - lsst-efd-client
    - lsst.resources
