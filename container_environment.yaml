@@ -16,6 +16,7 @@ dependencies:
  - uranography
  - param
  - git
+ - botocore
  - wget
  - pip
  - pip:
