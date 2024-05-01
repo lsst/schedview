@@ -17,6 +17,7 @@ dependencies:
  - param
  - git
  - botocore
+ - boto3
  - wget
  - pip
  - pip:
