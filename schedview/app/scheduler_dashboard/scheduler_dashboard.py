@@ -1807,8 +1807,8 @@ def main():
     print("Starting scheduler dashboard.")
     commandline_args = parse_arguments()
 
-    if "SCHEDULER_PORT" in os.environ:
-        scheduler_port = int(os.environ["SCHEDULER_PORT"])
+    if "SCHEDULER_SNAPSHOT_DASHBOARD_PORT" in os.environ:
+        scheduler_port = int(os.environ["SCHEDULER_SNAPSHOT_DASHBOARD_PORT"])
     else:
         scheduler_port = 8888
 

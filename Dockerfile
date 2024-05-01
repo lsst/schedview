@@ -16,6 +16,7 @@ RUN mkdir -p ${TEST_DATA_DIR} && \
 
 # Container execution
 ENV RUBIN_SIM_DATA_DIR=/home/${MAMBA_USER}/schedview/rubin_sim_data
+ENV SCHEDULER_SNAPSHOT_DASHBOARD_PORT=8080
 ENV LSST_DISABLE_BUCKET_VALIDATION=1
 ENV LSST_S3_USE_THREADS=False
 ENV S3_ENDPOINT_URL=https://s3dfrgw.slac.stanford.edu
