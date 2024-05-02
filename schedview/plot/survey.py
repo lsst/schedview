@@ -203,12 +203,19 @@ def map_survey_healpix(
 
     if survey is not None:
         try:
+            try:
+                ra_deg = list(survey.ra_deg)
+                dec_deg = list(survey.dec_deg)
+            except TypeError:
+                ra_deg = [survey.ra_deg]
+                dec_deg = [survey.dec_deg]
+
             survey_field_data_source = bokeh.models.ColumnDataSource(
                 data={
-                    "ra": list(survey.ra_deg),
-                    "decl": list(survey.dec_deg),
-                    "name": ["survey_pointing {i}" for i, ra in enumerate(list(survey.ra_deg))],
-                    "glyph_size": [20] * len(list(survey.ra_deg)),
+                    "ra": ra_deg,
+                    "decl": dec_deg,
+                    "name": ["survey_pointing {i}" for i, ra in enumerate(ra_deg)],
+                    "glyph_size": [20] * len(ra_deg),
                 },
                 name="survey_pointings",
             )
