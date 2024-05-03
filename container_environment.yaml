@@ -8,15 +8,18 @@ dependencies:
  - numpy
  - pandas
  - astropy >= 5.3
- - rubin-scheduler
- - rubin-sim
  - uranography >= 1.1.0
  - bokeh >= 3.1.1
  - panel >= 1.1.0
  - uranography
  - param
  - git
+ - botocore
+ - boto3
  - wget
+ - lsst-efd-client
+ - rubin-scheduler
+ - rubin-sim
  - pip
  - pip:
    - lsst.resources
