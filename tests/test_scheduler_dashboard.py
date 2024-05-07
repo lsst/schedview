@@ -573,7 +573,7 @@ class TestLFAModeE2E(unittest.TestCase):
         expect(page.get_by_text("Scheduler summary dataframe updated successfully").first).to_be_visible()
 
         # Check 3x headings updated.
-        survey_name = page.get_by_role("row").nth(2).get_by_role("gridcell").nth(1).text_content()
+        survey_name = page.get_by_role("row").nth(1).get_by_role("gridcell").nth(1).text_content()
         expect(page.locator("pre").nth(2)).to_contain_text("Scheduler summary for tier 0")
         expect(page.locator("pre").nth(3)).to_contain_text(
             f"Basis functions & rewards for survey {survey_name}"
