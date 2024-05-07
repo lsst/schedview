@@ -1481,13 +1481,13 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
 
     pickles_date = param.Date(
         default=datetime.now(),
-        label="Snapshot Date",
+        label="Snapshot selection cutoff date and time",
         doc="Show snapshots that are recent as of this date and time in the scheduler snapshot file dropdown",
         precedence=1,
     )
 
     telescope = param.Selector(
-        default=None, objects={"All": None, "Main": 1, "Auxtel": 2}, doc="Source Telescope", precedence=2
+        default=None, objects={"All": None, "Simonyi": 1, "Auxtel": 2}, doc="Source Telescope", precedence=2
     )
 
     _summary_widget_height = 310
