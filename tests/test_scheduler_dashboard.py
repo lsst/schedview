@@ -498,5 +498,97 @@ class TestURLModeE2E(unittest.TestCase):
         expect(page.locator("pre").nth(6)).not_to_contain_text(re.compile(r"Traceback|Cannot|unable"))
 
 
+class TestLFAModeE2E(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.playwright = sync_playwright().start()
+        cls.browser = cls.playwright.chromium.launch(headless=True)
+        # cls.browser = cls.playwright.chromium.launch(
+        #     headless=False,
+        #     slow_mo=100
+        # )
+        cls.dashboard_process = subprocess.Popen(
+            ["python", "schedview/app/scheduler_dashboard/scheduler_dashboard.py", "--lfa"]
+        )
+        time.sleep(20)  # TODO: replace this with better method
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls.browser.close()
+        cls.playwright.stop()
+
+        if hasattr(cls, "dashboard_process") and cls.dashboard_process:
+            cls.dashboard_process.terminate()
+            cls.dashboard_process.wait()
+
+    def test_with_data(self):
+        page = self.browser.new_page()
+        page.goto("http://localhost:8888/schedview-snapshot")
+
+        # expect.set_options(timeout=30_000)
+
+        # Choose snapshot date.
+        page.get_by_role("textbox").first.click()  # open date picker
+        page.get_by_label("Month").first.select_option("2")  # change date
+        page.get_by_label("March 12,").click()
+        page.get_by_label("Hour").first.fill("2")  # change hour
+        page.get_by_label("Minute").first.fill("0")  # change minute
+        page.get_by_role("spinbutton").nth(3).fill("0")  # change second
+        page.get_by_text("::").first.press("Enter")  # submit
+
+        # Check loading indicator.
+        indicator_div = page.locator("div").filter(has_text="Scheduler Dashboard").nth(1)
+        expect(indicator_div).to_have_attribute("class", "bk-GridBox pn-loading pn-arc")
+
+        # Check 4x info messages displayed.
+        expect(page.get_by_text("Loading snapshots...").first).to_be_visible()
+        expect(page.get_by_text("Snapshots loaded!!").first).to_be_visible()
+
+        # Select telescope.
+        page.get_by_role("combobox").first.select_option("Auxtel")
+        # page.get_by_label("Telescope").select_option("Auxtel")
+
+        # Check loading indicator.
+        indicator_div = page.locator("div").filter(has_text="Scheduler Dashboard").nth(1)
+        expect(indicator_div).to_have_attribute("class", "bk-GridBox pn-loading pn-arc")
+
+        # Check 4x info messages displayed.
+        expect(page.get_by_text("Loading snapshots...").first).to_be_visible()
+        expect(page.get_by_text("Snapshots loaded!!").first).to_be_visible()
+
+        # Select snapshot file.
+        snapshot = "s3://rubin:rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T00:33:05.127.p"
+        page.get_by_label("Scheduler snapshot file").select_option(snapshot)
+
+        # Check loading indicator.
+        indicator_div = page.locator("div").filter(has_text="Scheduler Dashboard").nth(1)
+        expect(indicator_div).to_have_attribute("class", "bk-GridBox pn-loading pn-arc")
+
+        # Check 4x info messages displayed.
+        expect(page.get_by_text("Scheduler loading...").first).to_be_visible()
+        expect(page.get_by_text("Scheduler pickle loaded successfully!").first).to_be_visible()
+        expect(page.get_by_text("Making scheduler summary dataframe...").first).to_be_visible()
+        expect(page.get_by_text("Scheduler summary dataframe updated successfully").first).to_be_visible()
+
+        # Check 3x headings updated.
+        survey_name = page.get_by_role("row").nth(2).get_by_role("gridcell").nth(1).text_content()
+        expect(page.locator("pre").nth(2)).to_contain_text("Scheduler summary for tier 0")
+        expect(page.locator("pre").nth(3)).to_contain_text(
+            f"Basis functions & rewards for survey {survey_name}"
+        )
+        expect(page.locator("pre").nth(4)).to_contain_text(f"Survey {survey_name} Map: reward")
+        # Check 2x tables visible.
+        expect(page.get_by_role("grid")).to_have_count(2)
+        # Check 1x map/key visible.
+        expect(page.locator(".bk-Canvas > div:nth-child(11)")).to_be_visible()
+
+        # Check debugger for any errors caused during test actions.
+        expect(page.locator("pre").nth(6)).not_to_contain_text(re.compile(r"Traceback|Cannot|unable"))
+        # Close debugger.
+        page.get_by_role("button", name="Debugging").click()
+
+
 if __name__ == "__main__":
     unittest.main()
