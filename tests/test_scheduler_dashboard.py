@@ -138,14 +138,18 @@ class TestSchedulerDashboard(unittest.TestCase):
         self.assertEqual(seeing_data.fwhm_500, fiducial_seeing)
 
 
-class TestDashboardE2E(unittest.TestCase):
+class TestStandardModeE2E(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.playwright = sync_playwright().start()
-        cls.browser = cls.playwright.chromium.launch()
+        cls.browser = cls.playwright.chromium.launch(headless=True)
+        # cls.browser = cls.playwright.chromium.launch(
+        #     headless=False,
+        #     slow_mo=100
+        # )
         cls.dashboard_process = subprocess.Popen(
-            ["python", "../schedview/app/scheduler_dashboard/scheduler_dashboard.py"]
+            ["python", "schedview/app/scheduler_dashboard/scheduler_dashboard.py"]
         )
         time.sleep(20)  # TODO: replace this with better method
 
@@ -161,15 +165,17 @@ class TestDashboardE2E(unittest.TestCase):
 
     def test_without_data(self):
         page = self.browser.new_page()
-        page.goto("http://localhost:8080/schedview-snapshot/dashboard")
+        page.goto("http://localhost:8888/schedview-snapshot")
 
         # Check page title.
         expect(page).to_have_title(re.compile("Scheduler Dashboard"))
 
         # Check logo.
-        img_src = page.get_by_role("img").get_attribute("src")
+        img_element = page.get_by_role("img").first
+        img_element.wait_for()
+        img_src = img_element.get_attribute("src")
         page_img = self.browser.new_page()
-        page_img.goto(f"http://localhost:8080{img_src}")
+        page_img.goto(f"http://localhost:8888{img_src}")
         expect(page_img).not_to_have_title("404: Not Found")
         page_img.close()
 
@@ -209,17 +215,18 @@ class TestDashboardE2E(unittest.TestCase):
         page.get_by_role("combobox").nth(4).select_option("Turbo256")
 
         # Check selections don't cause problems.
-        page.get_by_role("button", name="► Debugging").click()
         expect(page.locator("pre").nth(5)).not_to_contain_text("Traceback")
+        # Close debugging panel
+        page.get_by_role("button", name="Debugging").click()
 
     def test_with_data(self):
         page = self.browser.new_page()
-        page.goto("http://localhost:8080/schedview-snapshot/dashboard")
+        page.goto("http://localhost:8888/schedview-snapshot")
 
         expect.set_options(timeout=60_000)
 
         # Load data from pickle.
-        page.get_by_role("combobox").first.select_option(value=TEST_PICKLE)
+        page.get_by_label("Scheduler snapshot file").select_option(TEST_PICKLE[1:])  # Remove leading '/'
 
         # Check loading indicator.
         indicator_div = page.locator("div").filter(has_text="Scheduler Dashboard").nth(1)
@@ -234,7 +241,9 @@ class TestDashboardE2E(unittest.TestCase):
         # Check subheading.
         expect(page.locator("pre").nth(1)).to_contain_text("Tier 0 - Survey 0 - Map reward")
         # Check date.
-        expect(page.get_by_role("textbox")).to_have_value("2025-05-02 10:19:45")
+        expect(page.get_by_role("textbox")).to_have_value(
+            "2025-05-02 10:19:09"
+        )  # Vulnerable to data changes.
         # Check survey docs link works.
         with page.expect_popup() as page_survey_docs_info:
             row = page.get_by_role("row").nth(1)
@@ -245,7 +254,7 @@ class TestDashboardE2E(unittest.TestCase):
         page_survey_docs.close()
         # Check bf docs link works.
         with page.expect_popup() as page_bf_docs_info:
-            row = page.get_by_role("row", name="AvoidDirectWind")
+            row = page.get_by_role("row", name="AvoidDirectWind")  # Vulnerable to data changes.
             link = row.get_by_role("link")
             link.click()
         page_bf_docs = page_bf_docs_info.value
@@ -279,23 +288,23 @@ class TestDashboardE2E(unittest.TestCase):
         expect(page.locator("pre").nth(4)).to_contain_text(f"Survey {survey_name} Map: u_sky")
 
         # Select M5Diff from Survey map.
-        map_option = page.locator("option", has_text="M5Diff i").text_content()
+        map_option = page.locator("option", has_text="M5Diff i").text_content()  # Vulnerable to data changes.
         page.get_by_role("combobox").nth(2).select_option(map_option)
         # Check M5Diff row highlighted in bf table.
         expect(page.get_by_role("row", name="M5Diff i")).to_have_class(re.compile(r"tabulator-selected"))
 
         # Select MoonAvoidance row in bf table.
-        page.get_by_text("MoonAvoidance", exact=True).click()
+        page.get_by_text("MoonAvoidance", exact=True).click()  # Vulnerable to data changes.
         # Check map heading changed.
-        # expect(page.locator("pre").nth(4)).to_contain_text(
-        #     f"Survey {survey_name} Reward: MoonAvoidance"
-        # ) # TODO FAILING (colon bug)
+        expect(page.locator("pre").nth(4)).to_contain_text(
+            f"Survey {survey_name} Reward: MoonAvoidance"
+        )  # TODO FAILING (colon bug)
         # Check Survey map drop-down value = MoonAvoidance.
         map_option = page.locator("option", has_text="MoonAvoidance").text_content()
         expect(page.get_by_role("combobox").nth(2)).to_have_value(map_option)
 
         # Select FilterChange row in bf table.
-        page.get_by_text("FilterChange i").click()
+        page.get_by_text("FilterChange i").click()  # Vulnerable to data changes.
         # Check Survey map drop-down shows “”.
         expect(page.get_by_role("combobox").nth(2)).to_have_value("")
 
@@ -304,15 +313,16 @@ class TestDashboardE2E(unittest.TestCase):
 
         # Check Survey row 0 shows Reward='TimeToTwilight, NightModulo'.
         survey_0_reward = page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2)
-        expect(survey_0_reward).to_have_text("TimeToTwilight, NightModulo")
+        expect(survey_0_reward).to_have_text("TimeToTwilight, NightModulo")  # Vulnerable to data changes.
 
         # Check TimeToTwilight infeasiblility displayed correctly.
-        page.get_by_label("Show Page 2").click()  # TODO: Remove once Eman's PR merged.
-        img = page.get_by_role("row").filter(has_text="TimeToTwilight").get_by_role("img")
+        img = (
+            page.get_by_role("row").filter(has_text="TimeToTwilight").get_by_role("img")
+        )  # Vulnerable to data changes.
         fill_value = img.evaluate('(element) => element.querySelector("path").getAttribute("fill")')
         assert fill_value == "#CE1515"
         expect(
-            page.get_by_role("rowgroup").nth(5).get_by_role("row").nth(2).get_by_role("gridcell").nth(4)
+            page.get_by_role("rowgroup").nth(5).get_by_role("row").nth(15).get_by_role("gridcell").nth(3)
         ).to_contain_text("-Infinity")
 
         # Change date.
@@ -338,15 +348,16 @@ class TestDashboardE2E(unittest.TestCase):
 
         # Check survey row 0 shows Reward = 11.something
         survey_0_reward = page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2)
-        expect(survey_0_reward).to_have_text(re.compile(r"11\.7\d"))
+        expect(survey_0_reward).to_have_text(re.compile(r"11\.7\d"))  # Vulnerable to data changes.
 
         # Check TimeToTwilight feasiblility displayed correctly.
-        page.get_by_label("Show Page 2").click()  # TODO: Remove once Eman's PR merged.
-        img = page.get_by_role("row").filter(has_text="TimeToTwilight").get_by_role("img")
+        img = (
+            page.get_by_role("row").filter(has_text="TimeToTwilight").get_by_role("img")
+        )  # Vulnerable to data changes.
         fill_value = img.evaluate('(element) => element.querySelector("path").getAttribute("fill")')
         assert fill_value == "#2DC214"
         expect(
-            page.get_by_role("rowgroup").nth(5).get_by_role("row").nth(2).get_by_role("gridcell").nth(4)
+            page.get_by_role("rowgroup").nth(5).get_by_role("row").nth(15).get_by_role("gridcell").nth(3)
         ).to_contain_text("0.000")
 
         # Select Survey map u_sky (to check restore works)
@@ -386,16 +397,16 @@ class TestDashboardE2E(unittest.TestCase):
         )
         expect(page.locator("pre").nth(4)).to_contain_text(f"Survey {survey_name}")
         # Check date.
-        expect(page.get_by_role("textbox")).to_have_value("2025-05-02 10:19:45")
+        expect(page.get_by_role("textbox")).to_have_value(
+            "2025-05-02 10:19:09"
+        )  # Vulnerable to data changes.
         # Check Survey Map shows ‘reward’
         expect(page.get_by_role("combobox").nth(2)).to_have_value("reward")
 
-        # TODO: Check Map resolution = 16. (FAILING)
-        # expect(page.get_by_role("combobox").nth(3)).to_have_value("16")
-        # TODO: Check color palette = Viridis255. (FAILING)
-        # expect(
-        #     page.get_by_role("combobox").nth(4)
-        # ).to_have_value("Viridis256")
+        # Check Map resolution = 16.
+        expect(page.get_by_role("combobox").nth(3)).to_have_value("16")
+        # Check color palette = Viridis255.
+        expect(page.get_by_role("combobox").nth(4)).to_have_value("Viridis256")
 
         # Select tier 3.
         page.get_by_role("combobox").nth(1).select_option("tier 3")
@@ -407,10 +418,10 @@ class TestDashboardE2E(unittest.TestCase):
         # Check ordering of survey table (index).
         expect(page.get_by_role("columnheader", name="Basis Function")).to_have_attribute("aria-sort", "none")
 
-        # Check debugger.
-        page.get_by_role("button", name="► Debugging").click()
-        # expect(page.locator("pre").nth(5)).not_to_contain_text("Traceback")
+        # Check debugger for any errors caused during test actions.
         expect(page.locator("pre").nth(5)).not_to_contain_text(re.compile(r"Traceback|Cannot|unable"))
+        # Close debugger.
+        page.get_by_role("button", name="Debugging").click()
 
 
 if __name__ == "__main__":
