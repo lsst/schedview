@@ -20,7 +20,7 @@ from rubin_scheduler.scheduler.example import example_scheduler
 from rubin_scheduler.scheduler.features.conditions import Conditions
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 
-# Objects to test instances against
+# Objects to test instances against.
 from rubin_scheduler.scheduler.schedulers.core_scheduler import CoreScheduler
 
 import schedview
@@ -30,7 +30,7 @@ from schedview.app.scheduler_dashboard.scheduler_dashboard import (
     scheduler_app,
 )
 
-# Schedview methods
+# Schedview methods.
 from schedview.compute.scheduler import make_scheduler_summary_df
 from schedview.compute.survey import compute_maps
 
@@ -38,6 +38,9 @@ TEST_PICKLE = str(importlib.resources.files(schedview).joinpath("data", "sample_
 MJD_START = get_sky_brightness_date_bounds()[0]
 TEST_DATE = Time(MJD_START + 0.2, format="mjd").datetime
 DEFAULT_TIMEZONE = "America/Santiago"
+
+# Set timeout for Playwright tests to 10 seconds.
+expect.set_options(timeout=10_000)
 
 
 class TestSchedulerDashboard(unittest.TestCase):
@@ -141,7 +144,8 @@ class TestStandardModeE2E(unittest.TestCase):
         cls.dashboard_process = subprocess.Popen(
             ["python", "schedview/app/scheduler_dashboard/scheduler_dashboard.py"]
         )
-        time.sleep(20)  # TODO: replace this with better method
+        # Allow the dashboard time to start.
+        time.sleep(10)
 
     @classmethod
     def tearDownClass(cls):
@@ -212,8 +216,6 @@ class TestStandardModeE2E(unittest.TestCase):
     def test_with_data(self):
         page = self.browser.new_page()
         page.goto("http://localhost:8888/schedview-snapshot")
-
-        expect.set_options(timeout=60_000)
 
         # Load data from pickle.
         page.get_by_label("Scheduler snapshot file").select_option(TEST_PICKLE[1:])  # Remove leading '/'
@@ -358,6 +360,9 @@ class TestStandardModeE2E(unittest.TestCase):
         # Change ordering of bf table.
         page.get_by_role("columnheader", name="Basis Function").locator("div").nth(3).click()
 
+        # Allow the above changes time to propogate.
+        time.sleep(5)
+
         # Reset loading conditions.
         page.get_by_role("button", name="﫽 Restore Loading Conditions").click()
 
@@ -370,7 +375,7 @@ class TestStandardModeE2E(unittest.TestCase):
         expect(page.get_by_text("Scheduler pickle loaded successfully!").first).to_be_visible()
         expect(page.get_by_text("Making scheduler summary dataframe...").first).to_be_visible()
         expect(page.get_by_text("Scheduler summary dataframe updated successfully").first).to_be_visible()
-
+        
         # Check subheading = ‘Tier 0 - Survey 0 - Map reward’.
         expect(page.locator("pre").nth(1)).to_contain_text("Tier 0 - Survey 0 - Map reward")
         # Check 3x headings return to tier 0, survey 0.
@@ -418,7 +423,8 @@ class TestURLModeE2E(unittest.TestCase):
         cls.dashboard_process = subprocess.Popen(
             ["python", "schedview/app/scheduler_dashboard/scheduler_dashboard.py", "--data_from_urls"]
         )
-        time.sleep(20)  # TODO: replace this with better method
+        # Allow the dashboard time to start.
+        time.sleep(10)
 
     @classmethod
     def tearDownClass(cls):
@@ -434,8 +440,6 @@ class TestURLModeE2E(unittest.TestCase):
         page = self.browser.new_page()
         page.goto("http://localhost:8888/schedview-snapshot")
 
-        expect.set_options(timeout=30_000)
-
         # Input invalid url/filepath.
         snapshot_input = page.get_by_role("textbox").first
         snapshot_input.fill("invalid_url_or_filepath")
@@ -450,8 +454,6 @@ class TestURLModeE2E(unittest.TestCase):
     def test_with_data(self):
         page = self.browser.new_page()
         page.goto("http://localhost:8888/schedview-snapshot")
-
-        expect.set_options(timeout=60_000)
 
         # Load data from pickle.
         snapshot_input = page.get_by_role("textbox").first
@@ -511,7 +513,8 @@ class TestLFAModeE2E(unittest.TestCase):
         cls.dashboard_process = subprocess.Popen(
             ["python", "schedview/app/scheduler_dashboard/scheduler_dashboard.py", "--lfa"]
         )
-        time.sleep(20)  # TODO: replace this with better method
+        # Allow the dashboard time to start.
+        time.sleep(10)
 
     @classmethod
     def tearDownClass(cls):
@@ -526,8 +529,6 @@ class TestLFAModeE2E(unittest.TestCase):
     def test_with_data(self):
         page = self.browser.new_page()
         page.goto("http://localhost:8888/schedview-snapshot")
-
-        # expect.set_options(timeout=30_000)
 
         # Choose snapshot date.
         page.get_by_role("textbox").first.click()  # open date picker
