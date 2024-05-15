@@ -1,4 +1,5 @@
 import importlib.resources
+import os
 import re
 import subprocess
 import time
@@ -38,6 +39,11 @@ TEST_PICKLE = str(importlib.resources.files(schedview).joinpath("data", "sample_
 MJD_START = get_sky_brightness_date_bounds()[0]
 TEST_DATE = Time(MJD_START + 0.2, format="mjd").datetime
 DEFAULT_TIMEZONE = "America/Santiago"
+
+try:
+    PORT = int(os.environ["SCHEDULER_SNAPSHOT_DASHBOARD_PORT"])
+except KeyError:
+    PORT = 8888
 
 # Set timeout for Playwright tests to 10 seconds.
 expect.set_options(timeout=10_000)
@@ -159,7 +165,7 @@ class TestStandardModeE2E(unittest.TestCase):
 
     def test_without_data(self):
         page = self.browser.new_page()
-        page.goto("http://localhost:8888/schedview-snapshot")
+        page.goto(f"http://localhost:{PORT}/schedview-snapshot")
 
         # Check page title.
         expect(page).to_have_title(re.compile("Scheduler Dashboard"))
@@ -169,7 +175,7 @@ class TestStandardModeE2E(unittest.TestCase):
         img_element.wait_for()
         img_src = img_element.get_attribute("src")
         page_img = self.browser.new_page()
-        page_img.goto(f"http://localhost:8888{img_src}")
+        page_img.goto(f"http://localhost:{PORT}{img_src}")
         expect(page_img).not_to_have_title("404: Not Found")
         page_img.close()
 
@@ -215,7 +221,7 @@ class TestStandardModeE2E(unittest.TestCase):
 
     def test_with_data(self):
         page = self.browser.new_page()
-        page.goto("http://localhost:8888/schedview-snapshot")
+        page.goto(f"http://localhost:{PORT}/schedview-snapshot")
 
         # Load data from pickle.
         page.get_by_label("Scheduler snapshot file").select_option(TEST_PICKLE[1:])  # Remove leading '/'
@@ -375,7 +381,7 @@ class TestStandardModeE2E(unittest.TestCase):
         expect(page.get_by_text("Scheduler pickle loaded successfully!").first).to_be_visible()
         expect(page.get_by_text("Making scheduler summary dataframe...").first).to_be_visible()
         expect(page.get_by_text("Scheduler summary dataframe updated successfully").first).to_be_visible()
-        
+
         # Check subheading = ‘Tier 0 - Survey 0 - Map reward’.
         expect(page.locator("pre").nth(1)).to_contain_text("Tier 0 - Survey 0 - Map reward")
         # Check 3x headings return to tier 0, survey 0.
@@ -438,7 +444,7 @@ class TestURLModeE2E(unittest.TestCase):
 
     def test_invalid_input(self):
         page = self.browser.new_page()
-        page.goto("http://localhost:8888/schedview-snapshot")
+        page.goto(f"http://localhost:{PORT}/schedview-snapshot")
 
         # Input invalid url/filepath.
         snapshot_input = page.get_by_role("textbox").first
@@ -453,7 +459,7 @@ class TestURLModeE2E(unittest.TestCase):
 
     def test_with_data(self):
         page = self.browser.new_page()
-        page.goto("http://localhost:8888/schedview-snapshot")
+        page.goto(f"http://localhost:{PORT}/schedview-snapshot")
 
         # Load data from pickle.
         snapshot_input = page.get_by_role("textbox").first
@@ -528,7 +534,7 @@ class TestLFAModeE2E(unittest.TestCase):
 
     def test_with_data(self):
         page = self.browser.new_page()
-        page.goto("http://localhost:8888/schedview-snapshot")
+        page.goto(f"http://localhost:{PORT}/schedview-snapshot")
 
         # Choose snapshot date.
         page.get_by_role("textbox").first.click()  # open date picker
