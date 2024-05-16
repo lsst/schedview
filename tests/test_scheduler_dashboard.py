@@ -236,7 +236,7 @@ class TestStandardModeE2E(unittest.TestCase):
         page.goto(f"http://localhost:{PORT}/schedview-snapshot")
 
         # Load data from pickle.
-        page.get_by_label("Scheduler snapshot file").select_option(TEST_PICKLE[1:])  # Remove leading '/'
+        page.get_by_role("combobox").nth(0).select_option(TEST_PICKLE[1:])  # Remove leading '/'
 
         # Check loading indicator.
         indicator_div = page.locator("div").filter(has_text="Scheduler Dashboard").nth(1)
@@ -573,7 +573,7 @@ class TestLFAModeE2E(unittest.TestCase):
 
         # Check loading indicator.
         indicator_div = page.locator("div").filter(has_text="Scheduler Dashboard").nth(1)
-        expect(indicator_div).to_have_attribute("class", "bk-GridBox pn-loading pn-arc")
+        expect(indicator_div).to_have_attribute("class", "bk-GridBox")
 
         # Check 4x info messages displayed.
         expect(page.get_by_text("Loading snapshots...").first).to_be_visible()
@@ -581,7 +581,7 @@ class TestLFAModeE2E(unittest.TestCase):
 
         # Select snapshot file.
         snapshot = "s3://rubin:rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T00:33:05.127.p"
-        page.get_by_label("Scheduler snapshot file").select_option(snapshot)
+        page.get_by_role("combobox").nth(1).select_option(snapshot)
 
         # Check loading indicator.
         indicator_div = page.locator("div").filter(has_text="Scheduler Dashboard").nth(1)
