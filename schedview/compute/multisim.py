@@ -11,6 +11,9 @@ def compute_offsets(sim_indexes, visits):
         visits.loc[visits.sim_index == sim_indexes[1], cols].sort_values("observationStartMJD"),
     ]
 
+    # If nothing we do from here on is successful at setting result, make
+    # sure it has something to return.
+    result = None
     if len(sim_visits[0]) == 0 and len(sim_visits[1]) == 0:
         columns = [
             f"observationId_{sim_indexes[0]}",
@@ -24,7 +27,6 @@ def compute_offsets(sim_indexes, visits):
             "mjd_diff",
         ]
         result = pd.DataFrame(columns=columns)
-        result = None
     elif len(sim_visits[0]) == 0 or len(sim_visits[1]) == 0:
         if len(sim_visits[0]) == 0:
             empty_index, content_index = sim_indexes[0], sim_indexes[1]
