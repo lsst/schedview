@@ -40,6 +40,7 @@ TEST_PICKLE = str(importlib.resources.files(schedview).joinpath("data", "sample_
 MJD_START = get_sky_brightness_date_bounds()[0]
 TEST_DATE = Time(MJD_START + 0.2, format="mjd").datetime
 DEFAULT_TIMEZONE = "America/Santiago"
+HEADLESS = False
 
 try:
     PORT = int(os.environ["SCHEDULER_SNAPSHOT_DASHBOARD_PORT"])
@@ -154,11 +155,11 @@ class TestStandardModeE2E(unittest.TestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.playwright = sync_playwright().start()
-        cls.browser = cls.playwright.chromium.launch(headless=True)
-        # cls.browser = cls.playwright.chromium.launch(
-        #     headless=False,
-        #     slow_mo=100
-        # )
+        if HEADLESS:
+            cls.browser = cls.playwright.chromium.launch(headless=True)
+        else:
+            cls.browser = cls.playwright.chromium.launch(headless=False, slow_mo=100)
+
         cls.dashboard_process = subprocess.Popen(
             ["python", "schedview/app/scheduler_dashboard/scheduler_dashboard.py"]
         )
@@ -434,11 +435,11 @@ class TestURLModeE2E(unittest.TestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.playwright = sync_playwright().start()
-        cls.browser = cls.playwright.chromium.launch(headless=True)
-        # cls.browser = cls.playwright.chromium.launch(
-        #     headless=False,
-        #     slow_mo=100
-        # )
+        if HEADLESS:
+            cls.browser = cls.playwright.chromium.launch(headless=True)
+        else:
+            cls.browser = cls.playwright.chromium.launch(headless=False, slow_mo=100)
+
         cls.dashboard_process = subprocess.Popen(
             ["python", "schedview/app/scheduler_dashboard/scheduler_dashboard.py", "--data_from_urls"]
         )
@@ -525,11 +526,11 @@ class TestLFAModeE2E(unittest.TestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.playwright = sync_playwright().start()
-        cls.browser = cls.playwright.chromium.launch(headless=True)
-        # cls.browser = cls.playwright.chromium.launch(
-        #     headless=False,
-        #     slow_mo=100
-        # )
+        if HEADLESS:
+            cls.browser = cls.playwright.chromium.launch(headless=True)
+        else:
+            cls.browser = cls.playwright.chromium.launch(headless=False, slow_mo=100)
+
         cls.dashboard_process = subprocess.Popen(
             ["python", "schedview/app/scheduler_dashboard/scheduler_dashboard.py", "--lfa"]
         )
