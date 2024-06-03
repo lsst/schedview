@@ -46,13 +46,6 @@ from schedview.app.scheduler_dashboard.lfa_scheduler_snapshot_dashboard import L
 from schedview.app.scheduler_dashboard.restricted_scheduler_snapshot_dashboard import (
     RestrictedSchedulerSnapshotDashboard,
 )
-
-# import schedview
-# import schedview.collect.scheduler_pickle
-# import schedview.compute.scheduler
-# import schedview.compute.survey
-# import schedview.param
-# import schedview.plot.survey
 from schedview.app.scheduler_dashboard.scheduler_snapshot_dashboard import SchedulerSnapshotDashboard
 
 # Filter astropy warning that's filling the terminal with every update.
