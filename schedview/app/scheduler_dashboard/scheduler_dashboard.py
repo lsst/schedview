@@ -100,15 +100,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         del kwargs["lfa"]
 
     scheduler = None
-    # Suggestion: move these dynamic widgets to class definition?
-    data_loading_widgets = {}
-    # data loading parameters in both restricted and URL modes
-    data_loading_parameters = ["scheduler_fname", "widget_datetime", "widget_tier"]
-    # set the data loading parameter section height in both
-    # restricted and URL modes
-    # this will be used to adjust the layout of other sections
-    # in the grid
-    data_params_grid_height = 30
+
     # Accept pickle files from url or any path.
     if from_urls:
         scheduler = SchedulerSnapshotDashboard()
@@ -130,58 +122,17 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
                     "url_mjd": "mjd",
                 },
             )
-        # set specific widget props for data loading parameters
-        # in URL and restricted modes
-        data_loading_widgets = {
-            "scheduler_fname": {
-                "placeholder": "filepath or URL of pickle",
-            },
-            "widget_datetime": pn.widgets.DatetimePicker,
-        }
+
     # Load pickles from S3 bucket
     elif from_lfa:
         scheduler = LFASchedulerSnapshotDashboard()
-        # data loading parameters in LFA mode
-        data_loading_parameters = [
-            "scheduler_fname",
-            "pickles_date",
-            "telescope",
-            "widget_datetime",
-            "widget_tier",
-        ]
-        # set specific widget props for data loading parameters
-        # in LFA mode
-        data_loading_widgets = {
-            "pickles_date": pn.widgets.DatetimePicker,
-            "widget_datetime": pn.widgets.DatetimePicker,
-        }
-        # set the data loading parameter section height in LFA mode
-        data_params_grid_height = 42
-
-        @pn.depends(
-            selected_time=scheduler.param.pickles_date, selected_tel=scheduler.param.telescope, watch=True
-        )
-        async def get_scheduler_list(selected_time, selected_tel):
-            pn.state.notifications.clear()
-            pn.state.notifications.info("Loading snapshots...")
-            os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
-            # add an empty option at index 0 to be the default
-            # selection upon loading snapshot list
-            schedulers = [""]
-            schedulers[1:] = await scheduler.query_schedulers(selected_time, selected_tel)
-            scheduler.param["scheduler_fname"].objects = schedulers
-            scheduler.clear_dashboard()
-            if len(schedulers) > 1:
-                pn.state.notifications.success("Snapshots loaded!!")
-            else:
-                pn.state.notifications.info("No snapshots found for selected night!!", duration=0)
 
     # Restrict files to data_directory.
     else:
         scheduler = RestrictedSchedulerSnapshotDashboard(data_dir=data_dir)
-        data_loading_widgets = {
-            "widget_datetime": pn.widgets.DatetimePicker,
-        }
+        # data_loading_widgets = {
+        #     "widget_datetime": pn.widgets.DatetimePicker,
+        # }
 
     # Show dashboard as busy when scheduler.show_loading_spinner is True.
     @pn.depends(loading=scheduler.param.show_loading_indicator, watch=True)
@@ -238,16 +189,18 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     )
     # Parameter inputs (pickle, widget_datetime, tier)
     # as well as pickles date and telescope when running in LFA
-    sched_app[8:data_params_grid_height, 0:21] = pn.Param(
+    sched_app[8 : scheduler.data_params_grid_height, 0:21] = pn.Param(
         scheduler,
-        parameters=data_loading_parameters,
-        widgets=data_loading_widgets,
+        parameters=scheduler.data_loading_parameters,
+        widgets=scheduler.data_loading_widgets,
         name="Select pickle file, date and tier.",
     )
     # Reset button.
-    sched_app[data_params_grid_height : data_params_grid_height + 6, 3:15] = pn.Row(reset_button)
+    sched_app[scheduler.data_params_grid_height : scheduler.data_params_grid_height + 6, 3:15] = pn.Row(
+        reset_button
+    )
     # Survey rewards table and header.
-    sched_app[8 : data_params_grid_height + 6, 21:67] = pn.Row(
+    sched_app[8 : scheduler.data_params_grid_height + 6, 21:67] = pn.Row(
         pn.Spacer(width=10),
         pn.Column(
             pn.Spacer(height=10),
@@ -260,7 +213,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         pn.Spacer(width=10),
     )
     # Reward table and header.
-    sched_app[data_params_grid_height + 6 : data_params_grid_height + 45, 0:67] = pn.Row(
+    sched_app[scheduler.data_params_grid_height + 6 : scheduler.data_params_grid_height + 45, 0:67] = pn.Row(
         pn.Spacer(width=10),
         pn.Column(
             pn.Spacer(height=10),
@@ -273,7 +226,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         pn.Spacer(width=10),
     )
     # Map display and header.
-    sched_app[8 : data_params_grid_height + 25, 67:100] = pn.Column(
+    sched_app[8 : scheduler.data_params_grid_height + 25, 67:100] = pn.Column(
         pn.Spacer(height=10),
         pn.Row(
             scheduler.map_title,
@@ -282,19 +235,21 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         pn.param.ParamMethod(scheduler.publish_sky_map, loading_indicator=True),
     )
     # Map display parameters (map, nside, color palette).
-    sched_app[data_params_grid_height + 32 : data_params_grid_height + 45, 67:100] = pn.Param(
-        scheduler,
-        widgets={
-            "survey_map": {"type": pn.widgets.Select, "width": 250},
-            "nside": {"type": pn.widgets.Select, "width": 150},
-            "color_palette": {"type": pn.widgets.Select, "width": 100},
-        },
-        parameters=["survey_map", "nside", "color_palette"],
-        show_name=False,
-        default_layout=pn.Row,
+    sched_app[scheduler.data_params_grid_height + 32 : scheduler.data_params_grid_height + 45, 67:100] = (
+        pn.Param(
+            scheduler,
+            widgets={
+                "survey_map": {"type": pn.widgets.Select, "width": 250},
+                "nside": {"type": pn.widgets.Select, "width": 150},
+                "color_palette": {"type": pn.widgets.Select, "width": 100},
+            },
+            parameters=["survey_map", "nside", "color_palette"],
+            show_name=False,
+            default_layout=pn.Row,
+        )
     )
     # Debugging collapsable card.
-    sched_app[data_params_grid_height + 45 : data_params_grid_height + 52, :] = pn.Card(
+    sched_app[scheduler.data_params_grid_height + 45 : scheduler.data_params_grid_height + 52, :] = pn.Card(
         scheduler._debugging_messages,
         header=pn.pane.Str("Debugging", stylesheets=[h2_stylesheet]),
         header_color="white",
