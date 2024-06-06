@@ -1,3 +1,5 @@
+import panel as pn
+
 import schedview
 import schedview.param
 from schedview.app.scheduler_dashboard.constants import PACKAGE_DATA_DIR
@@ -24,6 +26,10 @@ class RestrictedSchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
         default=None,
         allow_None=True,
     )
+
+    data_loading_widgets = {
+        "widget_datetime": pn.widgets.DatetimePicker,
+    }
 
     def __init__(self, data_dir=None):
         super().__init__()

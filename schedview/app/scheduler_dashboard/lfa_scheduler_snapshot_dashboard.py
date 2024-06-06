@@ -1,6 +1,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import panel as pn
 import param
 from astropy.time import Time
 from pandas import Timestamp
@@ -43,6 +44,22 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
     # because there are more data loading parameters
     _summary_widget_height = 310
     _reward_widget_height = 350
+
+    data_loading_parameters = [
+        "scheduler_fname",
+        "pickles_date",
+        "telescope",
+        "widget_datetime",
+        "widget_tier",
+    ]
+    # set specific widget props for data loading parameters
+    # in LFA mode
+    data_loading_widgets = {
+        "pickles_date": pn.widgets.DatetimePicker,
+        "widget_datetime": pn.widgets.DatetimePicker,
+    }
+    # set the data loading parameter section height in LFA mode
+    data_params_grid_height = 42
 
     def __init__(self):
         super().__init__()

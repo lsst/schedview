@@ -136,6 +136,24 @@ class SchedulerSnapshotDashboard(param.Parameterized):
     _summary_widget_height = 220
     _reward_widget_height = 400
 
+    # data loading parameters in both restricted and URL modes
+    data_loading_parameters = ["scheduler_fname", "widget_datetime", "widget_tier"]
+    # set the data loading parameter section height in both
+    # restricted and URL modes
+    # this will be used to adjust the layout of other sections
+    # in the grid
+
+    data_params_grid_height = 30
+
+    # set specific widget props for data loading parameters
+    # in URL and restricted modes
+    data_loading_widgets = {
+        "scheduler_fname": {
+            "placeholder": "filepath or URL of pickle",
+        },
+        "widget_datetime": pn.widgets.DatetimePicker,
+    }
+
     def __init__(self, **params):
         super().__init__(**params)
         self.config_logger()
