@@ -30,11 +30,8 @@ from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 from rubin_scheduler.scheduler.schedulers.core_scheduler import CoreScheduler
 
 import schedview
-from schedview.app.scheduler_dashboard.scheduler_dashboard import (
-    SchedulerSnapshotDashboard,
-    get_sky_brightness_date_bounds,
-    scheduler_app,
-)
+from schedview.app.scheduler_dashboard.scheduler_dashboard import SchedulerSnapshotDashboard, scheduler_app
+from schedview.app.scheduler_dashboard.utils import get_sky_brightness_date_bounds
 
 # Schedview methods.
 from schedview.compute.scheduler import make_scheduler_summary_df
