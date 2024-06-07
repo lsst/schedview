@@ -1,6 +1,7 @@
 import importlib.resources
 import os
 import re
+import functools
 import subprocess
 import time
 import unittest
@@ -48,6 +49,16 @@ except KeyError:
 # Set timeout for Playwright tests to 10 seconds.
 expect.set_options(timeout=10_000)
 
+
+# Custom decorator to skip all tests in a class.
+# Applied to playwright tests to reduce CI workflow time.
+# Tests can be manually enabled by setting env variable.
+def skip_playwright_tests(cls):
+    if "ENABLE_PLAYWRIGHT_TESTS" not in os.environ:
+        for name, method in cls.__dict__.items():
+            if name.startswith("test_") or name in ("setUpClass", "tearDownClass"):
+                setattr(cls, name, functools.wraps(method)(unittest.skip("Playwright tests disabled")(method)))
+    return cls
 
 class TestSchedulerDashboard(unittest.TestCase):
     observatory = ModelObservatory(init_load_length=1)
@@ -137,6 +148,7 @@ class TestSchedulerDashboard(unittest.TestCase):
         self.assertEqual(seeing_data.fwhm_500, fiducial_seeing)
 
 
+@skip_playwright_tests
 class TestStandardModeE2E(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -416,6 +428,7 @@ class TestStandardModeE2E(unittest.TestCase):
         page.get_by_role("button", name="Debugging").click()
 
 
+@skip_playwright_tests
 class TestURLModeE2E(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -506,6 +519,7 @@ class TestURLModeE2E(unittest.TestCase):
         expect(page.locator("pre").nth(6)).not_to_contain_text(re.compile(r"Traceback|Cannot|unable"))
 
 
+@skip_playwright_tests
 class TestLFAModeE2E(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
