@@ -19,10 +19,12 @@ Depending on your OS, you may also need to run:
 
 Run (headless) tests
 --------------------
-Tests should be run from the root (where the tests are run during workflow)
+Tests should be run from the root (where the tests are run during workflow).
+The playwright tests are disabled by default, so, to run them, the environment variable ENABLE_PLAYWRIGHT_TESTS must be set.
+
 ::
 
- pytest tests/test_scheduler_dashboard.py
+ ENABLE_PLAYWRIGHT_TESTS=1 pytest tests/test_scheduler_dashboard.py
 
 Headed tests
 ------------
@@ -50,7 +52,7 @@ Visualise stepping through actions and assertions. Again, this needs to be run l
 
 ::
 
- PWDEBUG=1 pytest -s tests/test_scheduler_dashboard.py
+ ENABLE_PLAYWRIGHT_TESTS=1 PWDEBUG=1 pytest -s tests/test_scheduler_dashboard.py
 
 Note that when actions are taken that initiate the loading indicator + pop-up messages (e.g. load pickle, change date, reset dashboard), the assertions need to be stepped through very quickly or else the events will be missed and the test will fail. Be prepared for button mashing.
 
