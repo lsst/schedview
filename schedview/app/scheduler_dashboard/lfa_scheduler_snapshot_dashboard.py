@@ -7,7 +7,9 @@ from astropy.time import Time
 from pandas import Timestamp
 
 from schedview.app.scheduler_dashboard.constants import DEFAULT_TIMEZONE
-from schedview.app.scheduler_dashboard.scheduler_snapshot_dashboard import SchedulerSnapshotDashboard
+from schedview.app.scheduler_dashboard.unrestricted_scheduler_snapshot_dashboard import (
+    SchedulerSnapshotDashboard,
+)
 from schedview.app.scheduler_dashboard.utils import query_night_schedulers
 
 

@@ -3,7 +3,9 @@ import panel as pn
 import schedview
 import schedview.param
 from schedview.app.scheduler_dashboard.constants import PACKAGE_DATA_DIR
-from schedview.app.scheduler_dashboard.scheduler_snapshot_dashboard import SchedulerSnapshotDashboard
+from schedview.app.scheduler_dashboard.unrestricted_scheduler_snapshot_dashboard import (
+    SchedulerSnapshotDashboard,
+)
 
 
 class RestrictedSchedulerSnapshotDashboard(SchedulerSnapshotDashboard):

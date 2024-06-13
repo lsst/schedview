@@ -46,7 +46,9 @@ from schedview.app.scheduler_dashboard.lfa_scheduler_snapshot_dashboard import L
 from schedview.app.scheduler_dashboard.restricted_scheduler_snapshot_dashboard import (
     RestrictedSchedulerSnapshotDashboard,
 )
-from schedview.app.scheduler_dashboard.scheduler_snapshot_dashboard import SchedulerSnapshotDashboard
+from schedview.app.scheduler_dashboard.unrestricted_scheduler_snapshot_dashboard import (
+    SchedulerSnapshotDashboard,
+)
 
 # Filter astropy warning that's filling the terminal with every update.
 warnings.filterwarnings("ignore", category=AstropyWarning)
