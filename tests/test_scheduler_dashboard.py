@@ -56,7 +56,7 @@ expect.set_options(timeout=10_000)
 # Applied to playwright tests to reduce CI workflow time.
 # Tests can be manually enabled by setting env variable.
 def skip_playwright_tests(cls):
-    if "ENABLE_PLAYWRIGHT_TESTS" not in os.environ:
+    if os.environ.get("ENABLE_PLAYWRIGHT_TESTS", "false").lower() in ("", "0", "f", "false"):
         for name, method in cls.__dict__.items():
             if name.startswith("test_") or name in ("setUpClass", "tearDownClass"):
                 setattr(
