@@ -4,9 +4,9 @@ import bokeh
 import healpy as hp
 import numpy as np
 from astropy.time import Time
-from rubin_scheduler.data import get_baseline
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 from rubin_scheduler.utils import survey_start_mjd
+from rubin_sim.data import get_baseline
 from uranography.api import SphereMap
 
 import schedview.collect

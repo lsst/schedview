@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 import pandas as pd
 from astropy.time import Time
 from lsst.resources import ResourcePath
-from rubin_scheduler.data import get_baseline
+from rubin_sim.data import get_baseline
 
 from schedview.collect.opsim import read_ddf_visits, read_opsim
 from schedview.collect.resources import find_file_resources

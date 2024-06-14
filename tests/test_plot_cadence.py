@@ -3,7 +3,7 @@ from unittest import TestCase
 
 import bokeh.models.layouts
 import numpy as np
-from rubin_scheduler.data import get_baseline
+from rubin_sim.data import get_baseline
 
 import schedview.collect
 import schedview.compute.visits
