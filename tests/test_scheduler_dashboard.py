@@ -40,7 +40,7 @@ TEST_PICKLE = str(importlib.resources.files(schedview).joinpath("data", "sample_
 MJD_START = get_sky_brightness_date_bounds()[0]
 TEST_DATE = Time(MJD_START + 0.2, format="mjd").datetime
 DEFAULT_TIMEZONE = "America/Santiago"
-HEADLESS = False
+HEADLESS = True
 ISO8601_REGEX = re.compile(r"20[23][0-9]-[01][0-9]-[0-3][0-9][ T][0-2][0-9]:[0-5][0-9]:[0-5][0-9]")
 
 try:
