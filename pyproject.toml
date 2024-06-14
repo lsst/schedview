@@ -49,7 +49,9 @@ test = [
     "isort",
     "ruff",
     "pytest-cov",
-    "geckodriver"
+    "geckodriver",
+    "playwright",
+    "pre-commit"
 ]
 dev = [
   "documenteer[guide]",
