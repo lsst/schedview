@@ -1,7 +1,7 @@
+import functools
 import importlib.resources
 import os
 import re
-import functools
 import subprocess
 import time
 import unittest
@@ -41,6 +41,7 @@ MJD_START = get_sky_brightness_date_bounds()[0]
 TEST_DATE = Time(MJD_START + 0.2, format="mjd").datetime
 DEFAULT_TIMEZONE = "America/Santiago"
 HEADLESS = False
+ISO8601_REGEX = re.compile(r"20[23][0-9]-[01][0-9]-[0-3][0-9][ T][0-2][0-9]:[0-5][0-9]:[0-5][0-9]")
 
 try:
     PORT = int(os.environ["SCHEDULER_SNAPSHOT_DASHBOARD_PORT"])
@@ -58,8 +59,11 @@ def skip_playwright_tests(cls):
     if "ENABLE_PLAYWRIGHT_TESTS" not in os.environ:
         for name, method in cls.__dict__.items():
             if name.startswith("test_") or name in ("setUpClass", "tearDownClass"):
-                setattr(cls, name, functools.wraps(method)(unittest.skip("Playwright tests disabled")(method)))
+                setattr(
+                    cls, name, functools.wraps(method)(unittest.skip("Playwright tests disabled")(method))
+                )
     return cls
+
 
 class TestSchedulerDashboard(unittest.TestCase):
     observatory = ModelObservatory(init_load_length=1)
@@ -251,8 +255,8 @@ class TestStandardModeE2E(unittest.TestCase):
 
         # Check subheading.
         expect(page.locator("pre").nth(1)).to_contain_text("Tier 0 - Survey 0 - Map reward")
-        # Check date. (vulnerable to data changes)
-        expect(page.get_by_role("textbox")).to_have_value("2025-05-02 10:19:09")
+        # Check date.
+        expect(page.get_by_role("textbox")).to_have_value(ISO8601_REGEX)
         # Check survey docs link works.
         with page.expect_popup() as page_survey_docs_info:
             row = page.get_by_role("row").nth(1)
@@ -405,7 +409,7 @@ class TestStandardModeE2E(unittest.TestCase):
         )
         expect(page.locator("pre").nth(4)).to_contain_text(f"Survey {survey_name}")
         # Check date. (vulnerable to data changes)
-        expect(page.get_by_role("textbox")).to_have_value("2025-05-02 10:19:09")
+        expect(page.get_by_role("textbox")).to_have_value(ISO8601_REGEX)
         # Check Survey Map shows ‘reward’.
         expect(page.get_by_role("combobox").nth(2)).to_have_value("reward")
         # Check Map resolution = 16.
@@ -493,7 +497,7 @@ class TestURLModeE2E(unittest.TestCase):
         # Check subheading.
         expect(page.locator("pre").nth(1)).to_contain_text("Tier 0 - Survey 0 - Map reward")
         # Check date.
-        expect(page.get_by_role("textbox").nth(1)).to_have_value("2025-05-02 10:19:09")
+        expect(page.get_by_role("textbox").nth(1)).to_have_value(ISO8601_REGEX)
 
         # Select tier 5.
         page.get_by_role("combobox").first.select_option("tier 5")
