@@ -63,10 +63,31 @@ Install the (development) ``schedview`` in your new environment::
  $ pip install -e . --no-deps
 
 Some additional packages are required to run the tests.
-To install the tests, install the dependenices, then run the tests::
+To install the tests, install the dependenices::
 
- $ conda install -f test-requirements.txt
+ $ conda install -c conda-forge -f test-requirements.txt
+
+Some tests use ``playwright``, but the conda-forge package for ``playwright``
+is presently broken. You can install it either from the microsoft channel::
+
+ $ conda install -c microsoft playwright
+
+or with pip::
+
+ $ pip install playwright
+
+Then use playwright itself to install some things it depends on::
+
+ $ playwright install
+ $ playwright install-deps
+
+Finally, run the tests::
+
  $ pytest .
+
+By default, playwright tests are disabled. You can enable them thus:
+
+$ ENABLE_PLAYWRIGHT_TESTS=1 pytest .
 
 Building the documentation requires the installation of ``documenteer[guide]``::
 
@@ -79,30 +100,34 @@ The root of the local documentation will then be ``docs/_build/html/index.html``
 Using the schedview S3 bucket
 -----------------------------
 
-If a user has appropriate credentials, ``schedview`` can read data from an
-``S3`` bucket. To have the ``prenight`` dashboard read data from as ``S3``
-bucket, a few steps are needed to prepare the environment in which the
-dashboard will be run.
+``schedview`` can read data from an S3 bucket.
+To have the prenight dashboard read data from as S3 bucket, a few steps are
+needed to prepare the environment in which the dashboard will be run.
 
-First, the bucket credentials with access to the the endpoint and bucket
-in which the archive resides need to be added to ``.lsst/aws-credentials.ini``
-file in the account that will be running the dashboard.
+First, a couple of additional python modules need to be installed::
 
-For the pre-night ``S3`` bucket at the USDF, the endpoint is
+ $ conda install -c conda-forge boto3 botocore
+
+For the pre-night S3 bucket at the USDF, the endpoint is
 ``https://s3dfrgw.slac.stanford.edu/`` and the bucket name is
-``rubin-scheduler-prenight``. Access to this bucket must be
-coordinated with the USDF administrators and the Rubin Observatory
-survey scheduling team.
+``rubin:rubin-scheduler-prenight``.
 
-For example, if the USDF ``S3`` bucket is to be used anth the section with
-the ``aws_access_key_id`` and ``aws_secret_access_key`` with access to this
-endpoint and bucket is ``prenight``, then the following environment variables
-need to be set in the process running the dashboard:
+Users running in the notebook aspect of the USDF RSP will have a default
+credential in their ``~/.lsst/aws-credentials.ini`` file sufficient to
+read this bucket. (Read access is all that is used by ``schedview``.
+Write access to this bucket must be coordinated with the USDF administrators
+and the Rubin Observatory survey scheduling team.)
 
-::
+A few environment variables need to be set in the process running the
+dashboard::
 
-     $ export S3_ENDPOINT_URL='https://s3dfrgw.slac.stanford.edu/'
-     $ export AWS_PROFILE=prenight
+ $ export S3_ENDPOINT_URL='https://s3dfrgw.slac.stanford.edu/'
+ $ export LSST_DISABLE_BUCKET_VALIDATION=1
 
 The first of these (``S3_ENDPOINT_URL``) might have been set up automatically
 for you if you are running on the USDF.
+
+If you are not using the default credential at the USDF, you may also need
+to set your environment to point to the correct one, for example::
+
+$ export AWS_PROFILE=prenight
