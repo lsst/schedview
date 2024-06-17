@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import astropy.utils.iers
 import bokeh
 import pandas as pd
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
@@ -34,6 +35,7 @@ def _create_almanac(night):
 class TestNightly(unittest.TestCase):
     def test_plot_airmass_vs_time(self):
         visits = _load_sample_visits()
+        astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
         almanac_events = _create_almanac(visits["start_date"].dt.date[0])
 
         fig = schedview.plot.nightly.plot_airmass_vs_time(visits, almanac_events)
