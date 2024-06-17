@@ -126,14 +126,14 @@ def plot_overhead_vs_slew_distance(visits, plot=None, **kwargs):
             x_axis_label="slew distance (deg.)",
         )
 
-    circle_kwargs = {"color": PLOT_FILTER_CMAP, "fill_alpha": 0.3}
+    circle_kwargs = {"color": PLOT_FILTER_CMAP, "fill_alpha": 0.3, "marker": "circle"}
     circle_kwargs.update(kwargs)
 
     for band in PLOT_FILTER_CMAP.transform.factors:
         these_visits = visits.query(f'filter == "{band}"')
 
         if len(these_visits) > 0:
-            plot.circle(
+            plot.scatter(
                 x="slewDistance", y="overhead", source=these_visits, legend_label=band, **circle_kwargs
             )
 
