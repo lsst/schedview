@@ -61,7 +61,7 @@ pn.extension(
 )
 
 
-# ------------------------------------------------------------ Create dashboard.
+# ----------------------------------------------------------- Create dashboard.
 def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     """Create a dashboard with grids of Param parameters, Tabulator widgets,
     and Bokeh plots.
@@ -279,8 +279,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
 
 
 def parse_arguments():
-    """Parse commandline arguments to read data directory if provided.
-    """
+    """Parse commandline arguments to read data directory if provided."""
     parser = argparse.ArgumentParser(description="On-the-fly Rubin Scheduler dashboard")
     default_data_dir = f"{LFA_DATA_DIR}/*" if os.path.exists(LFA_DATA_DIR) else PACKAGE_DATA_DIR
 
