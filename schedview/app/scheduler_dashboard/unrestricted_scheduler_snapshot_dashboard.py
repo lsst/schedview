@@ -2,7 +2,7 @@ import logging
 import os
 import traceback
 
-# Filter the astropy warnings swamping the terminal
+# Filter the astropy warnings swamping the terminal.
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -18,7 +18,7 @@ from lsst.resources import ResourcePath
 from pandas import Timestamp
 from pytz import timezone
 
-# For the conditions.mjd bugfix
+# For the conditions.mjd bugfix.
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 
 import schedview
@@ -53,10 +53,10 @@ class SchedulerSnapshotDashboard(param.Parameterized):
     instance of rubin_scheduler.scheduler.conditions.Conditions.
     """
 
-    # Get available skybrightness_pre date range
+    # Get available skybrightness_pre date range.
     (mjd_min, mjd_max) = get_sky_brightness_date_bounds()
-    # convert astropy times to iso format to be
-    #  used as bounds for datetime parameter
+    # Convert astropy times to iso format to be
+    # used as bounds for datetime parameter.
     date_bounds = (mjd_min.to_datetime(), mjd_max.to_datetime())
 
     scheduler_fname = param.String(
@@ -73,7 +73,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         precedence=4,
     )
     # mjd date passed as a url path parameter when
-    # dashboard operates in --data_from_urls mode
+    # dashboard operates in --data_from_urls mode.
     url_mjd = param.Number(default=None)
     widget_tier = param.Selector(
         default="",
@@ -136,17 +136,16 @@ class SchedulerSnapshotDashboard(param.Parameterized):
     _summary_widget_height = 220
     _reward_widget_height = 400
 
-    # data loading parameters in both restricted and URL modes
+    # Data loading parameters in both restricted and URL modes.
     data_loading_parameters = ["scheduler_fname", "widget_datetime", "widget_tier"]
-    # set the data loading parameter section height in both
-    # restricted and URL modes
-    # this will be used to adjust the layout of other sections
-    # in the grid
-
+    # Set the data loading parameter section height in both
+    # restricted and URL modes.
+    # This will be used to adjust the layout of other sections
+    # in the grid.
     data_params_grid_height = 30
 
-    # set specific widget props for data loading parameters
-    # in URL and restricted modes
+    # Set specific widget properties for data loading parameters
+    # in URL and restricted modes.
     data_loading_widgets = {
         "scheduler_fname": {
             "placeholder": "filepath or URL of pickle",
@@ -183,7 +182,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         log_stream_handler.setFormatter(log_stream_formatter)
         self.logger.addHandler(log_stream_handler)
 
-    # ------------------------------------------------------------ User actions
+    # ------------------------------------------------------------ User actions.
 
     @param.depends("scheduler_fname", watch=True)
     def _update_scheduler_fname(self):
@@ -306,10 +305,10 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self.clear_dashboard()
 
         self._do_not_trigger_update = True
-        # set Date Time widget to the mjd value set in URL
+        # Set Date Time widget to the mjd value set in URL.
         self.widget_datetime = Time(self.url_mjd, format="mjd").to_datetime()
         self._do_not_trigger_update = False
-        # set the mjd value that's used across the dashboard
+        # Set the mjd value that's used across the dashboard.
         self._mjd = self.url_mjd
 
         if not self.update_conditions():
@@ -504,7 +503,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
             self.update_sky_map_with_survey_map()
         self.param.trigger("_publish_map")
 
-    # ------------------------------------------------------- Internal workings
+    # ------------------------------------------------------- Internal workings.
 
     def clear_dashboard(self):
         """Clear the dashboard for a new pickle or a new date."""
@@ -977,18 +976,18 @@ class SchedulerSnapshotDashboard(param.Parameterized):
             )
             self._sky_map_base.plot.add_layout(color_bar, "below")
             self._sky_map_base.plot.below[1].visible = False
-            self._sky_map_base.plot.toolbar.autohide = True  # show toolbar only when mouseover plot
-            self._sky_map_base.plot.title.text = ""  # remove 'Horizon' title
-            self._sky_map_base.plot.legend.propagate_hover = True  # hover tool works over in-plot legend
+            self._sky_map_base.plot.toolbar.autohide = True  # Show toolbar only when mouseover plot.
+            self._sky_map_base.plot.title.text = ""  # Remove 'Horizon' title.
+            self._sky_map_base.plot.legend.propagate_hover = True  # Hover tool works over in-plot legend.
             self._sky_map_base.plot.legend.title = "Key"
             self._sky_map_base.plot.legend.title_text_font_style = "bold"
             self._sky_map_base.plot.legend.border_line_color = "#048b8c"
             self._sky_map_base.plot.legend.border_line_width = 3
             self._sky_map_base.plot.legend.border_line_alpha = 1
-            self._sky_map_base.plot.legend.label_standoff = 10  # gap between images and text
-            self._sky_map_base.plot.legend.padding = 15  # space around inside edge
-            self._sky_map_base.plot.legend.title_standoff = 10  # space between title and items
-            self._sky_map_base.plot.legend.click_policy = "hide"  # hide elements when clicked
+            self._sky_map_base.plot.legend.label_standoff = 10  # Gap between images and text.
+            self._sky_map_base.plot.legend.padding = 15  # Space around inside edge.
+            self._sky_map_base.plot.legend.title_standoff = 10  # Space between title and items.
+            self._sky_map_base.plot.legend.click_policy = "hide"  # Hide elements when clicked.
             self._sky_map_base.plot.add_layout(self._sky_map_base.plot.legend[0], "right")
             self._sky_map_base.plot.right[0].location = "center_right"
 
@@ -1221,7 +1220,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
             self.debug_pane.object = self._debug_string
         return self.debug_pane
 
-    # ------------------------------------------------------ Dashboard titles
+    # ------------------------------------------------------ Dashboard titles.
 
     def generate_dashboard_subtitle(self):
         """Select the dashboard subtitle string based on whether whether a
