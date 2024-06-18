@@ -90,13 +90,13 @@ def plot_visit_param_vs_time(visits, column_name, plot=None, **kwargs):
     if plot is None:
         plot = bokeh.plotting.figure(y_axis_label=column_name, x_axis_label="Time (UTC)")
 
-    circle_kwargs = {"fill_alpha": 0.3}
+    circle_kwargs = {"fill_alpha": 0.3, "marker": "circle"}
     circle_kwargs.update(kwargs)
 
     for band in PLOT_FILTER_CMAP.transform.factors:
         these_visits = visits.query(f'filter == "{band}"')
         if len(these_visits) > 0:
-            plot.circle(
+            plot.scatter(
                 x="start_date",
                 y=column_name,
                 color=PLOT_FILTER_CMAP,
