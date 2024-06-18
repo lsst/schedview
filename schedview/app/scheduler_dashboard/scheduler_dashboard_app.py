@@ -328,7 +328,6 @@ def main():
     Use environment variable 'SCHEDULER_SNAPSHOT_DASHBOARD_PORT' for port
     configuration. Default to port 8888 if not set.
     """
-
     print("Starting scheduler dashboard.")
     commandline_args = parse_arguments()
 
