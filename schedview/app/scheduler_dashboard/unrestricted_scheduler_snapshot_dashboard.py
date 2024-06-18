@@ -560,7 +560,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        success : 'bool'
+        success : `bool`
             Record of success or failure of reading scheduler from file/URL.
         """
         try:
@@ -600,7 +600,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        success : 'bool'
+        success : `bool`
             Record of success of Conditions update.
         """
         if self._conditions is None:
@@ -658,7 +658,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        success : 'bool'
+        success : `bool`
             Record of success of dataframe construction.
         """
         if self._scheduler is None:
@@ -761,7 +761,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self._debugging_message = "Finished making summary widget."
 
     def update_summary_widget_data(self):
-        """Update data for survey Tabulator widget."""
+        """Update data for summary Tabulator widget."""
         self._debugging_message = "Starting to update summary widget."
         columns = [
             "survey_index",
@@ -783,7 +783,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        widget: 'panel.widgets.Tabulator'
+        widget: `panel.widgets.Tabulator`
             Table of scheduler summary data.
         """
         if self.summary_widget is None:
@@ -815,12 +815,12 @@ class SchedulerSnapshotDashboard(param.Parameterized):
             pn.state.notifications.error("Cannot compute survey maps!", duration=0)
 
     def make_reward_df(self):
-        """Make the summary dataframe."""
+        """Make the survey reward dataframe."""
         if self._scheduler is None:
-            self._debugging_message = "Cannot make summary dataframe as no scheduler loaded."
+            self._debugging_message = "Cannot make reward dataframe as no scheduler loaded."
             return
         if self._scheduler_summary_df is None:
-            self._debugging_message = "Cannot make summary dataframe as no scheduler summary made."
+            self._debugging_message = "Cannot make reward dataframe as no scheduler summary made."
             return
         try:
             self._debugging_message = "Starting to make reward dataframe."
@@ -935,7 +935,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self._debugging_message = "Finished making reward widget."
 
     def update_reward_widget_data(self):
-        """Update Reward Tabulator widget data."""
+        """Update survey reward Tabulator widget data."""
         if self._survey_reward_df is None:
             return
 
@@ -962,7 +962,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        widget: 'panel.widgets.Tabulator'
+        widget: `panel.widgets.Tabulator`
             Table of reward data for selected survey.
         """
         if self._survey_reward_df is None:
@@ -1194,7 +1194,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        sky_map : 'bokeh.models.layouts.Column'
+        sky_map : `bokeh.models.layouts.Column`
             Map of survey map or reward map as a Bokeh plot.
         """
         if self._conditions is None:
@@ -1216,7 +1216,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        debugging_messages : 'panel.pane.Str'
+        debugging_messages : `panel.pane.Str`
             A list of debugging messages ordered by newest message first.
         """
         if self._debugging_message is None:
@@ -1249,13 +1249,13 @@ class SchedulerSnapshotDashboard(param.Parameterized):
     # throughout the dashboard.
 
     def generate_dashboard_subtitle(self):
-        """Select the dashboard subtitle string based on whether whether a
+        """Select the dashboard subtitle string based on whether a
         survey map or reward map is being displayed.
 
         Returns
         -------
-        subtitle : 'str'
-            Lists the tier and survey, and either the survey or reward map.
+        subtitle : `str`
+            Heading text. Include tier and survey, and either the survey or reward map.
         """
         if not self._display_dashboard_data:
             return ""
@@ -1273,8 +1273,9 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        heading : 'str'
-            Lists the tier if data is displayed; else just a general title.
+        heading : `str`
+            Heading text. If data is diplayed, include current tier;
+            else, a general heading.
         """
         if not self._display_dashboard_data:
             return "Scheduler summary"
@@ -1287,8 +1288,9 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        heading : 'str'
-            Lists the survey name if data is displayed; else a general title.
+        heading : `str`
+            Heading text. If data is diplayed, include current survey;
+            else, a general heading.
         """
         if not self._display_dashboard_data:
             return "Basis functions & rewards"
@@ -1301,9 +1303,9 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        heading : 'str'
-            Lists the survey name and either the survey map name or reward
-            name if data is being displayed; else a general title.
+        heading : `str`
+            Heading text. If data is displayed, include current survey and
+            either the survey map or reward name; else, a general heading.
         """
         if not self._display_dashboard_data:
             return "Map"
@@ -1322,7 +1324,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        title : 'panel.pane.Str'
+        title : `panel.pane.Str`
             A panel String pane to display as the dashboard's subtitle.
         """
         title_string = self.generate_dashboard_subtitle()
@@ -1343,7 +1345,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        title : 'panel.pane.Str'
+        title : `panel.pane.Str`
             A panel String pane to display as the survey table's heading.
         """
         title_string = self.generate_summary_table_heading()
@@ -1362,7 +1364,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        title : 'panel.pane.Str'
+        title : `panel.pane.Str`
             A panel String pane to display as the reward table heading.
         """
         title_string = self.generate_reward_table_heading()
@@ -1381,7 +1383,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        title : 'panel.pane.Str'
+        title : `panel.pane.Str`
             A panel String pane to display as the map heading.
         """
         title_string = self.generate_map_heading()
