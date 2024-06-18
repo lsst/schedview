@@ -44,7 +44,6 @@ class SchedulerSnapshotDashboard(param.Parameterized):
     are loaded from any path or URL.
     """
 
-    # Param parameters that are modifiable by user actions.
     scheduler_fname_doc = """URL or file name of the scheduler pickle file.
     Such a pickle file can either be of an instance of a subclass of
     rubin_scheduler.scheduler.schedulers.CoreScheduler, or a tuple of the form
@@ -94,7 +93,6 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         label="Map resolution (nside)",
         doc="",
     )
-
     color_palette = param.Selector(default=DEFAULT_COLOR_PALETTE, objects=COLOR_PALETTES, doc="")
     summary_widget = param.Parameter(default=None, doc="")
     reward_widget = param.Parameter(default=None, doc="")
@@ -132,8 +130,11 @@ class SchedulerSnapshotDashboard(param.Parameterized):
     _debug_string = ""
     _display_reward = False
     _display_dashboard_data = False
-    # Suggestion: describe how updating parameters works
+
+    # This boolean variable prevents unwanted triggering
+    # of Param functions when updating watched variables.
     _do_not_trigger_update = True
+
     _summary_widget_height = 220
     _reward_widget_height = 400
 
@@ -184,6 +185,13 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self.logger.addHandler(log_stream_handler)
 
     # ------------------------------------------------------------ User actions.
+    # The following set of functions are triggered when the user
+    # updates one of the Parameters via the UI. The parameter
+    # being "watched" is specified in the function decorators.
+    #
+    # These "watcher" functions call the relevant "internal
+    # workings" functions (next section) to correctly update
+    # the data and UI according to the user's behaviour.
 
     @param.depends("scheduler_fname", watch=True)
     def _update_scheduler_fname(self):
@@ -219,6 +227,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self.summary_widget.selection = [0]
         self._do_not_trigger_update = False
 
+        # Suggestion: here the fragment is used again
         self.compute_survey_maps()
         self.survey_map = self.param["survey_map"].objects[-1]
         self._map_name = self.survey_map.split("@")[0].strip()
@@ -236,6 +245,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self.param.trigger("_update_headings")
 
         self.show_loading_indicator = False
+        # --------------------------------End of fragment
 
     @param.depends("widget_datetime", watch=True)
     def _update_mjd_from_picker(self):
@@ -277,6 +287,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self.summary_widget.selection = [0]
         self._do_not_trigger_update = False
 
+        # Suggestion: here the fragment is used again
         self.compute_survey_maps()
         self.survey_map = self.param["survey_map"].objects[-1]
         self._map_name = self.survey_map.split("@")[0].strip()
@@ -294,6 +305,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self.param.trigger("_update_headings")
 
         self.show_loading_indicator = False
+        # --------------------------------End of fragment
 
     @param.depends("url_mjd", watch=True)
     def _update_mjd_from_url(self):
@@ -333,7 +345,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self._do_not_trigger_update = False
 
         # Suggestion: Should this fragment be separated into a function?
-        # Looks like it's repeated in other parts of the dashboard
+        # it is used 3x in functions.
         self.compute_survey_maps()
         self.survey_map = self.param["survey_map"].objects[-1]
         self._map_name = self.survey_map.split("@")[0].strip()
@@ -505,6 +517,16 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self.param.trigger("_publish_map")
 
     # ------------------------------------------------------- Internal workings.
+    # The following set of functions are called by the above
+    # "watcher" functions. These functions are responsible
+    # for correctly updating particular aspects of the
+    # dashboard when the user makes a change in the UI.
+    #
+    # They are all self-contained functions (they do not call
+    # other functions).
+    #
+    # The functions with decorators are those that are
+    # returning objects to be displayed in the UI.
 
     def clear_dashboard(self):
         """Clear the dashboard for a new pickle or a new date."""
@@ -1222,6 +1244,9 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         return self.debug_pane
 
     # ------------------------------------------------------ Dashboard titles.
+    # The following set of functions are responsible for
+    # generating and updating the various text headings
+    # throughout the dashboard.
 
     def generate_dashboard_subtitle(self):
         """Select the dashboard subtitle string based on whether whether a
