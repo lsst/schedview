@@ -107,7 +107,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     if from_urls:
         scheduler = SchedulerSnapshotDashboard()
         # Read pickle and time if provided to the function in a notebook.
-        # It will be overriden if the dashboard runs in an app.
+        # It will be overridden if the dashboard runs in an app.
         if date_time is not None:
             scheduler.widget_datetime = date_time
 
