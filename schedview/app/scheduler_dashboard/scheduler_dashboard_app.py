@@ -27,7 +27,7 @@ import argparse
 import importlib.resources
 import os
 
-# Filter the astropy warnings swamping the terminal
+# Filter the astropy warnings swamping the terminal.
 import warnings
 from glob import glob
 
@@ -61,7 +61,7 @@ pn.extension(
 )
 
 
-# ------------------------------------------------------------ Create dashboard
+# ------------------------------------------------------------ Create dashboard.
 def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     """Create a dashboard with grids of Param parameters, Tabulator widgets,
     and Bokeh plots.
@@ -84,7 +84,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         max_height=1000,
     ).servable()
 
-    # Bools for different dashboard modes
+    # Bools for different dashboard modes.
     from_urls = False
     data_dir = None
     from_lfa = False
@@ -106,8 +106,8 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     # Accept pickle files from url or any path.
     if from_urls:
         scheduler = SchedulerSnapshotDashboard()
-        # read pickle and time if provided to the function in a notebook
-        # it will be overriden if the dashboard runs in an app
+        # Read pickle and time if provided to the function in a notebook.
+        # It will be overriden if the dashboard runs in an app.
         if date_time is not None:
             scheduler.widget_datetime = date_time
 
@@ -125,7 +125,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
                 },
             )
 
-    # Load pickles from S3 bucket
+    # Load pickles from S3 bucket.
     elif from_lfa:
         scheduler = LFASchedulerSnapshotDashboard()
 
@@ -167,7 +167,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     # Set function trigger.
     reset_button.on_click(handle_reload_pickle)
 
-    # ------------------------------------------------------ Dashboard layout
+    # ------------------------------------------------------ Dashboard layout.
     # Dashboard title.
     sched_app[0:8, :] = pn.Row(
         pn.Column(
@@ -190,7 +190,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         styles={"background": "#048b8c"},
     )
     # Parameter inputs (pickle, widget_datetime, tier)
-    # as well as pickles date and telescope when running in LFA
+    # as well as pickles date and telescope when running in LFA.
     sched_app[8 : scheduler.data_params_grid_height, 0:21] = pn.Param(
         scheduler,
         parameters=scheduler.data_loading_parameters,

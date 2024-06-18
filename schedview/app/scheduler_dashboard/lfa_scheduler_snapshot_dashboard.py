@@ -22,8 +22,8 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
     scheduler_fname_doc = """Recent pickles from LFA
     """
 
-    # precedence is used to make sure fields are displayed
-    # in the right order regardless of the dashboard mode
+    # Precedence is used to make sure fields are displayed
+    # in the right order regardless of the dashboard mode.
     scheduler_fname = param.Selector(
         default="",
         objects=[],
@@ -43,7 +43,7 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
     )
 
     # Summary widget and Reward widget heights are different in this mode
-    # because there are more data loading parameters
+    # because there are more data loading parameters.
     _summary_widget_height = 310
     _reward_widget_height = 350
 
@@ -54,13 +54,13 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
         "widget_datetime",
         "widget_tier",
     ]
-    # set specific widget props for data loading parameters
-    # in LFA mode
+    # Set specific widget props for data loading parameters
+    # in LFA mode.
     data_loading_widgets = {
         "pickles_date": pn.widgets.DatetimePicker,
         "widget_datetime": pn.widgets.DatetimePicker,
     }
-    # set the data loading parameter section height in LFA mode
+    # Set the data loading parameter section height in LFA mode.
     data_params_grid_height = 42
 
     def __init__(self):
