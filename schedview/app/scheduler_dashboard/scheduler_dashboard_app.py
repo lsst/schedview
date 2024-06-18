@@ -201,7 +201,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     sched_app[scheduler.data_params_grid_height : scheduler.data_params_grid_height + 6, 3:15] = pn.Row(
         reset_button
     )
-    # Survey rewards table and header.
+    # Summary table and header.
     sched_app[8 : scheduler.data_params_grid_height + 6, 21:67] = pn.Row(
         pn.Spacer(width=10),
         pn.Column(
