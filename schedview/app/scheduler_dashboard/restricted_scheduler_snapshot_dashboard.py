@@ -14,7 +14,6 @@ class RestrictedSchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
     be loaded from a certain data directory that is set through constructor.
     """
 
-    # Param parameters that are modifiable by user actions.
     scheduler_fname_doc = """URL or file name of the scheduler pickle file.
     Such a pickle file can either be of an instance of a subclass of
     rubin_scheduler.scheduler.schedulers.CoreScheduler, or a tuple of the form
