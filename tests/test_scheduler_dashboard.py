@@ -30,33 +30,6 @@ from schedview.app.scheduler_dashboard.utils import get_sky_brightness_date_boun
 from schedview.compute.scheduler import make_scheduler_summary_df
 from schedview.compute.survey import compute_maps
 
-"""
-Tests I usually perform:
-
-    1. Load valid pickle.
-    2. Choose date.
-    3. Choose tier.
-    4. Select survey.
-    5. Select basis function (array).
-    6. Select basis function (finite scalar).
-    7. Select basis function (-inf scalar).
-    8. Choose survey map (basis function).
-    9. Choose survey map (sky brightness).
-   10. Choose nside.
-   11. Choose color palette.
-   12. Check tooltip reflects selection data.
-   13. Choose invalid date.
-   14. Choose invalid pickle.
-   15. Load two pickles, one after the other.
-
-
-Notes
-
-    - Unit tests are not supposed to rely on each other.
-    - Unit tests are run in alphabetical order.
-
-"""
-
 TEST_PICKLE = str(importlib.resources.files(schedview).joinpath("data", "sample_scheduler.pickle.xz"))
 MJD_START = get_sky_brightness_date_bounds()[0]
 TEST_DATE = Time(MJD_START + 0.2, format="mjd").datetime
