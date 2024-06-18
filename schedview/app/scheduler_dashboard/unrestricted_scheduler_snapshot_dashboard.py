@@ -184,7 +184,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         log_stream_handler.setFormatter(log_stream_formatter)
         self.logger.addHandler(log_stream_handler)
 
-    # ------------------------------------------------------------ User actions.
+    # ----------------------------------------------------------- User actions.
     # The following set of functions are triggered when the user
     # updates one of the Parameters via the UI. The parameter
     # being "watched" is specified in the function decorators.
@@ -516,7 +516,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
             self.update_sky_map_with_survey_map()
         self.param.trigger("_publish_map")
 
-    # ------------------------------------------------------- Internal workings.
+    # ------------------------------------------------------ Internal workings.
     # The following set of functions are called by the above
     # "watcher" functions. These functions are responsible
     # for correctly updating particular aspects of the
@@ -1243,7 +1243,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
             self.debug_pane.object = self._debug_string
         return self.debug_pane
 
-    # ------------------------------------------------------ Dashboard titles.
+    # ----------------------------------------------------- Dashboard titles.
     # The following set of functions are responsible for
     # generating and updating the various text headings
     # throughout the dashboard.
@@ -1255,7 +1255,8 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         Returns
         -------
         subtitle : `str`
-            Heading text. Include tier and survey, and either the survey or reward map.
+            Heading text. Include tier and survey, and either the
+            survey or reward map.
         """
         if not self._display_dashboard_data:
             return ""
