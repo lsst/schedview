@@ -59,6 +59,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
     # used as bounds for datetime parameter.
     date_bounds = (mjd_min.to_datetime(), mjd_max.to_datetime())
 
+    # Param parameters that are modifiable by user actions.
     scheduler_fname = param.String(
         default="",
         label="Scheduler snapshot file",
