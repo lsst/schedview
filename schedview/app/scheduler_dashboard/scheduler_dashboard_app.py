@@ -68,14 +68,14 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
 
     Parameters
     ----------
-    widget_datetime : 'datetime' or 'date', optional
+    widget_datetime : `datetime` or `date`, optional
         The date/datetime of interest. The default is None.
-    scheduler_pickle : 'str', optional
+    scheduler_pickle : `str`, optional
         A filepath or URL for the scheduler pickle. The default is None.
 
     Returns
     -------
-    sched_app : 'panel.layout.grid.GridSpec'
+    sched_app : `panel.layout.grid.GridSpec`
         The dashboard.
     """
     # Initialize the dashboard layout.
@@ -139,6 +139,14 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     # Show dashboard as busy when scheduler.show_loading_spinner is True.
     @pn.depends(loading=scheduler.param.show_loading_indicator, watch=True)
     def update_loading(loading):
+        """Update the dashboard's loading indicator based on the
+        'show_loading_indicator' parameter.
+
+        Parameters
+        ----------
+        loading : `bool`
+            Indicates whether the loading indicator should be shown.
+        """
         if loading:
             scheduler.logger.debug("DASHBOARD START LOADING")
             start_loading_spinner(sched_app)
@@ -156,6 +164,13 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
 
     # Reset dashboard to loading conditions.
     def handle_reload_pickle(event):
+        """Reset the dashboard to its initial loading conditions.
+
+        Parameters
+        ----------
+        event : `pn.widgets.Button`
+            The Button widget instance that triggered the function call.
+        """
         scheduler.logger.debug("RELOAD PICKLE")
         scheduler.nside = 16
         scheduler.color_palette = "Viridis256"
@@ -264,8 +279,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
 
 
 def parse_arguments():
-    """
-    Parse commandline arguments to read data directory if provided
+    """Parse commandline arguments to read data directory if provided.
     """
     parser = argparse.ArgumentParser(description="On-the-fly Rubin Scheduler dashboard")
     default_data_dir = f"{LFA_DATA_DIR}/*" if os.path.exists(LFA_DATA_DIR) else PACKAGE_DATA_DIR
@@ -304,6 +318,17 @@ def parse_arguments():
 
 
 def main():
+    """Start the scheduler dashboard server.
+
+    Parse command-line arguments, set up the scheduler application,
+    and serve it using Panel (pn).
+
+    Notes
+    -----
+    Use environment variable 'SCHEDULER_SNAPSHOT_DASHBOARD_PORT' for port
+    configuration. Default to port 8888 if not set.
+    """
+
     print("Starting scheduler dashboard.")
     commandline_args = parse_arguments()
 
