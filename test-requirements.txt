@@ -4,3 +4,6 @@ ruff
 pytest-cov
 firefox
 geckodriver
+pre-commit
+boto3
+botocore
