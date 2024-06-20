@@ -1,8 +1,8 @@
 import unittest
 
 import numpy as np
-from rubin_scheduler.data import get_baseline
 from rubin_scheduler.utils import survey_start_mjd
+from rubin_sim.data import get_baseline
 
 from schedview.collect import read_opsim
 
