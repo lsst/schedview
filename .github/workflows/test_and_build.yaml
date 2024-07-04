@@ -72,7 +72,9 @@ jobs:
           python -m pip install -e . --no-deps
 
       - name: Install playwright browsers
-        run: python -m playwright install --with-deps
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps
 
       - name: Conda list
         shell: bash -l {0}
