@@ -7,3 +7,4 @@ geckodriver
 pre-commit
 boto3
 botocore
+playwright
