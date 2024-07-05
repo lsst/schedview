@@ -19,9 +19,12 @@ from pandas import Timestamp
 from panel.widgets import Tabulator
 
 # Conditional install for CI workflow.
-if os.environ.get("ENABLE_PLAYWRIGHT_TESTS", "false").lower() not in ("", "0", "f", "false"):
-    from playwright.sync_api import expect, sync_playwright
-
+# if os.environ.get(
+#     "ENABLE_PLAYWRIGHT_TESTS",
+#     "false"
+# ).lower() not in ("", "0", "f", "false"):
+#     from playwright.sync_api import expect, sync_playwright
+from playwright.sync_api import expect, sync_playwright
 from rubin_scheduler.scheduler.example import example_scheduler
 from rubin_scheduler.scheduler.features.conditions import Conditions
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
@@ -53,8 +56,12 @@ except KeyError:
     PORT = 8888
 
 # Set timeout for Playwright tests to 10 seconds.
-if os.environ.get("ENABLE_PLAYWRIGHT_TESTS", "false").lower() not in ("", "0", "f", "false"):
-    expect.set_options(timeout=10_000)
+# if os.environ.get(
+#     "ENABLE_PLAYWRIGHT_TESTS",
+#     "false"
+# ).lower() not in ("", "0", "f", "false"):
+#     expect.set_options(timeout=10_000)
+expect.set_options(timeout=10_000)
 
 
 # Custom decorator to skip all tests in a class.

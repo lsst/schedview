@@ -74,7 +74,8 @@ jobs:
       - name: Install playwright browsers
         run: |
           pip install playwright
-          python -m playwright install --with-deps
+          playwright install
+          # python -m playwright install --with-deps
 
       - name: Conda list
         shell: bash -l {0}
