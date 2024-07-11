@@ -1,3 +1,5 @@
+from warnings import warn
+
 import bokeh
 import healpy as hp
 import numpy as np
@@ -270,67 +272,10 @@ def plot_visit_skymaps(
     return fig
 
 
-def plot_visit_planisphere(
-    visits,
-    footprint,
-    conditions,
-    hatch=False,
-    fade_scale=2.0 / (24 * 60),
-    camera_perimeter="LSST",
-    nside_low=8,
-    show_stars=False,
-):
-    """Plot visits on a map of the sky.
-
-    Parameters
-    ----------
-    visits : `pandas.DataFrame`
-        One row per visit, with at least the following columns:
-
-        ``"fieldRA"``
-            The visit R.A. in degrees (`float`).
-        ``"fieldDec"``
-            The visit declination in degrees (`float`).
-        ``"observationStartMJD"``
-            The visit start MJD (`float`).
-        ``"filter"``
-            The visit filter (`str`)
-
-    footprint : `numpy.array`
-        A healpix map of the footprint.
-    conditions : `rubin_scheduler.scheduler.features.conditions.Conditions`
-        The conditions for the night, which determines the start and end
-        times covered by the map.
-    hatch : `bool`
-        Use hatches instead of filling visit polygons. (SLOW!)
-    fade_scale : `float`
-        Time (in days) over which visit outlines fade.
-    camera_perimeter : `str` or `object`
-        An function that returns the perimeter of the camera footprint,
-        or "LSST" for the LSST camera footprint.
-        Defaults to "LSST".
-    nside_low : `int`
-        The healpix nside to try to use for low resolution sections of the
-        healpix map.
-    show_stars : `bool`
-        Show stars? (Defaults to False)
-
-    Returns
-    -------
-    _type_
-        _description_
-    """
-    return plot_visit_skymaps(
-        visits,
-        footprint,
-        conditions,
-        hatch=hatch,
-        fade_scale=fade_scale,
-        camera_perimeter=camera_perimeter,
-        nside_low=nside_low,
-        show_stars=show_stars,
-        map_classes=[Planisphere],
-    )
+def plot_visit_planisphere(*args, **kwargs):
+    warn("Use plot_visit_skymaps and set map_classes instead", category=DeprecationWarning)
+    kwargs["map_classes"] = [Planisphere]
+    return plot_visit_skymaps(*args, **kwargs)
 
 
 def create_visit_skymaps(
@@ -404,7 +349,7 @@ def create_visit_skymaps(
     conditions = observatory.return_conditions()
     data = {"visits": visits, "footprint": footprint, "conditions": conditions}
     if planisphere_only:
-        vmap = schedview.plot.visitmap.plot_visit_planisphere(**data)
+        vmap = schedview.plot.visitmap.plot_visit_skymaps(map_classes=[Planisphere], **data)
     else:
         vmap = schedview.plot.visitmap.plot_visit_skymaps(**data)
 
