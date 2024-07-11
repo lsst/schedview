@@ -1,7 +1,6 @@
 import bokeh
 import healpy as hp
 import numpy as np
-import pandas as pd
 from astropy.time import Time
 
 # Imported to help sphinx make the link
@@ -24,6 +23,23 @@ BAND_HATCH_PATTERNS = dict(
     y="left_diagonal_line",
 )
 BAND_HATCH_SCALES = dict(u=6, g=6, r=6, i=6, z=12, y=12)
+VISIT_TOOLTIPS = "@observationId: @start_date{%F %T} UTC (mjd=@observationStartMJD{00000.00}, " \
+    + "LST=@observationStartLST\u00b0), band=@filter, RA=@fieldRA\u00b0, Decl=@fieldDec\u00b0, " \
+    + "PA=@paraAngle\u00b0, Az=@azimuth\u00b0, Alt=@altitude\u00b0, @note"
+VISIT_COLUMNS = [
+    "observationId",
+    "start_date",
+    "observationStartMJD",
+    "observationStartLST",
+    "filter",
+    "fieldRA",
+    "fieldDec",
+    "rotSkyPos",
+    "paraAngle",
+    "azimuth",
+    "altitude",
+    "note",
+]
 
 NSIDE_LOW = 8
 
@@ -135,24 +151,20 @@ def plot_visit_skymaps(
     )
 
     for band in "ugrizy":
-        band_visits = visits.query(f"filter == '{band}'")
+        band_visits = visits.reset_index().loc[visits["filter"] == band, VISIT_COLUMNS].copy()
+
         if len(band_visits) < 1:
             continue
 
         ras, decls = camera_perimeter(band_visits.fieldRA, band_visits.fieldDec, band_visits.rotSkyPos)
+        band_visits = band_visits.assign(ra=ras, decl=decls, mjd=band_visits.observationStartMJD.values)
 
-        perimeter_df = pd.DataFrame(
-            {
-                "ra": ras,
-                "decl": decls,
-                "mjd": band_visits.observationStartMJD.values,
-            }
-        )
         patches_kwargs = dict(
             fill_alpha=bokeh.transform.transform("mjd", past_future_transform),
             line_alpha=bokeh.transform.transform("mjd", recent_transform),
             line_color="#ff00ff",
             line_width=2,
+            name="visit_patches",
         )
 
         if hatch:
@@ -170,11 +182,19 @@ def plot_visit_skymaps(
             patches_kwargs.update(dict(fill_color=BAND_COLORS[band]))
 
         visit_ds = asphere.add_patches(
-            perimeter_df,
+            band_visits,
             patches_kwargs=patches_kwargs,
         )
 
         psphere.add_patches(data_source=visit_ds, patches_kwargs=patches_kwargs)
+
+        # Add hovertools
+        for plot in asphere.plot, psphere.plot:
+            hover_tool = bokeh.models.HoverTool()
+            hover_tool.renderers = list(plot.select({"name": "visit_patches"}))
+            hover_tool.tooltips = VISIT_TOOLTIPS
+            hover_tool.formatters = {"@start_date": "datetime"}
+            plot.add_tools(hover_tool)
 
     asphere.decorate()
     psphere.decorate()
@@ -310,25 +330,27 @@ def plot_visit_planisphere(
     healpix_low_ds, cmap, glyph = psphere.add_healpix(footprint_low, nside=nside_low, cmap=cmap)
 
     for band in "ugrizy":
-        band_visits = visits.query(f"filter == '{band}'")
+        band_visits = visits.reset_index().loc[visits["filter"] == band, VISIT_COLUMNS].copy()
+
         if len(band_visits) < 1:
             continue
 
         ras, decls = camera_perimeter(band_visits.fieldRA, band_visits.fieldDec, band_visits.rotSkyPos)
-
         mjd_start = band_visits.observationStartMJD.values
         current_mjd = conditions.sun_n12_setting
-        perimeter_df = pd.DataFrame(
-            {
-                "ra": ras,
-                "decl": decls,
-                "min_mjd": band_visits.observationStartMJD.values,
-                "in_mjd_window": [0.3] * len(ras),
-                "fade_scale": [fade_scale] * len(ras),
-                "recent_mjd": np.clip((current_mjd - mjd_start) / fade_scale, 0, 1),
-            }
+        band_visits = band_visits.assign(
+            ra=ras,
+            decl=decls,
+            mjd=band_visits.observationStartMJD.values,
+            min_mjd=band_visits.observationStartMJD.values,
+            in_mjd_window=0.3,
+            fade_scale=fade_scale,
+            recent_mjd=np.clip((current_mjd - mjd_start) / fade_scale, 0, 1),
         )
-        patches_kwargs = dict(line_alpha="recent_mjd", line_color="#ff00ff", line_width=2)
+
+        patches_kwargs = dict(
+            line_alpha="recent_mjd", line_color="#ff00ff", line_width=2, name="visit_patches"
+        )
 
         if hatch:
             patches_kwargs.update(
@@ -350,9 +372,17 @@ def plot_visit_planisphere(
             )
 
         visit_ds = psphere.add_patches(
-            perimeter_df,
+            band_visits,
             patches_kwargs=patches_kwargs,
         )
+
+        # Add hovertools
+        plot = psphere.plot
+        hover_tool = bokeh.models.HoverTool()
+        hover_tool.renderers = list(plot.select({"name": "visit_patches"}))
+        hover_tool.tooltips = VISIT_TOOLTIPS
+        hover_tool.formatters = {"@start_date": "datetime"}
+        plot.add_tools(hover_tool)
 
         psphere.set_js_update_func(visit_ds)
 
