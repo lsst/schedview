@@ -186,7 +186,6 @@ def plot_visit_skymaps(
             patches_kwargs.update(
                 dict(
                     fill_alpha=0,
-                    fill_color=None,
                     hatch_alpha=bokeh.transform.transform("mjd", past_future_transform),
                     hatch_color=BAND_COLORS[band],
                     hatch_pattern=BAND_HATCH_PATTERNS[band],
