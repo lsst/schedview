@@ -96,8 +96,9 @@ def plot_visit_skymaps(
 
     Returns
     -------
-    _type_
-        _description_
+    fig : `bokeh.models.layouts.LayoutDOM`
+        A bokeh element that can be displayed, or incorporated into a larger
+        element.
     """
 
     if camera_perimeter == "LSST":
