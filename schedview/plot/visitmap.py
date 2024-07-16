@@ -1,7 +1,8 @@
+from warnings import warn
+
 import bokeh
 import healpy as hp
 import numpy as np
-import pandas as pd
 from astropy.time import Time
 
 # Imported to help sphinx make the link
@@ -24,6 +25,25 @@ BAND_HATCH_PATTERNS = dict(
     y="left_diagonal_line",
 )
 BAND_HATCH_SCALES = dict(u=6, g=6, r=6, i=6, z=12, y=12)
+VISIT_TOOLTIPS = (
+    "@observationId: @start_date{%F %T} UTC (mjd=@observationStartMJD{00000.0000}, "
+    + "LST=@observationStartLST\u00b0), band=@filter, RA=@fieldRA\u00b0, Decl=@fieldDec\u00b0, "
+    + "PA=@paraAngle\u00b0, Az=@azimuth\u00b0, Alt=@altitude\u00b0, @note"
+)
+VISIT_COLUMNS = [
+    "observationId",
+    "start_date",
+    "observationStartMJD",
+    "observationStartLST",
+    "filter",
+    "fieldRA",
+    "fieldDec",
+    "rotSkyPos",
+    "paraAngle",
+    "azimuth",
+    "altitude",
+    "note",
+]
 
 NSIDE_LOW = 8
 
@@ -37,6 +57,7 @@ def plot_visit_skymaps(
     camera_perimeter="LSST",
     nside_low=8,
     show_stars=False,
+    map_classes=[ArmillarySphere, Planisphere],
 ):
     """Plot visits on a map of the sky.
 
@@ -75,8 +96,9 @@ def plot_visit_skymaps(
 
     Returns
     -------
-    _type_
-        _description_
+    fig : `bokeh.models.layouts.LayoutDOM`
+        A bokeh element that can be displayed, or incorporated into a larger
+        element.
     """
 
     if camera_perimeter == "LSST":
@@ -84,20 +106,29 @@ def plot_visit_skymaps(
 
     nside_low = NSIDE_LOW
 
-    asphere = ArmillarySphere(mjd=conditions.mjd)
-    psphere = Planisphere(mjd=conditions.mjd)
-    psphere.sliders["mjd"] = asphere.sliders["mjd"]
+    spheremaps = [mc(mjd=conditions.mjd) for mc in map_classes]
+
+    # Add an MJD slider to the reference (first) projection
+    if "mjd" not in spheremaps[0].sliders:
+        spheremaps[0].add_mjd_slider()
+
+    spheremaps[0].sliders["mjd"].start = conditions.sun_n12_setting
+    spheremaps[0].sliders["mjd"].end = conditions.sun_n12_rising
+
+    for spheremap in spheremaps[1:]:
+        spheremap.sliders["mjd"] = spheremaps[0].sliders["mjd"]
 
     cmap = bokeh.transform.linear_cmap("value", "Greys256", int(np.ceil(np.nanmax(footprint) * 2)), 0)
 
     nside_high = hp.npix2nside(footprint.shape[0])
     footprint_high, footprint_low = split_healpix_by_resolution(footprint, nside_low, nside_high)
 
-    healpix_high_ds, cmap, glyph = asphere.add_healpix(footprint_high, nside=nside_high, cmap=cmap)
-    psphere.add_healpix(healpix_high_ds, nside=nside_high, cmap=cmap)
+    healpix_high_ds, cmap, glyph = spheremaps[0].add_healpix(footprint_high, nside=nside_high, cmap=cmap)
+    healpix_low_ds, cmap, glyph = spheremaps[0].add_healpix(footprint_low, nside=nside_low, cmap=cmap)
 
-    healpix_low_ds, cmap, glyph = asphere.add_healpix(footprint_low, nside=nside_low, cmap=cmap)
-    psphere.add_healpix(healpix_low_ds, nside=nside_low, cmap=cmap)
+    for spheremap in spheremaps[1:]:
+        spheremap.add_healpix(healpix_high_ds, nside=nside_high, cmap=cmap)
+        spheremap.add_healpix(healpix_low_ds, nside=nside_low, cmap=cmap)
 
     # Transforms for recent, past, future visits
     past_future_js = """
@@ -113,7 +144,7 @@ def plot_visit_skymaps(
     """
 
     past_future_transform = bokeh.models.CustomJSTransform(
-        args=dict(mjd_slider=asphere.sliders["mjd"], past_value=0.5, future_value=0.0),
+        args=dict(mjd_slider=spheremaps[0].sliders["mjd"], past_value=0.5, future_value=0.0),
         v_func=past_future_js,
     )
 
@@ -130,36 +161,31 @@ def plot_visit_skymaps(
     """
 
     recent_transform = bokeh.models.CustomJSTransform(
-        args=dict(mjd_slider=asphere.sliders["mjd"], max_value=1.0, scale=fade_scale),
+        args=dict(mjd_slider=spheremaps[0].sliders["mjd"], max_value=1.0, scale=fade_scale),
         v_func=recent_js,
     )
 
     for band in "ugrizy":
-        band_visits = visits.query(f"filter == '{band}'")
+        band_visits = visits.reset_index().loc[visits["filter"] == band, VISIT_COLUMNS].copy()
+
         if len(band_visits) < 1:
             continue
 
         ras, decls = camera_perimeter(band_visits.fieldRA, band_visits.fieldDec, band_visits.rotSkyPos)
+        band_visits = band_visits.assign(ra=ras, decl=decls, mjd=band_visits.observationStartMJD.values)
 
-        perimeter_df = pd.DataFrame(
-            {
-                "ra": ras,
-                "decl": decls,
-                "mjd": band_visits.observationStartMJD.values,
-            }
-        )
         patches_kwargs = dict(
             fill_alpha=bokeh.transform.transform("mjd", past_future_transform),
             line_alpha=bokeh.transform.transform("mjd", recent_transform),
             line_color="#ff00ff",
             line_width=2,
+            name="visit_patches",
         )
 
         if hatch:
             patches_kwargs.update(
                 dict(
                     fill_alpha=0,
-                    fill_color=None,
                     hatch_alpha=bokeh.transform.transform("mjd", past_future_transform),
                     hatch_color=BAND_COLORS[band],
                     hatch_pattern=BAND_HATCH_PATTERNS[band],
@@ -169,196 +195,28 @@ def plot_visit_skymaps(
         else:
             patches_kwargs.update(dict(fill_color=BAND_COLORS[band]))
 
-        visit_ds = asphere.add_patches(
-            perimeter_df,
+        visit_ds = spheremaps[0].add_patches(
+            band_visits,
             patches_kwargs=patches_kwargs,
         )
 
-        psphere.add_patches(data_source=visit_ds, patches_kwargs=patches_kwargs)
+        for spheremap in spheremaps[1:]:
+            spheremap.add_patches(data_source=visit_ds, patches_kwargs=patches_kwargs)
 
-    asphere.decorate()
-    psphere.decorate()
+        # Add hovertools
+        for spheremap in spheremaps:
+            plot = spheremap.plot
+            hover_tool = bokeh.models.HoverTool()
+            hover_tool.renderers = list(plot.select({"name": "visit_patches"}))
+            hover_tool.tooltips = VISIT_TOOLTIPS
+            hover_tool.formatters = {"@start_date": "datetime"}
+            plot.add_tools(hover_tool)
 
-    sun_ds = asphere.add_marker(
-        ra=np.degrees(conditions.sun_ra),
-        decl=np.degrees(conditions.sun_dec),
-        name="Sun",
-        glyph_size=15,
-        circle_kwargs={"color": "yellow", "fill_alpha": 1},
-    )
-    psphere.add_marker(
-        data_source=sun_ds,
-        name="Sun",
-        glyph_size=15,
-        circle_kwargs={"color": "yellow", "fill_alpha": 1},
-    )
+    for spheremap in spheremaps:
+        spheremap.decorate()
 
-    moon_ds = asphere.add_marker(
-        ra=np.degrees(conditions.moon_ra),
-        decl=np.degrees(conditions.moon_dec),
-        name="Moon",
-        glyph_size=15,
-        circle_kwargs={"color": "orange", "fill_alpha": 0.8},
-    )
-    psphere.add_marker(
-        data_source=moon_ds,
-        name="Moon",
-        glyph_size=15,
-        circle_kwargs={"color": "orange", "fill_alpha": 0.8},
-    )
-
-    if show_stars:
-        star_data = load_bright_stars().loc[:, ["name", "ra", "decl", "Vmag"]]
-        star_data["glyph_size"] = 15 - (15.0 / 3.5) * star_data["Vmag"]
-        star_data.query("glyph_size>0", inplace=True)
-        star_ds = asphere.add_stars(star_data, mag_limit_slider=False, star_kwargs={"color": "yellow"})
-
-        psphere.add_stars(
-            star_data,
-            data_source=star_ds,
-            mag_limit_slider=True,
-            star_kwargs={"color": "yellow"},
-        )
-
-    horizon_ds = asphere.add_horizon()
-    psphere.add_horizon(data_source=horizon_ds)
-    horizon70_ds = asphere.add_horizon(zd=70, line_kwargs={"color": "red", "line_width": 2})
-    psphere.add_horizon(data_source=horizon70_ds, line_kwargs={"color": "red", "line_width": 2})
-
-    asphere.sliders["mjd"].start = conditions.sun_n12_setting
-    asphere.sliders["mjd"].end = conditions.sun_n12_rising
-
-    fig = bokeh.layouts.row(
-        asphere.figure,
-        psphere.figure,
-    )
-    return fig
-
-
-def plot_visit_planisphere(
-    visits,
-    footprint,
-    conditions,
-    hatch=False,
-    fade_scale=2.0 / (24 * 60),
-    camera_perimeter="LSST",
-    nside_low=8,
-    show_stars=False,
-):
-    """Plot visits on a map of the sky.
-
-    Parameters
-    ----------
-    visits : `pandas.DataFrame`
-        One row per visit, with at least the following columns:
-
-        ``"fieldRA"``
-            The visit R.A. in degrees (`float`).
-        ``"fieldDec"``
-            The visit declination in degrees (`float`).
-        ``"observationStartMJD"``
-            The visit start MJD (`float`).
-        ``"filter"``
-            The visit filter (`str`)
-
-    footprint : `numpy.array`
-        A healpix map of the footprint.
-    conditions : `rubin_scheduler.scheduler.features.conditions.Conditions`
-        The conditions for the night, which determines the start and end
-        times covered by the map.
-    hatch : `bool`
-        Use hatches instead of filling visit polygons. (SLOW!)
-    fade_scale : `float`
-        Time (in days) over which visit outlines fade.
-    camera_perimeter : `str` or `object`
-        An function that returns the perimeter of the camera footprint,
-        or "LSST" for the LSST camera footprint.
-        Defaults to "LSST".
-    nside_low : `int`
-        The healpix nside to try to use for low resolution sections of the
-        healpix map.
-    show_stars : `bool`
-        Show stars? (Defaults to False)
-
-    Returns
-    -------
-    _type_
-        _description_
-    """
-
-    if camera_perimeter == "LSST":
-        camera_perimeter = LsstCameraFootprintPerimeter()
-
-    nside_low = NSIDE_LOW
-
-    plot = bokeh.plotting.figure(
-        frame_width=1024,
-        frame_height=1024,
-        match_aspect=True,
-        title="Visits",
-    )
-    psphere = Planisphere(mjd=conditions.mjd, plot=plot)
-    psphere.add_mjd_slider()
-
-    cmap = bokeh.transform.linear_cmap("value", "Greys256", int(np.ceil(np.nanmax(footprint) * 2)), 0)
-
-    nside_high = hp.npix2nside(footprint.shape[0])
-    footprint_high, footprint_low = split_healpix_by_resolution(footprint, nside_low, nside_high)
-
-    healpix_high_ds, cmap, glyph = psphere.add_healpix(footprint_high, nside=nside_high, cmap=cmap)
-
-    healpix_low_ds, cmap, glyph = psphere.add_healpix(footprint_low, nside=nside_low, cmap=cmap)
-
-    for band in "ugrizy":
-        band_visits = visits.query(f"filter == '{band}'")
-        if len(band_visits) < 1:
-            continue
-
-        ras, decls = camera_perimeter(band_visits.fieldRA, band_visits.fieldDec, band_visits.rotSkyPos)
-
-        mjd_start = band_visits.observationStartMJD.values
-        current_mjd = conditions.sun_n12_setting
-        perimeter_df = pd.DataFrame(
-            {
-                "ra": ras,
-                "decl": decls,
-                "min_mjd": band_visits.observationStartMJD.values,
-                "in_mjd_window": [0.3] * len(ras),
-                "fade_scale": [fade_scale] * len(ras),
-                "recent_mjd": np.clip((current_mjd - mjd_start) / fade_scale, 0, 1),
-            }
-        )
-        patches_kwargs = dict(line_alpha="recent_mjd", line_color="#ff00ff", line_width=2)
-
-        if hatch:
-            patches_kwargs.update(
-                dict(
-                    fill_alpha=0,
-                    fill_color=None,
-                    hatch_alpha="in_mjd_window",
-                    hatch_color=BAND_COLORS[band],
-                    hatch_pattern=BAND_HATCH_PATTERNS[band],
-                    hatch_scale=BAND_HATCH_SCALES[band],
-                )
-            )
-        else:
-            patches_kwargs.update(
-                dict(
-                    fill_alpha="in_mjd_window",
-                    fill_color=BAND_COLORS[band],
-                )
-            )
-
-        visit_ds = psphere.add_patches(
-            perimeter_df,
-            patches_kwargs=patches_kwargs,
-        )
-
-        psphere.set_js_update_func(visit_ds)
-
-    psphere.decorate()
-
-    psphere.add_marker(
+    spheremap = spheremaps[0]
+    sun_ds = spheremap.add_marker(
         ra=np.degrees(conditions.sun_ra),
         decl=np.degrees(conditions.sun_dec),
         name="Sun",
@@ -366,7 +224,7 @@ def plot_visit_planisphere(
         circle_kwargs={"color": "yellow", "fill_alpha": 1},
     )
 
-    psphere.add_marker(
+    moon_ds = spheremap.add_marker(
         ra=np.degrees(conditions.moon_ra),
         decl=np.degrees(conditions.moon_dec),
         name="Moon",
@@ -378,18 +236,46 @@ def plot_visit_planisphere(
         star_data = load_bright_stars().loc[:, ["name", "ra", "decl", "Vmag"]]
         star_data["glyph_size"] = 15 - (15.0 / 3.5) * star_data["Vmag"]
         star_data.query("glyph_size>0", inplace=True)
-        psphere.add_stars(star_data, mag_limit_slider=False, star_kwargs={"color": "yellow"})
+        star_ds = spheremaps[0].add_stars(star_data, mag_limit_slider=False, star_kwargs={"color": "yellow"})
 
-    psphere.add_horizon()
-    psphere.add_horizon(zd=70, line_kwargs={"color": "red", "line_width": 2})
+    horizon_ds = spheremap.add_horizon()
+    horizon70_ds = spheremap.add_horizon(zd=70, line_kwargs={"color": "red", "line_width": 2})
 
-    psphere.sliders["mjd"].start = conditions.sun_n12_setting
-    psphere.sliders["mjd"].end = conditions.sun_n12_rising
+    for spheremap in spheremaps[1:]:
+        spheremap.add_marker(
+            data_source=sun_ds,
+            name="Sun",
+            glyph_size=15,
+            circle_kwargs={"color": "yellow", "fill_alpha": 1},
+        )
 
-    fig = bokeh.layouts.row(
-        psphere.figure,
-    )
+        spheremap.add_marker(
+            data_source=moon_ds,
+            name="Moon",
+            glyph_size=15,
+            circle_kwargs={"color": "orange", "fill_alpha": 0.8},
+        )
+
+        spheremap.add_horizon(data_source=horizon_ds)
+        spheremap.add_horizon(data_source=horizon70_ds, line_kwargs={"color": "red", "line_width": 2})
+
+        if show_stars:
+            for spheremap in spheremaps[1:]:
+                spheremap.add_stars(
+                    star_data,
+                    data_source=star_ds,
+                    mag_limit_slider=True,
+                    star_kwargs={"color": "yellow"},
+                )
+
+    fig = bokeh.layouts.row(list(s.figure for s in spheremaps))
     return fig
+
+
+def plot_visit_planisphere(*args, **kwargs):
+    warn("Use plot_visit_skymaps and set map_classes instead", category=DeprecationWarning)
+    kwargs["map_classes"] = [Planisphere]
+    return plot_visit_skymaps(*args, **kwargs)
 
 
 def create_visit_skymaps(
@@ -463,7 +349,7 @@ def create_visit_skymaps(
     conditions = observatory.return_conditions()
     data = {"visits": visits, "footprint": footprint, "conditions": conditions}
     if planisphere_only:
-        vmap = schedview.plot.visitmap.plot_visit_planisphere(**data)
+        vmap = schedview.plot.visitmap.plot_visit_skymaps(map_classes=[Planisphere], **data)
     else:
         vmap = schedview.plot.visitmap.plot_visit_skymaps(**data)
 
