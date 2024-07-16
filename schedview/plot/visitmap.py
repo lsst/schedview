@@ -166,7 +166,7 @@ def plot_visit_skymaps(
     )
 
     for band in "ugrizy":
-        band_visits = visits.reset_index().loc[visits["filter"] == band, VISIT_COLUMNS].copy()
+        band_visits = visits.reset_index().loc[visits.reset_index()["filter"] == band, VISIT_COLUMNS].copy()
 
         if len(band_visits) < 1:
             continue
