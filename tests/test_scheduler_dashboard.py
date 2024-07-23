@@ -19,12 +19,9 @@ from pandas import Timestamp
 from panel.widgets import Tabulator
 
 # Conditional install for CI workflow.
-# if os.environ.get(
-#     "ENABLE_PLAYWRIGHT_TESTS",
-#     "false"
-# ).lower() not in ("", "0", "f", "false"):
-#     from playwright.sync_api import expect, sync_playwright
-from playwright.sync_api import expect, sync_playwright
+if os.environ.get("ENABLE_PLAYWRIGHT_TESTS", "false").lower() not in ("", "0", "f", "false"):
+    from playwright.sync_api import expect, sync_playwright
+
 from rubin_scheduler.scheduler.example import example_scheduler
 from rubin_scheduler.scheduler.features.conditions import Conditions
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
@@ -56,12 +53,8 @@ except KeyError:
     PORT = 8888
 
 # Set timeout for Playwright tests to 10 seconds.
-# if os.environ.get(
-#     "ENABLE_PLAYWRIGHT_TESTS",
-#     "false"
-# ).lower() not in ("", "0", "f", "false"):
-#     expect.set_options(timeout=10_000)
-expect.set_options(timeout=10_000)
+if os.environ.get("ENABLE_PLAYWRIGHT_TESTS", "false").lower() not in ("", "0", "f", "false"):
+    expect.set_options(timeout=10_000)
 
 
 # Custom decorator to skip all tests in a class.
@@ -234,7 +227,12 @@ class TestStandardModeE2E(unittest.TestCase):
 
         # Change date.
         page.get_by_role("textbox").click()
-        page.get_by_label("December 17,").click()
+        if TEST_DATE.month == 12:
+            change_date = TEST_DATE.replace(year=TEST_DATE.year + 1, month=1)
+        else:
+            change_date = TEST_DATE.replace(month=TEST_DATE.month + 1)
+        date_string = f"{change_date.strftime('%B')} 1,"
+        page.get_by_label(date_string).click()
         page.get_by_label("Hour").press("Enter")
         # Restore loading conditions.
         page.get_by_role("button", name="﫽 Restore Loading Conditions").click()
