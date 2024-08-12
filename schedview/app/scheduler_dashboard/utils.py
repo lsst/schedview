@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta, timezone
 
 import astropy.units as u
@@ -9,22 +10,29 @@ from lsst_efd_client import EfdClient
 LOCAL_ROOT_URI = {"usdf": "s3://rubin:", "summit": "https://s3.cp.lsst.org/"}
 
 
-async def query_night_schedulers(reference_time_utc, selected_telescope=None, efd="usdf_efd"):
+async def query_night_schedulers(reference_time_utc, selected_telescope=None, efd=None):
     """Query the EFD for the night schedulers till reference time
 
     Parameters
     ----------
     reference_time_utc : `astropy.time.Time`
         selected reference time in UTC
-    efd : `str`
+    efd : `str` or `None`
         The name of the EFD to query, usdf_efd or summit_efd
-        Defaults to usdf_efd
+        If None, it derives it from the LSST_SITE environment variable,
+        and if that is not set, uses usdf_efd.
 
     Returns
     -------
     schedulers : `list`
         A list of the schedulers for the night
     """
+    if efd is None:
+        lfa_site = os.environ.get("LSST_SITE", "usdf")
+        efd = f"{lfa_site}_efd"
+    else:
+        lfa_site = efd.split("_")[0]
+
     # Use DOYOBS rollover as defined in SITCOMTN-32
     dayobs_tz = timezone(timedelta(hours=+12), "dayobs")
     reference_datetime_dayobs_tz = reference_time_utc.datetime.astimezone(dayobs_tz)
@@ -58,7 +66,7 @@ async def query_night_schedulers(reference_time_utc, selected_telescope=None, ef
         scheduler_urls = scheduler_urls.reset_index()
         # reverse schedulers order to show most recent one first
         scheduler_urls = scheduler_urls.sort_index(ascending=False)
-        scheduler_urls["url"] = scheduler_urls["url"].apply(lambda x: localize_scheduler_url(x))
+        scheduler_urls["url"] = scheduler_urls["url"].apply(lambda x: localize_scheduler_url(x, lfa_site))
         # return only URLs
         return scheduler_urls["url"]
     return []
