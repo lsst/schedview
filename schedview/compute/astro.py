@@ -129,3 +129,40 @@ def compute_central_night(visits, site=None, timezone="Chile/Continental"):
     central_night = Time(central_mjd + mjd_shift, format="mjd", scale="utc").datetime.date()
 
     return central_night
+
+
+def compute_sun_moon_positions(observatory: ModelObservatory) -> pd.DataFrame:
+    """Create a DataFrame of sun and moon positions with one row per body,
+    one column per coordinate, at the time set for the observatory.
+
+    Parameters
+    ----------
+    observatory : `ModelObservatory`
+        The model observatory.
+
+    Returns
+    -------
+    body_positions : `pandas.DataFrame`
+        The table of body positions.
+    """
+    body_positions_wide = pd.DataFrame(observatory.almanac.get_sun_moon_positions(observatory.mjd))
+
+    body_positions_wide.index.name = "r"
+    body_positions_wide.reset_index(inplace=True)
+
+    angle_columns = ["RA", "dec", "alt", "az"]
+    all_columns = angle_columns + ["phase"]
+    body_positions = (
+        pd.wide_to_long(
+            body_positions_wide,
+            stubnames=("sun", "moon"),
+            suffix=r".*",
+            sep="_",
+            i="r",
+            j="coordinate",
+        )
+        .droplevel("r")
+        .T[all_columns]
+    )
+    body_positions[angle_columns] = np.degrees(body_positions[angle_columns])
+    return body_positions
