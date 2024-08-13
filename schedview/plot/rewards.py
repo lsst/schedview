@@ -1,6 +1,12 @@
 import warnings
+from collections.abc import Callable
 
 import bokeh
+import bokeh.io
+import bokeh.layouts
+import bokeh.models
+import bokeh.plotting
+import bokeh.transform
 import colorcet
 import holoviews as hv
 import numpy as np
@@ -530,5 +536,63 @@ def reward_timeline_for_surveys(rewards_df, day_obs_mjd, show=True, **figure_kwa
     else:
         print(f"Too many surveys to plot, would by {plot_kwargs['height']} high.")
         plot = None
+
+    return plot
+
+
+def nested_tier_reward_timeline_plot(
+    rewards_df: pd.DataFrame,
+    plot_func: Callable,
+    day_obs_mjd: int,
+    max_basis_functions_per_tab: int = 200,
+    show: bool = True,
+) -> bokeh.models.UIElement:
+    """Plot rewards timelines tabs by tier.
+
+    Parameters
+    ----------
+    rewards_df : `pandas.DataFrame`
+        The table of rewards data.
+    plot_func : `Callable`
+        Plot function to be called in each tab.
+    day_obs_mjd : `int`
+        The MJD of the day_obs of the night to plot
+    max_basis_functions_per_tab : `int`
+        Maximum basis functions to plot in each tab, by default 200
+    show : `bool`
+        Actually show the plot? Defaults to `True`.
+
+    Returns
+    -------
+    plot : `bokeh.models.UIElement`
+        The bokeh plot.
+    """
+
+    tier_plot = {}
+    tier_indexes = np.sort(rewards_df.reset_index().list_index.unique())
+    sorted_rewards_df = rewards_df.sort_index()
+    for tier_index in tier_indexes:
+        num_basis_functions = len(
+            sorted_rewards_df.loc[tier_index, ("basis_function", "survey_label")].drop_duplicates()
+        )
+        if num_basis_functions > max_basis_functions_per_tab:
+            tier_plot[tier_index] = bokeh.models.Div(text="Too many basis functions to plot.")
+        else:
+            try:
+                tier_plot[tier_index] = plot_func(rewards_df, tier_index, day_obs_mjd, show=False)
+            except Exception as e:
+                print(f"Not showing tier {tier_index} due to an exception: {str(e)}")
+                tier_plot[tier_index] = None
+
+    plot = bokeh.models.Tabs(
+        tabs=[
+            bokeh.models.TabPanel(child=tier_plot[t], title=f"Tier {t}")
+            for t in tier_indexes
+            if tier_plot[t] is not None
+        ]
+    )
+
+    if show:
+        bokeh.io.show(plot)
 
     return plot
