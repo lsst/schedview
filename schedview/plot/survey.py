@@ -1,10 +1,13 @@
+import datetime
 import re
 from functools import partial
 
 import astropy
 import bokeh
+import bokeh.io
 import colorcet
 import healpy as hp
+import matplotlib as mpl
 import numpy as np
 import pandas as pd
 import rubin_scheduler.scheduler.features
@@ -12,7 +15,9 @@ import rubin_scheduler.scheduler.surveys  # noqa: F401
 from astropy.time import Time
 from uranography.api import HorizonMap, Planisphere, make_zscale_linear_cmap
 
+import schedview.compute.astro
 from schedview.compute.camera import LsstCameraFootprintPerimeter
+from schedview.compute.maf import compute_hpix_metric_in_bands
 
 
 def map_survey_healpix(
@@ -411,3 +416,53 @@ def create_hpix_visit_map_grid(hpix_maps, visits, conditions, **kwargs):
 
     map_grid = bokeh.layouts.gridplot(map_lists)
     return map_grid
+
+
+def create_metric_visit_map_grid(
+    metric, metric_visits, visits, observatory, nside=32, use_matplotlib=False
+) -> mpl.figure.Figure | bokeh.models.ui.ui_element.UIElement | None:
+    """Create a grid of maps of metric values with visits overplotted.
+
+    Parameters
+    ----------
+    metric : `numpy.array`
+        An array of healpix values
+    metric_visits : `pd.DataFrame`
+        The visits to use to compute the metric
+    visits : `pd.DataFrame`
+        The table of visits to plot, with columns matching the opsim database
+        definitions.
+    observatory : `ModelObservatory`
+        The model observotary to use.
+    nside : `int`
+        The nside with which to compute the metric.
+    use_matplotlib: `bool`
+        Use matplotlib instead of bokeh? Defaults to False.
+
+    Returns
+    -------
+    plot : `bokeh.models.plots.Plot`
+        The plot with the map
+    """
+
+    if len(metric_visits):
+        metric_hpix = compute_hpix_metric_in_bands(metric_visits, metric, nside=nside)
+    else:
+        metric_hpix = np.zeros(hp.nside2npix(nside))
+
+    if len(visits):
+        if use_matplotlib:
+            from schedview.plot import survey_skyproj
+
+            day_obs_mjd = np.floor(observatory.mjd - 0.5).astype("int")
+            day_obs_dt = Time(day_obs_mjd, format="mjd").datetime
+            day_obs_date = datetime.date(day_obs_dt.year, day_obs_dt.month, day_obs_dt.day)
+            night_events = schedview.compute.astro.night_events(day_obs_date)
+            fig = survey_skyproj.create_hpix_visit_map_grid(visits, metric_hpix, observatory, night_events)
+            return fig
+        else:
+            map_grid = create_hpix_visit_map_grid(metric_hpix, visits, observatory.return_conditions())
+            bokeh.io.show(map_grid)
+            return map_grid
+    else:
+        print("No visits")
