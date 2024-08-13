@@ -7,12 +7,13 @@ import bokeh
 import bokeh.io
 import colorcet
 import healpy as hp
-import matplotlib as mpl
 import numpy as np
 import pandas as pd
 import rubin_scheduler.scheduler.features
 import rubin_scheduler.scheduler.surveys  # noqa: F401
 from astropy.time import Time
+from bokeh.models.ui.ui_element import UIElement
+from matplotlib.figure import Figure
 from uranography.api import HorizonMap, Planisphere, make_zscale_linear_cmap
 
 import schedview.compute.astro
@@ -419,8 +420,8 @@ def create_hpix_visit_map_grid(hpix_maps, visits, conditions, **kwargs):
 
 
 def create_metric_visit_map_grid(
-    metric, metric_visits, visits, observatory, nside=32, use_matplotlib=False
-) -> mpl.figure.Figure | bokeh.models.ui.ui_element.UIElement | None:
+    metric, metric_visits, visits, observatory, nside=32, use_matplotlib=False, **kwargs
+) -> Figure | UIElement | None:
     """Create a grid of maps of metric values with visits overplotted.
 
     Parameters
@@ -458,10 +459,14 @@ def create_metric_visit_map_grid(
             day_obs_dt = Time(day_obs_mjd, format="mjd").datetime
             day_obs_date = datetime.date(day_obs_dt.year, day_obs_dt.month, day_obs_dt.day)
             night_events = schedview.compute.astro.night_events(day_obs_date)
-            fig = survey_skyproj.create_hpix_visit_map_grid(visits, metric_hpix, observatory, night_events)
+            fig = survey_skyproj.create_hpix_visit_map_grid(
+                visits, metric_hpix, observatory, night_events, **kwargs
+            )
             return fig
         else:
-            map_grid = create_hpix_visit_map_grid(metric_hpix, visits, observatory.return_conditions())
+            map_grid = create_hpix_visit_map_grid(
+                metric_hpix, visits, observatory.return_conditions(), **kwargs
+            )
             bokeh.io.show(map_grid)
             return map_grid
     else:
