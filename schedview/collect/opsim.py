@@ -1,6 +1,8 @@
 import sqlite3
+from warnings import warn
 
 import pandas as pd
+import rubin_scheduler
 import yaml
 from astropy.time import Time
 from lsst.resources import ResourcePath
@@ -90,7 +92,13 @@ def read_opsim(
                 ]
 
             try:
-                visits = pd.DataFrame(maf.get_sim_data(sim_connection, constraint, dbcols, **kwargs))
+                try:
+                    visits = pd.DataFrame(maf.get_sim_data(sim_connection, constraint, dbcols, **kwargs))
+                except UserWarning:
+                    warn("No visits match constraints.")
+                    visits = pd.DataFrame(rubin_scheduler.scheduler.utils.empty_observation()).drop(index=0)
+                    if "observationId" not in visits.columns and "ID" in visits.columns:
+                        visits.rename(columns={"ID": "observationId"}, inplace=True)
             except NameError as e:
                 if e.name == "maf" and e.args == ("name 'maf' is not defined",):
                     if len(kwargs) > 0:
