@@ -196,7 +196,7 @@ def accum_teff_by_night(visits):
             The effective exposure time (`float`).
         ``"filter"``
             The filter (`str`).
-        ``"target"``
+        ``"target_name"``
             The target name (`str`).
 
     Returns
@@ -220,11 +220,11 @@ def accum_teff_by_night(visits):
             f"{teff_col} column not found for visits; use the rubin_sim.maf.stackers.TeffStacker."
         )
 
-    nightly_teff = visits.groupby(["target", day_obs_col, "filter"])[teff_col].sum().reset_index()
+    nightly_teff = visits.groupby(["target_name", day_obs_col, "filter"])[teff_col].sum().reset_index()
     nightly_teff = (
-        nightly_teff.pivot(index=["target", day_obs_col], columns="filter", values=teff_col)
+        nightly_teff.pivot(index=["target_name", day_obs_col], columns="filter", values=teff_col)
         .fillna(0.0)
         .reset_index()
-        .set_index(["target", day_obs_col])
+        .set_index(["target_name", day_obs_col])
     )
     return nightly_teff

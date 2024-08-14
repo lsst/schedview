@@ -51,7 +51,7 @@ class TestComputeVisits(unittest.TestCase):
 
         visits = schedview.collect.read_ddf_visits(self.visit_db_fname, stackers=stackers)
         night_teff = schedview.compute.visits.accum_teff_by_night(visits)
-        self.assertEqual(night_teff.index.names[0], "target")
+        self.assertEqual(night_teff.index.names[0], "target_name")
         self.assertEqual(night_teff.index.names[1], "day_obs_iso8601")
         for col_name in night_teff.columns:
             self.assertTrue(col_name in "ugrizy")
