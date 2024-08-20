@@ -5,6 +5,7 @@ import bokeh.models
 import hvplot
 import pandas as pd
 from astropy.time import Time
+from typing import Any, Optional
 
 # Imported to help sphinx make the link
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory  # noqa F401
@@ -127,6 +128,7 @@ def create_visit_table(
         "filter",
     ],
     show: bool = True,
+    **data_table_kwargs: Optional[Any]
 ) -> bokeh.models.ui.ui_element.UIElement:
     """Create an interactive table of visits.
 
@@ -156,7 +158,7 @@ def create_visit_table(
         bokeh.models.TableColumn(field=cn, title=cn, name=f"tablecol{cn}", visible=cn in visible_column_names)
         for cn in data.column_names
     ]
-    visit_table = bokeh.models.DataTable(source=data, columns=columns, reorderable=False, width=1024)
+    visit_table = bokeh.models.DataTable(source=data, columns=columns, reorderable=False, **data_table_kwargs)
     multi_choice = bokeh.models.MultiChoice(value=visible_column_names, options=data.column_names, height=128)
 
     table_update_callback = bokeh.models.CustomJS(
