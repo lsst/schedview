@@ -1,5 +1,9 @@
 import bokeh
+import bokeh.io
+import bokeh.layouts
+import bokeh.models
 import hvplot
+import pandas as pd
 from astropy.time import Time
 
 # Imported to help sphinx make the link
@@ -111,3 +115,70 @@ def plot_visit_param_vs_time(visits, column_name, plot=None, **kwargs):
     legend.orientation = "horizontal"
     plot.add_layout(legend, "below")
     return plot
+
+
+def create_visit_table(
+    visits: pd.DataFrame | bokeh.models.ColumnarDataSource,
+    visible_column_names: list[str] = [
+        "observationId",
+        "observationStartMJD",
+        "fieldRA",
+        "fieldDec",
+        "filter",
+    ],
+    show: bool = True,
+) -> bokeh.models.ui.ui_element.UIElement:
+    """Create an interactive table of visits.
+
+    Parameters
+    ----------
+    visits : `pd.DataFrame` or `bokeh.models.ColumnarDataSource`
+        The visits to include in the table
+    visible_column_names : `list[str]`
+        The columns to display, by default
+        ['observationId', 'observationStartMJD',
+        'fieldRA', 'fieldDec', 'filter']
+    show : `bool`
+        Show the plot?, by default True
+
+    Returns
+    -------
+    element : `bokeh.models.ui.ui_element.UIElement`
+        The bokeh UI element with the table.
+    """
+
+    data = (
+        visits
+        if isinstance(visits, bokeh.models.ColumnarDataSource)
+        else bokeh.models.ColumnDataSource(visits)
+    )
+    columns = [
+        bokeh.models.TableColumn(field=cn, title=cn, name=f"tablecol{cn}", visible=cn in visible_column_names)
+        for cn in data.column_names
+    ]
+    visit_table = bokeh.models.DataTable(source=data, columns=columns, reorderable=False, width=1024)
+    multi_choice = bokeh.models.MultiChoice(value=visible_column_names, options=data.column_names, height=128)
+
+    table_update_callback = bokeh.models.CustomJS(
+        args={"multi_choice": multi_choice, "visit_table": visit_table},
+        code="""
+            for (var col_idx=0; col_idx<visit_table.columns.length; col_idx++) {
+                visit_table.columns[col_idx].visible = false
+                for (var choice_idx=0; choice_idx<multi_choice.value.length; choice_idx++) {
+                    if (visit_table.columns[col_idx].field == multi_choice.value[choice_idx]) {
+                        visit_table.columns[col_idx].visible = true
+                    }
+                }
+            }
+            visit_table.change.emit()
+        """,
+    )
+
+    multi_choice.js_on_change("value", table_update_callback)
+
+    ui_element = bokeh.layouts.column([multi_choice, visit_table])
+
+    if show:
+        bokeh.io.show(ui_element)
+
+    return ui_element

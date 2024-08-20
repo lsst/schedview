@@ -29,6 +29,7 @@ __all__ = [
     "PLOT_FILTER_COLORS",
     "PLOT_FILTER_CMAP",
     "create_cadence_plot",
+    "create_visit_table",
 ]
 
 from .cadence import create_cadence_plot
@@ -52,4 +53,4 @@ from .scheduler import (
 )
 from .survey import create_hpix_visit_map_grid, map_survey_healpix, map_visits_over_hpix
 from .visitmap import create_visit_skymaps, plot_visit_planisphere, plot_visit_skymaps
-from .visits import create_visit_explorer, plot_visit_param_vs_time, plot_visits
+from .visits import create_visit_explorer, create_visit_table, plot_visit_param_vs_time, plot_visits
