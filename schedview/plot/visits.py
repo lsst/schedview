@@ -3,6 +3,7 @@ import bokeh.io
 import bokeh.layouts
 import bokeh.models
 import hvplot
+import numpy as np
 import pandas as pd
 from astropy.time import Time
 from typing import Any, Optional
@@ -74,7 +75,7 @@ def create_visit_explorer(visits, night_date, observatory=None, timezone="Chile/
     return visit_explorer, data
 
 
-def plot_visit_param_vs_time(visits, column_name, plot=None, **kwargs):
+def plot_visit_param_vs_time(visits, column_name, plot=None, column_selector=False, **kwargs):
     """Plot a column in the visit table vs. time.
 
     Parameters
@@ -86,6 +87,9 @@ def plot_visit_param_vs_time(visits, column_name, plot=None, **kwargs):
     `plot`: `bokeh.models.plots.Plot` or None
         The figure on which to plot the visits. None creates a new
         figure. Defaults to None.
+    `column_selector`: `bool`
+        Include a drop-down to select which column to plot?
+        Defaults to False.
 
     Returns
     -------
@@ -95,26 +99,46 @@ def plot_visit_param_vs_time(visits, column_name, plot=None, **kwargs):
     if plot is None:
         plot = bokeh.plotting.figure(y_axis_label=column_name, x_axis_label="Time (UTC)")
 
+    data = (
+        visits
+        if isinstance(visits, bokeh.models.ColumnarDataSource)
+        else bokeh.models.ColumnDataSource(visits)
+    )
+
     circle_kwargs = {"fill_alpha": 0.3, "marker": "circle"}
     circle_kwargs.update(kwargs)
 
-    for band in PLOT_FILTER_CMAP.transform.factors:
-        these_visits = visits.query(f'filter == "{band}"')
-        if len(these_visits) > 0:
-            plot.scatter(
-                x="start_date",
-                y=column_name,
-                color=PLOT_FILTER_CMAP,
-                source=these_visits,
-                legend_label=band,
-                **circle_kwargs,
-            )
+    timeline = plot.scatter(
+        x="start_date",
+        y=column_name,
+        color=PLOT_FILTER_CMAP,
+        source=data,
+        legend_group="filter",
+        **circle_kwargs,
+    )
 
     plot.xaxis[0].formatter = bokeh.models.DatetimeTickFormatter(hours="%H:%M")
 
     legend = plot.legend[0]
     legend.orientation = "horizontal"
     plot.add_layout(legend, "below")
+
+    if column_selector:
+        # Only offer numeric fields as options
+        options = [k for k in data.column_names if  np.issubdtype(data.data[k].dtype, np.number)]
+        column_selector = bokeh.models.Select(value=column_name, options=options)
+
+        timeline_callback = bokeh.models.CustomJS(
+            args={"timeline": timeline, "data": data, "yaxis": plot.yaxis[0]},
+            code="""
+                timeline.glyph.y.field = this.value
+                yaxis.axis_label = this.value
+                data.change.emit()
+            """,
+        )
+        column_selector.js_on_change("value", timeline_callback)
+        plot = bokeh.layouts.row([column_selector, plot])
+
     return plot
 
 
@@ -128,7 +152,7 @@ def create_visit_table(
         "filter",
     ],
     show: bool = True,
-    **data_table_kwargs: Optional[Any]
+    **data_table_kwargs: Optional[Any],
 ) -> bokeh.models.ui.ui_element.UIElement:
     """Create an interactive table of visits.
 
