@@ -178,10 +178,18 @@ def create_visit_table(
         if isinstance(visits, bokeh.models.ColumnarDataSource)
         else bokeh.models.ColumnDataSource(visits)
     )
-    columns = [
+    date_columns = []
+    for date_colname in ['start_date', 'observationStartDatetime64']:
+        if date_colname in data.column_names:
+            date_columns = [bokeh.models.TableColumn(field="start_date", title="UTC Time", formatter=bokeh.models.DateFormatter(format="%H:%M:%S"))]
+            visible_column_names = [date_colname] + visible_column_names
+            break
+
+    data_columns = [
         bokeh.models.TableColumn(field=cn, title=cn, name=f"tablecol{cn}", visible=cn in visible_column_names)
         for cn in data.column_names
     ]
+    columns = date_columns + data_columns
     visit_table = bokeh.models.DataTable(source=data, columns=columns, reorderable=False, **data_table_kwargs)
     multi_choice = bokeh.models.MultiChoice(value=visible_column_names, options=data.column_names, height=128)
 
