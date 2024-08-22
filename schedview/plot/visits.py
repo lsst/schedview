@@ -188,6 +188,7 @@ def create_visit_table(
     data_columns = [
         bokeh.models.TableColumn(field=cn, title=cn, name=f"tablecol{cn}", visible=cn in visible_column_names)
         for cn in data.column_names
+        if cn != date_colname
     ]
     columns = date_columns + data_columns
     visit_table = bokeh.models.DataTable(source=data, columns=columns, reorderable=False, **data_table_kwargs)
