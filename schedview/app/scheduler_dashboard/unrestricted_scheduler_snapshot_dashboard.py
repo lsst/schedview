@@ -227,25 +227,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self.summary_widget.selection = [0]
         self._do_not_trigger_update = False
 
-        # Suggestion: here the fragment is used again
-        self.compute_survey_maps()
-        self.survey_map = self.param["survey_map"].objects[-1]
-        self._map_name = self.survey_map.split("@")[0].strip()
-
-        self.create_sky_map_base()
-        self.update_sky_map_with_survey_map()
-        self.param.trigger("_publish_map")
-
-        self.make_reward_df()
-        self.create_reward_widget()
-        self.param.trigger("_publish_reward_widget")
-
-        self._display_dashboard_data = True
-        self._display_reward = False
-        self.param.trigger("_update_headings")
-
-        self.show_loading_indicator = False
-        # --------------------------------End of fragment
+        self._update_map_and_rewards()
 
     @param.depends("widget_datetime", watch=True)
     def _update_mjd_from_picker(self):
@@ -287,7 +269,10 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self.summary_widget.selection = [0]
         self._do_not_trigger_update = False
 
-        # Suggestion: here the fragment is used again
+        self._update_map_and_rewards()
+
+    def _update_map_and_rewards(self):
+        """Update map, reward widget and headings."""
         self.compute_survey_maps()
         self.survey_map = self.param["survey_map"].objects[-1]
         self._map_name = self.survey_map.split("@")[0].strip()
@@ -305,7 +290,6 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self.param.trigger("_update_headings")
 
         self.show_loading_indicator = False
-        # --------------------------------End of fragment
 
     @param.depends("url_mjd", watch=True)
     def _update_mjd_from_url(self):
@@ -344,26 +328,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self.summary_widget.selection = [0]
         self._do_not_trigger_update = False
 
-        # Suggestion: Should this fragment be separated into a function?
-        # it is used 3x in functions.
-        self.compute_survey_maps()
-        self.survey_map = self.param["survey_map"].objects[-1]
-        self._map_name = self.survey_map.split("@")[0].strip()
-
-        self.create_sky_map_base()
-        self.update_sky_map_with_survey_map()
-        self.param.trigger("_publish_map")
-
-        self.make_reward_df()
-        self.create_reward_widget()
-        self.param.trigger("_publish_reward_widget")
-
-        self._display_dashboard_data = True
-        self._display_reward = False
-        self.param.trigger("_update_headings")
-
-        self.show_loading_indicator = False
-        # --------------------------------End of fragment
+        self._update_map_and_rewards()
 
     @param.depends("widget_tier", watch=True)
     def _update_tier(self):
