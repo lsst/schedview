@@ -139,7 +139,6 @@ def mock_schedulers_df():
     return df["url"]
 
 
-# Suggestion: Move to a utils module
 def get_sky_brightness_date_bounds():
     """Load available datetime range from SkyBrightness_Pre files.
 
