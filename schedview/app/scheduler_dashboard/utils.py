@@ -152,7 +152,6 @@ def get_sky_brightness_date_bounds():
     return (min_date, max_date)
 
 
-# Suggestion: Move to a utils module
 def url_formatter(dataframe_row, name_column, url_column):
     """Format survey name as a HTML href to survey URL (if URL exists).
 
