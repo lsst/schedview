@@ -1,7 +1,6 @@
 import importlib.resources
 
 import bokeh
-from astropy.time import Time
 
 # Change styles using CSS variables.
 h1_stylesheet = """
@@ -29,7 +28,6 @@ h3_stylesheet = """
 }
 """
 
-DEFAULT_CURRENT_TIME = Time.now()
 DEFAULT_TIMEZONE = "UTC"  # "America/Santiago"
 LOGO = "/schedview-snapshot/assets/lsst_white_logo.png"
 COLOR_PALETTES = [color for color in bokeh.palettes.__palettes__ if "256" in color]
