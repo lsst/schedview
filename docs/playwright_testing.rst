@@ -73,4 +73,3 @@ Run test generator from another terminal:
 ::
 
  playwright codegen http://localhost:8080/schedview-snapshot/dashboard
-

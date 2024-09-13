@@ -90,6 +90,7 @@ line_length = 110
 [tool.ruff]
 exclude = [
     "__init__.py",
+    "notebooks",
 ]
 ignore = [
     "N802",

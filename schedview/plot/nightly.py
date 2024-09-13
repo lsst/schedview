@@ -6,6 +6,7 @@ import colorcet
 import numpy as np
 
 from .visitmap import BAND_COLORS
+from .visits import visits_tooltips
 
 DEFAULT_EVENT_LABELS = {
     "sunset": "sunset",
@@ -39,78 +40,6 @@ BAND_SHAPES = {
     "g": "diamond",
     "u": "triangle",
 }
-
-
-def _visits_tooltips(visits, weather=False):
-    deg = "\u00b0"
-    tooltips = [
-        (
-            "Start time",
-            "@start_date{%F %T} UTC (mjd=@observationStartMJD{00000.00}, LST=@observationStartLST"
-            + deg
-            + ")",
-        ),
-        ("flush by mjd", "@flush_by_mjd{00000.00}"),
-        ("Note", "@note"),
-        ("Filter", "@filter"),
-        (
-            "Field coordinates",
-            "RA=@fieldRA" + deg + ", Decl=@fieldDec" + deg + ", Az=@azimuth" + deg + ", Alt=@altitude" + deg,
-        ),
-        ("Parallactic angle", "@paraAngle" + deg),
-        ("Rotator angle", "@rotTelPos" + deg),
-        ("Rotator angle (backup)", "@rotTelPos_backup" + deg),
-        ("Cumulative telescope azimuth", "@cummTelAz" + deg),
-        ("Airmass", "@airmass"),
-        ("Moon distance", "@moonDistance" + deg),
-        (
-            "Moon",
-            "RA=@sunRA"
-            + deg
-            + ", Decl=@sunDec"
-            + deg
-            + ", Az=@sunAz"
-            + deg
-            + ", Alt=@sunAlt"
-            + deg
-            + ", phase=@moonPhase"
-            + deg,
-        ),
-        (
-            "Sun",
-            "RA=@moonRA"
-            + deg
-            + ", Decl=@moonDec"
-            + deg
-            + ", Az=@moonAz"
-            + deg
-            + ", Alt=@moonAlt"
-            + deg
-            + ", elong=@solarElong"
-            + deg,
-        ),
-        ("Sky brightness", "@skyBrightness mag arcsec^-2"),
-        ("Exposure time", "@visitExposureTime seconds (@numExposures exposures)"),
-        ("Visit time", "@visitTime seconds"),
-        ("Slew distance", "@slewDistance" + deg),
-        ("Slew time", "@slewTime seconds"),
-        ("Field ID", "@fieldId"),
-        ("Proposal ID", "@proposalId"),
-        ("Block ID", "@block_id"),
-        ("Scripted ID", "@scripted_id"),
-    ]
-
-    if weather:
-        tooltips += [
-            (
-                "Seeing",
-                '@seeingFwhm500" (500nm), @seeingFwhmEff" (Eff), @seeingFwhmGeom" (Geom)',
-            ),
-            ("Cloud", "@cloud"),
-            ("5-sigma depth", "@fiveSigmaDepth"),
-        ]
-
-    return tooltips
 
 
 def _add_almanac_events(fig, almanac_events, event_labels, event_colors):
@@ -198,7 +127,7 @@ def plot_airmass_vs_time(
 
     hover_tool = bokeh.models.HoverTool()
     hover_tool.renderers = fig.select({"name": "visit_airmass"})
-    hover_tool.tooltips = _visits_tooltips(visits)
+    hover_tool.tooltips = visits_tooltips()
     hover_tool.formatters = {"@start_date": "datetime"}
     fig.add_tools(hover_tool)
 
@@ -327,7 +256,7 @@ def plot_alt_vs_time(
 
     hover_tool = bokeh.models.HoverTool()
     hover_tool.renderers = fig.select({"name": "visit_altitude"})
-    hover_tool.tooltips = _visits_tooltips(visits)
+    hover_tool.tooltips = visits_tooltips()
     hover_tool.formatters = {"@start_date": "datetime"}
     fig.add_tools(hover_tool)
 
@@ -539,7 +468,7 @@ def plot_polar_alt_az(visits, band_shapes=BAND_SHAPES, figure=None, legend=True)
 
     hover_tool = bokeh.models.HoverTool()
     hover_tool.renderers = fig.select({"name": "visit_altitude"})
-    hover_tool.tooltips = _visits_tooltips(visits)
+    hover_tool.tooltips = visits_tooltips()
     hover_tool.formatters = {"@start_date": "datetime"}
     fig.add_tools(hover_tool)
 
