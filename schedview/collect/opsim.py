@@ -4,6 +4,7 @@ import pandas as pd
 import yaml
 from astropy.time import Time
 from lsst.resources import ResourcePath
+from rubin_scheduler.scheduler.utils import SchemaConverter
 from rubin_scheduler.utils import ddf_locations
 
 try:
@@ -11,53 +12,13 @@ try:
 except ModuleNotFoundError:
     pass
 
-DEFAULT_VISITS_COLUMNS = [
-    "observationId",
-    "fieldRA",
-    "fieldDec",
-    "observationStartMJD",
-    "flush_by_mjd",
-    "visitExposureTime",
-    "filter",
-    "rotSkyPos",
-    "rotSkyPos_desired",
-    "numExposures",
-    "airmass",
-    "seeingFwhm500",
-    "seeingFwhmEff",
-    "seeingFwhmGeom",
-    "skyBrightness",
-    "night",
-    "slewTime",
-    "visitTime",
-    "slewDistance",
-    "fiveSigmaDepth",
-    "altitude",
-    "azimuth",
-    "paraAngle",
-    "cloud",
-    "moonAlt",
-    "sunAlt",
-    "note",
-    "target",
-    "fieldId",
-    "proposalId",
-    "block_id",
-    "observationStartLST",
-    "rotTelPos",
-    "rotTelPos_backup",
-    "moonAz",
-    "sunAz",
-    "sunRA",
-    "sunDec",
-    "moonRA",
-    "moonDec",
-    "moonDistance",
-    "solarElong",
-    "moonPhase",
-    "cummTelAz",
-    "scripted_id",
-]
+
+def _all_visits_columns():
+    """Return all visits columns understood by the current rubin_scheduler."""
+    schema_converter = SchemaConverter()
+    current_cols = set(schema_converter.convert_dict.keys())
+    backwards_cols = set(schema_converter.backwards.keys())
+    return current_cols.union(backwards_cols)
 
 
 def read_opsim(
@@ -65,7 +26,7 @@ def read_opsim(
     start_time=None,
     end_time=None,
     constraint=None,
-    dbcols=DEFAULT_VISITS_COLUMNS,
+    dbcols=None,
     **kwargs,
 ):
     """Read visits from an opsim database.
@@ -80,8 +41,9 @@ def read_opsim(
         The end time for visits ot be loaded
     constraint : `str`, None
         Query for which visits to load.
-    dbcols : `list` [`str`]
-        Columns required from the database.
+    dbcols : `None` or `list` [`str`]
+        Columns required from the database. Defaults to None, which queries
+        all columns known to rubin_scheduler.
     **kwargs
         Passed to `maf.get_sim_data`, if `rubin_sim` is available.
 
@@ -121,6 +83,12 @@ def read_opsim(
 
     with obs_path.as_local() as local_obs_path:
         with sqlite3.connect(local_obs_path.ospath) as sim_connection:
+            if dbcols is None:
+                col_query = "SELECT name FROM PRAGMA_TABLE_INFO('observations')"
+                dbcols = [
+                    c for c in pd.read_sql(col_query, sim_connection).name if c in _all_visits_columns()
+                ]
+
             try:
                 visits = pd.DataFrame(maf.get_sim_data(sim_connection, constraint, dbcols, **kwargs))
             except NameError as e:
@@ -147,6 +115,7 @@ def read_opsim(
                         visits.observationStartMJD + 2400000.5, origin="julian", unit="D", utc=True
                     )
 
+    visits.rename(columns=SchemaConverter().backwards, inplace=True)
     visits.set_index("observationId", inplace=True)
 
     return visits
@@ -156,7 +125,7 @@ def read_ddf_visits(
     opsim_uri,
     start_time=None,
     end_time=None,
-    dbcols=DEFAULT_VISITS_COLUMNS,
+    dbcols=None,
     **kwargs,
 ):
     """Read DDF visits from an opsim database.
@@ -169,8 +138,9 @@ def read_ddf_visits(
         The start time for visits to be loaded
     end_time : `str`, `astropy.time.Time`
         The end time for visits ot be loaded
-    dbcols : `list` [`str`]
-        Columns required from the database.
+    dbcols : `None` or `list` [`str`]
+        Columns required from the database. Defaults to None, which queries
+        all columns known to rubin_scheduler.
     stackers : `list` [`rubin_sim.maf.stackers`], optional
         Stackers to be used to generate additional columns.
 
@@ -179,6 +149,7 @@ def read_ddf_visits(
     visits : `pandas.DataFrame`
         The visits and their parameters.
     """
+
     ddf_field_names = tuple(ddf_locations().keys())
     constraint = f"target IN {tuple(field_name for field_name in ddf_field_names)}"
     visits = read_opsim(
