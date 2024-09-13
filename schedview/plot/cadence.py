@@ -37,7 +37,7 @@ def create_cadence_plot(
         The bokeh plot with cadence plots for all targets.
     """
     if targets is None:
-        targets = tuple(nightly_totals.index.get_level_values("target").unique())
+        targets = tuple(nightly_totals.index.get_level_values("target_name").unique())
 
     date_factors = [Time(mjd, format="mjd").iso[:10] for mjd in np.arange(start_dayobs_mjd, end_dayobs_mjd)]
     band_factors = cmap.transform.factors
