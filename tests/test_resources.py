@@ -44,7 +44,7 @@ class TestCollectOpsim(unittest.TestCase):
         # range that does not include DDFs.
         resource_path = ResourcePath(get_baseline())
         visits = read_ddf_visits(resource_path, Time("2026-11-01"), Time("2026-12-01"))
-        self.assertTrue("target" in visits.columns)
+        self.assertTrue("target_name" in visits.columns)
         self.assertGreater(len(visits), 0)
 
 
