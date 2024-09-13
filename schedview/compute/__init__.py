@@ -1,6 +1,7 @@
 __all__ = [
     "convert_evening_date_to_night_of_survey",
     "night_events",
+    "compute_sun_moon_positions",
     "LsstCameraFootprintPerimeter",
     "replay_visits",
     "compute_basis_function_reward_at_time",
@@ -15,7 +16,7 @@ __all__ = [
     "visits",
 ]
 
-from .astro import convert_evening_date_to_night_of_survey, night_events
+from .astro import compute_sun_moon_positions, convert_evening_date_to_night_of_survey, night_events
 from .camera import LsstCameraFootprintPerimeter
 from .scheduler import (
     compute_basis_function_reward_at_time,

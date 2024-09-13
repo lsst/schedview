@@ -1,4 +1,3 @@
-import sqlite3
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -10,12 +9,12 @@ __all__ = ["compute_metric_by_visit"]
 
 
 def _visits_to_opsim(visits, opsim):
-    # Only write columns in visits that are in opsim databases,
-    # thereby avoiding added columns that might not be types
-    # that can be written to sqlite databases.
-    opsim_columns = list(SchemaConverter().convert_dict.keys())
-    with sqlite3.connect(opsim) as connection:
-        visits.reset_index()[opsim_columns].to_sql("observations", connection, index=False)
+    # Take advantage of the schema migration code in SchemaConverter to make
+    # sure we have the correct column names
+
+    schema_converter = SchemaConverter()
+    obs = schema_converter.opsimdf2obs(visits)
+    schema_converter.obs2opsim(obs, filename=opsim)
 
 
 def compute_metric(visits, metric_bundle):
