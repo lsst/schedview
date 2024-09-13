@@ -138,7 +138,9 @@ def read_opsim(
 
             try:
                 try:
-                    visits = pd.DataFrame(maf.get_sim_data(sim_connection, constraint, norm_columns, **kwargs))
+                    visits = pd.DataFrame(
+                        maf.get_sim_data(sim_connection, constraint, norm_columns, **kwargs)
+                    )
                 except UserWarning:
                     warn("No visits match constraints.")
                     visits = (
@@ -198,8 +200,9 @@ def read_ddf_visits(
         The start time for visits to be loaded
     end_time : `str`, `astropy.time.Time`
         The end time for visits ot be loaded
-    dbcols : `list` [`str`]
-        Columns required from the database.
+    dbcols : `Note` oc `list` [`str`]
+        Columns required from the database. Defaults to None,
+        which uses all columns in the database.
     stackers : `list` [`rubin_sim.maf.stackers`], optional
         Stackers to be used to generate additional columns.
 
