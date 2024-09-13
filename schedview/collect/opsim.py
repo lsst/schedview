@@ -96,7 +96,11 @@ def read_opsim(
                     visits = pd.DataFrame(maf.get_sim_data(sim_connection, constraint, dbcols, **kwargs))
                 except UserWarning:
                     warn("No visits match constraints.")
-                    visits = pd.DataFrame(rubin_scheduler.scheduler.utils.empty_observation()).drop(index=0)
+                    visits = (
+                        SchemaConverter()
+                        .obs2opsim(rubin_scheduler.scheduler.utils.empty_observation())
+                        .drop(index=0)
+                    )
                     if "observationId" not in visits.columns and "ID" in visits.columns:
                         visits.rename(columns={"ID": "observationId"}, inplace=True)
             except NameError as e:
