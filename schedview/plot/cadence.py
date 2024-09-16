@@ -13,7 +13,8 @@ def create_cadence_plot(
     Parameters
     ----------
     nightly_totals : `pandas.DataFrame`
-        A DataFrame indexed by ``"target"`` (`str`) and ``"day_obs_iso8601"``
+        A DataFrame indexed by ``"targe_name"`` (`str`) and
+        ``"day_obs_iso8601"``
         (`str` in YYYY-MM-DD format), filter names as column names (`float`),
         with total effective exposure times.
     start_dayobs_mjd : `float`
