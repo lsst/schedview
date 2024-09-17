@@ -14,10 +14,12 @@ __all__ = [
     "compute_metric_by_visit",
     "compute_hpix_metric_in_bands",
     "visits",
+    "often_repeated_fields",
 ]
 
 from .astro import compute_sun_moon_positions, convert_evening_date_to_night_of_survey, night_events
 from .camera import LsstCameraFootprintPerimeter
+from .multisim import often_repeated_fields
 from .scheduler import (
     compute_basis_function_reward_at_time,
     compute_basis_function_rewards,
