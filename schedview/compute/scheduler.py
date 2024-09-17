@@ -248,8 +248,8 @@ def create_example(
             observatory, scheduler, observations, reward_df, obs_rewards = sim_runner(
                 observatory,
                 scheduler,
-                mjd_start=survey_start.mjd,
-                survey_length=sim_duration,
+                sim_start_mjd=survey_start.mjd,
+                sim_duration=sim_duration,
                 record_rewards=True,
             )
             reward_df.to_hdf(rewards_fname, "reward_df")
@@ -258,8 +258,8 @@ def create_example(
             observatory, scheduler, observations = sim_runner(
                 observatory,
                 scheduler,
-                mjd_start=survey_start.mjd,
-                survey_length=sim_duration,
+                sim_start_mjd=survey_start.mjd,
+                sim_duration=sim_duration,
             )
 
         if opsim_db_fname is not None:

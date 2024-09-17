@@ -107,24 +107,24 @@ def make_sample_test_data():
         np.floor(observatory.almanac.sunsets["sunset"] + observatory.site.longitude / 360) == evening_mjd
     )
 
-    mjd_start = observatory.almanac.sunsets[this_night]["sun_n12_setting"][0]
-    mjd_end = observatory.almanac.sunsets[this_night]["sunrise"][0]
+    sim_start_mjd = observatory.almanac.sunsets[this_night]["sun_n12_setting"][0]
+    sim_end_mjd = observatory.almanac.sunsets[this_night]["sunrise"][0]
 
     if args.duration is not None:
         duration = args.duration / 24.0
     else:
-        duration = mjd_end - mjd_start
+        duration = sim_end_mjd - sim_start_mjd
 
-    observatory = ModelObservatory(mjd_start=mjd_start)
+    observatory = ModelObservatory(mjd_start=sim_start_mjd)
 
-    scheduler = example_scheduler(mjd_start=mjd_start)
+    scheduler = example_scheduler(mjd_start=sim_start_mjd)
     scheduler.keep_rewards = True
 
     observatory, scheduler, observations, reward_df, obs_rewards = sim_runner(
         observatory,
         scheduler,
-        mjd_start=mjd_start,
-        survey_length=duration,
+        sim_start_mjd=sim_start_mjd,
+        sim_duration=duration,
         record_rewards=True,
     )
 

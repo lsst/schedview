@@ -98,8 +98,8 @@ For example, to return the data when running ``sim_runner``:
     >>> observatory, scheduler, observations, reward_df, obs_rewards = sim_runner(
     ...     observatory,
     ...     scheduler,
-    ...     mjd_start=mjd_start,
-    ...     survey_length=night_duration,
+    ...     sim_start_mjd=mjd_start,
+    ...     sim_duration=night_duration,
     ...     record_rewards=True,
     ... )
 
