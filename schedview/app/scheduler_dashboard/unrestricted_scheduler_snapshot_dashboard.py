@@ -206,7 +206,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
             return
 
         # Current fix for _conditions.mjd having different datatypes.
-        if type(self._conditions._mjd) == np.ndarray:
+        if type(self._conditions._mjd) is np.ndarray:
             self._conditions._mjd = self._conditions._mjd[0]
 
         # Get mjd from pickle and set widget and URL to match.
