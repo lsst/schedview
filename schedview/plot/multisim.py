@@ -5,7 +5,10 @@ from typing import List
 import bokeh
 import bokeh.core.enums
 import bokeh.models
+import bokeh.plotting
 import colorcet
+
+import schedview.plot
 
 SimIndicators = namedtuple("SimIndicators", ("color_mapper", "color_dict", "marker_mapper", "hatch_dict"))
 
@@ -71,3 +74,49 @@ def generate_sim_indicators(sim_labels: List[str]):
     sim_hatch_dict = dict(zip(factors, all_hatches[: len(factors)]))
 
     return SimIndicators(color_mapper, color_dict, marker_mapper, sim_hatch_dict)
+
+
+def plot_alt_airmass_vs_time(visits_ds, fig=None, scatter_user_kwargs={}):
+    """Plot alt and airmass vs. time for visits from multiple simulations.
+
+    Parameters
+    ----------
+    visits_ds : `bokeh.models.ColumnDataSource`
+        The table of visits.
+    fig : `bokeh.plotting.Figure` or `None`
+        The bokeh Figure to use, or None to create one
+    scatter_user_kwargs : `dict`
+        Any additional parameters to be passed
+        to `bokeh.plotting.Figure.scatter`.
+
+    Returns
+    -------
+    fig : `bokeh.plotting.Figure`
+        The figure with the plot.
+    """
+
+    if fig is None:
+        fig = bokeh.plotting.figure(
+            title="Altitude",
+            x_axis_label="Time (UTC)",
+            y_axis_label="Altitude",
+            frame_width=1024,
+            frame_height=633,
+        )
+
+    scatter_kwargs = dict(x="start_date", y="altitude", legend_group="label", source=visits_ds)
+    scatter_kwargs.update(scatter_user_kwargs)
+    fig.scatter(**scatter_kwargs)
+
+    fig.extra_y_ranges = {"airmass": fig.y_range}
+    fig.add_layout(bokeh.models.LinearAxis(), "right")
+    fig.yaxis[1].ticker.desired_num_ticks = fig.yaxis[0].ticker.desired_num_ticks
+    fig.yaxis[1].formatter = schedview.plot.nightly.make_airmass_tick_formatter()
+    fig.yaxis[1].minor_tick_line_alpha = 0
+    fig.yaxis[1].axis_label = "Airmass"
+
+    fig.xaxis[0].ticker = bokeh.models.DatetimeTicker()
+    fig.xaxis[0].formatter = bokeh.models.DatetimeTickFormatter(hours="%H:%M")
+
+    fig.add_layout(fig.legend[0], "below")
+    return fig
