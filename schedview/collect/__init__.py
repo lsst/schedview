@@ -5,6 +5,7 @@ __all__ = [
     "sample_pickle",
     "load_bright_stars",
     "read_ddf_visits",
+    "read_multiple_opsims",
 ]
 
 from .footprint import get_footprint

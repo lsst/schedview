@@ -15,7 +15,7 @@ except ModuleNotFoundError:
     pass
 
 
-def _all_visits_columns():
+def all_visits_columns():
     """Return all visits columns understood by the current rubin_scheduler."""
     schema_converter = SchemaConverter()
     current_cols = set(schema_converter.convert_dict.keys())
@@ -127,7 +127,7 @@ def read_opsim(
             if dbcols is None:
                 col_query = "SELECT name FROM PRAGMA_TABLE_INFO('observations')"
                 raw_dbcols = [
-                    c for c in pd.read_sql(col_query, sim_connection).name if c in _all_visits_columns()
+                    c for c in pd.read_sql(col_query, sim_connection).name if c in all_visits_columns()
                 ]
 
                 # Update any outdated column names
