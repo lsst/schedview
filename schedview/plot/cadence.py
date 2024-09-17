@@ -13,7 +13,8 @@ def create_cadence_plot(
     Parameters
     ----------
     nightly_totals : `pandas.DataFrame`
-        A DataFrame indexed by ``"target"`` (`str`) and ``"day_obs_iso8601"``
+        A DataFrame indexed by ``"targe_name"`` (`str`) and
+        ``"day_obs_iso8601"``
         (`str` in YYYY-MM-DD format), filter names as column names (`float`),
         with total effective exposure times.
     start_dayobs_mjd : `float`
@@ -37,7 +38,7 @@ def create_cadence_plot(
         The bokeh plot with cadence plots for all targets.
     """
     if targets is None:
-        targets = tuple(nightly_totals.index.get_level_values("target").unique())
+        targets = tuple(nightly_totals.index.get_level_values("target_name").unique())
 
     date_factors = [Time(mjd, format="mjd").iso[:10] for mjd in np.arange(start_dayobs_mjd, end_dayobs_mjd)]
     band_factors = cmap.transform.factors
