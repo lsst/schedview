@@ -31,11 +31,12 @@ __all__ = [
     "create_cadence_plot",
     "create_visit_table",
     "generate_sim_indicators",
+    "overplot_kernel_density_estimates",
 ]
 
 from .cadence import create_cadence_plot
 from .colors import PLOT_FILTER_CMAP, PLOT_FILTER_COLORS
-from .multisim import generate_sim_indicators
+from .multisim import generate_sim_indicators, overplot_kernel_density_estimates
 from .nightbf import plot_infeasible, plot_rewards
 from .nightly import plot_airmass_vs_time, plot_alt_vs_time, plot_polar_alt_az
 from .overhead import create_overhead_histogram, create_overhead_summary_table, plot_overhead_vs_slew_distance

@@ -1,12 +1,15 @@
 from collections import namedtuple
 from math import ceil
-from typing import List
+from typing import List, Literal
 
 import bokeh
 import bokeh.core.enums
 import bokeh.models
 import bokeh.plotting
 import colorcet
+import numpy as np
+import pandas as pd
+from sklearn.neighbors import KernelDensity
 
 import schedview.plot
 
@@ -76,14 +79,18 @@ def generate_sim_indicators(sim_labels: List[str]):
     return SimIndicators(color_mapper, color_dict, marker_mapper, sim_hatch_dict)
 
 
-def plot_alt_airmass_vs_time(visits_ds, fig=None, scatter_user_kwargs={}):
+def plot_alt_airmass_vs_time(
+    visits_ds: bokeh.models.ColumnDataSource,
+    fig: bokeh.plotting.figure | None = None,
+    scatter_user_kwargs: dict = {},
+) -> bokeh.plotting.figure:
     """Plot alt and airmass vs. time for visits from multiple simulations.
 
     Parameters
     ----------
     visits_ds : `bokeh.models.ColumnDataSource`
         The table of visits.
-    fig : `bokeh.plotting.Figure` or `None`
+    fig : `bokeh.plotting.figure` or `None`
         The bokeh Figure to use, or None to create one
     scatter_user_kwargs : `dict`
         Any additional parameters to be passed
@@ -117,6 +124,72 @@ def plot_alt_airmass_vs_time(visits_ds, fig=None, scatter_user_kwargs={}):
 
     fig.xaxis[0].ticker = bokeh.models.DatetimeTicker()
     fig.xaxis[0].formatter = bokeh.models.DatetimeTickFormatter(hours="%H:%M")
+
+    fig.add_layout(fig.legend[0], "below")
+    return fig
+
+
+def overplot_kernel_density_estimates(
+    visits: pd.DataFrame,
+    column: str,
+    x_points: np.ndarray,
+    bandwidth: float,
+    colors: dict | None = None,
+    hatches: dict | None = None,
+    kernel: Literal["gaussian", "tophat", "epanechnikov", "exponential", "linear", "cosine"] = "epanechnikov",
+    fig: bokeh.plotting.figure | None = None,
+) -> bokeh.plotting.figure:
+    """Overplot density estimates of distributions from different sims.
+
+    Paramaters
+    ----------
+    visits : `pandas.DataFrame`
+        The visits.
+    column : `str`
+        The column in the visits table of which to estimate the distribution.
+    x_points : `np.ndarray`
+        An array of points at which to compute the density estimates.
+    bandwith : `float`
+        The kernel bandwidth.
+    colors : `dict`
+        A mapping from sim label to bokeh color.
+    hatches : `dict`
+        A mapping from sim label to bokeh hatch pattern.
+    kernel : `str`
+        The kernel to use. See the sklearn.neighbors.KernelDensity
+        documentation for the options and what they mean.
+    fig: `bokeh.plotting.figure` or None
+        The figure on which to plot. None creates a new figure.
+
+    Returns
+    -------
+    fig: `bokeh.plotting.figure`
+        The figure with the plot.
+    """
+
+    if fig is None:
+        fig = bokeh.plotting.figure(width=1024, height=633, title=column)
+
+    sim_labels = visits["label"].unique()
+    for sim_label in sim_labels:
+        this_sim_data = visits.set_index("label").loc[sim_label, column]
+        if not isinstance(this_sim_data, pd.Series):
+            # Maybe just one visit in a sim, in which case this_sim_data
+            # will be a scalar.
+            this_sim_data = pd.Series([this_sim_data])
+
+        kde = KernelDensity(kernel=kernel, bandwidth=bandwidth).fit(this_sim_data.values[:, np.newaxis])
+        prob_density = np.exp(kde.score_samples(x_points[:, np.newaxis]))
+
+        varea_kwargs = dict(fill_alpha=0.1, legend_label=sim_label)
+
+        if colors is not None:
+            varea_kwargs["color"] = colors[sim_label]
+
+        if hatches is not None:
+            varea_kwargs["hatch_pattern"] = hatches[sim_label]
+
+        fig.varea(x_points, prob_density, 0, **varea_kwargs)
 
     fig.add_layout(fig.legend[0], "below")
     return fig
