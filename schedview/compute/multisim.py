@@ -26,3 +26,21 @@ def often_repeated_fields(visits: pd.DataFrame, min_counts: int = 4):
         .set_index("sim_index", append=True)
     )
     return often_repeated_fields, often_repeated_field_stats
+
+
+def count_visits_by_sim(
+    visits,
+    sim_identifier_column="sim_index",
+    visit_spec_columns=("fieldRA", "fieldDec", "filter", "visitExposureTime"),
+):
+    visit_counts = (
+        visits.groupby([sim_identifier_column] + list(visit_spec_columns))
+        .count()
+        .iloc[:, 0]
+        .rename("count")
+        .reset_index()
+        .pivot(index=list(visit_spec_columns), columns=[sim_identifier_column], values="count")
+        .fillna(0)
+        .astype(int)
+    )
+    return visit_counts
