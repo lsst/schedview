@@ -29,7 +29,7 @@ def visits_tooltips(weather: bool = False) -> list:
             + ")",
         ),
         ("flush by mjd", "@flush_by_mjd{00000.00}"),
-        ("Note", "@note"),
+        ("Scheduler note", "@scheduler_note"),
         ("Filter", "@filter"),
         (
             "Field coordinates",
@@ -104,7 +104,9 @@ def plot_visits(visits):
     figure : `hvplot.ui.hvDataFrameExplorer`
         The figure itself.
     """
-    visit_explorer = hvplot.explorer(visits, kind="scatter", x="start_date", y="airmass", by=["note"])
+    visit_explorer = hvplot.explorer(
+        visits, kind="scatter", x="start_date", y="airmass", by=["scheduler_note"]
+    )
     return visit_explorer
 
 
