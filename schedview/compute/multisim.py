@@ -6,6 +6,24 @@ import pandas as pd
 
 
 def often_repeated_fields(visits: pd.DataFrame, min_counts: int = 4):
+    """Find often repeated fields in a table of visits.
+
+    Parameters
+    ----------
+    visits : `pandas.DataFrame`
+        The visits.
+    min_counts : `int`
+        The minimum visits in a single simulation a field must have to be
+        considererd "often visited".
+
+    Returns
+    -------
+    often_repeated_fields: `pandas.DataFrame`
+        The table of repeated field parameters
+        (fieldRA, fieldDec, filter).
+    often_repeated_field_stats: `pandas.DataFrame`
+        Statistics on the repetitions of each field.
+    """
     field_repeats: pd.DataFrame = visits.groupby(["fieldRA", "fieldDec", "filter", "sim_index"]).agg(
         {"start_date": ["count", "min", "max"], "label": "first"}
     )
