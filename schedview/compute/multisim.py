@@ -29,7 +29,7 @@ def often_repeated_fields(visits: pd.DataFrame, min_counts: int = 4):
         .loc[often_repeated_fields, :]
         .set_index("sim_index", append=True)
     )
-    return often_repeated_fields, often_repeated_field_stats
+    return often_repeated_fields.to_frame(), often_repeated_field_stats
 
 
 def count_visits_by_sim(
