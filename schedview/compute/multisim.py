@@ -135,7 +135,7 @@ def count_visits_by_sim(
 
 
 def fraction_common(visit_counts: pd.DataFrame, sim1: Hashable, sim2: Hashable, match_count: bool = True):
-    """_summary_
+    """Count the fraction of visits in simulation 2 that it has with sim 1.
 
     Parameters
     ----------
@@ -166,9 +166,10 @@ def fraction_common(visit_counts: pd.DataFrame, sim1: Hashable, sim2: Hashable, 
     these_visit_counts = visit_counts[visit_counts[sim2] > 0]
 
     if not match_count:
-        # Count any number of repetitons of a field only once
-        for sim in sim1, sim2:
-            these_visit_counts.loc[these_visit_counts[sim] > 0, sim] = 1
+        # if we are not matching counts, visits in sim1 can match any number
+        # of visits is sim2.
+        present_in_sim1 = these_visit_counts.loc[:, sim1] > 0
+        these_visit_counts.loc[present_in_sim1, sim1] = np.iinfo(np.int32).max
 
     num_common_visits = these_visit_counts[[sim2, sim1]].min(axis="columns").sum()
     num_visits2 = these_visit_counts[sim2].sum()
@@ -176,7 +177,34 @@ def fraction_common(visit_counts: pd.DataFrame, sim1: Hashable, sim2: Hashable, 
     return fraction_common
 
 
-def make_fraction_common_matrix(visit_counts, match_count=True, sim_indexes=None):
+def make_fraction_common_matrix(
+    visit_counts: pd.DataFrame, match_count: bool = True, sim_indexes: list | None = None
+):
+    """Create a matric showing overlap fractions between different simulations.
+
+    Parameters
+    ----------
+    visit_counts : `pd.DataFrame`
+        A data frame in which each row corresponds to a set of visits on a
+        common field, each row to a simulation, and the value in each cell
+        the number of visits to the field in each simulation.
+    match_count : `bool`, optional
+        Match visits "one to one" acress simulations if True, (potentialy)
+        many to one if False, by default True
+    sim_indexes : `list` or `None`, optional
+        The list of simulations to include. Each value in the list must
+        be a column name in ``visit_counts``. If ``None``, use all columns.
+        By default, ``None``.
+
+    Returns
+    -------
+    common_matrix : `pd.DataFrame`
+        A matrix with one row and column for each value in ``sim_indexes``
+        (or every column in ``visit_counts``, if ``sim_indexes`` was ``None``.)
+        The value in row r, column y is the fraction of visits in simulation y
+        that are also present in simulation r.
+    """
+
     if sim_indexes is None:
         sim_indexes = visit_counts.columns.values
 
