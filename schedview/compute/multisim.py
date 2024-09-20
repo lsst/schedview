@@ -97,6 +97,29 @@ def count_visits_by_sim(
     sim_identifier_column: str = "sim_index",
     visit_spec_columns: tuple[str] = ("fieldRA", "fieldDec", "filter", "visitExposureTime"),
 ) -> pd.DataFrame:
+    """Count the numbers of visits on each field in each simulation.
+
+    Parameters
+    ----------
+    visits : `pd.DataFrame`
+        A table that must include both the columns listed in
+        ``sim_identifier_column`` and ``visit_spec_columns`` (below).
+    sim_identifier_column : `str`, optional
+        A column that uniquely identifies visits, by default "sim_index"
+    visit_spec_columns : `tuple`[`str`], optional
+        Columns that, together, uniquely identify a field that can be visited,
+        by default ("fieldRA", "fieldDec", "filter", "visitExposureTime")
+
+    Returns
+    -------
+    visit_counts : `pd.DataFrame`
+        A table in which columns listed in the ``visit_spec_columns``
+        constitute levels of the `pd.MultiIndex`, and each unique value of
+        the column listed in ``sim_identifier_column`` has a column named
+        after it. The values are the numbers of visits in the corresponding
+        combination of visit parameters in identified simulation.
+    """
+
     visit_counts = (
         visits.groupby([sim_identifier_column] + list(visit_spec_columns))
         .count()
