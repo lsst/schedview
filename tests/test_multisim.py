@@ -78,8 +78,6 @@ class TestMultisim(unittest.TestCase):
                 assert counts_df.loc[tuple(field_row), sim_id] == field_sequence.count(field_id)
 
     def test_common_fraction(self):
-
-        # Test when match_count is True
         visit_counts = schedview.compute.multisim.count_visits_by_sim(self.visits)
         for sim1, field_tuple1 in enumerate(FIELD_SEQUENCE_IN_SIMS):
             for sim2, field_tuple2 in enumerate(FIELD_SEQUENCE_IN_SIMS):
@@ -103,4 +101,18 @@ class TestMultisim(unittest.TestCase):
                     assert test_common_fraction == expected_common_fraction
 
     def test_make_fraction_common_matrix(self):
-        pass
+        visit_counts = schedview.compute.multisim.count_visits_by_sim(self.visits)
+        common_fraction_matrix = schedview.compute.multisim.make_fraction_common_matrix(visit_counts)
+        common_fraction_matrix_unmatched = schedview.compute.multisim.make_fraction_common_matrix(
+            visit_counts, match_count=False
+        )
+        for sim1 in range(len(FIELD_SEQUENCE_IN_SIMS)):
+            for sim2 in range(len(FIELD_SEQUENCE_IN_SIMS)):
+                matched_common_fraction = common_fraction_matrix.loc[sim1, sim2]
+                assert matched_common_fraction == schedview.compute.multisim.fraction_common(
+                    visit_counts, sim1, sim2
+                )
+                unmatched_common_fraction = common_fraction_matrix_unmatched.loc[sim1, sim2]
+                assert unmatched_common_fraction == schedview.compute.multisim.fraction_common(
+                    visit_counts, sim1, sim2, match_count=False
+                )
