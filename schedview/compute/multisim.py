@@ -1,5 +1,6 @@
 import itertools
 import math
+from typing import Hashable
 
 import numpy as np
 import pandas as pd
@@ -133,7 +134,34 @@ def count_visits_by_sim(
     return visit_counts
 
 
-def fraction_common(visit_counts, sim1, sim2, match_count=True):
+def fraction_common(visit_counts: pd.DataFrame, sim1: Hashable, sim2: Hashable, match_count: bool = True):
+    """_summary_
+
+    Parameters
+    ----------
+    visit_counts : `pd.DataFrame`
+        A table of the number of counts of field in each simulation.
+        Each row corresponds to a field, and the table must includes
+        columns with the names set by the ``sim1`` and ``sim2`` parameters
+        below. Values are integers.
+    sim1 : `Hashable`
+        The name of the column with the counts for the reference simulation.
+    sim2 : `Hashable`
+        The name of the column with the counts for the comparison simulation.
+    match_count : `bool`, optional
+        Match "one to one" between fields. For example, if sim1 has 4 visits
+        on a field and sim2 has 11, then if match_count is True, then sim1 will
+        be reported as having 4 matches with sim2, and sim2 as 4 matches with
+        sim1. But, if match_count is False, then sim1 will still be reported as
+        having 4 matches with sim2, but sim2 will be reported as having 11
+        matches with sim1.
+        By default True
+
+    Returns
+    -------
+    fraction_common: `float`
+        The fraction of visits in sim2 that it has in common with sim1.
+    """
     # Only count fields for which there is at least one visit in sim1
     these_visit_counts = visit_counts[visit_counts[sim2] > 0]
 
