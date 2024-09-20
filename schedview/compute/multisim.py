@@ -11,7 +11,20 @@ def often_repeated_fields(visits: pd.DataFrame, min_counts: int = 4):
     Parameters
     ----------
     visits : `pandas.DataFrame`
-        The visits.
+        The visits as a DataFrame with the following columns:
+
+        ``fieldRA``
+            R.A. in degrees.
+        ``fieldDec``
+            Declination in degrees.
+        ``filter``
+            The filter.
+        ``sim_index``
+            An ``int`` identifying which simulation a visit came from.
+        ``start_date``
+            The starting ``datetime64[ns, UTC]`` for the visit.
+        ``label``
+            The ``str`` label for the simulation.
     min_counts : `int`
         The minimum visits in a single simulation a field must have to be
         considererd "often visited".
@@ -19,10 +32,39 @@ def often_repeated_fields(visits: pd.DataFrame, min_counts: int = 4):
     Returns
     -------
     often_repeated_fields: `pandas.DataFrame`
-        The table of repeated field parameters
-        (fieldRA, fieldDec, filter).
+        The table of repeated field parameters, with the following columns:
+
+        ``fieldRA``
+            R.A. in degrees.
+        ``fieldDec``
+            Declination in degrees.
+        ``filter``
+            The filter.
     often_repeated_field_stats: `pandas.DataFrame`
         Statistics on the repetitions of each field.
+        The index is a ``pandas.MultiIndex`` with the following levels:
+
+        ``fieldRA``
+            R.A. in degrees.
+        ``fieldDec``
+            Declination in degrees.
+        ``filter``
+            The filter.
+        ``sim_index``
+            An ``int`` identifying which simulation a visit came from.
+
+        The columns are:
+
+        ``count``
+            The (``int``) number of visits in the simulation on the field.
+        ``first_time``
+            The ``datetime64[ns, UTC]`` start time of the first visit to the
+            field in the simulation.
+        ``last_time``
+            The ``datetime64[ns, UTC]`` start time of the last visit to the
+            field in the simulation.
+        ``label``
+            The ``str`` label for the simulation.
     """
     field_repeats: pd.DataFrame = visits.groupby(["fieldRA", "fieldDec", "filter", "sim_index"]).agg(
         {"start_date": ["count", "min", "max"], "label": "first"}
