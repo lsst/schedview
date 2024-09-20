@@ -217,7 +217,31 @@ def make_fraction_common_matrix(
     return common_matrix
 
 
-def match_visits_across_sims(start_times, sim_indexes=(1, 2), max_match_dist=np.inf):
+def match_visits_across_sims(
+    start_times: pd.Series, sim_indexes: tuple[int] = (1, 2), max_match_dist: float = np.inf
+):
+    """Match corresponding visits across two opsim simulations.
+
+    Parameters
+    ----------
+    start_times : `pd.Series`
+        A series of dtype ``datetime64[ns, UTC]`` indexed by simulation id,
+        such that ``start_times.loc[1].iloc[3]`` is the start time of the
+        fourth visit to a field in simulation 1.
+    sim_indexes :  `tuple`[`int`], optional
+        The simulations to compare, by default (1, 2)
+    max_match_dist : `float`, optional
+        The maximum time difference to allow for a match, in seconds,
+        by default np.inf
+
+    Returns
+    -------
+    best_match : `pd.DataFrame`
+        A data frame with one row for each matched visits, columns named for
+        each simulation index with the start times for the matched visits,
+        and a column named ``delta`` with the time difference in seconds.
+    """
+
     for sim_index in sim_indexes:
         if sim_index not in start_times.index:
             return pd.DataFrame({sim_indexes[0]: [], sim_indexes[1]: [], "delta": []})
