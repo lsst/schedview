@@ -67,3 +67,12 @@ class TestMultisim(unittest.TestCase):
             this_field_sequence = FIELD_SEQUENCE_IN_SIMS[row.sim_index]
             specified_count = this_field_sequence.count(field_ids.loc[index_value])  # type: ignore
             assert row["count"] == specified_count
+
+    def test_count_visits_by_sim(self):
+        visit_spec_columns = ("fieldRA", "fieldDec", "filter", "visitExposureTime")
+        counts_df = schedview.compute.multisim.count_visits_by_sim(
+            self.visits, visit_spec_columns=visit_spec_columns
+        )
+        for field_id, field_row in self.fields.loc[:, visit_spec_columns].iterrows():
+            for sim_id, field_sequence in enumerate(FIELD_SEQUENCE_IN_SIMS):
+                assert counts_df.loc[tuple(field_row), sim_id] == field_sequence.count(field_id)
