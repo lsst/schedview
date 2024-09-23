@@ -206,12 +206,14 @@ class SchedulerSnapshotDashboard(param.Parameterized):
             return
 
         # Current fix for _conditions.mjd having different datatypes.
-        if type(self._conditions._mjd) is np.ndarray:
+        if isinstance(self._conditions._mjd, np.ndarray):
+            print("self._conditions._mjd is np.ndarray")
             self._conditions._mjd = self._conditions._mjd[0]
 
         # Get mjd from pickle and set widget and URL to match.
         self._do_not_trigger_update = True
         self.url_mjd = self._conditions._mjd
+        print(type(self._conditions._mjd))
         self.widget_datetime = Time(self._conditions._mjd, format="mjd").to_datetime()
         self._do_not_trigger_update = False
 
@@ -303,7 +305,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         self._do_not_trigger_update = True
         # Set Date Time widget to the mjd value set in URL.
-        self.widget_datetime = Time(self.url_mjd, format="mjd").to_datetime()
+        self.widget_datetime = Time(self.url_mjd, format="mjd").to_datetime()[0]
         self._do_not_trigger_update = False
         # Set the mjd value that's used across the dashboard.
         self._mjd = self.url_mjd
