@@ -1,9 +1,11 @@
 import unittest
 
+import bokeh.models
 import numpy as np
 import pandas as pd
 
 import schedview.compute.multisim
+import schedview.plot.multisim
 
 NUM_TEST_FIELDS = 5
 TEST_RND_SEED = 6563
@@ -145,3 +147,21 @@ class TestMultisim(unittest.TestCase):
             "75%",
             "max",
         )
+
+    def test_generate_sim_indicators(self):
+        sim_labels = ["hen", "ducks", "geese", "oysters"]
+        indicators = schedview.plot.multisim.generate_sim_indicators(sim_labels)
+        assert isinstance(indicators.color_mapper, bokeh.models.CategoricalColorMapper)
+        assert isinstance(indicators.color_dict, dict)
+        assert isinstance(indicators.marker_mapper, bokeh.models.CategoricalMarkerMapper)
+        assert isinstance(indicators.hatch_dict, dict)
+
+    def test_plot_airmass_vs_time(self):
+        fig = schedview.plot.multisim.plot_alt_airmass_vs_time(bokeh.models.ColumnDataSource(self.visits))
+        self.assertIsInstance(fig, bokeh.models.layouts.LayoutDOM)
+
+    def test_overplot_kernel_density_estimates(self):
+        fig = schedview.plot.multisim.overplot_kernel_density_estimates(
+            self.visits, "fieldDec", np.arange(-90, 90, 1), 0.1
+        )
+        self.assertIsInstance(fig, bokeh.models.layouts.LayoutDOM)
