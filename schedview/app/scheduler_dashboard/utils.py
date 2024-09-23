@@ -6,6 +6,7 @@ import pandas as pd
 from astropy.time import Time, TimeDelta
 from lsst.resources import ResourcePath
 from lsst_efd_client import EfdClient
+from rubin_scheduler.skybrightness_pre.sky_model_pre import SkyModelPre
 
 LOCAL_ROOT_URI = {"usdf": "s3://rubin:", "summit": "https://s3.cp.lsst.org/"}
 
@@ -136,3 +137,36 @@ def mock_schedulers_df():
     df = df.sort_index(ascending=False)
     df["url"] = df["url"].apply(lambda x: localize_scheduler_url(x))
     return df["url"]
+
+
+def get_sky_brightness_date_bounds():
+    """Load available datetime range from SkyBrightness_Pre files.
+
+    Returns
+    -------
+    (min_date, max_date): tuple[astropy.time.Time, astropy.time.Time]
+    """
+    sky_model = SkyModelPre()
+    min_date = Time(sky_model.mjd_left.min(), format="mjd")
+    max_date = Time(sky_model.mjd_right.max() - 0.001, format="mjd")
+    return (min_date, max_date)
+
+
+def url_formatter(dataframe_row, name_column, url_column):
+    """Format survey name as a HTML href to survey URL (if URL exists).
+
+    Parameters
+    ----------
+    dataframe_row : 'pandas.core.series.Series'
+        A row of a pandas.core.frame.DataFrame.
+
+    Returns
+    -------
+    survey_name_or_url : 'str'
+        A HTML href or plain string.
+    """
+    if dataframe_row[url_column] == "":
+        return dataframe_row[name_column]
+    else:
+        return f'<a href="{dataframe_row[url_column]}" target="_blank"> \
+            <i class="fa fa-link"></i></a>'

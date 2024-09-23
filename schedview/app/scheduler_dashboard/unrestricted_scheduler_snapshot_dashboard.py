@@ -1,38 +1,9 @@
-#! /usr/bin/env python
-
-# This file is part of schedview.
-#
-# Developed for the LSST Data Management System.
-# This product includes software developed by the LSST Project
-# (https://www.lsst.org).
-# See the COPYRIGHT file at the top-level directory of this distribution
-# for details of code ownership.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-"""schedview docstring"""
-
-import argparse
-import importlib.resources
 import logging
 import os
 import traceback
 
-# Filter the astropy warnings swamping the terminal
-import warnings
+# Filter the astropy warnings swamping the terminal.
 from datetime import datetime
-from glob import glob
 from zoneinfo import ZoneInfo
 
 import bokeh
@@ -41,17 +12,14 @@ import panel as pn
 import param
 import rubin_scheduler.site_models
 from astropy.time import Time
-from astropy.utils.exceptions import AstropyWarning
 from bokeh.models import ColorBar, LinearColorMapper
 from bokeh.models.widgets.tables import BooleanFormatter, HTMLTemplateFormatter, NumberFormatter
 from lsst.resources import ResourcePath
 from pandas import Timestamp
-from panel.io.loading import start_loading_spinner, stop_loading_spinner
 from pytz import timezone
 
-# For the conditions.mjd bugfix
+# For the conditions.mjd bugfix.
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
-from rubin_scheduler.skybrightness_pre.sky_model_pre import SkyModelPre
 
 import schedview
 import schedview.collect.scheduler_pickle
@@ -59,88 +27,23 @@ import schedview.compute.scheduler
 import schedview.compute.survey
 import schedview.param
 import schedview.plot.survey
-from schedview.app.scheduler_dashboard.utils import query_night_schedulers
-
-# Filter astropy warning that's filling the terminal with every update.
-warnings.filterwarnings("ignore", category=AstropyWarning)
-
-DEFAULT_CURRENT_TIME = Time.now()
-DEFAULT_TIMEZONE = "UTC"  # "America/Santiago"
-LOGO = "/schedview-snapshot/assets/lsst_white_logo.png"
-COLOR_PALETTES = [color for color in bokeh.palettes.__palettes__ if "256" in color]
-DEFAULT_COLOR_PALETTE = "Viridis256"
-DEFAULT_NSIDE = 16
-PACKAGE_DATA_DIR = importlib.resources.files("schedview.data").as_posix()
-LFA_DATA_DIR = "s3://rubin:"
-
-
-pn.extension(
-    "tabulator",
-    sizing_mode="stretch_width",
-    notifications=True,
+from schedview.app.scheduler_dashboard.constants import (
+    COLOR_PALETTES,
+    DEFAULT_COLOR_PALETTE,
+    DEFAULT_NSIDE,
+    DEFAULT_TIMEZONE,
+    h2_stylesheet,
+    h3_stylesheet,
 )
-
-# Change styles using CSS variables.
-h1_stylesheet = """
-:host {
-  --mono-font: Helvetica;
-  color: white;
-  font-size: 16pt;
-  font-weight: 500;
-}
-"""
-h2_stylesheet = """
-:host {
-  --mono-font: Helvetica;
-  color: white;
-  font-size: 14pt;
-  font-weight: 300;
-}
-"""
-h3_stylesheet = """
-:host {
-  --mono-font: Helvetica;
-  color: white;
-  font-size: 13pt;
-  font-weight: 300;
-}
-"""
-
-
-def get_sky_brightness_date_bounds():
-    """Load available datetime range from SkyBrightness_Pre files"""
-    sky_model = SkyModelPre()
-    min_date = Time(sky_model.mjd_left.min(), format="mjd")
-    max_date = Time(sky_model.mjd_right.max() - 0.001, format="mjd")
-    return (min_date, max_date)
-
-
-def url_formatter(dataframe_row, name_column, url_column):
-    """Format survey name as a HTML href to survey URL (if URL exists).
-
-    Parameters
-    ----------
-    dataframe_row : 'pandas.core.series.Series'
-        A row of a pandas.core.frame.DataFrame.
-
-    Returns
-    -------
-    survey_name_or_url : 'str'
-        A HTML href or plain string.
-    """
-    if dataframe_row[url_column] == "":
-        return dataframe_row[name_column]
-    else:
-        return f'<a href="{dataframe_row[url_column]}" target="_blank"> \
-            <i class="fa fa-link"></i></a>'
+from schedview.app.scheduler_dashboard.utils import get_sky_brightness_date_bounds, url_formatter
 
 
 class SchedulerSnapshotDashboard(param.Parameterized):
     """A Parametrized container for parameters, data, and panel objects for the
-    scheduler dashboard.
+    scheduler dashboard working in flexible (insecure mode) where data files
+    are loaded from any path or URL.
     """
 
-    # Param parameters that are modifiable by user actions.
     scheduler_fname_doc = """URL or file name of the scheduler pickle file.
     Such a pickle file can either be of an instance of a subclass of
     rubin_scheduler.scheduler.schedulers.CoreScheduler, or a tuple of the form
@@ -149,9 +52,13 @@ class SchedulerSnapshotDashboard(param.Parameterized):
     instance of rubin_scheduler.scheduler.conditions.Conditions.
     """
 
+    # Get available skybrightness_pre date range.
     (mjd_min, mjd_max) = get_sky_brightness_date_bounds()
+    # Convert astropy times to iso format to be
+    # used as bounds for datetime parameter.
     date_bounds = (mjd_min.to_datetime(), mjd_max.to_datetime())
 
+    # Param parameters that are modifiable by user actions.
     scheduler_fname = param.String(
         default="",
         label="Scheduler snapshot file",
@@ -165,6 +72,8 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         bounds=date_bounds,
         precedence=4,
     )
+    # mjd date passed as a url path parameter when
+    # dashboard operates in --data_from_urls mode.
     url_mjd = param.Number(default=None)
     widget_tier = param.Selector(
         default="",
@@ -184,7 +93,6 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         label="Map resolution (nside)",
         doc="",
     )
-
     color_palette = param.Selector(default=DEFAULT_COLOR_PALETTE, objects=COLOR_PALETTES, doc="")
     summary_widget = param.Parameter(default=None, doc="")
     reward_widget = param.Parameter(default=None, doc="")
@@ -222,9 +130,30 @@ class SchedulerSnapshotDashboard(param.Parameterized):
     _debug_string = ""
     _display_reward = False
     _display_dashboard_data = False
+
+    # This boolean variable prevents unwanted triggering
+    # of Param functions when updating watched variables.
     _do_not_trigger_update = True
+
     _summary_widget_height = 220
     _reward_widget_height = 400
+
+    # Data loading parameters in both restricted and URL modes.
+    data_loading_parameters = ["scheduler_fname", "widget_datetime", "widget_tier"]
+    # Set the data loading parameter section height in both
+    # restricted and URL modes.
+    # This will be used to adjust the layout of other sections
+    # in the grid.
+    data_params_grid_height = 30
+
+    # Set specific widget properties for data loading parameters
+    # in URL and restricted modes.
+    data_loading_widgets = {
+        "scheduler_fname": {
+            "placeholder": "filepath or URL of pickle",
+        },
+        "widget_datetime": pn.widgets.DatetimePicker,
+    }
 
     def __init__(self, **params):
         super().__init__(**params)
@@ -255,7 +184,14 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         log_stream_handler.setFormatter(log_stream_formatter)
         self.logger.addHandler(log_stream_handler)
 
-    # ------------------------------------------------------------ User actions
+    # ----------------------------------------------------------- User actions.
+    # The following set of functions are triggered when the user
+    # updates one of the Parameters via the UI. The parameter
+    # being "watched" is specified in the function decorators.
+    #
+    # These "watcher" functions call the relevant "internal
+    # workings" functions (next section) to correctly update
+    # the data and UI according to the user's behaviour.
 
     @param.depends("scheduler_fname", watch=True)
     def _update_scheduler_fname(self):
@@ -271,11 +207,13 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         # Current fix for _conditions.mjd having different datatypes.
         if isinstance(self._conditions._mjd, np.ndarray):
+            print("self._conditions._mjd is np.ndarray")
             self._conditions._mjd = self._conditions._mjd[0]
 
         # Get mjd from pickle and set widget and URL to match.
         self._do_not_trigger_update = True
         self.url_mjd = self._conditions._mjd
+        print(type(self._conditions._mjd))
         self.widget_datetime = Time(self._conditions._mjd, format="mjd").to_datetime()
         self._do_not_trigger_update = False
 
@@ -291,23 +229,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self.summary_widget.selection = [0]
         self._do_not_trigger_update = False
 
-        self.compute_survey_maps()
-        self.survey_map = self.param["survey_map"].objects[-1]
-        self._map_name = self.survey_map.split("@")[0].strip()
-
-        self.create_sky_map_base()
-        self.update_sky_map_with_survey_map()
-        self.param.trigger("_publish_map")
-
-        self.make_reward_df()
-        self.create_reward_widget()
-        self.param.trigger("_publish_reward_widget")
-
-        self._display_dashboard_data = True
-        self._display_reward = False
-        self.param.trigger("_update_headings")
-
-        self.show_loading_indicator = False
+        self._update_map_and_rewards()
 
     @param.depends("widget_datetime", watch=True)
     def _update_mjd_from_picker(self):
@@ -349,6 +271,10 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self.summary_widget.selection = [0]
         self._do_not_trigger_update = False
 
+        self._update_map_and_rewards()
+
+    def _update_map_and_rewards(self):
+        """Update map, reward widget and headings."""
         self.compute_survey_maps()
         self.survey_map = self.param["survey_map"].objects[-1]
         self._map_name = self.survey_map.split("@")[0].strip()
@@ -378,8 +304,10 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self.clear_dashboard()
 
         self._do_not_trigger_update = True
-        self.widget_datetime = Time(self.url_mjd, format="mjd").to_datetime()
+        # Set Date Time widget to the mjd value set in URL.
+        self.widget_datetime = Time(self.url_mjd, format="mjd").to_datetime()[0]
         self._do_not_trigger_update = False
+        # Set the mjd value that's used across the dashboard.
         self._mjd = self.url_mjd
 
         if not self.update_conditions():
@@ -402,23 +330,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self.summary_widget.selection = [0]
         self._do_not_trigger_update = False
 
-        self.compute_survey_maps()
-        self.survey_map = self.param["survey_map"].objects[-1]
-        self._map_name = self.survey_map.split("@")[0].strip()
-
-        self.create_sky_map_base()
-        self.update_sky_map_with_survey_map()
-        self.param.trigger("_publish_map")
-
-        self.make_reward_df()
-        self.create_reward_widget()
-        self.param.trigger("_publish_reward_widget")
-
-        self._display_dashboard_data = True
-        self._display_reward = False
-        self.param.trigger("_update_headings")
-
-        self.show_loading_indicator = False
+        self._update_map_and_rewards()
 
     @param.depends("widget_tier", watch=True)
     def _update_tier(self):
@@ -571,7 +483,17 @@ class SchedulerSnapshotDashboard(param.Parameterized):
             self.update_sky_map_with_survey_map()
         self.param.trigger("_publish_map")
 
-    # ------------------------------------------------------- Internal workings
+    # ------------------------------------------------------ Internal workings.
+    # The following set of functions are called by the above
+    # "watcher" functions. These functions are responsible
+    # for correctly updating particular aspects of the
+    # dashboard when the user makes a change in the UI.
+    #
+    # They are all self-contained functions (they do not call
+    # other functions).
+    #
+    # The functions with decorators are those that are
+    # returning objects to be displayed in the UI.
 
     def clear_dashboard(self):
         """Clear the dashboard for a new pickle or a new date."""
@@ -605,7 +527,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        success : 'bool'
+        success : `bool`
             Record of success or failure of reading scheduler from file/URL.
         """
         try:
@@ -645,7 +567,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        success : 'bool'
+        success : `bool`
             Record of success of Conditions update.
         """
         if self._conditions is None:
@@ -703,7 +625,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        success : 'bool'
+        success : `bool`
             Record of success of dataframe construction.
         """
         if self._scheduler is None:
@@ -806,7 +728,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self._debugging_message = "Finished making summary widget."
 
     def update_summary_widget_data(self):
-        """Update data for survey Tabulator widget."""
+        """Update data for summary Tabulator widget."""
         self._debugging_message = "Starting to update summary widget."
         columns = [
             "survey_index",
@@ -828,7 +750,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        widget: 'panel.widgets.Tabulator'
+        widget: `panel.widgets.Tabulator`
             Table of scheduler summary data.
         """
         if self.summary_widget is None:
@@ -860,12 +782,12 @@ class SchedulerSnapshotDashboard(param.Parameterized):
             pn.state.notifications.error("Cannot compute survey maps!", duration=0)
 
     def make_reward_df(self):
-        """Make the summary dataframe."""
+        """Make the survey reward dataframe."""
         if self._scheduler is None:
-            self._debugging_message = "Cannot make summary dataframe as no scheduler loaded."
+            self._debugging_message = "Cannot make reward dataframe as no scheduler loaded."
             return
         if self._scheduler_summary_df is None:
-            self._debugging_message = "Cannot make summary dataframe as no scheduler summary made."
+            self._debugging_message = "Cannot make reward dataframe as no scheduler summary made."
             return
         try:
             self._debugging_message = "Starting to make reward dataframe."
@@ -980,7 +902,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self._debugging_message = "Finished making reward widget."
 
     def update_reward_widget_data(self):
-        """Update Reward Tabulator widget data."""
+        """Update survey reward Tabulator widget data."""
         if self._survey_reward_df is None:
             return
 
@@ -1007,7 +929,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        widget: 'panel.widgets.Tabulator'
+        widget: `panel.widgets.Tabulator`
             Table of reward data for selected survey.
         """
         if self._survey_reward_df is None:
@@ -1044,18 +966,18 @@ class SchedulerSnapshotDashboard(param.Parameterized):
             )
             self._sky_map_base.plot.add_layout(color_bar, "below")
             self._sky_map_base.plot.below[1].visible = False
-            self._sky_map_base.plot.toolbar.autohide = True  # show toolbar only when mouseover plot
-            self._sky_map_base.plot.title.text = ""  # remove 'Horizon' title
-            self._sky_map_base.plot.legend.propagate_hover = True  # hover tool works over in-plot legend
+            self._sky_map_base.plot.toolbar.autohide = True  # Show toolbar only when mouseover plot.
+            self._sky_map_base.plot.title.text = ""  # Remove 'Horizon' title.
+            self._sky_map_base.plot.legend.propagate_hover = True  # Hover tool works over in-plot legend.
             self._sky_map_base.plot.legend.title = "Key"
             self._sky_map_base.plot.legend.title_text_font_style = "bold"
             self._sky_map_base.plot.legend.border_line_color = "#048b8c"
             self._sky_map_base.plot.legend.border_line_width = 3
             self._sky_map_base.plot.legend.border_line_alpha = 1
-            self._sky_map_base.plot.legend.label_standoff = 10  # gap between images and text
-            self._sky_map_base.plot.legend.padding = 15  # space around inside edge
-            self._sky_map_base.plot.legend.title_standoff = 10  # space between title and items
-            self._sky_map_base.plot.legend.click_policy = "hide"  # hide elements when clicked
+            self._sky_map_base.plot.legend.label_standoff = 10  # Gap between images and text.
+            self._sky_map_base.plot.legend.padding = 15  # Space around inside edge.
+            self._sky_map_base.plot.legend.title_standoff = 10  # Space between title and items.
+            self._sky_map_base.plot.legend.click_policy = "hide"  # Hide elements when clicked.
             self._sky_map_base.plot.add_layout(self._sky_map_base.plot.legend[0], "right")
             self._sky_map_base.plot.right[0].location = "center_right"
 
@@ -1239,7 +1161,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        sky_map : 'bokeh.models.layouts.Column'
+        sky_map : `bokeh.models.layouts.Column`
             Map of survey map or reward map as a Bokeh plot.
         """
         if self._conditions is None:
@@ -1261,7 +1183,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        debugging_messages : 'panel.pane.Str'
+        debugging_messages : `panel.pane.Str`
             A list of debugging messages ordered by newest message first.
         """
         if self._debugging_message is None:
@@ -1288,16 +1210,20 @@ class SchedulerSnapshotDashboard(param.Parameterized):
             self.debug_pane.object = self._debug_string
         return self.debug_pane
 
-    # ------------------------------------------------------ Dashboard titles
+    # ----------------------------------------------------- Dashboard titles.
+    # The following set of functions are responsible for
+    # generating and updating the various text headings
+    # throughout the dashboard.
 
     def generate_dashboard_subtitle(self):
-        """Select the dashboard subtitle string based on whether whether a
+        """Select the dashboard subtitle string based on whether a
         survey map or reward map is being displayed.
 
         Returns
         -------
-        subtitle : 'str'
-            Lists the tier and survey, and either the survey or reward map.
+        subtitle : `str`
+            Heading text. Include tier and survey, and either the
+            survey or reward map.
         """
         if not self._display_dashboard_data:
             return ""
@@ -1315,8 +1241,9 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        heading : 'str'
-            Lists the tier if data is displayed; else just a general title.
+        heading : `str`
+            Heading text. If data is diplayed, include current tier;
+            else, a general heading.
         """
         if not self._display_dashboard_data:
             return "Scheduler summary"
@@ -1329,8 +1256,9 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        heading : 'str'
-            Lists the survey name if data is displayed; else a general title.
+        heading : `str`
+            Heading text. If data is diplayed, include current survey;
+            else, a general heading.
         """
         if not self._display_dashboard_data:
             return "Basis functions & rewards"
@@ -1343,9 +1271,9 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        heading : 'str'
-            Lists the survey name and either the survey map name or reward
-            name if data is being displayed; else a general title.
+        heading : `str`
+            Heading text. If data is displayed, include current survey and
+            either the survey map or reward name; else, a general heading.
         """
         if not self._display_dashboard_data:
             return "Map"
@@ -1364,7 +1292,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        title : 'panel.pane.Str'
+        title : `panel.pane.Str`
             A panel String pane to display as the dashboard's subtitle.
         """
         title_string = self.generate_dashboard_subtitle()
@@ -1385,7 +1313,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        title : 'panel.pane.Str'
+        title : `panel.pane.Str`
             A panel String pane to display as the survey table's heading.
         """
         title_string = self.generate_summary_table_heading()
@@ -1404,7 +1332,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        title : 'panel.pane.Str'
+        title : `panel.pane.Str`
             A panel String pane to display as the reward table heading.
         """
         title_string = self.generate_reward_table_heading()
@@ -1423,7 +1351,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         Returns
         -------
-        title : 'panel.pane.Str'
+        title : `panel.pane.Str`
             A panel String pane to display as the map heading.
         """
         title_string = self.generate_map_heading()
@@ -1435,404 +1363,3 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         else:
             self.map_title_pane.object = title_string
         return self.map_title_pane
-
-
-class RestrictedSchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
-    """A Parametrized container for parameters, data, and panel objects for the
-    scheduler dashboard.
-    """
-
-    # Param parameters that are modifiable by user actions.
-    scheduler_fname_doc = """URL or file name of the scheduler pickle file.
-    Such a pickle file can either be of an instance of a subclass of
-    rubin_scheduler.scheduler.schedulers.CoreScheduler, or a tuple of the form
-    (scheduler, conditions), where scheduler is an instance of a subclass of
-    rubin_scheduler.scheduler.schedulers.CoreScheduler, and conditions is an
-    instance of rubin_scheduler.scheduler.conditions.Conditions.
-    """
-    scheduler_fname = schedview.param.FileSelectorWithEmptyOption(
-        path=f"{PACKAGE_DATA_DIR}/*scheduler*.p*",
-        doc=scheduler_fname_doc,
-        default=None,
-        allow_None=True,
-    )
-
-    def __init__(self, data_dir=None):
-        super().__init__()
-
-        if data_dir is not None:
-            self.param["scheduler_fname"].update(path=f"{data_dir}/*scheduler*.p*")
-
-
-class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
-    """A Parametrized container for parameters, data, and panel objects for the
-    scheduler dashboard.
-    """
-
-    scheduler_fname_doc = """Recent pickles from LFA
-    """
-
-    scheduler_fname = param.Selector(
-        default="",
-        objects=[],
-        doc=scheduler_fname_doc,
-        precedence=3,
-    )
-
-    pickles_date = param.Date(
-        default=datetime.now(),
-        label="Snapshot selection cutoff date and time",
-        doc="Show snapshots that are recent as of this date and time in the scheduler snapshot file dropdown",
-        precedence=1,
-    )
-
-    telescope = param.Selector(
-        default=None, objects={"All": None, "Simonyi": 1, "Auxtel": 2}, doc="Source Telescope", precedence=2
-    )
-
-    _summary_widget_height = 310
-    _reward_widget_height = 350
-
-    def __init__(self):
-        super().__init__()
-
-    async def query_schedulers(self, selected_time, selected_tel):
-        """Query snapshots that have a timestamp between the start of the
-        night and selected datetime and generated by selected telescope
-        """
-        selected_time = Time(
-            Timestamp(
-                selected_time,
-                tzinfo=ZoneInfo(DEFAULT_TIMEZONE),
-            )
-        )
-        self.show_loading_indicator = True
-        self._debugging_message = "Starting retrieving snapshots"
-        self.logger.debug("Starting retrieving snapshots")
-        scheduler_urls = await query_night_schedulers(selected_time, selected_tel)
-        self.logger.debug("Finished retrieving snapshots")
-        self._debugging_message = "Finished retrieving snapshots"
-        self.show_loading_indicator = False
-        return scheduler_urls
-
-
-# ------------------------------------------------------------ Create dashboard
-
-
-def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
-    """Create a dashboard with grids of Param parameters, Tabulator widgets,
-    and Bokeh plots.
-
-    Parameters
-    ----------
-    widget_datetime : 'datetime' or 'date', optional
-        The date/datetime of interest. The default is None.
-    scheduler_pickle : 'str', optional
-        A filepath or URL for the scheduler pickle. The default is None.
-
-    Returns
-    -------
-    sched_app : 'panel.layout.grid.GridSpec'
-        The dashboard.
-    """
-    # Initialize the dashboard layout.
-    sched_app = pn.GridSpec(
-        sizing_mode="stretch_both",
-        max_height=1000,
-    ).servable()
-
-    from_urls = False
-    data_dir = None
-    from_lfa = False
-
-    if "data_from_urls" in kwargs.keys():
-        from_urls = kwargs["data_from_urls"]
-        del kwargs["data_from_urls"]
-
-    if "data_dir" in kwargs.keys():
-        data_dir = kwargs["data_dir"]
-        del kwargs["data_dir"]
-
-    if "lfa" in kwargs.keys():
-        from_lfa = kwargs["lfa"]
-        del kwargs["lfa"]
-
-    scheduler = None
-    data_loading_widgets = {}
-    # data loading parameters in both restricted and URL modes
-    data_loading_parameters = ["scheduler_fname", "widget_datetime", "widget_tier"]
-    # set the data loading parameter section height in both
-    # restricted and URL modes
-    # this will be used to adjust the layout of other sections
-    # in the grid
-    data_params_grid_height = 30
-    # Accept pickle files from url or any path.
-    if from_urls:
-        scheduler = SchedulerSnapshotDashboard()
-        # read pickle and time if provided to the function in a notebook
-        # it will be overriden if the dashboard runs in an app
-        if date_time is not None:
-            scheduler.widget_datetime = date_time
-
-        if scheduler_pickle is not None:
-            scheduler.scheduler_fname = scheduler_pickle
-
-        # Sync url parameters only if the files aren't restricted.
-        if pn.state.location is not None:
-            pn.state.location.sync(
-                scheduler,
-                {
-                    "scheduler_fname": "scheduler",
-                    "nside": "nside",
-                    "url_mjd": "mjd",
-                },
-            )
-        # set specific widget props for data loading parameters
-        # in URL and restricted modes
-        data_loading_widgets = {
-            "scheduler_fname": {
-                "placeholder": "filepath or URL of pickle",
-            },
-            "widget_datetime": pn.widgets.DatetimePicker,
-        }
-    # Load pickles from S3 bucket
-    elif from_lfa:
-        scheduler = LFASchedulerSnapshotDashboard()
-        # data loading parameters in LFA mode
-        data_loading_parameters = [
-            "scheduler_fname",
-            "pickles_date",
-            "telescope",
-            "widget_datetime",
-            "widget_tier",
-        ]
-        # set specific widget props for data loading parameters
-        # in LFA mode
-        data_loading_widgets = {
-            "pickles_date": pn.widgets.DatetimePicker,
-            "widget_datetime": pn.widgets.DatetimePicker,
-        }
-        # set the data loading parameter section height in LFA mode
-        data_params_grid_height = 42
-
-        @pn.depends(
-            selected_time=scheduler.param.pickles_date, selected_tel=scheduler.param.telescope, watch=True
-        )
-        async def get_scheduler_list(selected_time, selected_tel):
-            pn.state.notifications.clear()
-            pn.state.notifications.info("Loading snapshots...")
-            os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
-            # add an empty option at index 0 to be the default
-            # selection upon loading snapshot list
-            schedulers = [""]
-            schedulers[1:] = await scheduler.query_schedulers(selected_time, selected_tel)
-            scheduler.param["scheduler_fname"].objects = schedulers
-            scheduler.clear_dashboard()
-            if len(schedulers) > 1:
-                pn.state.notifications.success("Snapshots loaded!!")
-            else:
-                pn.state.notifications.info("No snapshots found for selected night!!", duration=0)
-
-    # Restrict files to data_directory.
-    else:
-        scheduler = RestrictedSchedulerSnapshotDashboard(data_dir=data_dir)
-        data_loading_widgets = {
-            "widget_datetime": pn.widgets.DatetimePicker,
-        }
-
-    # Show dashboard as busy when scheduler.show_loading_spinner is True.
-    @pn.depends(loading=scheduler.param.show_loading_indicator, watch=True)
-    def update_loading(loading):
-        if loading:
-            scheduler.logger.debug("DASHBOARD START LOADING")
-            start_loading_spinner(sched_app)
-        else:
-            scheduler.logger.debug("DASHBOARD STOP LOADING")
-            stop_loading_spinner(sched_app)
-
-    # Define reset button.
-    reset_button = pn.widgets.Button(
-        name="Restore Loading Conditions",
-        icon="restore",
-        icon_size="16px",
-        description=" Restore initial date, table ordering and map properties.",
-    )
-
-    # Reset dashboard to loading conditions.
-    def handle_reload_pickle(event):
-        scheduler.logger.debug("RELOAD PICKLE")
-        scheduler.nside = 16
-        scheduler.color_palette = "Viridis256"
-        if scheduler.scheduler_fname == "":
-            scheduler.clear_dashboard()
-        else:
-            scheduler._update_scheduler_fname()
-
-    # Set function trigger.
-    reset_button.on_click(handle_reload_pickle)
-
-    # ------------------------------------------------------ Dashboard layout
-    # Dashboard title.
-    sched_app[0:8, :] = pn.Row(
-        pn.Column(
-            pn.Spacer(height=4),
-            pn.pane.Str(
-                "Scheduler Dashboard",
-                height=20,
-                stylesheets=[h1_stylesheet],
-            ),
-            scheduler.dashboard_subtitle,
-        ),
-        pn.layout.HSpacer(),
-        pn.pane.PNG(
-            LOGO,
-            sizing_mode="scale_height",
-            align="center",
-            margin=(5, 5, 5, 5),
-        ),
-        sizing_mode="stretch_width",
-        styles={"background": "#048b8c"},
-    )
-    # Parameter inputs (pickle, widget_datetime, tier)
-    # as well as pickles date and telescope when running in LFA
-    sched_app[8:data_params_grid_height, 0:21] = pn.Param(
-        scheduler,
-        parameters=data_loading_parameters,
-        widgets=data_loading_widgets,
-        name="Select pickle file, date and tier.",
-    )
-    # Reset button.
-    sched_app[data_params_grid_height : data_params_grid_height + 6, 3:15] = pn.Row(reset_button)
-    # Survey rewards table and header.
-    sched_app[8 : data_params_grid_height + 6, 21:67] = pn.Row(
-        pn.Spacer(width=10),
-        pn.Column(
-            pn.Spacer(height=10),
-            pn.Row(
-                scheduler.summary_table_heading,
-                styles={"background": "#048b8c"},
-            ),
-            pn.param.ParamMethod(scheduler.publish_summary_widget, loading_indicator=True),
-        ),
-        pn.Spacer(width=10),
-    )
-    # Reward table and header.
-    sched_app[data_params_grid_height + 6 : data_params_grid_height + 45, 0:67] = pn.Row(
-        pn.Spacer(width=10),
-        pn.Column(
-            pn.Spacer(height=10),
-            pn.Row(
-                scheduler.reward_table_heading,
-                styles={"background": "#048b8c"},
-            ),
-            pn.param.ParamMethod(scheduler.publish_reward_widget, loading_indicator=True),
-        ),
-        pn.Spacer(width=10),
-    )
-    # Map display and header.
-    sched_app[8 : data_params_grid_height + 25, 67:100] = pn.Column(
-        pn.Spacer(height=10),
-        pn.Row(
-            scheduler.map_title,
-            styles={"background": "#048b8c"},
-        ),
-        pn.param.ParamMethod(scheduler.publish_sky_map, loading_indicator=True),
-    )
-    # Map display parameters (map, nside, color palette).
-    sched_app[data_params_grid_height + 32 : data_params_grid_height + 45, 67:100] = pn.Param(
-        scheduler,
-        widgets={
-            "survey_map": {"type": pn.widgets.Select, "width": 250},
-            "nside": {"type": pn.widgets.Select, "width": 150},
-            "color_palette": {"type": pn.widgets.Select, "width": 100},
-        },
-        parameters=["survey_map", "nside", "color_palette"],
-        show_name=False,
-        default_layout=pn.Row,
-    )
-    # Debugging collapsable card.
-    sched_app[data_params_grid_height + 45 : data_params_grid_height + 52, :] = pn.Card(
-        scheduler._debugging_messages,
-        header=pn.pane.Str("Debugging", stylesheets=[h2_stylesheet]),
-        header_color="white",
-        header_background="#048b8c",
-        sizing_mode="stretch_width",
-        collapsed=False,
-    )
-
-    return sched_app
-
-
-def parse_arguments():
-    """
-    Parse commandline arguments to read data directory if provided
-    """
-    parser = argparse.ArgumentParser(description="On-the-fly Rubin Scheduler dashboard")
-    default_data_dir = f"{LFA_DATA_DIR}/*" if os.path.exists(LFA_DATA_DIR) else PACKAGE_DATA_DIR
-
-    parser.add_argument(
-        "--data_dir",
-        "-d",
-        type=str,
-        default=default_data_dir,
-        help="The base directory for data files.",
-    )
-
-    parser.add_argument(
-        "--data_from_urls",
-        action="store_true",
-        help="Let the user specify URLs from which to load data. THIS IS NOT SECURE.",
-    )
-
-    parser.add_argument(
-        "--lfa",
-        action="store_true",
-        help="Loads pickle files from S3 buckets in LFA",
-    )
-
-    args = parser.parse_args()
-
-    if len(glob(args.data_dir)) == 0 and not args.data_from_urls:
-        args.data_dir = PACKAGE_DATA_DIR
-
-    if args.lfa and len(glob(LFA_DATA_DIR)) == 0:
-        args.data_dir = PACKAGE_DATA_DIR
-
-    scheduler_app_params = args.__dict__
-
-    return scheduler_app_params
-
-
-def main():
-    print("Starting scheduler dashboard.")
-    commandline_args = parse_arguments()
-
-    if "SCHEDULER_SNAPSHOT_DASHBOARD_PORT" in os.environ:
-        scheduler_port = int(os.environ["SCHEDULER_SNAPSHOT_DASHBOARD_PORT"])
-    else:
-        scheduler_port = 8888
-
-    assets_dir = os.path.join(importlib.resources.files("schedview"), "app", "scheduler_dashboard", "assets")
-
-    def scheduler_app_with_params():
-        return scheduler_app(**commandline_args)
-
-    app_dict = {"dashboard": scheduler_app_with_params}
-    prefix = "/schedview-snapshot"
-    print(f"prefix: {prefix}, app_dict keys = {list(app_dict.keys())}")
-
-    pn.serve(
-        app_dict,
-        port=scheduler_port,
-        title="Scheduler Dashboard",
-        show=False,
-        prefix=prefix,
-        start=True,
-        autoreload=True,
-        # threaded=True,
-        static_dirs={"assets": assets_dir},
-    )
-
-
-if __name__ == "__main__":
-    main()
