@@ -267,7 +267,8 @@ def match_visits_across_sims(
         combo_iterator = itertools.combinations(np.arange(len(longer)), len(shorter))
 
     matches = pd.DataFrame({"longer": longer.values[: len(shorter)], "shorter": shorter.values})
-    best_diff = np.inf
+    best_max_diff = np.inf
+    best_mad_diff = np.inf
     most_matches = 0
     best_match = None
     for matched_ids in combo_iterator:
@@ -275,11 +276,14 @@ def match_visits_across_sims(
         matches["delta"] = (matches.shorter - matches.longer).dt.total_seconds()
         good_matches = matches.query(f"abs(delta) < {max_match_dist}")
         num_matches = len(good_matches)
-        max_diff = matches["delta"].max()
-        if (num_matches >= most_matches) and (max_diff < best_diff):
-            best_match = good_matches.copy().rename(columns=sim_map)
-            best_diff = max_diff
-            most_matches = num_matches
+        max_diff = np.abs(matches["delta"]).max()
+        mad_diff = np.abs(matches["delta"]).mean()
+        if num_matches >= most_matches:
+            if (max_diff < best_max_diff) or (max_diff == best_max_diff and mad_diff < best_mad_diff):
+                best_match = good_matches.copy().rename(columns=sim_map)
+                best_max_diff = max_diff
+                best_mad_diff = mad_diff
+                most_matches = num_matches
 
     return best_match
 
