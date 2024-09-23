@@ -218,7 +218,7 @@ def make_fraction_common_matrix(
 
 
 def match_visits_across_sims(
-    start_times: pd.Series, sim_indexes: tuple[int] = (1, 2), max_match_dist: float = np.inf
+    start_times: pd.Series, sim_indexes: tuple[int, int] = (1, 2), max_match_dist: float = np.inf
 ):
     """Match corresponding visits across two opsim simulations.
 
@@ -268,7 +268,8 @@ def match_visits_across_sims(
 
     matches = pd.DataFrame({"longer": longer.values[: len(shorter)], "shorter": shorter.values})
     best_max_diff = np.inf
-    best_mad_diff = np.inf
+    # msdiff => mean squared difference
+    best_msdiff = np.inf
     most_matches = 0
     best_match = None
     for matched_ids in combo_iterator:
@@ -277,12 +278,14 @@ def match_visits_across_sims(
         good_matches = matches.query(f"abs(delta) < {max_match_dist}")
         num_matches = len(good_matches)
         max_diff = np.abs(matches["delta"]).max()
-        mad_diff = np.abs(matches["delta"]).mean()
+
+        # msdiff => mean squared difference
+        msdiff = (matches["delta"] ** 2).mean()
         if num_matches >= most_matches:
-            if (max_diff < best_max_diff) or (max_diff == best_max_diff and mad_diff < best_mad_diff):
+            if (max_diff < best_max_diff) or (max_diff == best_max_diff and msdiff < best_msdiff):
                 best_match = good_matches.copy().rename(columns=sim_map)
                 best_max_diff = max_diff
-                best_mad_diff = mad_diff
+                best_msdiff = msdiff
                 most_matches = num_matches
 
     return best_match
