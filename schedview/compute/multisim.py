@@ -1,6 +1,5 @@
 import itertools
 import math
-from typing import Hashable
 
 import numpy as np
 import pandas as pd
@@ -76,7 +75,9 @@ def often_repeated_fields(visits: pd.DataFrame, min_counts: int = 4):
         ("start_date", "max"): "last_time",
         ("label", "first"): "label",
     }
-    field_repeats.columns = pd.Index([column_map[c] for c in field_repeats.columns])
+    # type hinting doesn't recognize that the column names in a multiindex
+    # are tuples.
+    field_repeats.columns = pd.Index([column_map[c] for c in field_repeats.columns])  # type: ignore
 
     # Get the index in ra/dec/filter then use that as in index so we can show
     # instances in simulations that have fewer than four visits of a field the
@@ -96,7 +97,7 @@ def often_repeated_fields(visits: pd.DataFrame, min_counts: int = 4):
 def count_visits_by_sim(
     visits: pd.DataFrame,
     sim_identifier_column: str = "sim_index",
-    visit_spec_columns: tuple[str] = ("fieldRA", "fieldDec", "filter", "visitExposureTime"),
+    visit_spec_columns: tuple[str, ...] = ("fieldRA", "fieldDec", "filter", "visitExposureTime"),
 ) -> pd.DataFrame:
     """Count the numbers of visits on each field in each simulation.
 
@@ -134,7 +135,7 @@ def count_visits_by_sim(
     return visit_counts
 
 
-def fraction_common(visit_counts: pd.DataFrame, sim1: Hashable, sim2: Hashable, match_count: bool = True):
+def fraction_common(visit_counts: pd.DataFrame, sim1: int | str, sim2: int | str, match_count: bool = True):
     """Count the fraction of visits in simulation 2 that it has with sim 1.
 
     Parameters
@@ -144,9 +145,9 @@ def fraction_common(visit_counts: pd.DataFrame, sim1: Hashable, sim2: Hashable, 
         Each row corresponds to a field, and the table must includes
         columns with the names set by the ``sim1`` and ``sim2`` parameters
         below. Values are integers.
-    sim1 : `Hashable`
+    sim1 : `int` | `str`
         The name of the column with the counts for the reference simulation.
-    sim2 : `Hashable`
+    sim2 : `int` | `str`
         The name of the column with the counts for the comparison simulation.
     match_count : `bool`, optional
         Match "one to one" between fields. For example, if sim1 has 4 visits
@@ -163,7 +164,7 @@ def fraction_common(visit_counts: pd.DataFrame, sim1: Hashable, sim2: Hashable, 
         The fraction of visits in sim2 that it has in common with sim1.
     """
     # Only count fields for which there is at least one visit in sim1
-    these_visit_counts = visit_counts[visit_counts[sim2] > 0]
+    these_visit_counts: pd.DataFrame = visit_counts.loc[visit_counts[sim2] > 0, :]
 
     if not match_count:
         # if we are not matching counts, visits in sim1 can match any number
@@ -206,7 +207,7 @@ def make_fraction_common_matrix(
     """
 
     if sim_indexes is None:
-        sim_indexes = visit_counts.columns.values
+        sim_indexes = list(visit_counts.columns.values)
 
     common_matrix = pd.DataFrame(np.nan, index=sim_indexes, columns=sim_indexes)
     for row in sim_indexes:
@@ -302,13 +303,13 @@ def compute_matched_visit_delta_statistics(
     def _compute_best_match_delta_stats(
         these_visits, sim_identifier_values, sim_identifier_column="sim_index"
     ):
-        return (
-            match_visits_across_sims(
-                these_visits.set_index(sim_identifier_column).start_date, sim_identifier_values
-            )
-            .loc[:, "delta"]
-            .describe()
+        these_matches = match_visits_across_sims(
+            these_visits.set_index(sim_identifier_column).start_date, sim_identifier_values
         )
+        if these_matches is None:
+            return None
+        else:
+            return these_matches.loc[:, "delta"].describe()
 
     for sim_identifier_comparison_value in visits[sim_identifier_column].unique():
         if sim_identifier_comparison_value == sim_identifier_reference_value:

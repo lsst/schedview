@@ -73,7 +73,7 @@ class TestMultisim(unittest.TestCase):
         counts_df = schedview.compute.multisim.count_visits_by_sim(
             self.visits, visit_spec_columns=visit_spec_columns
         )
-        for field_id, field_row in self.fields.loc[:, visit_spec_columns].iterrows():
+        for field_id, field_row in self.fields.loc[:, list(visit_spec_columns)].iterrows():
             for sim_id, field_sequence in enumerate(FIELD_SEQUENCE_IN_SIMS):
                 assert counts_df.loc[tuple(field_row), sim_id] == field_sequence.count(field_id)
 
@@ -116,3 +116,32 @@ class TestMultisim(unittest.TestCase):
                 assert unmatched_common_fraction == schedview.compute.multisim.fraction_common(
                     visit_counts, sim1, sim2, match_count=False
                 )
+
+    def test_match_visits_across_sims(self):
+        start_times = self.visits.set_index(["fieldId", "sim_index"])["start_date"]
+        matched_visits = schedview.compute.multisim.match_visits_across_sims(
+            start_times.loc[4, :], sim_indexes=(0, 1)
+        )
+        # Hand checked values for these test data.
+        assert matched_visits is not None
+        assert np.isclose(matched_visits.loc[:, "delta"], [-573.278053, -604.849867]).all()
+
+    def test_compute_matched_visit_delta_statistics(self):
+        matched_visit_stats = schedview.compute.multisim.compute_matched_visit_delta_statistics(self.visits)
+        assert tuple(matched_visit_stats.index.names) == (
+            "fieldRA",
+            "fieldDec",
+            "filter",
+            "visitExposureTime",
+            "sim_index",
+        )
+        assert tuple(matched_visit_stats.columns) == (
+            "count",
+            "mean",
+            "std",
+            "min",
+            "25%",
+            "50%",
+            "75%",
+            "max",
+        )
