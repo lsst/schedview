@@ -220,7 +220,7 @@ def make_fraction_common_matrix(
 
 def match_visits_across_sims(
     start_times: pd.Series, sim_indexes: tuple[int, int] = (1, 2), max_match_dist: float = np.inf
-):
+) -> pd.DataFrame:
     """Match corresponding visits across two opsim simulations.
 
     Parameters
@@ -252,8 +252,8 @@ def match_visits_across_sims(
     else:
         sim_map = {"longer": sim_indexes[1], "shorter": sim_indexes[0]}
 
-    longer = start_times.loc[[sim_map["longer"]]]
-    shorter = start_times.loc[[sim_map["shorter"]]]
+    longer = start_times.loc[[sim_map["longer"]]].reset_index(drop=True)
+    shorter = start_times.loc[[sim_map["shorter"]]].reset_index(drop=True)
 
     num_combinations = math.comb(len(longer), len(shorter))
     if num_combinations > 1000:
@@ -267,14 +267,18 @@ def match_visits_across_sims(
     else:
         combo_iterator = itertools.combinations(np.arange(len(longer)), len(shorter))
 
-    matches = pd.DataFrame({"longer": longer.values[: len(shorter)], "shorter": shorter.values})
+    # Use copy here so that the column in the dataframe can be update without
+    # corrupting the origin longer Series.
+    matches = pd.DataFrame({"longer": longer[: len(shorter)].copy(), "shorter": shorter.copy()})
     best_max_diff = np.inf
     # msdiff => mean squared difference
     best_msdiff = np.inf
     most_matches = 0
     best_match = None
     for matched_ids in combo_iterator:
-        matches.loc[:, "longer"] = longer.values[np.array(matched_ids)]
+        these_longer = longer[np.array(matched_ids)].copy()
+        these_longer.index = matches.index
+        matches.loc[:, "longer"] = these_longer
         matches["delta"] = (matches.shorter - matches.longer).dt.total_seconds()
         good_matches = matches.query(f"abs(delta) < {max_match_dist}")
         num_matches = len(good_matches)
@@ -288,6 +292,8 @@ def match_visits_across_sims(
                 best_max_diff = max_diff
                 best_msdiff = msdiff
                 most_matches = num_matches
+
+    assert best_match is not None
 
     return best_match
 
@@ -328,15 +334,14 @@ def compute_matched_visit_delta_statistics(
     delta_stats_list = []
 
     def _compute_best_match_delta_stats(
-        these_visits, sim_identifier_values, sim_identifier_column="sim_index"
-    ):
+        these_visits: pd.DataFrame,
+        sim_identifier_values: tuple[int, int],
+        sim_identifier_column: str | int = "sim_index",
+    ) -> pd.Series:
         these_matches = match_visits_across_sims(
             these_visits.set_index(sim_identifier_column).start_date, sim_identifier_values
         )
-        if these_matches is None:
-            return None
-        else:
-            return these_matches.loc[:, "delta"].describe()
+        return these_matches.loc[:, "delta"].describe()
 
     for sim_identifier_comparison_value in visits[sim_identifier_column].unique():
         if sim_identifier_comparison_value == sim_identifier_reference_value:
@@ -348,6 +353,7 @@ def compute_matched_visit_delta_statistics(
                 _compute_best_match_delta_stats,
                 sim_identifier_values=sim_identifier_values,
                 sim_identifier_column=sim_identifier_column,
+                include_groups=False,
             )
             .query("count > 0")
         )
