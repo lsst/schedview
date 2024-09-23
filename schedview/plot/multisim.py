@@ -16,7 +16,7 @@ import schedview.plot
 SimIndicators = namedtuple("SimIndicators", ("color_mapper", "color_dict", "marker_mapper", "hatch_dict"))
 
 
-def generate_sim_indicators(sim_labels: List[str]):
+def generate_sim_indicators(sim_labels: List[str]) -> SimIndicators:
     """Generate a tuple of simulation indicators for bokeh.
 
     Parameters

@@ -293,11 +293,38 @@ def match_visits_across_sims(
 
 
 def compute_matched_visit_delta_statistics(
-    visits,
-    sim_identifier_reference_value=1,
-    sim_identifier_column="sim_index",
-    visit_spec_columns=("fieldRA", "fieldDec", "filter", "visitExposureTime"),
-):
+    visits: pd.DataFrame,
+    sim_identifier_reference_value: int | str = 1,
+    sim_identifier_column: str = "sim_index",
+    visit_spec_columns: tuple[str, ...] = ("fieldRA", "fieldDec", "filter", "visitExposureTime"),
+) -> pd.DataFrame:
+    """Compute statistics on time differencse in visits matched across sims.
+
+    Parameters
+    ----------
+    visits : `pd.DataFrame`
+        _description_
+    sim_identifier_reference_value : `int` or `str`, optional
+        Value of sim_identifier_column for the reference simulation times,
+        by default 1.
+    sim_identifier_column : `str`, optional
+        Column that in visits that identifies simulations,
+        by default "sim_index".
+    visit_spec_columns : `tuple[str, ...]`, optional
+        Columns in ``visits`` whose values need to match to be matched
+        across simulations,
+        by default ("fieldRA", "fieldDec", "filter", "visitExposureTime")
+
+    Returns
+    -------
+    matched_visit_delta_stats : `pd.DataFrame`
+        Statistics for each matched field.
+        The index is a `pandas.MultiIndex` with levels matching those specified
+        by ``visit_spec_columns``, and there are columns for these statistics:
+        ``count``, ``mean``, ``std``, ``min``, ``25%``, ``50%``, ``75%``,
+        ``max``.
+    """
+
     delta_stats_list = []
 
     def _compute_best_match_delta_stats(
