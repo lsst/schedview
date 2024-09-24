@@ -65,6 +65,12 @@ def often_repeated_fields(visits: pd.DataFrame, min_counts: int = 4):
             field in the simulation.
         ``label``
             The ``str`` label for the simulation.
+
+    Notes
+    -----
+    This created table is intended to provide overviews of sets of visits
+    to specific fields for which the specific pointing and filter combinations
+    are of particular interest (e.g. DDF fields).
     """
     field_repeats: pd.DataFrame = visits.groupby(["fieldRA", "fieldDec", "filter", "sim_index"]).agg(
         {"start_date": ["count", "min", "max"], "label": "first"}
@@ -106,6 +112,9 @@ def count_visits_by_sim(
     visits : `pd.DataFrame`
         A table that must include both the columns listed in
         ``sim_identifier_column`` and ``visit_spec_columns`` (below).
+        This ``DataFrame`` should include visits from all simulations to
+        be compared, with a column that identifies which simulation each
+        visits was from (sepecified by ``sim_identifier_column``).
     sim_identifier_column : `str`, optional
         A column that uniquely identifies visits, by default "sim_index"
     visit_spec_columns : `tuple`[`str`], optional
