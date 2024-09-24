@@ -143,7 +143,7 @@ def plot_airmass_vs_time(
     return fig
 
 
-def _make_airmass_tick_formatter():
+def make_airmass_tick_formatter():
     """Make a bokeh.models.TickFormatter for airmass values"""
     js_code = """
         const cos_zd = Math.sin(tick * Math.PI / 180.0)
@@ -271,7 +271,7 @@ def plot_alt_vs_time(
     fig.extra_y_ranges = {"airmass": fig.y_range}
     fig.add_layout(bokeh.models.LinearAxis(), "right")
     fig.yaxis[1].ticker.desired_num_ticks = fig.yaxis[0].ticker.desired_num_ticks
-    fig.yaxis[1].formatter = _make_airmass_tick_formatter()
+    fig.yaxis[1].formatter = make_airmass_tick_formatter()
     fig.yaxis[1].minor_tick_line_alpha = 0
     fig.yaxis[1].axis_label = "Airmass"
 

@@ -13,11 +13,20 @@ __all__ = [
     "compute_maps",
     "compute_metric_by_visit",
     "compute_hpix_metric_in_bands",
-    "visits",
+    "often_repeated_fields",
+    "count_visits_by_sim",
+    "match_visits_across_sims",
+    "compute_matched_visit_delta_statistics",
 ]
 
 from .astro import compute_sun_moon_positions, convert_evening_date_to_night_of_survey, night_events
 from .camera import LsstCameraFootprintPerimeter
+from .multisim import (
+    compute_matched_visit_delta_statistics,
+    count_visits_by_sim,
+    match_visits_across_sims,
+    often_repeated_fields,
+)
 from .scheduler import (
     compute_basis_function_reward_at_time,
     compute_basis_function_rewards,
