@@ -55,6 +55,8 @@ def _make_observation_from_record(record):
     observation["moonAlt"] = np.radians(record["moonAlt"])
     observation["sunAlt"] = np.radians(record["sunAlt"])
     observation["note"] = record["note"]
+    if "scheduler_note" in record:
+        observation["scheduler_note"] = record["scheduler_note"]
     observation["field_id"] = record["fieldId"]
     observation["survey_id"] = record["proposalId"]
     observation["block_id"] = record["block_id"]

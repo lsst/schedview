@@ -162,6 +162,7 @@ def plot_alt_vs_time(
     event_labels=DEFAULT_EVENT_LABELS,
     event_colors=DEFAULT_EVENT_COLORS,
     figure=None,
+    note_column=None,
 ):
     """Plot airmass vs. time for a set of visits
 
@@ -181,12 +182,24 @@ def plot_alt_vs_time(
         Default is `DEFAULT_EVENT_COLORS`.
     figure : `bokeh.plotting.Figure`
         Bokeh figure object to plot on.  If None, a new figure will be created.
+    note_column : `str` or None
+        The column to use as the note to map to color.
+        Defaults to None, which defaults `scheduler_note` if it is present
+        in the visit datasource, otherwise `note`.
 
     Returns
     -------
     fig : `bokeh.plotting.Figure`
         Bokeh figure object
     """
+
+    if note_column is None:
+        if isinstance(visits, bokeh.models.ColumnDataSource):
+            scheduler_note_present = "scheduler_note" in visits.data
+        else:
+            scheduler_note_present = "scheduler_note" in visits
+        note_column = "scheduler_note" if scheduler_note_present else "note"
+
     for time_column in "start_date", "observationStartDatetime64":
         if isinstance(visits, bokeh.models.ColumnDataSource):
             if time_column in visits.data:
@@ -211,17 +224,17 @@ def plot_alt_vs_time(
     else:
         visits_ds = bokeh.models.ColumnDataSource(visits)
 
-    note_values = np.unique(visits_ds.data["note"])
+    note_values = np.unique(visits_ds.data[note_column])
     too_many_note_values = len(note_values) > len(colorcet.palette["glasbey"])
 
     if not too_many_note_values:
         note_color_mapper = bokeh.models.CategoricalColorMapper(
-            factors=note_values, palette=colorcet.palette["glasbey"][: len(note_values)], name="note"
+            factors=note_values, palette=colorcet.palette["glasbey"][: len(note_values)], name=note_column
         )
 
         if "note_and_filter" not in visits_ds.column_names:
             note_and_filter = tuple(
-                [f"{n} in {f}" for n, f in zip(visits_ds.data["note"], visits_ds.data["filter"])]
+                [f"{n} in {f}" for n, f in zip(visits_ds.data[note_column], visits_ds.data["filter"])]
             )
             visits_ds.add(note_and_filter, "note_and_filter")
 
@@ -247,7 +260,7 @@ def plot_alt_vs_time(
             time_column,
             "altitude",
             source=visits_ds,
-            color={"field": "note", "transform": note_color_mapper},
+            color={"field": note_column, "transform": note_color_mapper},
             marker={"field": "filter", "transform": filter_marker_mapper},
             size=5,
             legend_field="note_and_filter",
@@ -366,7 +379,7 @@ def _add_az_graticules(fig, transform, min_alt=0, min_az=0, max_az=360, az_step=
             )
 
 
-def plot_polar_alt_az(visits, band_shapes=BAND_SHAPES, figure=None, legend=True):
+def plot_polar_alt_az(visits, band_shapes=BAND_SHAPES, figure=None, legend=True, note_column=None):
     """Plot airmass vs. time for a set of visits
 
     Parameters
@@ -387,6 +400,12 @@ def plot_polar_alt_az(visits, band_shapes=BAND_SHAPES, figure=None, legend=True)
     fig : `bokeh.plotting.Figure`
         Bokeh figure object
     """
+    if note_column is None:
+        if isinstance(visits, bokeh.models.ColumnDataSource):
+            scheduler_note_present = "scheduler_note" in visits.data
+        else:
+            scheduler_note_present = "scheduler_note" in visits
+        note_column = "scheduler_note" if scheduler_note_present else "note"
 
     if figure is None:
         fig = bokeh.plotting.figure(
@@ -416,17 +435,17 @@ def plot_polar_alt_az(visits, band_shapes=BAND_SHAPES, figure=None, legend=True)
     if "zd" not in visits_ds.column_names:
         visits_ds.add(90 - np.array(visits_ds.data["altitude"]), "zd")
 
-    note_values = np.unique(visits_ds.data["note"])
+    note_values = np.unique(visits_ds.data[note_column])
     too_many_note_values = len(note_values) > len(colorcet.palette["glasbey"])
 
     if not too_many_note_values:
         note_color_mapper = bokeh.models.CategoricalColorMapper(
-            factors=note_values, palette=colorcet.palette["glasbey"][: len(note_values)], name="note"
+            factors=note_values, palette=colorcet.palette["glasbey"][: len(note_values)], name=note_column
         )
 
         if "note_and_filter" not in visits_ds.column_names:
             note_and_filter = tuple(
-                [f"{n} in {f}" for n, f in zip(visits_ds.data["note"], visits_ds.data["filter"])]
+                [f"{n} in {f}" for n, f in zip(visits_ds.data[note_column], visits_ds.data["filter"])]
             )
             visits_ds.add(note_and_filter, "note_and_filter")
 
@@ -456,7 +475,7 @@ def plot_polar_alt_az(visits, band_shapes=BAND_SHAPES, figure=None, legend=True)
             polar_transform.y,
             polar_transform.x,
             source=visits_ds,
-            color={"field": "note", "transform": note_color_mapper},
+            color={"field": note_column, "transform": note_color_mapper},
             marker={"field": "filter", "transform": filter_marker_mapper},
             size=5,
             legend_field="note_and_filter",

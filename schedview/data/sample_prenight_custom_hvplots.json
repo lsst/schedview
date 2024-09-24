@@ -2,7 +2,7 @@
     {
         "name": "Airmass histogram",
         "settings": {
-            "by": "note",
+            "by": "scheduler_note",
             "kind": "hist",
             "y": "airmass",
             "bins": 15,
@@ -15,7 +15,7 @@
     {
         "name": "Slew time histogram",
         "settings": {
-            "by": "note",
+            "by": "scheduler_note",
             "kind": "hist",
             "y": "slewTime",
             "bins": 15,
@@ -28,7 +28,7 @@
     {
         "name": "Airmass vs. H.A.",
         "settings": {
-            "by": "note",
+            "by": "scheduler_note",
             "kind": "scatter",
             "x": "HA",
             "y": "airmass",
@@ -44,7 +44,7 @@
                 "moonAlt",
                 "moonDistance",
                 "moonPhase",
-                "note"
+                "scheduler_note"
             ],
             "height": 512
         }
@@ -62,7 +62,7 @@
                 "sunAlt",
                 "moonAlt",
                 "moonPhase",
-                "note"
+                "scheduler_note"
             ],
             "height": 512
         }
