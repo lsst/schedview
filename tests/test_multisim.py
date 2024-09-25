@@ -14,6 +14,8 @@ FIELD_SEQUENCE_IN_SIMS = (
     (0, 0, 1, 2, 2, 2, 4, 4),
     (0, 1, 2, 2, 2, 3, 3, 4),
     (0, 1, 2, 3, 4, 2, 2, 4),
+    (0, 1, 3, 4, 4),
+    (0, 1, 4, 4, 4),
 )
 
 
@@ -127,6 +129,18 @@ class TestMultisim(unittest.TestCase):
         # Hand checked values for these test data.
         assert matched_visits is not None
         assert np.isclose(matched_visits.loc[:, "delta"], [-573.278053, -604.849867]).all()
+
+        # What if there are no matches?
+        matched_visits = schedview.compute.multisim.match_visits_across_sims(
+            start_times.loc[2, :], sim_indexes=(0, 4)
+        )
+        assert len(matched_visits) == 0
+
+        # What about no visits in either sim?
+        matched_visits = schedview.compute.multisim.match_visits_across_sims(
+            start_times.loc[2, :], sim_indexes=(4, 5)
+        )
+        assert len(matched_visits) == 0
 
     def test_compute_matched_visit_delta_statistics(self):
         matched_visit_stats = schedview.compute.multisim.compute_matched_visit_delta_statistics(self.visits)
