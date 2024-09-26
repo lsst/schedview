@@ -216,11 +216,23 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     sched_app[scheduler.data_params_grid_height : scheduler.data_params_grid_height + 6, 3:15] = pn.Row(
         reset_button
     )
-    # Summary table and header.
-    sched_app[8 : scheduler.data_params_grid_height, 21:67] = pn.Row(
+    # Selected survey label.
+    sched_app[8 : 12, 21:67] = pn.Row(
         pn.Spacer(width=10),
         pn.Column(
             pn.Spacer(height=10),
+            pn.Row(
+                scheduler.selected_survey_label,
+                styles={"background": "#045D5D"},
+            ),
+        ),
+        pn.Spacer(width=10),
+    )
+    # Summary table and header.
+    sched_app[12 : scheduler.data_params_grid_height, 21:67] = pn.Row(
+        pn.Spacer(width=10),
+        pn.Column(
+            # pn.Spacer(height=10),
             pn.Row(
                 scheduler.summary_table_heading,
                 styles={"background": "#048b8c"},
@@ -228,11 +240,6 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
             pn.param.ParamMethod(scheduler.publish_summary_widget, loading_indicator=True),
         ),
         pn.Spacer(width=10),
-    )
-    # Selected survey label.
-    sched_app[scheduler.data_params_grid_height : scheduler.data_params_grid_height + 6, 21:67] = pn.Row(
-        scheduler.selected_survey_label,
-        styles={"background": "#048b8c"},
     )
     # Reward table and header.
     sched_app[scheduler.data_params_grid_height + 6 : scheduler.data_params_grid_height + 45, 0:67] = pn.Row(
