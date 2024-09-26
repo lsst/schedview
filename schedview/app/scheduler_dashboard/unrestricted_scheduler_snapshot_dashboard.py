@@ -111,6 +111,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
     summary_table_heading_pane = None
     reward_table_heading_pane = None
     map_title_pane = None
+    selected_survey_label_pane = None
 
     # Non-Param internal parameters.
     _mjd = None
@@ -1361,3 +1362,25 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         else:
             self.map_title_pane.object = title_string
         return self.map_title_pane
+
+    def generate_selected_survey_label(self):
+
+        if not self._display_dashboard_data:
+            return ""
+        self._scheduler.request_observation()
+        tier_label, survey_label = self._reward_df.loc[tuple(self._scheduler.survey_index), ("tier", "survey")].drop_duplicates().values
+        return f"Chosen survey was {tier_label}, {survey_label}."
+
+    @param.depends("_update_headings")
+    def selected_survey_label(self):
+        """DOCSTRING
+        """
+        selected_survey_string = self.generate_selected_survey_label()
+        if self.selected_survey_label_pane is None:
+            self.selected_survey_label_pane = pn.pane.Str(
+                selected_survey_string,
+                stylesheets=[h3_stylesheet],
+            )
+        else:
+            self.selected_survey_label_pane.object = selected_survey_string
+        return self.selected_survey_label_pane
