@@ -216,23 +216,16 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     sched_app[scheduler.data_params_grid_height : scheduler.data_params_grid_height + 6, 3:15] = pn.Row(
         reset_button
     )
-    # Selected survey label.
-    sched_app[8 : 12, 21:67] = pn.Row(
+    # Summary table and header + chosen survey label.
+    sched_app[8 : scheduler.data_params_grid_height + 6, 21:67] = pn.Row(
         pn.Spacer(width=10),
         pn.Column(
             pn.Spacer(height=10),
             pn.Row(
-                scheduler.selected_survey_label,
+                scheduler.chosen_survey_label,
                 styles={"background": "#045D5D"},
             ),
-        ),
-        pn.Spacer(width=10),
-    )
-    # Summary table and header.
-    sched_app[12 : scheduler.data_params_grid_height, 21:67] = pn.Row(
-        pn.Spacer(width=10),
-        pn.Column(
-            # pn.Spacer(height=10),
+            pn.Spacer(height=10),
             pn.Row(
                 scheduler.summary_table_heading,
                 styles={"background": "#048b8c"},
