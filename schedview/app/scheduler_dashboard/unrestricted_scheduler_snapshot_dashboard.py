@@ -1248,7 +1248,11 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         if not self._display_dashboard_data:
             return "Chosen survey is ..."
         self._scheduler.request_observation()
-        label = self._reward_df.loc[tuple(self._scheduler.survey_index), ("tier_label", "survey_label")].drop_duplicates().values
+        label = (
+            self._reward_df.loc[tuple(self._scheduler.survey_index), ("tier_label", "survey_label")]
+            .drop_duplicates()
+            .values
+        )
         tier_label = label[0][0]
         survey_label = label[0][1]
         return f"Chosen survey is {tier_label}, {survey_label}."
