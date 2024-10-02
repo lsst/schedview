@@ -16,6 +16,7 @@ async def test_get_scheduler_list():
     scheduler.telescope = None
     await scheduler.get_scheduler_list()
     # No snapshots should be retreived if it isn't an LFA environment
+    # the dropdown has one empty option
     assert len(scheduler.param.scheduler_fname.objects) >= 1
 
 
@@ -30,6 +31,8 @@ async def test_get_scheduler_list_in_USDF():
     # the env variables needed for LFA mode are set
     if os.environ.get("AWS_SHARED_CREDENTIALS_FILE") and os.environ.get("S3_ENDPOINT_URL"):
         # at least one snapshot file should be retreived
+        # the dropdown should have one empty option +
+        # at least one snapshot
         assert len(scheduler.param.scheduler_fname.objects) >= 2
         scheduler.scheduler_fname = scheduler.param["scheduler_fname"].objects[1]
         scheduler.read_scheduler()
