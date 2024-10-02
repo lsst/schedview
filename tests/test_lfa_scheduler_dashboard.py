@@ -1,0 +1,40 @@
+import os
+from datetime import datetime
+
+import pytest
+
+# Objects to test instances against.
+from rubin_scheduler.scheduler.features.conditions import Conditions
+from rubin_scheduler.scheduler.schedulers.core_scheduler import CoreScheduler
+
+from schedview.app.scheduler_dashboard.scheduler_dashboard_app import LFASchedulerSnapshotDashboard
+
+
+@pytest.mark.asyncio
+async def test_get_scheduler_list():
+    scheduler = LFASchedulerSnapshotDashboard()
+    scheduler.telescope = None
+    await scheduler.get_scheduler_list()
+    # No snapshots should be retreived if it isn't an LFA environment
+    assert len(scheduler.param.scheduler_fname.objects) >= 1
+
+
+@pytest.mark.asyncio
+async def test_get_scheduler_list_in_USDF():
+    scheduler = LFASchedulerSnapshotDashboard()
+
+    scheduler.telescope = None
+    scheduler.pickles_date = datetime(2024, 9, 30, 16, 26, 23)
+    await scheduler.get_scheduler_list()
+    # make sure it's a LFA environment by checking
+    # the env variables needed for LFA mode are set
+    if os.environ.get("AWS_SHARED_CREDENTIALS_FILE") and os.environ.get("S3_ENDPOINT_URL"):
+        # at least one snapshot file should be retreived
+        assert len(scheduler.param.scheduler_fname.objects) >= 2
+        scheduler.scheduler_fname = scheduler.param["scheduler_fname"].objects[1]
+        scheduler.read_scheduler()
+        assert isinstance(scheduler._scheduler, CoreScheduler)
+        assert isinstance(scheduler._conditions, Conditions)
+    else:
+        # pass the test if it isn't an LFA environment
+        pass
