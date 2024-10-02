@@ -103,6 +103,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
     _publish_reward_widget = param.Parameter(None)
     _publish_map = param.Parameter(None)
     _update_headings = param.Parameter(None)
+    _update_chosen_survey = param.Parameter(None)
     _debugging_message = param.Parameter(None)
 
     # Non-Param parameters storing Panel pane objects.
@@ -111,6 +112,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
     summary_table_heading_pane = None
     reward_table_heading_pane = None
     map_title_pane = None
+    chosen_survey_label_pane = None
 
     # Non-Param internal parameters.
     _mjd = None
@@ -207,13 +209,11 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
         # Current fix for _conditions.mjd having different datatypes.
         if isinstance(self._conditions._mjd, np.ndarray):
-            print("self._conditions._mjd is np.ndarray")
             self._conditions._mjd = self._conditions._mjd[0]
 
         # Get mjd from pickle and set widget and URL to match.
         self._do_not_trigger_update = True
         self.url_mjd = self._conditions._mjd
-        print(type(self._conditions._mjd))
         self.widget_datetime = Time(self._conditions._mjd, format="mjd").to_datetime()
         self._do_not_trigger_update = False
 
@@ -290,6 +290,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self._display_dashboard_data = True
         self._display_reward = False
         self.param.trigger("_update_headings")
+        self.param.trigger("_update_chosen_survey")
 
         self.show_loading_indicator = False
 
@@ -509,6 +510,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         self.param.trigger("_publish_reward_widget")
         self.param.trigger("_publish_map")
         self.param.trigger("_update_headings")
+        self.param.trigger("_update_chosen_survey")
 
         self.param["widget_tier"].objects = [""]
         self.param["survey_map"].objects = [""]
@@ -1235,6 +1237,26 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         else:
             return f"\nTier {self._tier[-1]} - Survey {self._survey} - Reward {self._reward_name}"
 
+    def generate_chosen_survey_label(self):
+        """Generate a string listing the chosen survey.
+
+        Returns
+        -------
+        label : `str`
+            Label text. Include tier and survey.
+        """
+        if not self._display_dashboard_data:
+            return "Chosen survey is ..."
+        self._scheduler.request_observation()
+        label = (
+            self._reward_df.loc[tuple(self._scheduler.survey_index), ("tier_label", "survey_label")]
+            .drop_duplicates()
+            .values
+        )
+        tier_label = label[0][0]
+        survey_label = label[0][1]
+        return f"Chosen survey is {tier_label}, {survey_label}."
+
     def generate_summary_table_heading(self):
         """Select the summary table heading based on whether data is being
         displayed or not.
@@ -1305,6 +1327,26 @@ class SchedulerSnapshotDashboard(param.Parameterized):
         else:
             self.dashboard_subtitle_pane.object = title_string
         return self.dashboard_subtitle_pane
+
+    @param.depends("_update_chosen_survey")
+    def chosen_survey_label(self):
+        """Load label data and create/update
+        a String pane to display label.
+
+        Returns
+        -------
+        label : `panel.pane.Str`
+            A panel String pane to display the chosen survey label.
+        """
+        chosen_survey_string = self.generate_chosen_survey_label()
+        if self.chosen_survey_label_pane is None:
+            self.chosen_survey_label_pane = pn.pane.Str(
+                chosen_survey_string,
+                stylesheets=[h3_stylesheet],
+            )
+        else:
+            self.chosen_survey_label_pane.object = chosen_survey_string
+        return self.chosen_survey_label_pane
 
     @param.depends("_update_headings")
     def summary_table_heading(self):
