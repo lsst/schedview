@@ -25,7 +25,7 @@ async def test_get_scheduler_list_in_USDF():
     scheduler = LFASchedulerSnapshotDashboard()
 
     scheduler.telescope = None
-    scheduler.pickles_date = datetime(2024, 9, 30, 16, 26, 23)
+    scheduler.pickles_date = datetime(2024, 10, 1, 21, 26, 23)
     await scheduler.get_scheduler_list()
     # make sure it's a LFA environment by checking
     # the env variables needed for LFA mode are set
