@@ -166,19 +166,24 @@ class TestLFASchedulerDashboard(unittest.TestCase):
     async def test_get_scheduler_list(self):
         self.scheduler.telescope = None
         await self.scheduler.get_scheduler_list()
+        # No snapshots should be retreived if it isn't an LFA environment
         self.assertGreaterEqual(len(self.scheduler.scheduler_fname), 0)
 
     async def test_get_scheduler_list_in_USDF(self):
         self.scheduler.telescope = None
         self.pickles_date = datetime(2024, 10, 1, 20, 26, 23)
         await self.scheduler.get_scheduler_list()
+        # make sure it's a LFA environment by checking
+        # the env variables needed for LFA mode are set
         if os.environ.get("AWS_SHARED_CREDENTIALS_FILE") and os.environ.get("S3_ENDPOINT_URL"):
+            # at least one snapshot file should be retreived
             self.assertGreaterEqual(len(self.scheduler.scheduler_fname), 1)
             self.scheduler.scheduler_fname = self.scheduler.param["scheduler_fname"].objects[1]
             self.scheduler.read_scheduler()
             self.assertIsInstance(self.scheduler._scheduler, CoreScheduler)
             self.assertIsInstance(self.scheduler._conditions, Conditions)
         else:
+            # pass the test if it isn't an LFA environment
             pass
 
 
