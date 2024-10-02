@@ -6,7 +6,6 @@ import subprocess
 import time
 import unittest
 from collections import OrderedDict
-from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from zoneinfo import ZoneInfo
@@ -32,7 +31,6 @@ from rubin_scheduler.scheduler.schedulers.core_scheduler import CoreScheduler
 
 import schedview
 from schedview.app.scheduler_dashboard.scheduler_dashboard_app import (
-    LFASchedulerSnapshotDashboard,
     SchedulerSnapshotDashboard,
     scheduler_app,
 )
@@ -158,33 +156,6 @@ class TestSchedulerDashboard(unittest.TestCase):
         self.assertEqual(wind_data.wind_speed, wind_speed)
         self.assertEqual(wind_data.wind_direction, wind_direction)
         self.assertEqual(seeing_data.fwhm_500, fiducial_seeing)
-
-
-class TestLFASchedulerDashboard(unittest.TestCase):
-    scheduler = LFASchedulerSnapshotDashboard()
-
-    async def test_get_scheduler_list(self):
-        self.scheduler.telescope = None
-        await self.scheduler.get_scheduler_list()
-        # No snapshots should be retreived if it isn't an LFA environment
-        self.assertGreaterEqual(len(self.scheduler.scheduler_fname), 0)
-
-    async def test_get_scheduler_list_in_USDF(self):
-        self.scheduler.telescope = None
-        self.pickles_date = datetime(2024, 10, 1, 20, 26, 23)
-        await self.scheduler.get_scheduler_list()
-        # make sure it's a LFA environment by checking
-        # the env variables needed for LFA mode are set
-        if os.environ.get("AWS_SHARED_CREDENTIALS_FILE") and os.environ.get("S3_ENDPOINT_URL"):
-            # at least one snapshot file should be retreived
-            self.assertGreaterEqual(len(self.scheduler.scheduler_fname), 1)
-            self.scheduler.scheduler_fname = self.scheduler.param["scheduler_fname"].objects[1]
-            self.scheduler.read_scheduler()
-            self.assertIsInstance(self.scheduler._scheduler, CoreScheduler)
-            self.assertIsInstance(self.scheduler._conditions, Conditions)
-        else:
-            # pass the test if it isn't an LFA environment
-            pass
 
 
 @skip_playwright_tests
