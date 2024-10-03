@@ -59,7 +59,7 @@ dev = [
 
 [project.scripts]
 prenight = "schedview.app.prenight.prenight:main"
-scheduler_dashboard = "schedview.app.scheduler_dashboard.scheduler_dashboard:main"
+scheduler_dashboard = "schedview.app.scheduler_dashboard.scheduler_dashboard_app:main"
 
 [tool.setuptools.dynamic]
 version = { attr = "setuptools_scm.get_version" }

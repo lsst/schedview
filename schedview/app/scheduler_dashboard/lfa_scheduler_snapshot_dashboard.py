@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -65,6 +66,7 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
 
     def __init__(self):
         super().__init__()
+        self.get_scheduler_list()
 
     async def query_schedulers(self, selected_time, selected_tel):
         """Query snapshots that have a timestamp between the start of the
@@ -84,3 +86,21 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
         self._debugging_message = "Finished retrieving snapshots"
         self.show_loading_indicator = False
         return scheduler_urls
+
+    @pn.depends("pickles_date", "telescope", watch=True)
+    async def get_scheduler_list(self):
+        selected_time = self.pickles_date
+        selected_tel = self.telescope
+        pn.state.notifications.clear()
+        pn.state.notifications.info("Loading snapshots...")
+        os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
+        # add an empty option at index 0 to be the default
+        # selection upon loading snapshot list
+        schedulers = [""]
+        schedulers[1:] = await self.query_schedulers(selected_time, selected_tel)
+        self.param["scheduler_fname"].objects = schedulers
+        self.clear_dashboard()
+        if len(schedulers) > 1:
+            pn.state.notifications.success("Snapshots loaded!!")
+        else:
+            pn.state.notifications.info("No snapshots found for selected night!!", duration=0)
