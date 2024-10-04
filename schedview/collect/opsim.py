@@ -145,8 +145,8 @@ def read_opsim(
                     warn("No visits match constraints.")
                     visits = (
                         SchemaConverter()
-                        .obs2opsim(rubin_scheduler.scheduler.utils.empty_observation())
-                        .drop(index=0)
+                        .obs2opsim(rubin_scheduler.scheduler.utils.ObservationArray())
+                        .iloc[0:-1]
                     )
                     if "observationId" not in visits.columns and "ID" in visits.columns:
                         visits.rename(columns={"ID": "observationId"}, inplace=True)
