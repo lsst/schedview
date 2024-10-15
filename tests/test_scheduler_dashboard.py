@@ -136,7 +136,7 @@ class TestSchedulerDashboard(unittest.TestCase):
         self.scheduler._scheduler = example_scheduler(mjd_start=MJD_START)
         self.scheduler._conditions = self.observatory.return_conditions()
         self.scheduler._scheduler.update_conditions(self.scheduler._conditions)
-        survey = self.scheduler._scheduler.survey_lists[2][3]
+        survey = self.scheduler._scheduler.survey_lists[4][2]
         survey_maps = compute_maps(survey, self.scheduler._conditions, nside=8)
         self.assertIsInstance(survey_maps, OrderedDict)
         self.assertIn("reward", survey_maps)

@@ -25,7 +25,7 @@ class TestComputeSurvey(unittest.TestCase):
     def test_compute_maps(self):
         self.observatory.mjd = TEST_MJD
         conditions = self.observatory.return_conditions()
-        survey = self.scheduler.survey_lists[2][2]
+        survey = self.scheduler.survey_lists[4][2]
         survey_maps = compute_maps(survey, conditions, nside=8)
         self.assertIsInstance(survey_maps, OrderedDict)
         self.assertIn("reward", survey_maps)
