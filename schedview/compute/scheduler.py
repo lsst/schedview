@@ -12,69 +12,7 @@ from astropy.timeseries import TimeSeries
 from rubin_scheduler.scheduler import sim_runner, surveys
 from rubin_scheduler.scheduler.example import example_scheduler
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
-from rubin_scheduler.scheduler.utils import SchemaConverter, empty_observation
-
-
-def _make_observation_from_record(record):
-    """Convert an opsim visit record to a scheduler observation
-
-    Parameters
-    ----------
-    record : `dict`
-        A row from an opsim output table
-
-    Returns
-    -------
-    observation : `numpy.ndarray`
-        A numpy recarray with data understood by the scheduler
-    """
-    observation = empty_observation()
-    observation["RA"] = np.radians(record["fieldRA"])
-    observation["dec"] = np.radians(record["fieldDec"])
-    observation["mjd"] = record["observationStartMJD"]
-    observation["flush_by_mjd"] = record["flush_by_mjd"]
-    observation["exptime"] = record["visitExposureTime"]
-    observation["filter"] = record["filter"]
-    observation["rotSkyPos"] = np.radians(record["rotSkyPos"])
-    observation["rotSkyPos_desired"] = np.radians(record["rotSkyPos_desired"])
-    observation["nexp"] = record["numExposures"]
-    observation["airmass"] = record["airmass"]
-    observation["FWHM_500"] = record["seeingFwhm500"]
-    observation["FWHMeff"] = record["seeingFwhmEff"]
-    observation["FWHM_geometric"] = record["seeingFwhmGeom"]
-    observation["skybrightness"] = record["skyBrightness"]
-    observation["night"] = record["night"]
-    observation["slewtime"] = record["slewTime"]
-    observation["visittime"] = record["visitTime"]
-    observation["slewdist"] = np.radians(record["slewDistance"])
-    observation["fivesigmadepth"] = record["fiveSigmaDepth"]
-    observation["alt"] = np.radians(record["altitude"])
-    observation["az"] = np.radians(record["azimuth"])
-    observation["pa"] = np.radians(record["paraAngle"])
-    observation["clouds"] = record["cloud"]
-    observation["moonAlt"] = np.radians(record["moonAlt"])
-    observation["sunAlt"] = np.radians(record["sunAlt"])
-    observation["note"] = record["note"]
-    if "scheduler_note" in record:
-        observation["scheduler_note"] = record["scheduler_note"]
-    observation["field_id"] = record["fieldId"]
-    observation["survey_id"] = record["proposalId"]
-    observation["block_id"] = record["block_id"]
-    observation["lmst"] = record["observationStartLST"] / 15
-    observation["rotTelPos"] = np.radians(record["rotTelPos"])
-    observation["rotTelPos_backup"] = np.radians(record["rotTelPos_backup"])
-    observation["moonAz"] = np.radians(record["moonAz"])
-    observation["sunAz"] = np.radians(record["sunAz"])
-    observation["sunRA"] = np.radians(record["sunRA"])
-    observation["sunDec"] = np.radians(record["sunDec"])
-    observation["moonRA"] = np.radians(record["moonRA"])
-    observation["moonDec"] = np.radians(record["moonDec"])
-    observation["moonDist"] = np.radians(record["moonDistance"])
-    observation["solarElong"] = np.radians(record["solarElong"])
-    observation["moonPhase"] = record["moonPhase"]
-    observation["cummTelAz"] = np.radians(record["cummTelAz"])
-    observation["scripted_id"] = record["scripted_id"]
-    return observation
+from rubin_scheduler.scheduler.utils import SchemaConverter
 
 
 def replay_visits(scheduler, visits):
@@ -87,11 +25,13 @@ def replay_visits(scheduler, visits):
     visits : `pandas.DataFrame`
         A table of visits to add.
     """
-    for visit_id, visit_record in visits.iterrows():
-        obs = _make_observation_from_record(visit_record)
-        scheduler.add_observation(obs)
+    obs = SchemaConverter().opsimdf2obs(visits)
+    for this_obs in obs:
+        scheduler.add_observation(this_obs)
 
-    scheduler.conditions.mjd = float(obs["mjd"] + (obs["slewtime"] + obs["visittime"]) / (24 * 60 * 60))
+    scheduler.conditions.mjd = float(
+        this_obs["mjd"] + (this_obs["slewtime"] + this_obs["visittime"]) / (24 * 60 * 60)
+    )
 
 
 def compute_basis_function_reward_at_time(scheduler, time, observatory=None):
