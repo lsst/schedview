@@ -78,6 +78,7 @@ __version__ = "{version}"
 [tool.pytest.ini_options]
 addopts = "--ignore-glob=*/version.py --ignore-glob=*data_dir/*"
 testpaths = "."
+asyncio_default_fixture_loop_scope="function"
 
 [tool.black]
 line-length = 110
