@@ -1,4 +1,5 @@
 import os
+import unittest
 from datetime import datetime
 
 import pytest
@@ -20,6 +21,7 @@ async def test_get_scheduler_list():
     assert len(scheduler.param.scheduler_fname.objects) >= 1
 
 
+@unittest.skip("Skip until there are compatible schedulers in the LFA.")
 @pytest.mark.asyncio
 async def test_get_scheduler_list_in_USDF():
     scheduler = LFASchedulerSnapshotDashboard()
