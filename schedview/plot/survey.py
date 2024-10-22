@@ -449,7 +449,7 @@ def create_metric_visit_map_grid(
     if len(metric_visits):
         metric_hpix = compute_hpix_metric_in_bands(metric_visits, metric, nside=nside)
     else:
-        metric_hpix = np.zeros(hp.nside2npix(nside))
+        metric_hpix = {b: np.zeros(hp.nside2npix(nside)) for b in visits["filter"].unique()}
 
     if len(visits):
         if use_matplotlib:
