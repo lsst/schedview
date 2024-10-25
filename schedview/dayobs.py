@@ -69,9 +69,9 @@ class DayObs:
         """
 
         # If the argument is convertable to an int, do.
-        if isinstance(arg, str):
+        if isinstance(arg, str) and int_format in ("yyyymmdd", "auto"):
             try:
-                arg = int(arg)
+                arg = datetime.datetime.strptime(arg, "%Y%m%d").date()
             except ValueError:
                 pass
 
@@ -85,24 +85,18 @@ class DayObs:
                     len(str(arg)) == len(str("YYYYMMDD")) and int_format == "auto"
                 ):
                     # Digits encode YYYYMMDD
-                    year = arg // 10000
-                    month = (arg - year * 10000) // 100
-                    day = arg - year * 10000 - month * 100
-                    date = datetime.date(year, month, day)
+                    date = datetime.datetime.strptime(str(arg), "%Y%m%d").date()
                 else:
                     if int_format not in ("auto", "mjd"):
                         raise ValueError("Invalid integer format.")
 
                     date = MJD_EPOCH + datetime.timedelta(days=arg)
             case "yesterday":
-                dayobs_datetime: datetime.datetime = datetime.datetime.now(tz=DAYOBS_TZ) - ONE_DAY
-                date = datetime.date(dayobs_datetime.year, dayobs_datetime.month, dayobs_datetime.day)
+                date = (datetime.datetime.now(tz=DAYOBS_TZ) - ONE_DAY).date()
             case "today" | "tonight":
-                dayobs_datetime: datetime.datetime = datetime.datetime.now(tz=DAYOBS_TZ)
-                date = datetime.date(dayobs_datetime.year, dayobs_datetime.month, dayobs_datetime.day)
+                date = datetime.datetime.now(tz=DAYOBS_TZ).date()
             case "tomorrow":
-                dayobs_datetime: datetime.datetime = datetime.datetime.now(tz=DAYOBS_TZ) + ONE_DAY
-                date = datetime.date(dayobs_datetime.year, dayobs_datetime.month, dayobs_datetime.day)
+                date = (datetime.datetime.now(tz=DAYOBS_TZ) + ONE_DAY).date()
             case str():
                 dayobs_datetime = dateutil.parser.parse(arg)
                 if dayobs_datetime.hour != 0 or dayobs_datetime.minute != 0 or dayobs_datetime.second != 0:
@@ -171,8 +165,7 @@ class DayObs:
         if dayobs_datetime.tzinfo is None:
             dayobs_datetime = dayobs_datetime.replace(tzinfo=datetime.timezone.utc)
 
-        dayobs_datetime = dayobs_datetime.astimezone(DAYOBS_TZ)
-        dayobs_date = datetime.date(dayobs_datetime.year, dayobs_datetime.month, dayobs_datetime.day)
+        dayobs_date = dayobs_datetime.astimezone(DAYOBS_TZ).date()
         return cls(dayobs_date, int_format)
 
     @cached_property
