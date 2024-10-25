@@ -1,14 +1,13 @@
 import pandas as pd
 from lsst.resources import ResourcePath
 from rubin_scheduler.utils import ddf_locations
+from rubin_scheduler.utils.consdb import KNOWN_INSTRUMENTS
 from rubin_sim import maf
 
 from schedview import DayObs
 
 from .consdb import read_consdb
 from .opsim import read_opsim
-
-KNOWN_INSTRUMENTS = ["lsstcomcamsim"]
 
 # Use old-style format, because f-strings are not reusable
 OPSIMDB_TEMPLATE = (
