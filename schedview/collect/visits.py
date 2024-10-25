@@ -65,6 +65,9 @@ def read_ddf_visits(*args, **kwargs) -> pd.DataFrame:
     all_visits = read_visits(*args, **kwargs)
 
     ddf_field_names = tuple(ddf_locations().keys())
+    # Different versions of the schedule include a DD: prefix, or not.
+    # Catch them all.
+    ddf_field_names = ddf_field_names + tuple([f"DD:{n}" for n in ddf_field_names])
 
     # Figure out which column has the target names.
     target_column_name = "target_name" if "target_name" in all_visits.columns else "target"
