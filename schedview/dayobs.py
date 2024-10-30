@@ -6,6 +6,8 @@ from typing import Literal, Self
 
 import dateutil.parser
 from astropy.time import Time
+from rubin_scheduler.site_models import Almanac
+from rubin_scheduler.utils import Site
 
 DAYOBS_TZ = datetime.timezone(datetime.timedelta(hours=-12))
 MJD_EPOCH = datetime.date(1858, 11, 17)
@@ -31,12 +33,15 @@ class DayObs:
         ``yyyymmdd`` if an integer representation is a mapping of decimal
         digits to year, month, and day; ``mjd`` if the integer representation
         is the Modified Julian Date. The default is ``mjd``.
+    site_name : `str`
+        Name of the site, defaults to ``LSST``.
     """
 
     # Use the standard library date as a lowest common denominator
     # that cannot represent more or less than we want it to.
     date: datetime.date
     int_format: IntDateFormat = "auto"
+    site_name: str = "LSST"
 
     @classmethod
     def from_date(cls, arg: datetime.date | int | str | Self, int_format: IntDateFormat = "auto") -> Self:
@@ -187,6 +192,16 @@ class DayObs:
             datetime.datetime(self.date.year, self.date.month, self.date.day, tzinfo=DAYOBS_TZ) + ONE_DAY
         )
         return Time(end_datetime)
+
+    @cached_property
+    def _site(self):
+        return Site(self.site_name)
+
+    @cached_property
+    def sunset_info(self):
+        return Almanac().get_sunset_info(
+            evening_date=self.date.isoformat(), longitude=self._site.longitude_rad
+        )
 
     def __int__(self) -> int:
         return self.mjd if self.int_format in ("auto", "mjd") else self.yyyymmdd
