@@ -1,5 +1,7 @@
 import os
+from collections import defaultdict
 from collections.abc import Iterable
+from functools import partial
 
 import pandas as pd
 from lsst_efd_client import EfdClient
@@ -9,7 +11,7 @@ from schedview.dayobs import DayObs
 DEFAULT_EFD = (
     "summit_efd" if os.getenv("EXTERNAL_INSTANCE_URL", "") == "https://summit-lsp.lsst.codes" else "usdf_efd"
 )
-SAL_INDEX_GUESSES = {"lsstcomcam": [1], "latiss": [2]}
+SAL_INDEX_GUESSES = defaultdict(partial([[]].__getitem__, 0), {"lsstcomcam": [1, 3], "latiss": [2]})
 
 
 def _get_efd_client(efd: EfdClient | str | None) -> EfdClient:
@@ -34,19 +36,42 @@ async def _get_efd_fields_for_topic(efd_client, topic, public_only=True):
     return fields
 
 
-def _guess_sal_indexes(instrument):
-    return SAL_INDEX_GUESSES[instrument]
+async def query_efd_topic_for_night(
+    topic: str,
+    day_obs: DayObs | str | int,
+    sal_indexes: tuple[int, ...] = (1, 2, 3),
+    efd: EfdClient | str | None = None,
+    fields: list[str] | None = None,
+) -> pd.DataFrame:
+    """Query and EFD topic for all entries on a night.
 
+    Parameters
+    ----------
+    topic : `str`
+        The topic to query
+    day_obs : `DayObs` or `str` or `int`
+        The date of the start of the night requested.
+    sal_indexes : `tuple[int, ...]`, optional
+        Which SAL indexes to query, by default (1, 2, 3).
+        Can be guessed by instrument with ``SAL_INDEX_GUESSES[instrument]``
+    efd : `EfdClient` or `str`  `None`, optional
+        The EFD client to use, by default None, which creates a new one
+        based on the environment.
+    fields : `list[str]` or `None`, optional
+        Fields to query from the topic, by default None, which queries all
+        fields.
 
-async def query_efd_topic_for_night(topic, instrument, day_obs, efd=None, fields=None, sal_indexes=None):
+    Returns
+    -------
+    result : `pd.DataFrame`
+        The result of the query
+    """
+
     day_obs = day_obs if isinstance(day_obs, DayObs) else DayObs.from_date(day_obs)
     efd_client = _get_efd_client(efd)
 
     if fields is None:
         fields = await _get_efd_fields_for_topic(efd_client, topic)
-
-    if sal_indexes is None:
-        sal_indexes = _guess_sal_indexes(instrument)
 
     if not isinstance(sal_indexes, Iterable):
         sal_indexes = [sal_indexes]
@@ -65,15 +90,40 @@ async def query_efd_topic_for_night(topic, instrument, day_obs, efd=None, fields
 
 
 async def query_latest_in_efd_topic(
-    topic, instrument, num_records=6, efd=None, fields=None, sal_indexes=None
-):
+    topic: str,
+    num_records: int = 6,
+    sal_indexes: tuple[int, ...] = (1, 2, 3),
+    efd: EfdClient | str | None = None,
+    fields: list[str] | None = None,
+) -> pd.DataFrame:
+    """Query and EFD topic for all entries on a night.
+
+    Parameters
+    ----------
+    topic : `str`
+        The topic to query
+    num_records : `int`
+        The number of records to return.
+    sal_indexes : `tuple[int, ...]`, optional
+        Which SAL indexes to query, by default (1, 2, 3).
+        Can be guessed by instrument with ``SAL_INDEX_GUESSES[instrument]``
+    efd : `EfdClient` or `str`  `None`, optional
+        The EFD client to use, by default None, which creates a new one
+        based on the environment.
+    fields : `list[str]` or `None`, optional
+        Fields to query from the topic, by default None, which queries all
+        fields.
+
+    Returns
+    -------
+    result : `pd.DataFrame`
+        The result of the query
+    """
+
     efd_client = _get_efd_client(efd)
 
     if fields is None:
         fields = await _get_efd_fields_for_topic(efd_client, topic)
-
-    if sal_indexes is None:
-        sal_indexes = _guess_sal_indexes(instrument)
 
     if not isinstance(sal_indexes, Iterable):
         sal_indexes = [sal_indexes]
