@@ -6,6 +6,7 @@ __all__ = [
     "load_bright_stars",
     "read_ddf_visits",
     "read_multiple_opsims",
+    "read_night_visits",
 ]
 
 from .footprint import get_footprint
