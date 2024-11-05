@@ -226,7 +226,7 @@ def plot_visit_param_vs_time(
             if np.issubdtype(column_data.dtype, np.number):
                 options.append(k)
 
-        column_selector = bokeh.models.Select(value=column_name, options=options)
+        column_selector = bokeh.models.Select(value=column_name, options=options, name="visitcolselect")
 
         timeline_callback = bokeh.models.CustomJS(
             args={"timeline": timeline, "data": data, "yaxis": plot.yaxis[0]},
@@ -237,7 +237,7 @@ def plot_visit_param_vs_time(
             """,
         )
         column_selector.js_on_change("value", timeline_callback)
-        ui_element = bokeh.layouts.row([column_selector, plot])
+        ui_element = bokeh.layouts.column([column_selector, plot])
     else:
         ui_element = plot
 
