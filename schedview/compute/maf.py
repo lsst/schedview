@@ -1,3 +1,4 @@
+import sqlite3
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -10,11 +11,27 @@ __all__ = ["compute_metric_by_visit"]
 
 def _visits_to_opsim(visits, opsim):
     # Take advantage of the schema migration code in SchemaConverter to make
-    # sure we have the correct column names
-
+    # sure we have up to date column names.
     schema_converter = SchemaConverter()
     obs = schema_converter.opsimdf2obs(visits)
-    schema_converter.obs2opsim(obs, filename=opsim)
+    updated_opsim = schema_converter.obs2opsim(obs)
+
+    # We can't just use the update opsim as is, because it might drop columns
+    # we want. Instead, merge the results back into the visits passed to us.
+    restored_columns = set(visits.columns) - set(updated_opsim.columns)
+    restored_columns.add("observationId")
+    merged_opsim = updated_opsim.merge(
+        visits.loc[:, list(restored_columns)], on="observationId", suffixes=("", "_orig")
+    )
+
+    # If the round trip change actually changes values in an existing column
+    # without changing the names, the merge might not work correctly. If
+    # this happens, the default "inner join" performed by DataFrame.merge
+    # will drop visits. Double check that this hasn't happened.
+    assert len(merged_opsim) == len(visits)
+
+    with sqlite3.connect(opsim) as con:
+        merged_opsim.to_sql("observations", con)
 
 
 def compute_metric(visits, metric_bundle):

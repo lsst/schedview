@@ -16,7 +16,9 @@ def read_consdb(
     # right dtypes, so use ObservationArray()[0:0] instead to make the
     # empty recarray with the correct dtypes.
     visit_records: np.recarray = (
-        consdb_visits.opsim.to_records() if len(consdb_visits.opsim) > 0 else ObservationArray()[0:0]
+        consdb_visits.merged_opsim_consdb.to_records()
+        if len(consdb_visits.opsim) > 0
+        else ObservationArray()[0:0]
     )
     for stacker in stackers:
         visit_records = stacker.run(visit_records)
