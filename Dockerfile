@@ -1,7 +1,7 @@
 # Follow https://micromamba-docker.readthedocs.io/en/latest/
 
 # Base container
-FROM mambaorg/micromamba:1.5.1
+FROM mambaorg/micromamba:2.0.3
 
 # Container construction
 COPY --chown=$MAMBA_USER:$MAMBA_USER . /home/${MAMBA_USER}/schedview
