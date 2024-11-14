@@ -265,11 +265,13 @@ def make_unique_survey_name(scheduler, survey_index=None):
     # attribute.
     try:
         observation_note = f"{survey.observations['note'][0]}"
+        if len(observation_note) == 0:
+            observation_note = None
     except (AttributeError, ValueError, TypeError):
         observation_note = None
 
     if (observation_note is not None) and (survey.survey_name != observation_note):
-        survey_name = f"{survey.observations['note'][0]}"
+        survey_name = f"{survey.survey_name} ({survey.observations['note'][0]})"
 
     survey_name = f"{survey_index[1]}: {survey_name}"
 
