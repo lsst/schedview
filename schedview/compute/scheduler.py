@@ -261,15 +261,21 @@ def make_unique_survey_name(scheduler, survey_index=None):
 
     # For auxtel, different fields have the same survey_name, but
     # the interface should show the field name. So, if we're
-    # getting a field name in note, use that instead of the survey_name
-    # attribute.
+    # getting a field name in scheduler_note or note, use that in addition to
+    # the survey_name attribute.
     try:
-        observation_note = f"{survey.observations['note'][0]}"
-    except (AttributeError, ValueError, TypeError):
-        observation_note = None
+        try:
+            scheduler_note = f"{survey.observations['scheduler_note'][0]}"
+        except KeyError:
+            # The key used to be just "note". If "scheduler_note" is absent,
+            # we may be following the older convention, so fall back on
+            # that.
+            scheduler_note = f"{survey.observations['note'][0]}"
+    except (AttributeError, ValueError, TypeError, KeyError):
+        scheduler_note = None
 
-    if (observation_note is not None) and (survey.survey_name != observation_note):
-        survey_name = f"{survey.observations['note'][0]}"
+    if scheduler_note and scheduler_note not in survey_name:
+        survey_name = f"{survey_name} ({scheduler_note})"
 
     survey_name = f"{survey_index[1]}: {survey_name}"
 
