@@ -14,8 +14,8 @@ TABLE_WIDTH = 1024
 
 
 def make_visit_table(
-    night: str,
-    visit_source: str,
+    night: str = "2026-03-15",
+    visit_source: str = "3.5",
 ) -> UIElement:
 
     day_obs: DayObs = DayObs.from_date(night)
@@ -41,4 +41,7 @@ if __name__ == "__main__":
     astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
 
     figure = make_visit_table(args.night, args.visit_source)
+
+    # You can also save html fragments suitable for embedding in other pages
+    # See https://docs.bokeh.org/en/latest/docs/user_guide/output/embed.html
     bokeh.io.save(figure, args.filename)
