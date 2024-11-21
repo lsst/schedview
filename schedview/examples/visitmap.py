@@ -1,3 +1,7 @@
+import argparse
+
+import astropy.utils.iers
+import bokeh.io
 import pandas as pd
 import uranography.api
 from bokeh.models.ui.ui_element import UIElement
@@ -9,12 +13,14 @@ import schedview.plot
 from schedview.dayobs import DayObs
 
 
-def visit_map(
+def make_visit_map(
+    night: str = "2026-03-15",
     visit_source: str = "3.5",
-    day_obs: DayObs = DayObs.from_date("2026-03-15"),
     nside: int = 8,
     map_classes=[uranography.api.ArmillarySphere],
 ) -> UIElement:
+
+    day_obs: DayObs = DayObs.from_date(night)
 
     # Collect the data to be shown
     visits: pd.DataFrame = schedview.collect.visits.read_visits(
@@ -34,3 +40,22 @@ def visit_map(
         visits, footprint, conditions, map_classes=map_classes
     )
     return sky_map
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(prog="visittable", description="Write an html file with map of visits.")
+    parser.add_argument("filename", type=str, help="output file name")
+    parser.add_argument("night", type=str, help="Evening YYYY-MM-DD")
+    parser.add_argument(
+        "visit_source", type=str, default="lsstcomcam", help="Instrument or baseline version number"
+    )
+    parser.add_argument("--nside", type=int, default=32, help="nside of map to show")
+    args = parser.parse_args()
+
+    astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
+
+    figure = make_visit_map(args.night, args.visit_source, nside=args.nside)
+
+    # You can also save html fragments suitable for embedding in other pages.
+    # See https://docs.bokeh.org/en/latest/docs/user_guide/output/embed.html
+    bokeh.io.save(figure, args.filename)
