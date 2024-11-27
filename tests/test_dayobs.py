@@ -126,15 +126,15 @@ class TestDayObs(unittest.TestCase):
         )
         for sunset_mjd, night_times in almanac_times.iterrows():
             day_obs = DayObs.from_time(sunset_mjd)
-            assert np.isclose(night_times.sunset, day_obs.body_time("sun", 0, "set").mjd)
-            assert np.isclose(night_times.sunrise, day_obs.body_time("sun", 0, "rise").mjd)
-            assert np.isclose(night_times.sun_n12_setting, day_obs.body_time("sun", -12, "set").mjd)
-            assert np.isclose(night_times.sun_n12_rising, day_obs.body_time("sun", -12, "rise").mjd)
-            assert np.isclose(night_times.sun_n18_setting, day_obs.body_time("sun", -18, "set").mjd)
-            assert np.isclose(night_times.sun_n18_rising, day_obs.body_time("sun", -18, "rise").mjd)
+            assert np.isclose(night_times.sunset, day_obs.sunset.mjd)
+            assert np.isclose(night_times.sunrise, day_obs.sunrise.mjd)
+            assert np.isclose(night_times.sun_n12_setting, day_obs.sun_n12_setting.mjd)
+            assert np.isclose(night_times.sun_n12_rising, day_obs.sun_n12_rising.mjd)
+            assert np.isclose(night_times.sun_n18_setting, day_obs.sun_n18_setting.mjd)
+            assert np.isclose(night_times.sun_n18_rising, day_obs.sun_n18_rising.mjd)
             try:
                 assert (
-                    np.isclose(night_times.moonset, day_obs.body_time("moon", 0, "set").mjd)
+                    np.isclose(night_times.moonset, day_obs.moonset.mjd)
                     or DayObs.from_time(night_times.moonset).mjd != day_obs.mjd
                 )
             except ValueError:
@@ -143,7 +143,7 @@ class TestDayObs(unittest.TestCase):
 
             try:
                 assert (
-                    np.isclose(night_times.moonrise, day_obs.body_time("moon", 0, "rise").mjd)
+                    np.isclose(night_times.moonrise, day_obs.moonrise.mjd)
                     or DayObs.from_time(night_times.moonrise).mjd != day_obs.mjd
                 )
             except ValueError:

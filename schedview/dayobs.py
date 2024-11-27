@@ -47,13 +47,19 @@ class DayObs:
     # that cannot represent more or less than we want it to.
     date: datetime.date
     int_format: IntDateFormat = "auto"
+    atmosphere: dict | None = None
     location: EarthLocation = EarthLocation.from_geodetic(
         lon=-70.7494 * u.deg, lat=-30.2444 * u.deg, height=2650.0 * u.meter
     )
-    atmosphere: dict | None = None
 
     @classmethod
-    def from_date(cls, arg: datetime.date | int | str | Self, int_format: IntDateFormat = "auto") -> Self:
+    def from_date(
+        cls,
+        arg: datetime.date | int | str | Self,
+        int_format: IntDateFormat = "auto",
+        atmosphere: dict | None = None,
+        location: EarthLocation | None = None,
+    ) -> Self:
         """Create a representation of day_obs for a given date.
         This factory takes a representation of the date (already in the
         -12hr timezone as defined in SITCOMTN-032), not a date and time.
@@ -122,11 +128,20 @@ class DayObs:
             case _:
                 raise NotImplementedError()
 
-        return cls(date, int_format)
+        if location is None:
+            day_obs = cls(date, int_format, atmosphere=atmosphere)
+        else:
+            day_obs = cls(date, int_format, location=location, atmosphere=atmosphere)
+
+        return day_obs
 
     @classmethod
     def from_time(
-        cls, arg: datetime.datetime | str | float | Time, int_format: IntDateFormat = "mjd"
+        cls,
+        arg: datetime.datetime | str | float | Time,
+        int_format: IntDateFormat = "mjd",
+        atmosphere: dict | None = None,
+        location: EarthLocation | None = None,
     ) -> Self:
         """Create a representation of the dayobs that includes a given time.
 
@@ -181,7 +196,13 @@ class DayObs:
             dayobs_datetime = dayobs_datetime.replace(tzinfo=datetime.timezone.utc)
 
         dayobs_date = dayobs_datetime.astimezone(DAYOBS_TZ).date()
-        return cls(dayobs_date, int_format)
+
+        if location is None:
+            day_obs = cls(dayobs_date, int_format, atmosphere=atmosphere)
+        else:
+            day_obs = cls(dayobs_date, int_format, location=location, atmosphere=atmosphere)
+
+        return day_obs
 
     @cached_property
     def yyyymmdd(self) -> int:
@@ -302,6 +323,30 @@ class DayObs:
     @cached_property
     def sunrise(self):
         return self.body_time("sun", alt=0.0, direction="rise")
+
+    @cached_property
+    def sun_n12_setting(self):
+        return self.body_time("sun", alt=-12.0, direction="set")
+
+    @cached_property
+    def sun_n18_rising(self):
+        return self.body_time("sun", alt=-18.0, direction="rise")
+
+    @cached_property
+    def sun_n18_setting(self):
+        return self.body_time("sun", alt=-18.0, direction="set")
+
+    @cached_property
+    def sun_n12_rising(self):
+        return self.body_time("sun", alt=-12.0, direction="rise")
+
+    @cached_property
+    def moonset(self):
+        return self.body_time("moon", alt=0.0, direction="set")
+
+    @cached_property
+    def moonrise(self):
+        return self.body_time("moon", alt=0.0, direction="rise")
 
     def __int__(self) -> int:
         return self.mjd if self.int_format in ("auto", "mjd") else self.yyyymmdd
