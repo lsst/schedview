@@ -300,9 +300,22 @@ class DayObs:
         else:
             opt_bounds = [(self.start.mjd, min(midpoint_mjd, self.end.mjd))]
 
-        solution = scipy.optimize.minimize(abs_delta_alt, rough_time.mjd, bounds=opt_bounds, method="Powell")
+        # Nelder-Mead gets closer to the desired alt in the same time
+        # and usually succeeds, but Powell is more robust, and still gets
+        # within a few arcseconds, to the extent I was able to hand-tune
+        # the minimizer options.
+        # So, try Nelder-Mead first, and if it fails to converge, fall back
+        # on Powell.
+        minimizer_options = {"Nelder-Mead": {"fatol": 1e-4}, "Powell": {"ftol": 1e-5, "maxiter": 1000}}
+        for method in ("Nelder-Mead", "Powell"):
+            solution = scipy.optimize.minimize(
+                abs_delta_alt, rough_time.mjd, bounds=opt_bounds, method=method, options=minimizer_options
+            )
+            optimized_mjd = solution.x[0]
+            if solution.success and abs_delta_alt(optimized_mjd) < 0.01:
+                break
+
         assert solution.success, f"Minimizer failed: {solution.message}"
-        optimized_mjd = solution.x[0]
 
         # When an event does not happen at all in a day_obs (which can happen
         # for the moon, or for the sun in the arctic circle), the optimizer
