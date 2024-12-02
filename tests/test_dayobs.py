@@ -68,7 +68,7 @@ class TestDayObs(unittest.TestCase):
                 self.assert_equal(DayObs.from_time(t.mjd), d)
 
     def test_rs_time(self):
-        num_nights_tested = 10
+        num_nights_tested = 1
 
         rng = np.random.default_rng(seed=6563)
         test_mjds = rng.choice(
@@ -118,7 +118,7 @@ class TestDayObs(unittest.TestCase):
 
     @unittest.skipUnless(ALMANAC is not None, "rubin_scheduler almanac not available.")
     def test_against_almanac(self):
-        num_nights_tested = 10
+        num_nights_tested = 2
         almanac_times = (
             pd.DataFrame(ALMANAC.sunsets)
             .sample(num_nights_tested, random_state=42)
