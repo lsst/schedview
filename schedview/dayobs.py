@@ -41,6 +41,13 @@ class DayObs:
         ``yyyymmdd`` if an integer representation is a mapping of decimal
         digits to year, month, and day; ``mjd`` if the integer representation
         is the Modified Julian Date. The default is ``mjd``.
+    atmosphere : `dict` or `None`
+        A dictionary with atmospheric conditions. These are passed directly
+        as keyword arguments to the utilized `astropy.coordinates.AltAz` for
+        use in converting to alt and az.
+        Defaults to None, which is vaccuum.
+    location : `astropy.coordinates.EarthLocation`
+        The location of the observatory. Defaults to the Simonyi telescope.
     """
 
     # Use the standard library date as a lowest common denominator
@@ -81,10 +88,17 @@ class DayObs:
             into decimal digits,
             or ``auto``, in which case 8 digit decimals are interpretd as
             yyyymmdd and others as mjd.
+        atmosphere : `dict` or `None`
+            A dictionary with atmospheric conditions. These are passed directly
+            as keyword arguments to the utilized `astropy.coordinates.AltAz`
+            for use in converting to alt and az.
+            Defaults to None, which is vaccuum.
+        location : `astropy.coordinates.EarthLocation`
+            The location of the observatory. Defaults to the Simonyi telescope.
 
         Returns
         -------
-        day_obs_converter: `DayObsConverter`
+        day_obs_converter: `DayObsr`
             A new instance of the converter.
         """
 
@@ -157,12 +171,17 @@ class DayObs:
             If `yyyymmdd`, encode year month and day into decimal digits
             instead.
             `mjd` by default.
+        atmosphere : `dict` or `None`
+            A dictionary with atmospheric conditions. These are passed directly
+            as keyword arguments to the utilized `astropy.coordinates.AltAz`
+            for use in converting to alt and az.
+            Defaults to None, which is vaccuum.
+        location : `astropy.coordinates.EarthLocation`
+            The location of the observatory. Defaults to the Simonyi telescope.
 
         Returns
         -------
-        Returns
-        -------
-        day_obs_converter: `DayObsConverter`
+        day_obs_converter: `DayObs`
             A new instance of the converter.
         """
 
@@ -206,37 +225,60 @@ class DayObs:
 
     @cached_property
     def yyyymmdd(self) -> int:
+        """The year, month, and day of the dayobs encoded into decimal."""
         return self.date.day + 100 * (self.date.month + 100 * self.date.year)
 
     @cached_property
     def mjd(self) -> int:
+        """The Modified Julian Date."""
         return (self.date - MJD_EPOCH).days
 
     @cached_property
     def start(self) -> Time:
+        """The `astropy.time.Time` of the start of the day obs."""
         start_datetime = datetime.datetime(self.date.year, self.date.month, self.date.day, tzinfo=DAYOBS_TZ)
         return Time(start_datetime)
 
     @cached_property
     def end(self) -> Time:
+        """The `astropy.time.Time` of the end of the day obs."""
         end_datetime = (
             datetime.datetime(self.date.year, self.date.month, self.date.day, tzinfo=DAYOBS_TZ) + ONE_DAY
         )
         return Time(end_datetime)
 
     @cached_property
-    def mean_local_solar_midnight(self):
+    def jd(self) -> int:
+        """True, unmodified Julian date for the whole dayobs."""
+        return int(np.round(self.start.jd))
+
+    @cached_property
+    def mean_local_solar_midnight(self) -> Time:
+        """The `astropy.time.Time` of the mean local solar midnight."""
         mjd = self.start.mjd + (-1 * self.location.lon.deg / 360 - self.start.mjd) % 1
         assert self.start.mjd <= mjd <= self.end.mjd
         return Time(mjd, format="mjd")
 
     @cached_property
     def mean_local_solar_noon(self):
+        """The `astropy.time.Time` of the mean local solar noon."""
         mjd = self.start.mjd + (self.mean_solar_midnight.mjd + 0.5 - self.start.mjd) % 1
         assert self.start.mjd <= mjd <= self.end.mjd
         return Time(mjd, format="mjd")
 
-    def rough_body_coordinates(self, body):
+    def rough_body_coordinates(self, body: str) -> SkyCoord:
+        """Compute a rough estimate of the position of a body on this night.
+
+        Parameters
+        ----------
+        body : `str`
+            One of "sun" or "moon".
+
+        Returns
+        -------
+        coordinates : `SkyCoord`
+            The coordinates of the body at mean local solar midnight.
+        """
         return get_body(body, time=self.mean_local_solar_midnight, location=self.location)
 
     def _coords_time_in_vaccuum(
@@ -245,6 +287,26 @@ class DayObs:
         alt: float = 0.0,
         direction: Literal["rise", "set"] = "set",
     ) -> Time:
+        """Compute the time at which a set of coordinates pass an alt,
+        ignoring atmosphere.
+
+        Parameters
+        ----------
+        coords : `SkyCoord`
+            The coordinates for which to compute.
+        alt : `float`
+            The alt for which to look for the time, in degrees.
+            Defaults to 0.0.
+        direction : `str`
+            "rise" to return the resing time, "set" the setting time.
+
+        Returns
+        -------
+        event_time : `Time`
+            The time of the requested event (rising or setting of the
+            specified coordinates).
+        """
+
         ha_at_mean_solar_midnight = coords.transform_to(
             HADec(obstime=self.mean_local_solar_midnight, location=self.location)
         ).ha.deg
@@ -267,6 +329,26 @@ class DayObs:
         alt: float = 0.0,
         direction: Literal["rise", "set"] = "set",
     ) -> Time:
+        """Compute the time at which the sun or moon pass an altitude.
+        Atmosphere will be included only if specified when DayObs
+        was instantiated.
+
+        Parameters
+        ----------
+        body: `str`
+            Which body: "sun" or "moon". Defaults to "sun".
+        alt : `float`
+            The alt for which to look for the time, in degrees.
+            Defaults to 0.0.
+        direction : `str`
+            "rise" to return the resing time, "set" the setting time.
+
+        Returns
+        -------
+        event_time : `Time`
+            The time of the requested event (rising or setting of the
+            specified coordinates).
+        """
 
         if self.atmosphere is None:
             get_altaz = partial(AltAz, location=self.location)
@@ -330,35 +412,43 @@ class DayObs:
         return optimized_time
 
     @cached_property
-    def sunset(self):
+    def sunset(self) -> Time:
+        """`Time` of sunset on the day of observing."""
         return self.body_time("sun", alt=0.0, direction="set")
 
     @cached_property
     def sunrise(self):
+        """`Time` of sunrise on the day of observing."""
         return self.body_time("sun", alt=0.0, direction="rise")
 
     @cached_property
     def sun_n12_setting(self):
+        """`Time` of evening naut. twilight during the night of observing."""
         return self.body_time("sun", alt=-12.0, direction="set")
 
     @cached_property
     def sun_n18_rising(self):
+        """`Time` of morning astron. twilight during the night of observing."""
         return self.body_time("sun", alt=-18.0, direction="rise")
 
     @cached_property
     def sun_n18_setting(self):
+        """`Time` of evening astron. twilight during the night of observing."""
         return self.body_time("sun", alt=-18.0, direction="set")
 
     @cached_property
     def sun_n12_rising(self):
+        """`Time` of morning naut. twilight during the night of observing."""
         return self.body_time("sun", alt=-12.0, direction="rise")
 
     @cached_property
     def moonset(self):
+        """`Time` of moonrise during the night of observing."""
         return self.body_time("moon", alt=0.0, direction="set")
 
     @cached_property
     def moonrise(self):
+        """`Time` of moonset during the night of observing."""
         return self.body_time("moon", alt=0.0, direction="rise")
 
     def __int__(self) -> int:
