@@ -328,6 +328,7 @@ class DayObs:
         body: Literal["sun", "moon"] = "sun",
         alt: float = 0.0,
         direction: Literal["rise", "set"] = "set",
+        tolerance: float = 1e-6,
     ) -> Time:
         """Compute the time at which the sun or moon pass an altitude.
         Atmosphere will be included only if specified when DayObs
@@ -342,6 +343,9 @@ class DayObs:
             Defaults to 0.0.
         direction : `str`
             "rise" to return the resing time, "set" the setting time.
+        tolerance : `float`
+            Tolerance used by the optimizer, roughly how close to the target
+            alt we need to reach, in degrees.
 
         Returns
         -------
@@ -382,32 +386,52 @@ class DayObs:
         else:
             opt_bounds = [(self.start.mjd, min(midpoint_mjd, self.end.mjd))]
 
-        # Nelder-Mead gets closer to the desired alt in the same time
-        # and usually succeeds, but Powell is more robust, and still gets
-        # within a few arcseconds, to the extent I was able to hand-tune
-        # the minimizer options.
-        # So, try Nelder-Mead first, and if it fails to converge, fall back
-        # on Powell.
-        minimizer_options = {"Nelder-Mead": {"fatol": 1e-4}, "Powell": {"ftol": 1e-5, "maxiter": 1000}}
-        for method in ("Nelder-Mead", "Powell"):
-            solution = scipy.optimize.minimize(
-                abs_delta_alt, rough_time.mjd, bounds=opt_bounds, method=method, options=minimizer_options
-            )
-            optimized_mjd = solution.x[0]
-            if solution.success and abs_delta_alt(optimized_mjd) < 0.01:
-                break
+        if (
+            (tolerance > 0.2)
+            and (abs_delta_alt(rough_time) < tolerance)
+            and (opt_bounds[0][0] <= rough_time.mjd <= opt_bounds[0][1])
+        ):
+            # We are close enough already, don't bother with the optimizer.
+            # Do the test if tolerance > 0.2 first, because if its not,
+            # the chance that it will be close enough is low enough that
+            # it's not worth the time for the extra call to
+            # abs_delta_alt
+            optimized_mjd = rough_time
+        else:
+            # Nelder-Mead gets closer to the desired alt in the same time
+            # and usually succeeds, but Powell is more robust, and still gets
+            # within a few arcseconds, to the extent I was able to hand-tune
+            # the minimizer options.
+            # So, try Nelder-Mead first, and if it fails to converge, fall back
+            # on Powell.
+            minimizer_options = {
+                "Nelder-Mead": {"fatol": tolerance},
+                "Powell": {"ftol": tolerance, "maxiter": 1000},
+            }
+            for method in ("Nelder-Mead", "Powell"):
+                solution = scipy.optimize.minimize(
+                    abs_delta_alt,
+                    rough_time.mjd,
+                    bounds=opt_bounds,
+                    method=method,
+                    options=minimizer_options[method],
+                )
+                optimized_mjd = solution.x[0]
+                if solution.success and abs_delta_alt(optimized_mjd) < 0.01:
+                    break
 
-        assert solution.success, f"Minimizer failed: {solution.message}"
+            assert solution.success, f"Minimizer failed: {solution.message}"
 
-        # When an event does not happen at all in a day_obs (which can happen
-        # for the moon, or for the sun in the arctic circle), the optimizer
-        # finds a value near the bounds, and the alt at the optimized time is
-        # not what we requested. Raise an exception when this happens.
-        if abs_delta_alt(optimized_mjd) > 0.01:
-            assert (optimized_mjd - opt_bounds[0][0] < 0.01) or (opt_bounds[0][1] - optimized_mjd < 0.01)
-            raise ValueError(f"The body {body} never reaches {alt} during {direction}")
+            # When an event does not happen at all in a day_obs (which can
+            # happen for the moon, or for the sun in the arctic circle), the
+            # optimizer finds a value near the bounds, and the alt at the
+            # optimized time is not what we requested. Raise an exception when
+            # this happens.
+            if abs_delta_alt(optimized_mjd) > 0.01:
+                assert (optimized_mjd - opt_bounds[0][0] < 0.01) or (opt_bounds[0][1] - optimized_mjd < 0.01)
+                raise ValueError(f"The body {body} never reaches {alt} during {direction}")
 
-        optimized_time = Time(optimized_mjd, format="mjd")
+            optimized_time = Time(optimized_mjd, format="mjd")
 
         return optimized_time
 
