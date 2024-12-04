@@ -68,7 +68,7 @@ class TestDayObs(unittest.TestCase):
                 self.assert_equal(DayObs.from_time(t.mjd), d)
 
     def test_rs_time(self):
-        num_nights_tested = 1
+        num_nights_tested = 100
 
         rng = np.random.default_rng(seed=6563)
         test_mjds = rng.choice(
@@ -118,7 +118,9 @@ class TestDayObs(unittest.TestCase):
 
     @unittest.skipUnless(ALMANAC is not None, "rubin_scheduler almanac not available.")
     def test_against_almanac(self):
-        num_nights_tested = 2
+        num_nights_tested = 1
+        rtol = 0.0
+        atol = 1.0 / (24 * 60)
         almanac_times = (
             pd.DataFrame(ALMANAC.sunsets)
             .sample(num_nights_tested, random_state=42)
@@ -126,15 +128,15 @@ class TestDayObs(unittest.TestCase):
         )
         for sunset_mjd, night_times in almanac_times.iterrows():
             day_obs = DayObs.from_time(sunset_mjd)
-            assert np.isclose(night_times.sunset, day_obs.sunset.mjd)
-            assert np.isclose(night_times.sunrise, day_obs.sunrise.mjd)
-            assert np.isclose(night_times.sun_n12_setting, day_obs.sun_n12_setting.mjd)
-            assert np.isclose(night_times.sun_n12_rising, day_obs.sun_n12_rising.mjd)
-            assert np.isclose(night_times.sun_n18_setting, day_obs.sun_n18_setting.mjd)
-            assert np.isclose(night_times.sun_n18_rising, day_obs.sun_n18_rising.mjd)
+            assert np.isclose(night_times.sunset, day_obs.sunset.mjd, rtol=rtol, atol=atol)
+            assert np.isclose(night_times.sunrise, day_obs.sunrise.mjd, rtol=rtol, atol=atol)
+            assert np.isclose(night_times.sun_n12_setting, day_obs.sun_n12_setting.mjd, rtol=rtol, atol=atol)
+            assert np.isclose(night_times.sun_n12_rising, day_obs.sun_n12_rising.mjd, rtol=rtol, atol=atol)
+            assert np.isclose(night_times.sun_n18_setting, day_obs.sun_n18_setting.mjd, rtol=rtol, atol=atol)
+            assert np.isclose(night_times.sun_n18_rising, day_obs.sun_n18_rising.mjd, rtol=rtol, atol=atol)
             try:
                 assert (
-                    np.isclose(night_times.moonset, day_obs.moonset.mjd)
+                    np.isclose(night_times.moonset, day_obs.moonset.mjd, rtol=rtol, atol=atol)
                     or DayObs.from_time(night_times.moonset).mjd != day_obs.mjd
                 )
             except ValueError:
@@ -143,7 +145,7 @@ class TestDayObs(unittest.TestCase):
 
             try:
                 assert (
-                    np.isclose(night_times.moonrise, day_obs.moonrise.mjd)
+                    np.isclose(night_times.moonrise, day_obs.moonrise.mjd, rtol=rtol, atol=atol)
                     or DayObs.from_time(night_times.moonrise).mjd != day_obs.mjd
                 )
             except ValueError:
