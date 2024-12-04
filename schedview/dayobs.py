@@ -283,7 +283,8 @@ class DayObs:
 
     def _coords_time_in_vaccuum(
         self,
-        coords: SkyCoord,
+        ra: float,
+        decl: float,
         alt: float = 0.0,
         direction: Literal["rise", "set"] = "set",
     ) -> Time:
@@ -292,8 +293,10 @@ class DayObs:
 
         Parameters
         ----------
-        coords : `SkyCoord`
-            The coordinates for which to compute.
+        ra : `float`
+            R.A. in decimal degrees
+        decl : `float`
+            Declination in decimal degrees
         alt : `float`
             The alt for which to look for the time, in degrees.
             Defaults to 0.0.
@@ -306,7 +309,7 @@ class DayObs:
             The time of the requested event (rising or setting of the
             specified coordinates).
         """
-
+        coords = SkyCoord(ra * u.deg, decl * u.deg)
         ha_at_mean_solar_midnight = coords.transform_to(
             HADec(obstime=self.mean_local_solar_midnight, location=self.location)
         ).ha.deg
@@ -328,7 +331,9 @@ class DayObs:
         body: Literal["sun", "moon"] = "sun",
         alt: float = 0.0,
         direction: Literal["rise", "set"] = "set",
-        tolerance: float = 1e-6,
+        tolerance: float = 0.00278,
+        opt_tolerance: float = 1e-6,
+        num_rough_iterations: int = 2,
     ) -> Time:
         """Compute the time at which the sun or moon pass an altitude.
         Atmosphere will be included only if specified when DayObs
@@ -344,8 +349,14 @@ class DayObs:
         direction : `str`
             "rise" to return the resing time, "set" the setting time.
         tolerance : `float`
-            Tolerance used by the optimizer, roughly how close to the target
-            alt we need to reach, in degrees.
+            If the alt at the returned time should be within the tolerance
+            (in degrees) of requested alt, otherwise throw an exception.
+            Defaults to 0.00278 (10 arcseconds).
+        opt_tolerance : `float`
+            Tolerance used by the optimizer, improvement per optimizer
+            iteration before which the optimizer finishes, in degrees.
+        num_rough_iterations : `int`
+            Number of "rough" iterations before using scipy minimizer.
 
         Returns
         -------
@@ -359,22 +370,41 @@ class DayObs:
         else:
             get_altaz = partial(AltAz, location=self.location, **self.atmosphere)
 
-        # Get the coordinates of the body at midnight, and use direct
-        # spherical trig to find when that reaches the desired alt in vaccuum.
-        # This will then be used as the initial guess by the solver.
-        rough_coords = self.rough_body_coordinates(body)
-        rough_time = self._coords_time_in_vaccuum(rough_coords, alt, direction)
-
-        # We'll use this to get the optimizer to go to the right minimum
-        opposite_direction = "set" if direction == "rise" else "rise"
-        opposite_time = self._coords_time_in_vaccuum(rough_coords, alt, opposite_direction)
-
         def abs_delta_alt(mjd):
             obstime = Time(mjd, format="mjd")
             sun = get_body(body, obstime)
             altaz = get_altaz(obstime=obstime)
             alt_at_mjd = sun.transform_to(altaz).alt.deg
             return np.abs(alt_at_mjd - alt)
+
+        # Approximate, starting with body position at midnight, then
+        # refining. Assumes body moves slowly on the timescale of one day.
+
+        # If an atmosphere is supplied, we want to include refraction,
+        # so include it in our rough estimate.
+        if self.atmosphere is None or alt < 0:
+            rough_refraction = 0.0
+        else:
+            # Use the refraction formula of Kristensen (1998)
+            # http://adsabs.harvard.edu/abs/1998AN....319..193K
+            a = 380.0
+            a_cos_zd = a * np.cos(np.radians(90 - alt))
+            sin_zd = np.sin(np.radians(90 - alt))
+            airmass = np.sqrt(a_cos_zd * a_cos_zd + 2 * a + 1) - a_cos_zd
+            rough_refraction = (57.085 / (60 * 60)) * sin_zd * airmass
+
+        rough_time = self.mean_local_solar_midnight
+        for _ in range(num_rough_iterations):
+            rough_coords = get_body(body, time=rough_time, location=self.location)
+            rough_time = self._coords_time_in_vaccuum(
+                rough_coords.ra.deg, rough_coords.dec.deg, alt - rough_refraction, direction
+            )
+
+        # We'll use this to get the optimizer to go to the right minimum
+        opposite_direction = "set" if direction == "rise" else "rise"
+        opposite_time = self._coords_time_in_vaccuum(
+            rough_coords.ra.deg, rough_coords.dec.deg, alt, opposite_direction
+        )
 
         # Set the bounds so that the optimized minimum found is the one
         # that is closest to the rough minimum, thereby preventing it
@@ -387,12 +417,12 @@ class DayObs:
             opt_bounds = [(self.start.mjd, min(midpoint_mjd, self.end.mjd))]
 
         if (
-            (tolerance > 0.2)
+            (tolerance > 0.03)
             and (abs_delta_alt(rough_time) < tolerance)
             and (opt_bounds[0][0] <= rough_time.mjd <= opt_bounds[0][1])
         ):
             # We are close enough already, don't bother with the optimizer.
-            # Do the test if tolerance > 0.2 first, because if its not,
+            # Do the test if tolerance > 0.03 first, because if its not,
             # the chance that it will be close enough is low enough that
             # it's not worth the time for the extra call to
             # abs_delta_alt
@@ -405,8 +435,8 @@ class DayObs:
             # So, try Nelder-Mead first, and if it fails to converge, fall back
             # on Powell.
             minimizer_options = {
-                "Nelder-Mead": {"fatol": tolerance},
-                "Powell": {"ftol": tolerance, "maxiter": 1000},
+                "Nelder-Mead": {"fatol": opt_tolerance},
+                "Powell": {"ftol": opt_tolerance, "maxiter": 1000},
             }
             for method in ("Nelder-Mead", "Powell"):
                 solution = scipy.optimize.minimize(
@@ -417,7 +447,7 @@ class DayObs:
                     options=minimizer_options[method],
                 )
                 optimized_mjd = solution.x[0]
-                if solution.success and abs_delta_alt(optimized_mjd) < 0.01:
+                if solution.success and abs_delta_alt(optimized_mjd) < tolerance:
                     break
 
             assert solution.success, f"Minimizer failed: {solution.message}"
@@ -427,7 +457,7 @@ class DayObs:
             # optimizer finds a value near the bounds, and the alt at the
             # optimized time is not what we requested. Raise an exception when
             # this happens.
-            if abs_delta_alt(optimized_mjd) > 0.01:
+            if abs_delta_alt(optimized_mjd) > tolerance:
                 assert (optimized_mjd - opt_bounds[0][0] < 0.01) or (opt_bounds[0][1] - optimized_mjd < 0.01)
                 raise ValueError(f"The body {body} never reaches {alt} during {direction}")
 
@@ -468,12 +498,12 @@ class DayObs:
     @cached_property
     def moonset(self):
         """`Time` of moonrise during the night of observing."""
-        return self.body_time("moon", alt=0.0, direction="set")
+        return self.body_time("moon", alt=0.0, direction="set", num_rough_iterations=3)
 
     @cached_property
     def moonrise(self):
         """`Time` of moonset during the night of observing."""
-        return self.body_time("moon", alt=0.0, direction="rise")
+        return self.body_time("moon", alt=0.0, direction="rise", num_rough_iterations=3)
 
     def __int__(self) -> int:
         return self.mjd if self.int_format in ("auto", "mjd") else self.yyyymmdd
