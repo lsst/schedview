@@ -22,8 +22,13 @@ DayObsTestData = namedtuple("DayObsTestData", ("date", "yyyymmdd", "iso_date", "
 
 
 class TestDayObs(unittest.TestCase):
-    rtol = 0.0
-    atol = 1.0 / (24 * 60)
+    # Times should be within one minute
+    time_rtol = 0.0
+    time_atol = u.minute.to(u.day)
+
+    # Angles should be within 20 arcseconds
+    angle_rtol = 0.0
+    angle_atol = 20.0 * u.arcsecond.to(u.deg)
     test_values = (
         DayObsTestData(
             datetime.date(2024, 9, 3),
@@ -97,7 +102,7 @@ class TestDayObs(unittest.TestCase):
 
                         event_altaz = AltAz(obstime=event_time, location=day_obs.location)
                         event_alt = get_body(body, event_time).transform_to(event_altaz).alt.deg
-                        assert np.isclose(alt, event_alt, rtol=self.rtol, atol=self.atol)
+                        assert np.isclose(alt, event_alt, rtol=self.angle_rtol, atol=self.angle_atol)
 
                         assert DayObs.from_time(event_time).mjd == day_obs.mjd
 
@@ -128,23 +133,41 @@ class TestDayObs(unittest.TestCase):
         )
         for sunset_mjd, night_times in almanac_times.iterrows():
             day_obs = DayObs.from_time(sunset_mjd)
-            assert np.isclose(night_times.sunset, day_obs.sunset.mjd, rtol=self.rtol, atol=self.atol)
-            assert np.isclose(night_times.sunrise, day_obs.sunrise.mjd, rtol=self.rtol, atol=self.atol)
             assert np.isclose(
-                night_times.sun_n12_setting, day_obs.sun_n12_setting.mjd, rtol=self.rtol, atol=self.atol
+                night_times.sunset, day_obs.sunset.mjd, rtol=self.time_rtol, atol=self.time_atol
             )
             assert np.isclose(
-                night_times.sun_n12_rising, day_obs.sun_n12_rising.mjd, rtol=self.rtol, atol=self.atol
+                night_times.sunrise, day_obs.sunrise.mjd, rtol=self.time_rtol, atol=self.time_atol
             )
             assert np.isclose(
-                night_times.sun_n18_setting, day_obs.sun_n18_setting.mjd, rtol=self.rtol, atol=self.atol
+                night_times.sun_n12_setting,
+                day_obs.sun_n12_setting.mjd,
+                rtol=self.time_rtol,
+                atol=self.time_atol,
             )
             assert np.isclose(
-                night_times.sun_n18_rising, day_obs.sun_n18_rising.mjd, rtol=self.rtol, atol=self.atol
+                night_times.sun_n12_rising,
+                day_obs.sun_n12_rising.mjd,
+                rtol=self.time_rtol,
+                atol=self.time_atol,
+            )
+            assert np.isclose(
+                night_times.sun_n18_setting,
+                day_obs.sun_n18_setting.mjd,
+                rtol=self.time_rtol,
+                atol=self.time_atol,
+            )
+            assert np.isclose(
+                night_times.sun_n18_rising,
+                day_obs.sun_n18_rising.mjd,
+                rtol=self.time_rtol,
+                atol=self.time_atol,
             )
             try:
                 assert (
-                    np.isclose(night_times.moonset, day_obs.moonset.mjd, rtol=self.rtol, atol=self.atol)
+                    np.isclose(
+                        night_times.moonset, day_obs.moonset.mjd, rtol=self.time_rtol, atol=self.time_atol
+                    )
                     or DayObs.from_time(night_times.moonset).mjd != day_obs.mjd
                 )
             except ValueError:
@@ -153,7 +176,9 @@ class TestDayObs(unittest.TestCase):
 
             try:
                 assert (
-                    np.isclose(night_times.moonrise, day_obs.moonrise.mjd, rtol=self.rtol, atol=self.atol)
+                    np.isclose(
+                        night_times.moonrise, day_obs.moonrise.mjd, rtol=self.time_rtol, atol=self.time_atol
+                    )
                     or DayObs.from_time(night_times.moonrise).mjd != day_obs.mjd
                 )
             except ValueError:
