@@ -5,7 +5,7 @@ import requests
 
 from schedview.dayobs import DayObs
 
-MAX_RETRIES = 1
+MAX_RETRIES = 2
 
 EXCLUDED_COMPONENTS_FOR_TELESCOPE = {
     "AuxTel": ["MTMount", "MainTel"],
