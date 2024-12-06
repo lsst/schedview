@@ -55,5 +55,6 @@ from .scheduler import (
     make_logger,
 )
 from .survey import create_hpix_visit_map_grid, map_survey_healpix, map_visits_over_hpix
+from .timeline import add_timeline_scatter_renderer, make_timeline_scatterplots
 from .visitmap import create_visit_skymaps, plot_visit_planisphere, plot_visit_skymaps
 from .visits import create_visit_explorer, create_visit_table, plot_visit_param_vs_time, plot_visits
