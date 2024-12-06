@@ -46,7 +46,11 @@ def night_report_markdown(night_report: dict, heading_level=1) -> str:
         if night_plan_block == "BLOCK":
             night_plan_block = night_report["confluence_url"]
         print(f"{headhash}# Night plan", file=report)
-        print(f"[{night_plan_block}]({night_report['confluence_url']})", file=report)
+        confluence_url = night_report["confluence_url"]
+        print(
+            f'<a href="{confluence_url}" target="_blank" rel="noreferrer noopener">{night_plan_block}</a>',
+            file=report,
+        )
 
     if "summary" in night_report:
         print(f"{headhash}# Summary", file=report)
