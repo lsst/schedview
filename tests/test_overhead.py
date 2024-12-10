@@ -2,7 +2,7 @@ import unittest
 
 import bokeh
 from astropy.time import Time
-from rubin_scheduler.utils import survey_start_mjd
+from rubin_scheduler.utils import SURVEY_START_MJD
 from rubin_sim.data import get_baseline
 
 import schedview.collect
@@ -15,7 +15,7 @@ class TestOverhead(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.visit_db_fname = get_baseline()
-        start_mjd = survey_start_mjd()
+        start_mjd = SURVEY_START_MJD
         cls.start_time = Time(start_mjd + 0.5, format="mjd")
         cls.end_time = Time(start_mjd + 1.5, format="mjd")
         cls.visits = schedview.collect.read_opsim(cls.visit_db_fname, cls.start_time, cls.end_time)

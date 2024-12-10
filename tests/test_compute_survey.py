@@ -4,11 +4,11 @@ from collections import OrderedDict
 import pandas as pd
 from rubin_scheduler.scheduler.example import example_scheduler
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
-from rubin_scheduler.utils import survey_start_mjd
+from rubin_scheduler.utils import SURVEY_START_MJD
 
 from schedview.compute.survey import compute_maps, make_survey_reward_df
 
-MJD_START = survey_start_mjd()
+MJD_START = SURVEY_START_MJD
 TEST_MJD = MJD_START + 0.2
 
 

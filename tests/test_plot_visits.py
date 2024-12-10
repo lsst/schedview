@@ -3,7 +3,7 @@ from unittest import TestCase
 import bokeh
 import bokeh.models
 from astropy.time import Time
-from rubin_scheduler.utils import survey_start_mjd
+from rubin_scheduler.utils import SURVEY_START_MJD
 from rubin_sim.data import get_baseline
 
 import schedview.collect
@@ -14,7 +14,7 @@ class TestPlotVisits(TestCase):
 
     def setUp(self):
         self.visit_db_fname = get_baseline()
-        start_mjd = survey_start_mjd()
+        start_mjd = SURVEY_START_MJD
         self.start_time = Time(start_mjd + 0.5, format="mjd")
         self.end_time = Time(start_mjd + 1.5, format="mjd")
         self.visits = schedview.collect.read_opsim(self.visit_db_fname, self.start_time, self.end_time)
