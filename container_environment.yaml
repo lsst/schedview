@@ -18,7 +18,7 @@ dependencies:
  - boto3
  - wget
  - lsst-efd-client
- - rubin-scheduler
+ - rubin-scheduler = 3.4.0
  - rubin-sim
  - pip
  - pip:
