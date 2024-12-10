@@ -18,14 +18,14 @@ from astropy.time import Time
 from rubin_scheduler.scheduler.features.conditions import Conditions
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 from rubin_scheduler.scheduler.schedulers.core_scheduler import CoreScheduler as CoreScheduler
-from rubin_scheduler.utils import survey_start_mjd
+from rubin_scheduler.utils import SURVEY_START_MJD
 from uranography.api import ArmillarySphere, HorizonMap, MollweideMap, Planisphere, make_zscale_linear_cmap
 
 from schedview.collect import read_scheduler
 from schedview.compute.scheduler import make_scheduler_summary_df, make_unique_survey_name
 from schedview.compute.survey import make_survey_reward_df
 
-DEFAULT_MJD = survey_start_mjd() + 0.2
+DEFAULT_MJD = SURVEY_START_MJD + 0.2
 DEFAULT_NSIDE = 32
 
 

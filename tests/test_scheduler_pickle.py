@@ -6,11 +6,11 @@ from tempfile import TemporaryDirectory
 from rubin_scheduler.scheduler.example import example_scheduler
 from rubin_scheduler.scheduler.features.conditions import Conditions
 from rubin_scheduler.scheduler.schedulers.core_scheduler import CoreScheduler
-from rubin_scheduler.utils import survey_start_mjd
+from rubin_scheduler.utils import SURVEY_START_MJD
 
 from schedview.collect.scheduler_pickle import read_scheduler
 
-MJD_START = survey_start_mjd()
+MJD_START = SURVEY_START_MJD
 
 
 class TestSchedulerPickle(unittest.TestCase):

@@ -5,7 +5,7 @@ import healpy as hp
 import numpy as np
 from astropy.time import Time
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
-from rubin_scheduler.utils import survey_start_mjd
+from rubin_scheduler.utils import SURVEY_START_MJD
 from rubin_sim.data import get_baseline
 from uranography.api import SphereMap
 
@@ -13,7 +13,7 @@ import schedview.collect
 from schedview.plot.survey import create_hpix_visit_map_grid, map_survey_healpix, map_visits_over_hpix
 
 RANDOM_NUMBER_GENERATOR = np.random.default_rng(6563)
-TEST_MJD = survey_start_mjd() + 0.2
+TEST_MJD = SURVEY_START_MJD + 0.2
 
 
 class TestMapSurvey(unittest.TestCase):
@@ -29,7 +29,7 @@ class TestMapSurvey(unittest.TestCase):
         npix = hp.nside2npix(nside)
         hpix_maps = {b: RANDOM_NUMBER_GENERATOR.random(npix) for b in "ugrizy"}
 
-        start_mjd = survey_start_mjd()
+        start_mjd = SURVEY_START_MJD
         visits = schedview.collect.read_opsim(
             get_baseline(), Time(start_mjd + 0.5, format="mjd"), Time(start_mjd + 1.5, format="mjd")
         )
@@ -45,7 +45,7 @@ class TestMapSurvey(unittest.TestCase):
         npix = hp.nside2npix(nside)
         hpix_map = RANDOM_NUMBER_GENERATOR.random(npix)
 
-        start_mjd = survey_start_mjd()
+        start_mjd = SURVEY_START_MJD
         visits = schedview.collect.read_opsim(
             get_baseline(), Time(start_mjd + 0.5, format="mjd"), Time(start_mjd + 1.5, format="mjd")
         )
