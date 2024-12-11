@@ -1,3 +1,6 @@
+import json
+import pprint
+
 import bokeh
 import bokeh.layouts
 import bokeh.models
@@ -30,7 +33,7 @@ class TimelinePlotter:
     def __init__(
         self, data: pd.DataFrame | ColumnDataSource | dict | list, plot: Plot | None = None, **kwargs
     ):
-        self.plot = plot if plot is not None else self._create_plot()
+        self.plot: Plot = plot if plot is not None else self._create_plot()
 
         # Many queries return lists of dicts, which ColumnDataSource cannot
         # handle directly.
@@ -41,7 +44,9 @@ class TimelinePlotter:
                 assert isinstance(data[0], dict)
             data = pd.DataFrame(data)
 
-        self.source = data if isinstance(data, ColumnDataSource) else self._create_source(data)
+        self.source: ColumnDataSource = (
+            data if isinstance(data, ColumnDataSource) else self._create_source(data)
+        )
         self._update_factors()
 
         glyph_kwargs = self.default_glyph_kwargs
@@ -61,7 +66,7 @@ class TimelinePlotter:
 
     @classmethod
     def _make_hovertext(cls, row_data: pd.Series) -> str:
-        return f"<pre>{str(row_data)}</pre>"
+        return row_data.to_frame().to_html()
 
     @classmethod
     def _create_source(cls, *args, **kwargs) -> ColumnDataSource:
@@ -127,14 +132,39 @@ class LogMessageTimelinePlotter(TimelinePlotter):
     key: str = "log_messages"
     hovertext_column: str | None = "html"
     time_column: str = "date_added"
-    factor = "Log messages"
+    factor: str = "Log messages"
 
     @classmethod
     def _make_hovertext(cls, row_data: pd.Series) -> str:
         return f"<pre>{row_data['message_text']}</pre>"
 
 
-def make_multitimeline(plot=None, **kwargs):
+class SchedulerDependenciesTimelinePlotter(TimelinePlotter):
+    key: str = "scheduler_dependencies"
+    factor: str = "Scheduler dependencies"
+    hovertext_column: str | None = "html"
+
+
+class SchedulerConfigurationTimelinePlotter(TimelinePlotter):
+    key: str = "scheduler_configuration"
+    factor: str = "Scheduler configuration"
+    hovertext_column: str | None = "html"
+
+
+class BlockStatusTimelinePlotter(TimelinePlotter):
+    key: str = "block_status"
+    factor: str = "Block status"
+    hovertext_column: str | None = "html"
+
+    @classmethod
+    def _make_hovertext(cls, row_data: pd.Series) -> str:
+        definition = pprint.pformat(json.loads(row_data["definition"]))
+        table = row_data.drop("definition").to_frame().to_html()
+        hovertext = f"<h1>Block</h1>{table}<h2>Definition</h2><pre>{definition}</pre>"
+        return hovertext
+
+
+def make_multitimeline(plot: Plot | None = None, **kwargs) -> Plot:
 
     # Map keyword arguments to the classes we will use to plot them
     plotter_classes = {c.key: c for c in TimelinePlotter.__subclasses__()}
@@ -156,10 +186,12 @@ def make_multitimeline(plot=None, **kwargs):
 
 def make_timeline_scatterplots(visits, visits_column="seeingFwhmEff", **kwargs):
     timeline_plot = make_multitimeline(**kwargs)
+
+    visit_plot = bokeh.plotting.figure(
+        x_range=timeline_plot.x_range, y_axis_label=visits_column, x_axis_label="Time (UTC)", name="visit"
+    )
     visit_param_vs_time = schedview.plot.plot_visit_param_vs_time(
-        visits,
-        visits_column,
-        show_column_selector=True,
+        visits, visits_column, show_column_selector=True, plot=visit_plot
     )
 
     ui_element = bokeh.layouts.gridplot([[timeline_plot, visit_param_vs_time]])
