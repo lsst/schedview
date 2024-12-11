@@ -9,6 +9,10 @@ import schedview.compute.nightreport
 import schedview.plot.nightreport
 
 
+def pre_string(content):
+    return f"<pre>{str(content)}</pre>"
+
+
 def _make_log_message_data_source(messages, name="Log messages", html_formatter=None) -> ColumnDataSource:
     # Create a bokeh data source from the list of messages
     ds_dict = {}
@@ -17,13 +21,27 @@ def _make_log_message_data_source(messages, name="Log messages", html_formatter=
             ds_dict[key] = Time([m[key] for m in messages]).datetime64
         else:
             ds_dict[key] = [m[key] for m in messages]
-        if html_formatter is not None:
-            ds_dict["html"] = [html_formatter(m) for m in messages]
-        else:
-            ds_dict["html"] = [f"<pre>{m['message_text']}</pre>" for m in messages]
-        ds_dict["timeline"] = [name] * len(messages)
+
+    if html_formatter is not None:
+        ds_dict["html"] = [html_formatter(m) for m in messages]
+    else:
+        ds_dict["html"] = [f"<pre>{m['message_text']}</pre>" for m in messages]
+
+    ds_dict["timeline"] = [name] * len(messages)
+
     messages_ds = ColumnDataSource(data=ds_dict)
     return messages_ds
+
+
+def _make_event_data_source(events, name="Events", html_formatter=pre_string):
+    event_ds = ColumnDataSource(data=events)
+    if "time" not in events.columns:
+        event_ds.data["time"] = events.index.values
+    if "html" not in events.columns:
+        event_ds.data["html"] = [html_formatter(m) for m in events.iterrows()]
+    if "timeline" not in events.columns:
+        event_ds.data["timeline"] = [name] * len(events)
+    return event_ds
 
 
 def add_timeline_scatter_renderer(
@@ -54,7 +72,9 @@ def add_timeline_scatter_renderer(
     return renderer
 
 
-def make_timeline_scatterplots(log_messages=None, visits=None, visits_column="seeingFwhmEff", jitter=False):
+def make_timeline_scatterplots(
+    log_messages=None, visits=None, events=None, visits_column="seeingFwhmEff", jitter=False
+):
     timeline_plot = bokeh.plotting.figure(
         x_axis_type="datetime",
         y_range=bokeh.models.FactorRange(),
@@ -66,6 +86,14 @@ def make_timeline_scatterplots(log_messages=None, visits=None, visits_column="se
             log_messages, html_formatter=schedview.plot.nightreport.narrative_message_html
         )
         add_timeline_scatter_renderer(timeline_plot, log_message_source, jitter=jitter)
+
+    if events is not None:
+        for name in events:
+            event = events[name]
+            event_source = _make_event_data_source(event.data, name=name, html_formatter=event.html_formatter)
+            add_timeline_scatter_renderer(
+                timeline_plot, event_source, time_column=event.time_column, jitter=jitter, **event.kwargs
+            )
 
     if visits is not None and len(visits) > 0:
         visit_plot = bokeh.plotting.figure(
