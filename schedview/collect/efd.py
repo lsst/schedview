@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from functools import partial
 
 import pandas as pd
+from lsst.summit.utils.efdUtils import makeEfdClient
 from lsst_efd_client import EfdClient
 
 from schedview.dayobs import DayObs
@@ -21,7 +22,7 @@ def _get_efd_client(efd: EfdClient | str | None) -> EfdClient:
         case str():
             efd_client = EfdClient(efd)
         case None:
-            efd_client = EfdClient(DEFAULT_EFD)
+            efd_client = makeEfdClient()
         case _:
             raise ValueError(f"Cannot translate a {type(efd)} to an EfdClient.")
 
@@ -85,6 +86,7 @@ async def query_efd_topic_for_night(
             results.append(result)
 
     result = pd.concat(results) if len(results) > 0 else pd.DataFrame()
+    result.index.name = "time"
 
     return result
 
