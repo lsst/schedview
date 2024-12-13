@@ -40,30 +40,15 @@ def summarize_blocks(data: list[dict]) -> pd.DataFrame:
 
 def compute_block_spans(data: list[dict]) -> pd.DataFrame:
     block_status = pd.DataFrame(data)
-    block_status["first"] = (
-        (block_status["status"] == "STARTED")
-        | (block_status["hash"] != block_status["hash"].shift())
-        | (block_status["executionsCompleted"] != block_status["executionsCompleted"].shift())
-        | (block_status["status"].shift() == "COMPLETED")
-        | (block_status["status"].shift() == "ERROR")
-    )
-    # The status before the first of a sequence is the last of the previous
-    block_status["last"] = block_status["first"].shift(-1)
-
-    # Treat of the first and last statuses we have as the first and
-    # last of their respective sequences.
-
-    first_iloc = block_status.columns.get_loc("first")
-    last_iloc = block_status.columns.get_loc("last")
+    block_status["end"] = (block_status["status"] == "COMPLETED") | (block_status["status"] == "ERROR")
+    end_iloc = block_status.columns.get_loc("end")
     # make type checkers happy by verifying that we don't have multiple
     # columns with the same name
-    assert isinstance(first_iloc, int)
-    assert isinstance(last_iloc, int)
-    block_status.iloc[0, first_iloc] = True
-    block_status.iloc[-1, last_iloc] = True
+    assert isinstance(end_iloc, int)
+    block_status.iloc[-1, end_iloc] = True
 
     block_status["start_time"] = block_status.index.values
     block_status["end_time"] = np.where(
-        block_status["last"], block_status["start_time"], block_status["start_time"].shift(-1)
+        block_status["end"], block_status["start_time"], block_status["start_time"].shift(-1)
     )
     return block_status
