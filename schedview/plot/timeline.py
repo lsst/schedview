@@ -1,5 +1,6 @@
 import json
 import pprint
+from functools import cached_property
 
 import bokeh
 import bokeh.layouts
@@ -155,6 +156,7 @@ class BlockStatusTimelinePlotter(TimelinePlotter):
     key: str = "block_status"
     factor: str = "Block status"
     hovertext_column: str | None = "html"
+    jitter: bool = False
 
     @classmethod
     def _make_hovertext(cls, row_data: pd.Series) -> str:
@@ -163,11 +165,77 @@ class BlockStatusTimelinePlotter(TimelinePlotter):
         hovertext = f"<h1>Block</h1>{table}<h2>Definition</h2><pre>{definition}</pre>"
         return hovertext
 
+    @cached_property
+    def _color_map(self):
+        status_values = ["STARTED", "EXECUTING", "COMPLETED", "ERRER"]
+        status_values = status_values + list(set(np.unique(self.source.data["status"])) - set(status_values))
+        color_map = bokeh.transform.factor_cmap(
+            "status",
+            palette=bokeh.palettes.Colorblind[len(status_values)],
+            factors=status_values,
+        )
+        return color_map
+
+    @property
+    def default_glyph_kwargs(self) -> dict:
+
+        if self.jitter:
+            y = bokeh.transform.jitter(self.factor_column, width=self.jitter_width, range=self.plot.y_range)
+        else:
+            y = self.factor_column
+
+        glyph_kwargs = {
+            "y": y,
+            "x": self.time_column,
+            "line_color": self._color_map,
+            "fill_color": self._color_map,
+        }
+
+        return glyph_kwargs
+
+
+class BlockSpanTimelinePlotter(BlockStatusTimelinePlotter):
+    key: str = "block_spans"
+    glyph_class: type = bokeh.models.HBar
+    height: float = 0.2
+
+    @property
+    def default_glyph_kwargs(self) -> dict:
+
+        glyph_kwargs = {
+            "y": self.factor_column,
+            "left": "start_time",
+            "right": "end_time",
+            "line_color": self._color_map,
+            "fill_color": self._color_map,
+            "line_alpha": 0.5,
+            "fill_alpha": 0.5,
+            "height": self.height,
+        }
+        return glyph_kwargs
+
+    @classmethod
+    def _make_hovertext(cls, row_data: pd.Series) -> str:
+        definition = pprint.pformat(json.loads(row_data["definition"]))
+        dropped_columns = ["definition", "first", "last", "start_time", "end_time"]
+        table = row_data.to_frame().drop(dropped_columns).to_html()
+        hovertext = f"<h1>Block</h1>{table}<h2>Definition</h2><pre>{definition}</pre>"
+        return hovertext
+
 
 def make_multitimeline(plot: Plot | None = None, **kwargs) -> Plot:
 
     # Map keyword arguments to the classes we will use to plot them
-    plotter_classes = {c.key: c for c in TimelinePlotter.__subclasses__()}
+
+    # Recursive utility to get all descendents of the base class, not
+    # just direct childer.
+    def get_descendents(cls):
+        found_descendents = set(cls.__subclasses__())
+        for direct_descendent in cls.__subclasses__():
+            found_descendents.update(get_descendents(direct_descendent))
+        return found_descendents
+
+    plotter_classes = {c.key: c for c in get_descendents(TimelinePlotter)}
 
     # Iterate over keyword arguments, using the appropriate classes to
     # add timelines to our plot.
