@@ -9,9 +9,9 @@ from rubin_scheduler.scheduler import sim_runner
 from rubin_scheduler.scheduler.example import example_scheduler
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 from rubin_scheduler.scheduler.utils import SchemaConverter
-from rubin_scheduler.utils import survey_start_mjd
+from rubin_scheduler.utils import SURVEY_START_MJD
 
-DEFAULT_DATE = Time(survey_start_mjd(), format="mjd").iso[:10]
+DEFAULT_DATE = Time(SURVEY_START_MJD, format="mjd").iso[:10]
 
 # Several dependencies throw prodigious instances of (benign) warnings.
 # Suppress them to avoid poluting the executed notebook.
