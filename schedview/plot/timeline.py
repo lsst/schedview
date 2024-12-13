@@ -25,7 +25,7 @@ class TimelinePlotter:
     factor = "Events"
     glyph_class: type = bokeh.models.Scatter
     jitter: bool = True
-    jitter_width: float = 0.05
+    jitter_width: float = 0.2
     default_figure_kwargs: dict = {
         "x_axis_type": "datetime",
         "y_range": bokeh.models.FactorRange(),
@@ -124,7 +124,7 @@ class TimelinePlotter:
         else:
             y = self.factor_column
 
-        glyph_kwargs = {"x": self.time_column, "y": y}
+        glyph_kwargs = {"x": self.time_column, "y": y, "size": 5}
 
         return glyph_kwargs
 
@@ -156,7 +156,7 @@ class BlockStatusTimelinePlotter(TimelinePlotter):
     key: str = "block_status"
     factor: str = "Block status"
     hovertext_column: str | None = "html"
-    jitter: bool = False
+    jitter: bool = True
 
     @classmethod
     def _make_hovertext(cls, row_data: pd.Series) -> str:
@@ -187,8 +187,9 @@ class BlockStatusTimelinePlotter(TimelinePlotter):
         glyph_kwargs = {
             "y": y,
             "x": self.time_column,
-            "line_color": self._color_map,
+            "line_color": "black",
             "fill_color": self._color_map,
+            "size": 5,
         }
 
         return glyph_kwargs
@@ -217,7 +218,7 @@ class BlockSpanTimelinePlotter(BlockStatusTimelinePlotter):
     @classmethod
     def _make_hovertext(cls, row_data: pd.Series) -> str:
         definition = pprint.pformat(json.loads(row_data["definition"]))
-        dropped_columns = ["definition", "first", "last", "start_time", "end_time"]
+        dropped_columns = ["definition", "end", "start_time", "end_time"]
         table = row_data.to_frame().drop(dropped_columns).to_html()
         hovertext = f"<h1>Block</h1>{table}<h2>Definition</h2><pre>{definition}</pre>"
         return hovertext
