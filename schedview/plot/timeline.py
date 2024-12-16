@@ -16,6 +16,8 @@ from bokeh.models.plots import Plot
 import schedview.compute.nightreport
 import schedview.plot.nightreport
 
+from .colors import PLOT_FILTER_CMAP
+
 
 class TimelinePlotter:
     key = "events"
@@ -67,7 +69,7 @@ class TimelinePlotter:
 
     @classmethod
     def _make_hovertext(cls, row_data: pd.Series) -> str:
-        return row_data.to_frame().to_html()
+        return row_data.to_frame().to_html(header=False)
 
     @classmethod
     def _create_source(cls, *args, **kwargs) -> ColumnDataSource:
@@ -168,7 +170,7 @@ class LogMessageTimelinePlotter(TimelinePlotter):
 class LogMessageTimelineSpanPlotter(LogMessageTimelinePlotter):
     key: str = "message_spans"
     glyph_class: type = bokeh.models.HBar
-    height: float = 0.2
+    height: float = 0.05
 
     @classmethod
     def _create_source(cls, *args, **kwargs) -> ColumnDataSource:
@@ -178,27 +180,20 @@ class LogMessageTimelineSpanPlotter(LogMessageTimelinePlotter):
 
         return source
 
-    @cached_property
-    def _color(self):
-        status_values = list(set(np.unique(self.source.data["time_lost_type"])))
-        if len(status_values) == 1:
-            color = "red"
-        else:
-            color = bokeh.transform.factor_cmap(
-                "time_lost_type",
-                palette=bokeh.palettes.Colorblind[len(status_values)],
-                factors=status_values,
-            )
-        return color
-
     @property
     def default_glyph_kwargs(self) -> dict:
+
+        if self.jitter:
+            y = bokeh.transform.jitter(self.factor_column, width=self.jitter_width, range=self.plot.y_range)
+        else:
+            y = self.factor_column
+
         glyph_kwargs = {
-            "y": self.factor_column,
+            "y": y,
             "left": "date_begin",
             "right": "date_end",
-            "line_color": self._color,
-            "fill_color": self._color,
+            "line_color": "#00babc",
+            "fill_color": "#00babc",
             "line_alpha": 0.5,
             "fill_alpha": 0.5,
             "height": self.height,
@@ -264,7 +259,7 @@ class BlockStatusTimelinePlotter(TimelinePlotter):
 class BlockSpanTimelinePlotter(BlockStatusTimelinePlotter):
     key: str = "block_spans"
     glyph_class: type = bokeh.models.HBar
-    height: float = 0.2
+    height: float = 0.1
 
     @property
     def default_glyph_kwargs(self) -> dict:
@@ -277,7 +272,7 @@ class BlockSpanTimelinePlotter(BlockStatusTimelinePlotter):
             "fill_color": self._color_map,
             "line_alpha": 0.5,
             "fill_alpha": 0.5,
-            "height": self.height,
+            "height": 0.1,
         }
         return glyph_kwargs
 
@@ -288,6 +283,61 @@ class BlockSpanTimelinePlotter(BlockStatusTimelinePlotter):
         table = row_data.to_frame().drop(dropped_columns).to_html()
         hovertext = f"<h1>Block</h1>{table}<h2>Definition</h2><pre>{definition}</pre>"
         return hovertext
+
+
+class VisitTimelinePlotter(TimelinePlotter):
+    key: str = "visits"
+    factor: str = "visits"
+    glyph_class: type = bokeh.models.HBar
+    time_column: str = "obs_start"
+    height: float = 0.05
+    hovertext_column: str | None = "html"
+    hovertext_rows: list[str] = [
+        "visit_id",
+        "exposure_name",
+        "seq_num",
+        "physical_filter",
+        "band",
+        "s_ra",
+        "s_dec",
+        "sky_rotation",
+        "azimuth",
+        "altitude",
+        "zenith_distance",
+        "airmass",
+        "exp_time",
+        "shut_time",
+        "dark_time",
+        "img_type",
+        "emulated",
+        "science_program",
+        "observation_reason",
+        "target_name",
+        "air_temp",
+        "pressure",
+        "humidity",
+        "wind_speed",
+        "wind_dir",
+        "dimm_seeing",
+    ]
+
+    @property
+    def default_glyph_kwargs(self) -> dict:
+        glyph_kwargs = {
+            "y": self.factor_column,
+            "left": "obs_start",
+            "right": "obs_end",
+            "line_color": PLOT_FILTER_CMAP,
+            "fill_color": PLOT_FILTER_CMAP,
+            "line_alpha": 1.0,
+            "fill_alpha": 0.5,
+            "height": self.height,
+        }
+        return glyph_kwargs
+
+    @classmethod
+    def _make_hovertext(cls, row_data: pd.Series) -> str:
+        return row_data[cls.hovertext_rows].to_frame().to_html(header=False)
 
 
 def make_multitimeline(plot: Plot | None = None, **kwargs) -> Plot:
@@ -319,8 +369,12 @@ def make_multitimeline(plot: Plot | None = None, **kwargs) -> Plot:
     return plot
 
 
-def make_timeline_scatterplots(visits, visits_column="seeingFwhmEff", **kwargs):
-    timeline_plot = make_multitimeline(**kwargs)
+def make_timeline_scatterplots(visits, visits_column="seeingFwhmEff", visit_timeline=True, **kwargs):
+    timeline_kwargs = kwargs
+    if visit_timeline:
+        timeline_kwargs["visits"] = visits
+
+    timeline_plot = make_multitimeline(**timeline_kwargs)
 
     visit_plot = bokeh.plotting.figure(
         x_range=timeline_plot.x_range, y_axis_label=visits_column, x_axis_label="Time (UTC)", name="visit"
