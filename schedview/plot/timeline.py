@@ -116,7 +116,14 @@ class TimelinePlotter:
         except AttributeError:
             raise ValueError("supplied plot instance y_range must be FactorRange.")
 
-        needed_factors = sorted(list(set(self.source.data[self.factor_column])))
+        if isinstance(self.source.data[self.factor_column][0], list):
+            # Our factor column has offsets
+            factor_values = [f[0] for f in self.source.data[self.factor_column]]
+        else:
+            factor_values = self.source.data[self.factor_column]
+
+        needed_factors = sorted(list(set(factor_values)))
+
         for needed_factor in needed_factors:
             if needed_factor not in factors:
                 factors.append(needed_factor)
@@ -161,7 +168,7 @@ class LogMessageTimelinePlotter(TimelinePlotter):
                 if len(components) == 1:
                     component = components[0]
                 else:
-                    component = " & ".join(", ".join([components[:-1], components[-1]]))
+                    component = " & ".join([", ".join(components[:-1]), components[-1]])
                 factor_data.append(f"{writer} log message ({component} {time_lost_type})")
 
             source.data[cls.factor_column] = factor_data
@@ -287,10 +294,10 @@ class BlockSpanTimelinePlotter(BlockStatusTimelinePlotter):
 
 class VisitTimelinePlotter(TimelinePlotter):
     key: str = "visits"
-    factor: str = "visits"
+    factor: str = "Visits"
     glyph_class: type = bokeh.models.HBar
     time_column: str = "obs_start"
-    height: float = 0.05
+    height: float = 0.025
     hovertext_column: str | None = "html"
     hovertext_rows: list[str] = [
         "visit_id",
@@ -309,17 +316,11 @@ class VisitTimelinePlotter(TimelinePlotter):
         "shut_time",
         "dark_time",
         "img_type",
-        "emulated",
         "science_program",
         "observation_reason",
         "target_name",
-        "air_temp",
-        "pressure",
-        "humidity",
-        "wind_speed",
-        "wind_dir",
-        "dimm_seeing",
     ]
+    alt_scale = 0.1 / 90.0
 
     @property
     def default_glyph_kwargs(self) -> dict:
@@ -338,6 +339,20 @@ class VisitTimelinePlotter(TimelinePlotter):
     @classmethod
     def _make_hovertext(cls, row_data: pd.Series) -> str:
         return row_data[cls.hovertext_rows].to_frame().to_html(header=False)
+
+    @classmethod
+    def _make_factors(cls, source):
+        # Create the factor column in the source data table if it is not
+        # already there.
+        factor_values = []
+        if cls.factor_column is not None and cls.factor_column not in source.data:
+            for alt in source.data["altitude"]:
+                if isinstance(alt, float) and 0 < alt < 90:
+                    factor_values.append([cls.factor, (alt - 90) * cls.alt_scale])
+                else:
+                    factor_values.append([cls.factor, 0])
+
+            source.data[cls.factor_column] = factor_values
 
 
 def make_multitimeline(plot: Plot | None = None, **kwargs) -> Plot:
