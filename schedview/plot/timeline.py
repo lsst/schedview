@@ -165,6 +165,47 @@ class LogMessageTimelinePlotter(TimelinePlotter):
             source.data[cls.factor_column] = factor_data
 
 
+class LogMessageTimelineSpanPlotter(LogMessageTimelinePlotter):
+    key: str = "message_spans"
+    glyph_class: type = bokeh.models.HBar
+    height: float = 0.2
+
+    @classmethod
+    def _create_source(cls, *args, **kwargs) -> ColumnDataSource:
+        source = super()._create_source(*args, **kwargs)
+        for col in ("date_begin", "date_end"):
+            source.data[col] = Time([str(t) for t in source.data[col]]).datetime64
+
+        return source
+
+    @cached_property
+    def _color(self):
+        status_values = list(set(np.unique(self.source.data["time_lost_type"])))
+        if len(status_values) == 1:
+            color = "red"
+        else:
+            color = bokeh.transform.factor_cmap(
+                "time_lost_type",
+                palette=bokeh.palettes.Colorblind[len(status_values)],
+                factors=status_values,
+            )
+        return color
+
+    @property
+    def default_glyph_kwargs(self) -> dict:
+        glyph_kwargs = {
+            "y": self.factor_column,
+            "left": "date_begin",
+            "right": "date_end",
+            "line_color": self._color,
+            "fill_color": self._color,
+            "line_alpha": 0.5,
+            "fill_alpha": 0.5,
+            "height": self.height,
+        }
+        return glyph_kwargs
+
+
 class SchedulerDependenciesTimelinePlotter(TimelinePlotter):
     key: str = "scheduler_dependencies"
     factor: str = "Scheduler dependencies"
