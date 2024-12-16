@@ -355,6 +355,60 @@ class VisitTimelinePlotter(TimelinePlotter):
             source.data[cls.factor_column] = factor_values
 
 
+class SunTimelinePlotter(TimelinePlotter):
+    key: str = "sun"
+    factor: str = "Sun"
+    glyph_class: type = bokeh.models.HBar
+    height: float = 0.2
+
+    @classmethod
+    def _create_source(cls, night_events) -> ColumnDataSource:
+        sun_events = [
+            "sunset",
+            "sun_n12_setting",
+            "sun_n18_setting",
+            "sun_n18_rising",
+            "sun_n12_rising",
+            "sunrise",
+        ]
+        period_names = [
+            "twilight",
+            "astronomical",
+            "night",
+            "astronomical",
+            "twilight",
+        ]
+
+        source = ColumnDataSource(
+            data={
+                "start_time": night_events.loc[sun_events[:-1], "UTC"].values,
+                "end_time": night_events.loc[sun_events[1:], "UTC"].values,
+                "period": period_names,
+                "factor": [cls.factor] * 5,
+            },
+        )
+        return source
+
+    @property
+    def default_glyph_kwargs(self) -> dict:
+
+        cmap = bokeh.transform.factor_cmap(
+            "period",
+            palette=["lightblue", "blue", "black"],
+            factors=["twilight", "astronomical", "night"],
+        )
+
+        glyph_kwargs = {
+            "y": self.factor_column,
+            "left": "start_time",
+            "right": "end_time",
+            "line_color": cmap,
+            "fill_color": cmap,
+            "height": self.height,
+        }
+        return glyph_kwargs
+
+
 def make_multitimeline(plot: Plot | None = None, **kwargs) -> Plot:
 
     # Map keyword arguments to the classes we will use to plot them
