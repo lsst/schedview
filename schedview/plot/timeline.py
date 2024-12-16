@@ -316,16 +316,9 @@ class VisitTimelinePlotter(TimelinePlotter):
         "shut_time",
         "dark_time",
         "img_type",
-        "emulated",
         "science_program",
         "observation_reason",
         "target_name",
-        "air_temp",
-        "pressure",
-        "humidity",
-        "wind_speed",
-        "wind_dir",
-        "dimm_seeing",
     ]
     alt_scale = 0.1 / 90.0
 
