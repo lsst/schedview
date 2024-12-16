@@ -80,10 +80,7 @@ class TimelinePlotter:
                 hovertext.append(cls._make_hovertext(row_data))
             source.data[cls.hovertext_column] = hovertext
 
-        # Create the factor column if necessary
-        if cls.factor_column is not None and cls.factor_column not in source.data:
-            num_events = len(source.data[cls.time_column])
-            source.data[cls.factor_column] = [cls.factor] * num_events
+        cls._make_factors(source)
 
         # Convert type of time column if necessary
         time_data = source.data[cls.time_column]
@@ -101,6 +98,14 @@ class TimelinePlotter:
                 source.data[cls.time_column] = Time([str(t) for t in time_data]).datetime64
 
         return source
+
+    @classmethod
+    def _make_factors(cls, source):
+        # Create the factor column in the source data table if it is not
+        # already there.
+        if cls.factor_column is not None and cls.factor_column not in source.data:
+            num_events = len(source.data[cls.time_column])
+            source.data[cls.factor_column] = [cls.factor] * num_events
 
     def _update_factors(self):
         # Make sure this timeline is included in the y range
@@ -138,6 +143,26 @@ class LogMessageTimelinePlotter(TimelinePlotter):
     @classmethod
     def _make_hovertext(cls, row_data: pd.Series) -> str:
         return f"<pre>{row_data['message_text']}</pre>"
+
+    @classmethod
+    def _make_factors(cls, source):
+        # Create the factor column in the source data table if it is not
+        # already there.
+        if cls.factor_column is not None and cls.factor_column not in source.data:
+            # build factor labels for each message
+            factor_data = []
+            for id in range(len(source.data[cls.time_column])):
+                message = {k: source.data[k][id] for k in source.data}
+                time_lost_type = "" if message["time_lost_type"] == "None" else message["time_lost_type"]
+                writer = "Human" if message["is_human"] else "Automated "
+                components = message["components"]
+                if len(components) == 1:
+                    component = components[0]
+                else:
+                    component = " & ".join(", ".join([components[:-1], components[-1]]))
+                factor_data.append(f"{writer} log message ({component} {time_lost_type})")
+
+            source.data[cls.factor_column] = factor_data
 
 
 class SchedulerDependenciesTimelinePlotter(TimelinePlotter):
