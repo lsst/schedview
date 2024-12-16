@@ -168,7 +168,7 @@ class LogMessageTimelinePlotter(TimelinePlotter):
                 if len(components) == 1:
                     component = components[0]
                 else:
-                    component = " & ".join(", ".join([components[:-1], components[-1]]))
+                    component = " & ".join([", ".join(components[:-1]), components[-1]])
                 factor_data.append(f"{writer} log message ({component} {time_lost_type})")
 
             source.data[cls.factor_column] = factor_data
