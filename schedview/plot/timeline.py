@@ -230,7 +230,7 @@ class SchedulerStapshotTimelinePlotter(TimelinePlotter):
         self.plot.add_tools(
             bokeh.models.TapTool(
                 renderers=[self.renderer],
-                callback=bokeh.models.OpenURL(url="https://en.wikipedia.org/wiki/Vera_C._Rubin_Observatory"),
+                callback=bokeh.models.OpenURL(url="@url"),
             )
         )
 
