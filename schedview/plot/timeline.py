@@ -429,7 +429,7 @@ class ModelSkyTimelinePlotter(TimelinePlotter):
     factor: str = "Med. model sky br."
     hovertext_column: str | None = "html"
     glyph_class: type = bokeh.models.HBar
-    height: float = 0.025
+    height: float = 0.2
     band: str = "r"
     alt_scale = 0.1 / 90.0
 
@@ -439,8 +439,8 @@ class ModelSkyTimelinePlotter(TimelinePlotter):
         cmap = bokeh.transform.linear_cmap(
             self.band,
             palette=bokeh.palettes.Cividis256,
-            low=np.max(self.source.data["r"]),
-            high=np.min(self.source.data["r"]),
+            low=21.5,
+            high=19.5,
         )
 
         glyph_kwargs = {
