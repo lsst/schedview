@@ -56,7 +56,7 @@ class TimelinePlotter:
         glyph_kwargs.update(kwargs)
         self.glyph = self.glyph_class(**glyph_kwargs)
 
-        self.plot.add_glyph(self.source, self.glyph)
+        self.renderer = self.plot.add_glyph(self.source, self.glyph)
 
     @classmethod
     def _create_plot(cls) -> Plot:
@@ -218,6 +218,21 @@ class SchedulerConfigurationTimelinePlotter(TimelinePlotter):
     key: str = "scheduler_configuration"
     factor: str = "Scheduler configuration"
     hovertext_column: str | None = "html"
+
+
+class SchedulerStapshotTimelinePlotter(TimelinePlotter):
+    key: str = "scheduler_snapshots"
+    factor: str = "Scheduler snapshots"
+    hovertext_column: str | None = "html"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.plot.add_tools(
+            bokeh.models.TapTool(
+                renderers=[self.renderer],
+                callback=bokeh.models.OpenURL(url="@url"),
+            )
+        )
 
 
 class BlockStatusTimelinePlotter(TimelinePlotter):
