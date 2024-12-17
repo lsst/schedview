@@ -308,7 +308,7 @@ class BlockSpanTimelinePlotter(BlockStatusTimelinePlotter):
 
 
 class VisitTimelinePlotter(TimelinePlotter):
-    key: str = "visits"
+    key: str = "visit_timeline"
     factor: str = "Visits"
     glyph_class: type = bokeh.models.HBar
     time_column: str = "obs_start"
@@ -440,7 +440,9 @@ def make_multitimeline(plot: Plot | None = None, **kwargs) -> Plot:
 
     # Iterate over keyword arguments, using the appropriate classes to
     # add timelines to our plot.
-    for key in kwargs:
+    # Reverse the order in the dictionary so the "top down" order in the
+    # argument list matches the "top down" order in the plot.
+    for key in reversed(kwargs.keys()):
         try:
             cls = plotter_classes[key]
         except KeyError:
@@ -453,12 +455,8 @@ def make_multitimeline(plot: Plot | None = None, **kwargs) -> Plot:
     return plot
 
 
-def make_timeline_scatterplots(visits, visits_column="seeingFwhmEff", visit_timeline=True, **kwargs):
-    timeline_kwargs = kwargs
-    if visit_timeline:
-        timeline_kwargs["visits"] = visits
-
-    timeline_plot = make_multitimeline(**timeline_kwargs)
+def make_timeline_scatterplots(visits, visits_column="seeingFwhmEff", **kwargs):
+    timeline_plot = make_multitimeline(**kwargs)
 
     visit_plot = bokeh.plotting.figure(
         x_range=timeline_plot.x_range, y_axis_label=visits_column, x_axis_label="Time (UTC)", name="visit"
