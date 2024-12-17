@@ -20,12 +20,53 @@ from .colors import PLOT_FILTER_CMAP
 
 
 class TimelinePlotter:
+    """A base and generic class for bokeh timeline plot creation.
+
+    Parameters
+    ----------
+    data : pd.DataFrame | ColumnDataSource | dict | list
+        Data which can be used to create a bokeh ColumnDataSource.
+    plot : `Plot` or `None`
+        The ``bokeh.models.Plot`` instance on which to put the timeline.
+
+    Notes
+    -----
+    The initializer does most of the work, creating (or maybe reusing, in the
+    case of ``plot``) the ``plot``, ``glyph``, and ``renderer`` members, which
+    are the relevant instances of ``bokeh.models.plots.Plot``,
+    ``bokeh.models.glyph.Glyph``, and
+    ``bokeh.models.renderers.renderer.Renderer``, respectively.
+
+    Although the class itself can be used for simple timelines, in most
+    cases it will be used as a base class for subclasses specialized for
+    the plot desired.
+    """
+
     key = "events"
+    """Used by ``make_multitimeline`` to identify a class to use to instantiate
+    a timeline plot: the key attribute of a subclass of TimelinePlotter
+    becomes a keyword argument to ``make_multitimeline``."""
+
     hovertext_column: str | None = None
+    """Column name for hovertext text, ``None`` for no hovertext."""
+
     time_column: str = "time"
+    """Column used to place points along the timeline. Some subclasses
+    with different kinds of placement may ignore this."""
+
     factor_column: str = "factor"
+    """When multiple timelines are placed on the same factor plot, this
+    this column determines the factor. If the column does not exist,
+    the _make_factors method may create it."""
+
     factor = "Events"
+    """The factor name, if the factor column does not exist and the
+    default implementation of _make_factors is not overriden."""
+
     glyph_class: type = bokeh.models.Scatter
+    """The ``bokeh.models.glyph.Glyph``` subclass to be used to represent
+    the data."""
+
     jitter: bool = True
     jitter_width: float = 0.2
     default_figure_kwargs: dict = {
@@ -52,7 +93,7 @@ class TimelinePlotter:
         )
         self._update_factors()
 
-        glyph_kwargs = self.default_glyph_kwargs
+        glyph_kwargs = self._make_glyph_kwargs
         glyph_kwargs.update(kwargs)
         self.glyph = self.glyph_class(**glyph_kwargs)
 
@@ -60,6 +101,10 @@ class TimelinePlotter:
 
     @classmethod
     def _create_plot(cls) -> Plot:
+        """Instantiate a ``bokeh.models.plots.Plot`` onto which to put
+        the timeline.
+        """
+
         figure_kwargs = {}
         figure_kwargs.update(cls.default_figure_kwargs)
         if cls.hovertext_column is not None and "tooltips" not in figure_kwargs:
@@ -69,10 +114,35 @@ class TimelinePlotter:
 
     @classmethod
     def _make_hovertext(cls, row_data: pd.Series) -> str:
+        """Create the content for hovertext.
+
+        Parameters
+        ----------
+        row_data : `pd.Series`
+            Fields for one row of the column data source.
+
+        Returns
+        -------
+        hovertext : `str`
+            The content of the hovertext, marked up with html.
+        """
         return row_data.to_frame().to_html(header=False)
 
     @classmethod
     def _create_source(cls, *args, **kwargs) -> ColumnDataSource:
+        """Wrapper around the ``ColumnDataSource`` constructor that adds
+        any additional columns needed.
+
+        Parameters
+        ----------
+        See ``ColumnDataSource``.
+
+        Returns
+        -------
+        source : `ColumnDataSource`
+            The data source to use for the plot.
+        """
+
         source: ColumnDataSource = ColumnDataSource(*args, **kwargs)
 
         # Create the hovertext if necessary
@@ -102,7 +172,15 @@ class TimelinePlotter:
         return source
 
     @classmethod
-    def _make_factors(cls, source):
+    def _make_factors(cls, source: ColumnDataSource):
+        """If it does not alread exist, fill out the factor column (set by the
+        ``factor_column`` attribute) in the data source.
+
+        Parameters
+        ----------
+        source : `ColumnDataSource`
+            The source to supplement with factors.
+        """
         # Create the factor column in the source data table if it is not
         # already there.
         if cls.factor_column is not None and cls.factor_column not in source.data:
@@ -110,6 +188,9 @@ class TimelinePlotter:
             source.data[cls.factor_column] = [cls.factor] * num_events
 
     def _update_factors(self):
+        """Update the y axis of the ``bokeh.models.plot.Plot`` in the ``plot``
+        attribute to include all the factors used in this timeline.
+        """
         # Make sure this timeline is included in the y range
         try:
             factors = self.plot.y_range.factors
@@ -131,8 +212,11 @@ class TimelinePlotter:
         self.plot.y_range.update(factors=factors)
 
     @property
-    def default_glyph_kwargs(self) -> dict:
-
+    def _make_glyph_kwargs(self) -> dict:
+        """Set the keyword argumentns used to instantiate the timeline's
+        ``bokeh.models.glyph.Glyph``. This dictionary will be used as arguments
+        for the constructor of the class specified in the ``glyph_class``
+        attribute."""
         if self.jitter:
             y = bokeh.transform.jitter(self.factor_column, width=self.jitter_width, range=self.plot.y_range)
         else:
@@ -188,7 +272,7 @@ class LogMessageTimelineSpanPlotter(LogMessageTimelinePlotter):
         return source
 
     @property
-    def default_glyph_kwargs(self) -> dict:
+    def _make_glyph_kwargs(self) -> dict:
 
         if self.jitter:
             y = bokeh.transform.jitter(self.factor_column, width=self.jitter_width, range=self.plot.y_range)
@@ -260,7 +344,7 @@ class BlockStatusTimelinePlotter(TimelinePlotter):
         return color_map
 
     @property
-    def default_glyph_kwargs(self) -> dict:
+    def _make_glyph_kwargs(self) -> dict:
 
         if self.jitter:
             y = bokeh.transform.jitter(self.factor_column, width=self.jitter_width, range=self.plot.y_range)
@@ -284,7 +368,7 @@ class BlockSpanTimelinePlotter(BlockStatusTimelinePlotter):
     height: float = 0.1
 
     @property
-    def default_glyph_kwargs(self) -> dict:
+    def _make_glyph_kwargs(self) -> dict:
 
         glyph_kwargs = {
             "y": self.factor_column,
@@ -338,7 +422,7 @@ class VisitTimelinePlotter(TimelinePlotter):
     alt_scale = 0.4 / 90.0
 
     @property
-    def default_glyph_kwargs(self) -> dict:
+    def _make_glyph_kwargs(self) -> dict:
         glyph_kwargs = {
             "y": self.factor_column,
             "left": "obs_start",
@@ -411,7 +495,7 @@ class SunTimelinePlotter(TimelinePlotter):
         return source
 
     @property
-    def default_glyph_kwargs(self) -> dict:
+    def _make_glyph_kwargs(self) -> dict:
 
         cmap = bokeh.transform.factor_cmap(
             "period",
@@ -440,7 +524,7 @@ class ModelSkyTimelinePlotter(TimelinePlotter):
     alt_scale = 0.2 / 90.0
 
     @property
-    def default_glyph_kwargs(self) -> dict:
+    def _make_glyph_kwargs(self) -> dict:
 
         cmap = bokeh.transform.linear_cmap(
             self.band,
