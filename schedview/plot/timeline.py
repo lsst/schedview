@@ -335,7 +335,7 @@ class VisitTimelinePlotter(TimelinePlotter):
         "observation_reason",
         "target_name",
     ]
-    alt_scale = 0.1 / 90.0
+    alt_scale = 0.4 / 90.0
 
     @property
     def default_glyph_kwargs(self) -> dict:
@@ -347,7 +347,7 @@ class VisitTimelinePlotter(TimelinePlotter):
             "fill_color": PLOT_FILTER_CMAP,
             "line_alpha": 1.0,
             "fill_alpha": 0.5,
-            "height": self.height,
+            "height": "scaled_alt",
         }
         return glyph_kwargs
 
@@ -356,7 +356,13 @@ class VisitTimelinePlotter(TimelinePlotter):
         return row_data[cls.hovertext_rows].to_frame().to_html(header=False)
 
     @classmethod
-    def _make_factors(cls, source):
+    def _create_source(cls, *args, **kwargs) -> ColumnDataSource:
+        source = super()._create_source(*args, **kwargs)
+        source.data["scaled_alt"] = cls.alt_scale * source.data["altitude"]
+        return source
+
+    @classmethod
+    def foo_make_factors(cls, source):
         # Create the factor column in the source data table if it is not
         # already there.
         factor_values = []
@@ -422,6 +428,50 @@ class SunTimelinePlotter(TimelinePlotter):
             "height": self.height,
         }
         return glyph_kwargs
+
+
+class ModelSkyTimelinePlotter(TimelinePlotter):
+    key: str = "model_sky"
+    factor: str = "Med. model sky"
+    hovertext_column: str | None = "html"
+    glyph_class: type = bokeh.models.HBar
+    height: float = 0.2
+    band: str = "r"
+    alt_scale = 0.2 / 90.0
+
+    @property
+    def default_glyph_kwargs(self) -> dict:
+
+        cmap = bokeh.transform.linear_cmap(
+            self.band,
+            palette=bokeh.palettes.Cividis256,
+            low=21.5,
+            high=19.5,
+        )
+
+        glyph_kwargs = {
+            "y": self.factor_column,
+            "left": "begin_time",
+            "right": "end_time",
+            "line_color": cmap,
+            "fill_color": cmap,
+            "height": self.height,
+        }
+        return glyph_kwargs
+
+    @classmethod
+    def _make_factors(cls, source):
+        # Create the factor column in the source data table if it is not
+        # already there.
+        factor_values = []
+        if cls.factor_column is not None and cls.factor_column not in source.data:
+            for alt in source.data["moon_alt"]:
+                if isinstance(alt, float) and -90 <= alt <= 90:
+                    factor_values.append([cls.factor, alt * cls.alt_scale])
+                else:
+                    factor_values.append([cls.factor, 0])
+
+            source.data[cls.factor_column] = factor_values
 
 
 def make_multitimeline(plot: Plot | None = None, **kwargs) -> Plot:

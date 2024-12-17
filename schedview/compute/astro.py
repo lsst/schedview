@@ -7,6 +7,9 @@ import pytz
 from astropy.time import Time
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 from rubin_scheduler.site_models.almanac import Almanac
+from rubin_scheduler.skybrightness_pre import SkyModelPre
+
+from schedview.dayobs import DayObs
 
 
 @cache
@@ -166,3 +169,52 @@ def compute_sun_moon_positions(observatory: ModelObservatory) -> pd.DataFrame:
     )
     body_positions[angle_columns] = np.degrees(body_positions[angle_columns])
     return body_positions
+
+
+def get_median_model_sky(day_obs: DayObs, bands: tuple[str] = ("u", "g", "r", "i", "z", "y")) -> pd.DataFrame:
+    """Get model sky and ephemeris values suitable for a timeline plot.
+
+    Parameters
+    ----------
+    day_obs : `DayObs`
+        The day of observing.
+    bands : `tuple`, optional
+        Bands to get sky values for, by default ("u", "g", "r", "i", "z", "y")
+
+    Returns
+    -------
+    median_model_sky : `pd.DataFrame`
+        A pandas.DataFrame with the median model sky values and sun and moon
+        parameters.
+    """
+    sky_model = SkyModelPre(mjd0=day_obs.start.mjd, load_length=1)
+    mjds = sky_model.mjds
+
+    whole_day_obs = pd.DataFrame(Almanac().get_sun_moon_positions(mjds), index=pd.Index(mjds, name="mjd"))
+
+    for band in bands:
+        whole_day_obs[band] = np.nanmedian(np.array(sky_model.sb[band]), axis=1)
+
+    # Get edges of span over which the sample can be plotted
+    sample_mjds = mjds[1:-1]
+    prior_mjds = mjds[:-2]
+    next_mjds = mjds[2:]
+
+    # Use day_obs to get the times of night.
+    # We cannot use the sun alt we get from the almanac, because
+    # the sun from the prior night does not reach alt=0 until after
+    # the day_obs rollover, and so doing this will give one or more
+    # points from the prior night.
+    night_mjds = sample_mjds[(prior_mjds > day_obs.sunset.mjd) & (next_mjds < day_obs.sunrise.mjd)]
+    whole_day_obs.loc[sample_mjds, "begin_time"] = Time(
+        (sample_mjds + prior_mjds) / 2, format="mjd"
+    ).datetime64
+    whole_day_obs.loc[sample_mjds, "time"] = Time(sample_mjds, format="mjd").datetime64
+    whole_day_obs.loc[sample_mjds, "end_time"] = Time((sample_mjds + next_mjds) / 2, format="mjd").datetime64
+
+    result_columns = ["time", "begin_time", "end_time"] + list(bands) + ["sun_alt", "moon_alt", "moon_phase"]
+
+    night = whole_day_obs.loc[night_mjds, result_columns]
+    night["sun_alt"] = np.degrees(night["sun_alt"])
+    night["moon_alt"] = np.degrees(night["moon_alt"])
+    return night
