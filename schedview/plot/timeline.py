@@ -335,7 +335,7 @@ class VisitTimelinePlotter(TimelinePlotter):
         "observation_reason",
         "target_name",
     ]
-    alt_scale = 0.1 / 90.0
+    alt_scale = 0.4 / 90.0
 
     @property
     def default_glyph_kwargs(self) -> dict:
@@ -347,7 +347,7 @@ class VisitTimelinePlotter(TimelinePlotter):
             "fill_color": PLOT_FILTER_CMAP,
             "line_alpha": 1.0,
             "fill_alpha": 0.5,
-            "height": self.height,
+            "height": "scaled_alt",
         }
         return glyph_kwargs
 
@@ -356,7 +356,13 @@ class VisitTimelinePlotter(TimelinePlotter):
         return row_data[cls.hovertext_rows].to_frame().to_html(header=False)
 
     @classmethod
-    def _make_factors(cls, source):
+    def _create_source(cls, *args, **kwargs) -> ColumnDataSource:
+        source = super()._create_source(*args, **kwargs)
+        source.data["scaled_alt"] = cls.alt_scale * source.data["altitude"]
+        return source
+
+    @classmethod
+    def foo_make_factors(cls, source):
         # Create the factor column in the source data table if it is not
         # already there.
         factor_values = []
@@ -426,12 +432,12 @@ class SunTimelinePlotter(TimelinePlotter):
 
 class ModelSkyTimelinePlotter(TimelinePlotter):
     key: str = "model_sky"
-    factor: str = "Med. model sky br."
+    factor: str = "Med. model sky"
     hovertext_column: str | None = "html"
     glyph_class: type = bokeh.models.HBar
     height: float = 0.2
     band: str = "r"
-    alt_scale = 0.1 / 90.0
+    alt_scale = 0.2 / 90.0
 
     @property
     def default_glyph_kwargs(self) -> dict:
