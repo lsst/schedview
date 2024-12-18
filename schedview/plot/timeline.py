@@ -67,7 +67,7 @@ class TimelinePlotter:
     """The ``bokeh.models.glyph.Glyph``` subclass to be used to represent
     the data."""
 
-    jitter: bool = True
+    jitter: bool = False
     jitter_width: float = 0.2
     default_figure_kwargs: dict = {
         "x_axis_type": "datetime",
@@ -222,7 +222,7 @@ class TimelinePlotter:
         else:
             y = self.factor_column
 
-        glyph_kwargs = {"x": self.time_column, "y": y, "size": 5}
+        glyph_kwargs = {"x": self.time_column, "y": y, "size": 10, "marker": "diamond"}
 
         return glyph_kwargs
 
@@ -261,30 +261,33 @@ class LogMessageTimelinePlotter(TimelinePlotter):
         return f"<pre>{row_data['message_text']}</pre>"
 
     @classmethod
-    def _make_factors(cls, source):
+    def _make_factor_data(cls, source):
+        factor_data = []
+        for id in range(len(source.data[cls.time_column])):
+            message = {k: source.data[k][id] for k in source.data}
+            time_lost_type = "" if message["time_lost_type"] == "None" else message["time_lost_type"]
+            writer = "Human" if message["is_human"] else "Automated "
+            components = message["components"]
+            if len(components) == 1:
+                component = components[0]
+            else:
+                component = " & ".join([", ".join(components[:-1]), components[-1]])
+            factor_data.append(f"{writer} log message ({component} {time_lost_type})")
+        return factor_data
+
+    @classmethod
+    def _make_factors(cls, source: ColumnDataSource):
         # Create the factor column in the source data table if it is not
         # already there.
         if cls.factor_column is not None and cls.factor_column not in source.data:
-            # build factor labels for each message
-            factor_data = []
-            for id in range(len(source.data[cls.time_column])):
-                message = {k: source.data[k][id] for k in source.data}
-                time_lost_type = "" if message["time_lost_type"] == "None" else message["time_lost_type"]
-                writer = "Human" if message["is_human"] else "Automated "
-                components = message["components"]
-                if len(components) == 1:
-                    component = components[0]
-                else:
-                    component = " & ".join([", ".join(components[:-1]), components[-1]])
-                factor_data.append(f"{writer} log message ({component} {time_lost_type})")
-
-            source.data[cls.factor_column] = factor_data
+            source.data[cls.factor_column] = cls._make_factor_data(source)
 
 
 class LogMessageTimelineSpanPlotter(LogMessageTimelinePlotter):
     key: str = "message_spans"
     glyph_class: type = bokeh.models.HBar
-    height: float = 0.05
+    height: float = 0.1
+    vertical_offset: float = -0.15
 
     @classmethod
     def _create_source(cls, *args, **kwargs) -> ColumnDataSource:
@@ -293,6 +296,13 @@ class LogMessageTimelineSpanPlotter(LogMessageTimelinePlotter):
             source.data[col] = Time([str(t) for t in source.data[col]]).datetime64
 
         return source
+
+    @classmethod
+    def _make_factors(cls, source: ColumnDataSource):
+        # Create the factor column in the source data table if it is not
+        # already there.
+        if cls.factor_column is not None and cls.factor_column not in source.data:
+            source.data[cls.factor_column] = [[f, cls.vertical_offset] for f in cls._make_factor_data(source)]
 
     @property
     def _make_glyph_kwargs(self) -> dict:
@@ -346,7 +356,6 @@ class BlockStatusTimelinePlotter(TimelinePlotter):
     key: str = "block_status"
     factor: str = "Block status"
     hovertext_column: str | None = "html"
-    jitter: bool = True
 
     @classmethod
     def _make_hovertext(cls, row_data: pd.Series) -> str:
@@ -377,9 +386,10 @@ class BlockStatusTimelinePlotter(TimelinePlotter):
         glyph_kwargs = {
             "y": y,
             "x": self.time_column,
-            "line_color": "black",
+            "line_color": self._color_map,
             "fill_color": self._color_map,
-            "size": 5,
+            "size": 10,
+            "marker": "diamond",
         }
 
         return glyph_kwargs
@@ -389,6 +399,7 @@ class BlockSpanTimelinePlotter(BlockStatusTimelinePlotter):
     key: str = "block_spans"
     glyph_class: type = bokeh.models.HBar
     height: float = 0.1
+    vertical_offset: float = -0.15
 
     @property
     def _make_glyph_kwargs(self) -> dict:
@@ -404,6 +415,14 @@ class BlockSpanTimelinePlotter(BlockStatusTimelinePlotter):
             "height": 0.1,
         }
         return glyph_kwargs
+
+    @classmethod
+    def _make_factors(cls, source: ColumnDataSource):
+        # Create the factor column in the source data table if it is not
+        # already there.
+        if cls.factor_column is not None and cls.factor_column not in source.data:
+            num_events = len(source.data[cls.time_column])
+            source.data[cls.factor_column] = [[cls.factor, cls.vertical_offset]] * num_events
 
     @classmethod
     def _make_hovertext(cls, row_data: pd.Series) -> str:
