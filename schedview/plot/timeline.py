@@ -228,6 +228,29 @@ class TimelinePlotter:
 
 
 class LogMessageTimelinePlotter(TimelinePlotter):
+    """Plot generator for the narrative log.
+
+    Parameters
+    ----------
+    `data`: `list`
+        As produced by
+        ``schedview.collect.nightreport import get_night_narrative``
+
+    Examples
+    --------
+
+    > import bokeh.plotting
+    > from schedview.dayobs import DayObs
+    > from schedview.collect.nightreport import get_night_narrative
+    > from schedview.plot.timeline import LogMessageTimelinePlotter
+    >
+    > day_obs = DayObs.from_date('2024-12-10')
+    > telescope = "Simonyi"
+    > messages = get_night_narrative(day_obs, telescope)
+    > timeline = LogMessageTimelinePlotter(messages)
+    > bokeh.plotting.save(timeline.plot, filename='myplot.html')
+    """
+
     key: str = "log_messages"
     hovertext_column: str | None = "html"
     time_column: str = "date_added"
@@ -577,13 +600,17 @@ def make_multitimeline(plot: Plot | None = None, **kwargs) -> Plot:
     # Reverse the order in the dictionary so the "top down" order in the
     # argument list matches the "top down" order in the plot.
     for key in reversed(kwargs.keys()):
+        data = kwargs[key]
+        if len(data) < 1:
+            # If there is no data, don't add it.
+            continue
         try:
             cls = plotter_classes[key]
         except KeyError:
             # If we have not defined a subclass, attempt to use the
             # generic one.
             cls = TimelinePlotter
-        timeline_plotter = cls(kwargs[key], plot=plot)
+        timeline_plotter = cls(data, plot=plot)
         plot = timeline_plotter.plot
 
     return plot
