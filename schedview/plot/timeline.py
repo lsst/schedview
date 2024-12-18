@@ -12,6 +12,7 @@ import pandas as pd
 from astropy.time import Time
 from bokeh.models import ColumnDataSource
 from bokeh.models.plots import Plot
+from lsst.ts.xml.enums.Script import ScriptState
 
 import schedview.compute.nightreport
 import schedview.plot.nightreport
@@ -551,6 +552,88 @@ class SunTimelinePlotter(TimelinePlotter):
             "right": "end_time",
             "line_color": cmap,
             "fill_color": cmap,
+            "height": self.height,
+        }
+        return glyph_kwargs
+
+
+class ScriptQueueLogeventScriptTimelinePlotter(TimelinePlotter):
+    key: str = "script_queue_logevent_script"
+    factor: str = "Script queue"
+    hovertext_column: str | None = "html"
+    time_column: str = "first_logevent_time"
+
+    @classmethod
+    def _create_source(cls, data, *args, **kwargs) -> ColumnDataSource:
+        for col in tuple(data.keys()):
+            if col.startswith("timestamp"):
+                data[col.removeprefix("timestamp")] = Time(data[col], format="unix_tai").datetime64
+
+        data["scriptStateName"] = data["scriptState"].map({int(k): ScriptState(k).name for k in ScriptState})
+
+        source = super()._create_source(data, *args, **kwargs)
+        return source
+
+    @property
+    def _make_glyph_kwargs(self) -> dict:
+        script_states = [ScriptState(k).name for k in ScriptState]
+
+        if len(script_states) <= 8:
+            palette = bokeh.palettes.Colorblind[len(script_states)]
+        else:
+            palette = bokeh.palettes.Category20[len(script_states)]
+
+        color_map = bokeh.transform.factor_cmap(
+            "scriptStateName",
+            palette=palette,
+            factors=script_states,
+        )
+
+        glyph_kwargs = {
+            "x": self.time_column,
+            "y": self.factor_column,
+            "size": 10,
+            "marker": "diamond",
+            "line_color": color_map,
+            "fill_color": color_map,
+            "fill_alpha": 0.5,
+        }
+        return glyph_kwargs
+
+
+class ScriptQueueLogeventScriptSpanTimelinePlotter(ScriptQueueLogeventScriptTimelinePlotter):
+    key: str = "script_queue_logevent_script_span"
+    glyph_class: type = bokeh.models.HBar
+    height: float = 0.1
+    vertical_offset: float = -0.15
+
+    @classmethod
+    def _make_factors(cls, source: ColumnDataSource):
+        # Create the factor column in the source data table if it is not
+        # already there.
+        if cls.factor_column is not None and cls.factor_column not in source.data:
+            num_events = len(source.data[cls.time_column])
+            source.data[cls.factor_column] = [[cls.factor, cls.vertical_offset]] * num_events
+
+    @property
+    def _make_glyph_kwargs(self) -> dict:
+
+        stages = ["Congifure", "Process"]
+        palette = ["red", "blue"]
+
+        color_map = bokeh.transform.factor_cmap(
+            "stage",
+            palette=palette,
+            factors=stages,
+        )
+
+        glyph_kwargs = {
+            "y": self.factor_column,
+            "left": "start_time",
+            "right": "end_time",
+            "line_color": color_map,
+            "fill_color": color_map,
+            "fill_alpha": 0.5,
             "height": self.height,
         }
         return glyph_kwargs
