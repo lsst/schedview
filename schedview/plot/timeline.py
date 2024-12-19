@@ -12,7 +12,6 @@ import pandas as pd
 from astropy.time import Time
 from bokeh.models import ColumnDataSource
 from bokeh.models.plots import Plot
-from lsst.ts.xml.enums.Script import ScriptState
 
 import schedview.compute.nightreport
 import schedview.plot.nightreport
@@ -569,6 +568,10 @@ class ScriptQueueLogeventScriptTimelinePlotter(TimelinePlotter):
             if col.startswith("timestamp"):
                 data[col.removeprefix("timestamp")] = Time(data[col], format="unix_tai").datetime64
 
+        # Import here rather than up top so we can import the module even
+        # if lsst.ts.xml.enums.Script in missing.
+        from lsst.ts.xml.enums.Script import ScriptState
+
         data["scriptStateName"] = data["scriptState"].map({int(k): ScriptState(k).name for k in ScriptState})
 
         source = super()._create_source(data, *args, **kwargs)
@@ -576,6 +579,11 @@ class ScriptQueueLogeventScriptTimelinePlotter(TimelinePlotter):
 
     @property
     def _make_glyph_kwargs(self) -> dict:
+
+        # Import here rather than up top so we can import the module even
+        # if lsst.ts.xml.enums.Script in missing.
+        from lsst.ts.xml.enums.Script import ScriptState
+
         script_states = [ScriptState(k).name for k in ScriptState]
 
         if len(script_states) <= 8:
@@ -684,7 +692,27 @@ class ModelSkyTimelinePlotter(TimelinePlotter):
 
 
 def make_multitimeline(plot: Plot | None = None, **kwargs) -> Plot:
+    """Create a plot with multiple parallel timelines.
 
+    Parameters
+    ----------
+    plot : `Plot` | `None`, optional
+        Instance of `bokeh.models.Plot` onto which to put the plots,
+        by default ``None``.
+    **kwargs : `dict`:
+        Keyword arguments suppled to this function map directly to the `key`
+        member of subclasses of `schedview.plot.Timeline`. For example,
+        if you assign data to the `foo` keyword argument of this function,
+        it will search for a subclass of
+        `schedview.plot.timeline.TimelinePlotter` with `foo` as the value of
+        it`s `key` attribute, and use that to create the timeline for that
+        data.
+
+    Returns
+    -------
+    plot : `Plot`
+        Instance of `bokeh.models.Plot` with the plots.
+    """
     # Map keyword arguments to the classes we will use to plot them
 
     # Recursive utility to get all descendents of the base class, not
@@ -719,6 +747,32 @@ def make_multitimeline(plot: Plot | None = None, **kwargs) -> Plot:
 
 
 def make_timeline_scatterplots(visits, visits_column="seeingFwhmEff", **kwargs):
+    """Create a figure with a timeline plot (as created by
+    `schedview.plot.timeline.make_multitimeline`) and a visit scatterplot
+    (as created by `schedview.plot.visits.plot_visit_param_vs_time`)
+    side-by-side.
+
+    Parameters
+    ----------
+    `visits`: `pandas.DataFrame`
+        One row per visit, as created by `schedview.collect.opsim.read_opsim`.
+    `column_name`: `str`
+        The name of the column to plot against time.
+    **kwargs : `dict`:
+        Keyword arguments suppled to this function map directly to the `key`
+        member of subclasses of `schedview.plot.Timeline`. For example,
+        if you assign data to the `foo` keyword argument of this function,
+        it will search for a subclass of
+        `schedview.plot.timeline.TimelinePlotter` with `foo` as the value of
+        it`s `key` attribute, and use that to create the timeline for that
+        data.
+
+    Returns
+    -------
+    element : `bokeh.models.ui.ui_element.UIElement`
+        The bokeh UI element with the side-by-side plots.
+    """
+
     timeline_plot = make_multitimeline(**kwargs)
 
     visit_plot = bokeh.plotting.figure(
