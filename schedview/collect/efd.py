@@ -1,10 +1,12 @@
+import asyncio
 import os
+import threading
 from collections import defaultdict
 from collections.abc import Iterable
 from functools import partial
+from warnings import warn
 
 import pandas as pd
-from lsst.summit.utils.efdUtils import makeEfdClient
 from lsst_efd_client import EfdClient
 
 from schedview.dayobs import DayObs
@@ -22,7 +24,16 @@ def _get_efd_client(efd: EfdClient | str | None) -> EfdClient:
         case str():
             efd_client = EfdClient(efd)
         case None:
-            efd_client = makeEfdClient()
+            try:
+                from lsst.summit.utils.efdUtils import makeEfdClient
+
+                efd_client = makeEfdClient()
+            except ModuleNotFoundError:
+                warn(
+                    "lsst.summit.utils not installed, "
+                    f"falling back on guessing the EFD client: {DEFAULT_EFD}"
+                )
+                efd_client = EfdClient(DEFAULT_EFD)
         case _:
             raise ValueError(f"Cannot translate a {type(efd)} to an EfdClient.")
 
@@ -138,4 +149,23 @@ async def query_latest_in_efd_topic(
 
     result = pd.concat(results) if len(results) > 0 else pd.DataFrame()
 
+    return result
+
+
+def sync_query_efd_topic_for_night(*args, **kwargs):
+    """Just like query_efd_topic_for_night, but run in a separate thread
+    and block for results, so it can be run within a separate event loop.
+    """
+    # Inspired by https://stackoverflow.com/questions/74703727
+    # Works even in a panel event loop
+    io_loop = asyncio.new_event_loop()
+    io_thread = threading.Thread(target=io_loop.run_forever, name="EFD query thread", daemon=True)
+
+    def run_async(coro):
+        if not io_thread.is_alive():
+            io_thread.start()
+        future = asyncio.run_coroutine_threadsafe(coro, io_loop)
+        return future.result()
+
+    result = run_async(query_efd_topic_for_night(*args, **kwargs))
     return result
