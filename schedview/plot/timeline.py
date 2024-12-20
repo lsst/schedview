@@ -71,7 +71,6 @@ class TimelinePlotter:
     jitter_width: float = 0.2
     default_figure_kwargs: dict = {
         "x_axis_type": "datetime",
-        "y_range": bokeh.models.FactorRange(),
     }
 
     def __init__(
@@ -105,7 +104,7 @@ class TimelinePlotter:
         the timeline.
         """
 
-        figure_kwargs = {}
+        figure_kwargs = {"y_range": bokeh.models.FactorRange()}
         figure_kwargs.update(cls.default_figure_kwargs)
         if cls.hovertext_column is not None and "tooltips" not in figure_kwargs:
             figure_kwargs["tooltips"] = "@" + cls.hovertext_column
