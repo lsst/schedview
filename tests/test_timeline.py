@@ -2,6 +2,7 @@ import asyncio
 import os
 import string
 import time
+import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -40,6 +41,11 @@ class TestTimelinePlotters(TestCase):
     num_events = 5
     rng = np.random.default_rng(6563)
 
+    @unittest.skip("Slow and depends on real consdb and EFD")
+    def test_example(self):
+        ui_element = asyncio.run(run_full_timeline_pipeline("2024-12-11"))
+        assert is_plottable_bokeh(ui_element)
+
     def test_plot(self):
         mjds = self.rng.uniform(61000.2, 61001.4, self.num_events)
         data = {
@@ -48,8 +54,3 @@ class TestTimelinePlotters(TestCase):
         }
         plotter = TimelinePlotter(data)
         assert is_plottable_bokeh(plotter.plot)
-
-    #    @unittest.skip("Slow and depends on real consdb and EFD")
-    def test_example(self):
-        ui_element = asyncio.run(run_full_timeline_pipeline("2024-12-11"))
-        assert is_plottable_bokeh(ui_element)
