@@ -1,3 +1,5 @@
+import asyncio
+import threading
 from datetime import date
 
 import astropy.utils.iers
@@ -5,53 +7,99 @@ import panel as pn
 import param
 
 from schedview import DayObs
-from schedview.collect.nightreport import get_night_narrative
-from schedview.collect.visits import read_visits
+from schedview.collect.efd import SAL_INDEX_GUESSES
+from schedview.collect.timeline import collect_timeline_data
+from schedview.compute.astro import get_median_model_sky, night_events
+from schedview.compute.obsblocks import compute_block_spans
 from schedview.plot import make_timeline_scatterplots
 
 
 class CombinedTimelineDashboard(param.Parameterized):
 
     # Parameters set in the UI
-    night = param.Date(
-        default=date.today(),
+    evening_date = param.Date(
+        default=date(2024, 12, 10),
         label="Date",
         doc="Day obs (local calendar date of sunset for the night)",
     )
     telescope = param.String(default="Simonyi", label="Telescope", doc="Telescope name")
     visit_origin = param.String(default="lsstcomcam", label="Instrument", doc="Instrument")
-    jitter = param.Boolean(default=False, label="Jitter", doc="Jitter the timelines")
 
     # Derived parameters
     day_obs = param.Parameter()
-    log_messages = param.Parameter()
-    visits = param.Parameter()
+    events = param.Parameter()
 
-    @param.depends("night", watch=True)
+    @param.depends("evening_date", watch=True)
     def update_day_obs(self):
-        self.day_obs = DayObs(self.night)
+        evening_date = self.evening_date
+        assert isinstance(evening_date, date)
+        self.day_obs = DayObs(evening_date)
 
-    @param.depends("telescope", "day_obs", watch=True)
-    def update_log_messages(self):
-        self.log_messages = get_night_narrative(self.day_obs, self.telescope)
+    @param.depends("telescope", "day_obs", "visit_origin", watch=True)
+    def update_events(self):
+        day_obs = self.day_obs
+        assert isinstance(day_obs, DayObs)
 
-    @param.depends("day_obs", "visit_origin", watch=True)
-    def update_visits(self):
-        self.visits = read_visits(self.day_obs, self.visit_origin)
+        visit_origin = self.visit_origin
+        assert isinstance(visit_origin, str)
 
-    @param.depends("log_messages", "visits", "jitter")
+        sal_indexes = tuple(SAL_INDEX_GUESSES[visit_origin])
+
+        async def collect_these_timeline_data():
+            events = await collect_timeline_data(
+                day_obs,
+                sal_indexes=sal_indexes,
+                telescope="Simonyi",
+                visit_origin="lsstcomcam",
+                visits=True,
+                log_messages=True,
+                scheduler_dependencies=True,
+                scheduler_configuration=True,
+                block_status=True,
+                scheduler_snapshots=True,
+            )
+            return events
+
+        # Inspired by
+        # https://stackoverflow.com/questions/74703727/how-to-call-async-function-from-sync-funcion-and-get-result-while-a-loop-is-alr
+        io_loop = asyncio.new_event_loop()
+        io_thread = threading.Thread(target=io_loop.run_forever, name="Async Runner", daemon=True)
+
+        def run_async(coro):
+            if not io_thread.is_alive():
+                io_thread.start()
+            future = asyncio.run_coroutine_threadsafe(coro, io_loop)
+            return future.result()
+
+        events = run_async(collect_these_timeline_data())
+
+        events["block_spans"] = compute_block_spans(events["block_status"])
+        events["median_model_sky"] = get_median_model_sky(day_obs)
+        events["sun"] = night_events(day_obs.date)
+        self.events = events
+
+    @param.depends("events")
     def event_timeline(self):
-        ui_element = make_timeline_scatterplots(
-            log_messages=self.log_messages, visits=self.visits, jitter=self.jitter
-        )
+        events = self.events
+        if events is None:
+            events = {}
+
+        assert isinstance(events, dict)
+
+        # Extract visits from **events to avoid confusing type checking.
+        visits = events["visits"]
+        del events["visits"]
+        ui_element = make_timeline_scatterplots(visits=visits, **events)
+
         return ui_element
 
     def make_app(self):
+        self.param.trigger("evening_date")
         app = pn.Column(
             pn.Param(
                 self,
-                parameters=["night", "telescope", "visit_origin", "jitter"],
-                widgets={"night": pn.widgets.DatePicker},
+                parameters=["evening_date", "telescope", "visit_origin"],
+                widgets={"evening_date": pn.widgets.DatePicker},
             ),
             pn.param.ParamMethod(self.event_timeline, loading_indicator=True),
         )
