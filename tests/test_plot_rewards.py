@@ -24,11 +24,11 @@ class TestPlotRewards(unittest.TestCase):
         # Even though this seems unnecessary given the filename argument used
         # in verify_can_plot, without it tests fail when they are run in CI
         # by github (but run locally).
-        saved_html_fname = cls.temp_path.joinpath(f"test_plot_rewards_{time.time()}.html").name
+        saved_html_fname = str(cls.temp_path.joinpath(f"test_plot_rewards_{time.time()}.html"))
         bokeh.plotting.output_file(filename=saved_html_fname, title="This Test Page")
 
     def verify_can_plot(self, plot):
-        saved_html_fname = self.temp_path.joinpath(f"can_verify_plot_test_{time.time()}.html").name
+        saved_html_fname = str(self.temp_path.joinpath(f"can_verify_plot_test_{time.time()}.html"))
         bokeh.io.save(plot, filename=saved_html_fname)
         waited_time_seconds = 0
         while waited_time_seconds < WRITE_TIMEOUT_SECONDS and not os.path.isfile(saved_html_fname):
