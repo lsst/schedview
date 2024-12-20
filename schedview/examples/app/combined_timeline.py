@@ -13,6 +13,9 @@ from schedview.compute.astro import get_median_model_sky, night_events
 from schedview.compute.obsblocks import compute_block_spans
 from schedview.plot import make_timeline_scatterplots
 
+IO_LOOP = asyncio.new_event_loop()
+IO_THREAD = threading.Thread(target=IO_LOOP.run_forever, name="Timeline IO thread", daemon=True)
+
 
 class CombinedTimelineDashboard(param.Parameterized):
 
@@ -28,6 +31,18 @@ class CombinedTimelineDashboard(param.Parameterized):
     # Derived parameters
     day_obs = param.Parameter()
     events = param.Parameter()
+
+    def _run_async_io(self, io_coroutine):
+        # Run the async io (needed for the EFD) in a separate thread and
+        # block while waiting for it to finish.
+        # This will avoid issues with the panel event loop.
+        # See https://stackoverflow.com/a/74710015
+        if not IO_THREAD.is_alive():
+            IO_THREAD.start()
+
+        result = asyncio.run_coroutine_threadsafe(io_coroutine, IO_LOOP).result()
+
+        return result
 
     @param.depends("evening_date", watch=True)
     def update_day_obs(self):
@@ -45,8 +60,14 @@ class CombinedTimelineDashboard(param.Parameterized):
 
         sal_indexes = tuple(SAL_INDEX_GUESSES[visit_origin])
 
-        async def collect_these_timeline_data():
-            events = await collect_timeline_data(
+        # The EFD queries called by collect_timeline_data run
+        # asynchronously, and interactions with panel's io loop
+        # are subtle.
+        # Call the async loop in a separate thread, and block until
+        # it's done.
+        # See https://stackoverflow.com/a/74710015
+        events = self._run_async_io(
+            collect_timeline_data(
                 day_obs,
                 sal_indexes=sal_indexes,
                 telescope="Simonyi",
@@ -58,20 +79,7 @@ class CombinedTimelineDashboard(param.Parameterized):
                 block_status=True,
                 scheduler_snapshots=True,
             )
-            return events
-
-        # Inspired by
-        # https://stackoverflow.com/questions/74703727/how-to-call-async-function-from-sync-funcion-and-get-result-while-a-loop-is-alr
-        io_loop = asyncio.new_event_loop()
-        io_thread = threading.Thread(target=io_loop.run_forever, name="Async Runner", daemon=True)
-
-        def run_async(coro):
-            if not io_thread.is_alive():
-                io_thread.start()
-            future = asyncio.run_coroutine_threadsafe(coro, io_loop)
-            return future.result()
-
-        events = run_async(collect_these_timeline_data())
+        )
 
         events["block_spans"] = compute_block_spans(events["block_status"])
         events["median_model_sky"] = get_median_model_sky(day_obs)
