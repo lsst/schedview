@@ -47,7 +47,7 @@ class TimelinePlotter:
     a timeline plot: the key attribute of a subclass of TimelinePlotter
     becomes a keyword argument to ``make_multitimeline``."""
 
-    hovertext_column: str | None = None
+    hovertext_column: str = "hovertext"
     """Column name for hovertext text, ``None`` for no hovertext."""
 
     time_column: str = "time"
@@ -251,7 +251,6 @@ class LogMessageTimelinePlotter(TimelinePlotter):
     """
 
     key: str = "log_messages"
-    hovertext_column: str | None = "html"
     time_column: str = "date_added"
     factor: str = "Log messages"
 
@@ -327,19 +326,16 @@ class LogMessageTimelineSpanPlotter(LogMessageTimelinePlotter):
 class SchedulerDependenciesTimelinePlotter(TimelinePlotter):
     key: str = "scheduler_dependencies"
     factor: str = "Scheduler dependencies"
-    hovertext_column: str | None = "html"
 
 
 class SchedulerConfigurationTimelinePlotter(TimelinePlotter):
     key: str = "scheduler_configuration"
     factor: str = "Scheduler configuration"
-    hovertext_column: str | None = "html"
 
 
 class SchedulerStapshotTimelinePlotter(TimelinePlotter):
     key: str = "scheduler_snapshots"
     factor: str = "Scheduler snapshots"
-    hovertext_column: str | None = "html"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -354,7 +350,6 @@ class SchedulerStapshotTimelinePlotter(TimelinePlotter):
 class BlockStatusTimelinePlotter(TimelinePlotter):
     key: str = "block_status"
     factor: str = "Block status"
-    hovertext_column: str | None = "html"
 
     @classmethod
     def _make_hovertext(cls, row_data: pd.Series) -> str:
@@ -438,7 +433,6 @@ class VisitTimelinePlotter(TimelinePlotter):
     glyph_class: type = bokeh.models.HBar
     time_column: str = "obs_start"
     height: float = 0.025
-    hovertext_column: str | None = "html"
     hovertext_rows: list[str] = [
         "visit_id",
         "exposure_name",
@@ -518,11 +512,11 @@ class SunTimelinePlotter(TimelinePlotter):
             "sunrise",
         ]
         period_names = [
-            "twilight",
-            "astronomical",
+            "civil & nautical twilight",
+            "astronomical twilight",
             "night",
-            "astronomical",
-            "twilight",
+            "astronomical twilight",
+            "civil & nautical twilight",
         ]
 
         source = ColumnDataSource(
@@ -533,6 +527,14 @@ class SunTimelinePlotter(TimelinePlotter):
                 "factor": [cls.factor] * 5,
             },
         )
+
+        source.data[cls.hovertext_column] = [
+            f"""<h2>{r['period']}</h2>
+            <table><tr><th>Start</th><td>{r['start_time'].strftime("%Y-%m-%d %H:%M:%SZ")}</td></tr>
+            <tr><th>End</th><td>{r['end_time'].strftime("%Y-%m-%d %H:%M:%SZ")}</td></tr></table>"""
+            for _, r in source.to_df().iterrows()
+        ]
+
         return source
 
     @property
@@ -541,7 +543,7 @@ class SunTimelinePlotter(TimelinePlotter):
         cmap = bokeh.transform.factor_cmap(
             "period",
             palette=["lightblue", "blue", "black"],
-            factors=["twilight", "astronomical", "night"],
+            factors=["civil & nautical twilight", "astronomical twilight", "night"],
         )
 
         glyph_kwargs = {
@@ -558,7 +560,6 @@ class SunTimelinePlotter(TimelinePlotter):
 class ScriptQueueLogeventScriptTimelinePlotter(TimelinePlotter):
     key: str = "script_queue_logevent_script"
     factor: str = "Script queue"
-    hovertext_column: str | None = "html"
     time_column: str = "first_logevent_time"
 
     @classmethod
@@ -649,7 +650,6 @@ class ScriptQueueLogeventScriptSpanTimelinePlotter(ScriptQueueLogeventScriptTime
 class ModelSkyTimelinePlotter(TimelinePlotter):
     key: str = "model_sky"
     factor: str = "Med. model sky"
-    hovertext_column: str | None = "html"
     glyph_class: type = bokeh.models.HBar
     height: float = 0.2
     band: str = "r"
@@ -738,6 +738,7 @@ def make_multitimeline(plot: Plot | None = None, **kwargs) -> Plot:
         except KeyError:
             # If we have not defined a subclass, attempt to use the
             # generic one.
+            print(f"GENERIC for {key}!")
             cls = TimelinePlotter
         timeline_plotter = cls(data, plot=plot)
         plot = timeline_plotter.plot
