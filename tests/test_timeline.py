@@ -177,12 +177,12 @@ class TestTimelinePlotters(TestCase):
         assert is_plottable_bokeh(plotter.plot)
 
     def test_sun_timeline_plotter(self):
-        events = night_events(DayObs.from_date("2025-01-01").date)
+        events = night_events(DayObs.from_date("2025-11-21").date)
         plotter = SunTimelinePlotter(events)
         assert is_plottable_bokeh(plotter.plot)
 
     def test_model_sky_timeline_plotter(self):
-        median_model_sky = get_median_model_sky(DayObs.from_date("2025-01-01"))
+        median_model_sky = get_median_model_sky(DayObs.from_date("2025-11-21"))
         plotter = ModelSkyTimelinePlotter(median_model_sky)
         assert is_plottable_bokeh(plotter.plot)
 
