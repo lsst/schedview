@@ -69,7 +69,7 @@ class TestTimelinePlotters(TestCase):
 
     @unittest.skip("Slow and depends on real consdb and EFD")
     def test_example(self):
-        ui_element = asyncio.run(run_full_timeline_pipeline("2024-12-11"))
+        ui_element = asyncio.run(run_full_timeline_pipeline("2025-11-21"))
         assert is_plottable_bokeh(ui_element)
 
     def test_generic_plotter(self):
