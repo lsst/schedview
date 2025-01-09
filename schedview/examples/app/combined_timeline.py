@@ -84,7 +84,8 @@ class CombinedTimelineDashboard(param.Parameterized):
         )
 
         events["block_spans"] = compute_block_spans(events["block_status"])
-        events["median_model_sky"] = get_median_model_sky(day_obs)
+        events["visit_timeline"] = events["visits"]
+        events["model_sky"] = get_median_model_sky(day_obs)
         events["sun"] = night_events(day_obs.date)
         self.events = events
 
