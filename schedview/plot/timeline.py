@@ -1,3 +1,36 @@
+"""Module for creating timelines.
+
+Tools for creating timelines of sequences of events.
+
+Notes
+-----
+
+The ``TimelinePlotter`` base class creates a generic timeline from a
+``bokeh.models.ColumnDataSource`` or a ``pandas.DataFrame``, ``dict``, or
+``list`` that can be converted to ``bokeh.models.ColumnDataSource`` by the
+`ColumnDataSource constructor`_. It must contain a ``time`` column, and it
+produces a simple timeline where each row is represented by a diamond on a
+timeline.
+
+.. _`ColumnDataSource constructor`:
+    https://docs.bokeh.org/en/latest/docs/reference/models/sources.html#bokeh.models.ColumnDataSource
+
+Subclasses of ``TimelinePlotter`` tune the timeline plots to different kinds
+of data.  Some customizations are simple: changing the factor used to
+represent timeline (vertical horizontal line on the plot), the columns used
+for time and any hovertext, the bokeh glyph used to represent the data,
+and parameter used by that glyph are all specified by simple class attributes
+that can be overriden by child classes; see the docstrings for the attributes
+of the ``TimelinePlotter`` base class.
+
+More complex changes can be achieved through overriding methods of
+``TimelinePlotter``, including replacing how the
+``bokeh.models.ColumnDataSource`` is derived from the data argument, how
+hovertext is constructed, setting glyph keyword arguments based on data values,
+and splitting data from a single source across multiple factors (resulting
+in multiple parallel timelines on the same plot).
+"""
+
 import json
 import pprint
 from functools import cached_property
@@ -48,7 +81,7 @@ class TimelinePlotter:
     becomes a keyword argument to ``make_multitimeline``."""
 
     hovertext_column: str = "hovertext"
-    """Column name for hovertext text, ``None`` for no hovertext."""
+    """Column name for hovertext text."""
 
     time_column: str = "time"
     """Column used to place points along the timeline. Some subclasses
@@ -699,7 +732,8 @@ def make_multitimeline(plot: Plot | None = None, **kwargs) -> Plot:
         Instance of `bokeh.models.Plot` onto which to put the plots,
         by default ``None``.
     **kwargs : `dict`:
-        Keyword arguments suppled to this function map directly to the `key`
+        Keyword arguments suppled to this function map supply tho data
+        to be plotted as timelines. Each keyword maps directly to the `key`
         member of subclasses of `schedview.plot.Timeline`. For example,
         if you assign data to the `foo` keyword argument of this function,
         it will search for a subclass of
@@ -711,11 +745,68 @@ def make_multitimeline(plot: Plot | None = None, **kwargs) -> Plot:
     -------
     plot : `Plot`
         Instance of `bokeh.models.Plot` with the plots.
+
+    Examples
+    --------
+
+    ``make_multitimeline`` creates plots using the ``TimelinePlotter``
+    class or one of its subclasses. Arguments to ``make_multitimeline`` provide
+    the data for these timelines. The names of these arguments (that is,
+    keys of ``**kwargs``) determine which sublclasse of ``TimelinePlotter``
+    gets used by ``make_timelineplotter`` to plot the assigned data.
+
+    For example, let's plot ``egg`` and ``ham`` event data. Begin by
+    importing the necessary modules:
+
+    >>> from schedview.plot.timeline import TimelinePlotter, make_multitimeline
+    >>> from astropy.time import Time
+    >>> import pandas as pd
+    >>> import bokeh.plotting
+
+
+    Now, create some egg and hame data:
+    >>> egg_data = pd.DataFrame({
+    ...     'time': Time(
+    ...         [61000.2, 61000.22, 61000.45], format='mjd').datetime64,
+    ...     'n': [1, 2, 42]
+    ... })
+    >>> ham_data = pd.DataFrame({
+    ...    'ham_time': Time(
+    ...        [61000.3, 61000.35, 61000.37], format='mjd').datetime64,
+    ...     'm': [10, 20, 33]
+    ... })
+
+
+    Create some costom subclasses of ``TimelinePlotter`` for plotting ``egg``
+    and ``ham`` data:
+    >>> class EggTimelinePlotter(TimelinePlotter):
+    ...     key = 'eggs'
+    ...     factor = 'Egg events'
+    ...
+    >>> class HamTimelinePlotter(TimelinePlotter):
+    ...     key = 'ham'
+    ...     factor = 'Ham events'
+    ...     time_column = 'ham_time'
+    ...
+
+    Now, we can call ``make_multitimeline`` to create a plot in which there
+    are two parallel horizontal timelines, one for eggs, and one for ham, with
+    each of these horizontal timelines named with the string assigned to
+    the ``factor`` class attribute in the above defined subclasses of
+    ``TimelinePlotter``: ``Egg events`` and ``Ham events``, for ham and egg
+    data, respectively.
+    >>> p = make_multitimeline(eggs=egg_data, ham=ham_data)
+    >>> bokeh.plotting.output_file('/tmp/egg_ham_timelines.html')
+    >>> bokeh.plotting.save(p)
+    '/tmp/egg_ham_timelines.html'
+
+    Note the that keyword arguments to ``make_multitimeline`` correspond to the
+    ``key`` attributes of ``EggTimelinePlotter`` and ``HamTimelinePlotter``.
     """
     # Map keyword arguments to the classes we will use to plot them
 
     # Recursive utility to get all descendents of the base class, not
-    # just direct childer.
+    # just direct children.
     def get_descendents(cls):
         found_descendents = set(cls.__subclasses__())
         for direct_descendent in cls.__subclasses__():
