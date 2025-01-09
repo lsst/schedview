@@ -55,6 +55,8 @@ class CombinedTimelineDashboard(param.Parameterized):
         day_obs = self.day_obs
         assert isinstance(day_obs, DayObs)
 
+        telescope = self.telescope
+
         visit_origin = self.visit_origin
         assert isinstance(visit_origin, str)
 
@@ -70,8 +72,8 @@ class CombinedTimelineDashboard(param.Parameterized):
             collect_timeline_data(
                 day_obs,
                 sal_indexes=sal_indexes,
-                telescope="Simonyi",
-                visit_origin="lsstcomcam",
+                telescope=telescope,
+                visit_origin=visit_origin,
                 visits=True,
                 log_messages=True,
                 scheduler_dependencies=True,
