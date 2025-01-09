@@ -34,6 +34,12 @@ def _get_efd_client(efd: EfdClient | str | None) -> EfdClient:
                     f"falling back on guessing the EFD client: {DEFAULT_EFD}"
                 )
                 efd_client = EfdClient(DEFAULT_EFD)
+            except RuntimeError:
+                warn(
+                    "lsst.summit.utils cannot automatically determine which EFD to use on this host, "
+                    f"falling back on guessing the EFD client: {DEFAULT_EFD}"
+                )
+                efd_client = EfdClient(DEFAULT_EFD)
         case _:
             raise ValueError(f"Cannot translate a {type(efd)} to an EfdClient.")
 
