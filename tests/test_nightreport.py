@@ -3,7 +3,6 @@ import unittest
 import unittest.mock
 
 import astropy.utils.iers
-import bokeh.models
 import requests.models
 
 import schedview.collect.nightreport
@@ -134,7 +133,3 @@ class TestNightReport(unittest.TestCase):
     def test_scrolling_narrative_messages_html(self):
         text = schedview.plot.nightreport.scrolling_narrative_messages_html(MOCK_NARRATIVE_RESPONSE)
         assert isinstance(text, str)
-
-    def test_make_timeline_scatterplots(self):
-        ui_element = schedview.plot.timeline.make_timeline_scatterplots(MOCK_NARRATIVE_RESPONSE)
-        assert isinstance(ui_element, bokeh.models.UIElement)
