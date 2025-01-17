@@ -2,6 +2,7 @@ name: schedview
 channels:
  - conda-forge
 dependencies:
+ - tabulate
  - rubin-scheduler
  - bokeh
  - pytest-flake8
