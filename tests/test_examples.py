@@ -13,6 +13,7 @@ from schedview.examples.gaps import make_gaps
 from schedview.examples.horizonplot import make_horizon_plot
 from schedview.examples.nightevents import make_night_events
 from schedview.examples.visitmap import make_visit_map
+from schedview.examples.visitparam import make_visit_param_vs_time_plot
 
 astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
 
@@ -54,4 +55,10 @@ class TestExamples(unittest.TestCase):
         with TemporaryDirectory() as dir:
             report = Path(dir).joinpath("horizonplot.html").name
             make_horizon_plot(TEST_ISO_DATE, "baseline", report=report)
+            assert os.path.exists(report)
+
+    def test_visitparam(self):
+        with TemporaryDirectory() as dir:
+            report = Path(dir).joinpath("visitparam.html").name
+            make_visit_param_vs_time_plot(TEST_ISO_DATE, "baseline", report=report)
             assert os.path.exists(report)

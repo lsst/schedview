@@ -12,12 +12,12 @@ import schedview.plot.nightly
 from schedview.dayobs import DayObs
 
 
-def make_horizon_plot(
+def make_visit_param_vs_time_plot(
     iso_date: str,
     visit_source: str,
     report: None | str = None,
 ) -> bokeh.models.UIElement:
-    """Create an horzon (alt/az) plot for a given night.
+    """Create an interative scatter plot of visit params vs time.
 
     Parameters
     ----------
@@ -45,7 +45,9 @@ def make_horizon_plot(
     )
 
     # Plot
-    result: bokeh.models.UIElement = schedview.plot.nightly.plot_polar_alt_az(visits=visits)
+    result: bokeh.models.UIElement = schedview.plot.plot_visit_param_vs_time(
+        visits, "moonDistance", show_column_selector=True
+    )
 
     # Report
     if report is not None:
@@ -57,7 +59,7 @@ def make_horizon_plot(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog="horizonplot", description="Write an html file a plot of alt and az."
+        prog="visitparam", description="Write an html file a plot visit parameter vs. time."
     )
     parser.add_argument("date", type=str, help="Evening YYYY-MM-DD")
     parser.add_argument(
@@ -68,4 +70,4 @@ if __name__ == "__main__":
 
     astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
 
-    make_horizon_plot(args.date, args.visit_source, report=args.report)
+    make_visit_param_vs_time_plot(args.date, args.visit_source, report=args.report)
