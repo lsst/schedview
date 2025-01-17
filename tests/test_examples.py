@@ -10,6 +10,7 @@ from rubin_scheduler.utils import SURVEY_START_MJD
 
 from schedview.dayobs import DayObs
 from schedview.examples.altplot import make_alt_vs_time_plot
+from schedview.examples.bfrewards import make_basis_function_reward_plot
 from schedview.examples.gaps import make_gaps
 from schedview.examples.horizonplot import make_horizon_plot
 from schedview.examples.nightevents import make_night_events
@@ -72,4 +73,13 @@ class TestExamples(unittest.TestCase):
                 importlib.resources.files("schedview").joinpath("data").joinpath("sample_rewards.h5")
             )
             make_survey_reward_plot(TEST_ISO_DATE, rewards_uri, report=report)
+            assert os.path.exists(report)
+
+    def test_bfrewards(self):
+        with TemporaryDirectory() as dir:
+            report = Path(dir).joinpath("surveyrewards.html").name
+            rewards_uri: str = str(
+                importlib.resources.files("schedview").joinpath("data").joinpath("sample_rewards.h5")
+            )
+            make_basis_function_reward_plot(TEST_ISO_DATE, rewards_uri, report=report)
             assert os.path.exists(report)
