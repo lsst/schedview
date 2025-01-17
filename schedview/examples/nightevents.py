@@ -18,7 +18,8 @@ def make_night_events(
     Parameters
     ----------
     iso_date : `str`
-        Local calendar date of the evening on which the night starts.
+        Local calendar date of the evening on which the night starts,
+        in YYYY-MM-DD (ISO 8601) format.
     report : `None` | `str`, optional
         Report file name, by default ``None`` (to not write to a file).
 

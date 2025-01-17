@@ -3,6 +3,7 @@ from lsst.resources import ResourcePath
 from rubin_scheduler.utils import ddf_locations
 from rubin_scheduler.utils.consdb import KNOWN_INSTRUMENTS
 from rubin_sim import maf
+from rubin_sim.data import get_baseline
 
 from schedview import DayObs
 
@@ -44,7 +45,10 @@ def read_visits(
             num_nights=num_nights,
         )
     else:
-        baseline_opsim_rp = ResourcePath(OPSIMDB_TEMPLATE.format(sim_version=visit_source))
+        if visit_source == "baseline":
+            baseline_opsim_rp = ResourcePath(get_baseline())
+        else:
+            baseline_opsim_rp = ResourcePath(OPSIMDB_TEMPLATE.format(sim_version=visit_source))
         mjd: int = DayObs.from_date(day_obs).mjd
         visits = read_opsim(
             baseline_opsim_rp,
