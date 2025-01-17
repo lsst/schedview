@@ -1,3 +1,4 @@
+import importlib.resources
 import os
 import unittest
 from pathlib import Path
@@ -12,6 +13,7 @@ from schedview.examples.altplot import make_alt_vs_time_plot
 from schedview.examples.gaps import make_gaps
 from schedview.examples.horizonplot import make_horizon_plot
 from schedview.examples.nightevents import make_night_events
+from schedview.examples.surveyrewards import make_survey_reward_plot
 from schedview.examples.visitmap import make_visit_map
 from schedview.examples.visitparam import make_visit_param_vs_time_plot
 
@@ -61,4 +63,13 @@ class TestExamples(unittest.TestCase):
         with TemporaryDirectory() as dir:
             report = Path(dir).joinpath("visitparam.html").name
             make_visit_param_vs_time_plot(TEST_ISO_DATE, "baseline", report=report)
+            assert os.path.exists(report)
+
+    def test_surveyrewards(self):
+        with TemporaryDirectory() as dir:
+            report = Path(dir).joinpath("surveyrewards.html").name
+            rewards_uri: str = str(
+                importlib.resources.files("schedview").joinpath("data").joinpath("sample_rewards.h5")
+            )
+            make_survey_reward_plot(TEST_ISO_DATE, rewards_uri, report=report)
             assert os.path.exists(report)
