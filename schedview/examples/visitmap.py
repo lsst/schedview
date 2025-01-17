@@ -79,7 +79,7 @@ if __name__ == "__main__":
         "visit_source", type=str, default="lsstcomcam", help="Instrument or baseline version number"
     )
     parser.add_argument("report", type=str, help="output file name")
-    parser.add_argument("--nside", type=int, default=32, help="nside of map to show")
+    parser.add_argument("--nside", type=int, default=16, help="nside of map to show")
     args = parser.parse_args()
 
     astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
