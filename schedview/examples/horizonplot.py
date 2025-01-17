@@ -7,17 +7,17 @@ import bokeh.models
 import pandas as pd
 
 import schedview.collect.visits
-import schedview.compute.visits
 import schedview.plot
+import schedview.plot.nightly
 from schedview.dayobs import DayObs
 
 
-def make_alt_vs_time_plot(
+def make_horizon_plot(
     iso_date: str,
     visit_source: str,
     report: None | str = None,
 ) -> bokeh.models.UIElement:
-    """Create an alt vs. time plot for a given night.
+    """Create an horzon (alt/az) plot for a given night.
 
     Parameters
     ----------
@@ -39,15 +39,13 @@ def make_alt_vs_time_plot(
     day_obs: DayObs = DayObs.from_date(iso_date)
 
     # Collect
-    visits: pd.DataFrame = schedview.collect.visits.read_visits(day_obs, visit_source)
-
-    # Compute
-    night_events: pd.DataFrame = schedview.compute.astro.night_events(day_obs.date)
+    visits: pd.DataFrame = schedview.collect.visits.read_visits(
+        day_obs,
+        visit_source,  # stackers=schedview.collect.visits.NIGHT_STACKERS
+    )
 
     # Plot
-    result: bokeh.models.UIElement = schedview.plot.nightly.plot_alt_vs_time(
-        visits=visits, almanac_events=night_events
-    )
+    result: bokeh.models.UIElement = schedview.plot.nightly.plot_polar_alt_az(visits=visits)
 
     # Report
     if report is not None:
@@ -58,7 +56,9 @@ def make_alt_vs_time_plot(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="altplot", description="Write an html file a plot of alt vs. time.")
+    parser = argparse.ArgumentParser(
+        prog="horizonplot", description="Write an html file a plot of alt and az."
+    )
     parser.add_argument("date", type=str, help="Evening YYYY-MM-DD")
     parser.add_argument(
         "visit_source", type=str, default="lsstcomcam", help="Instrument or baseline version number"
@@ -68,4 +68,4 @@ if __name__ == "__main__":
 
     astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
 
-    make_alt_vs_time_plot(args.date, args.visit_source, report=args.report)
+    make_horizon_plot(args.date, args.visit_source, report=args.report)

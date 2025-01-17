@@ -10,6 +10,7 @@ from rubin_scheduler.utils import SURVEY_START_MJD
 from schedview.dayobs import DayObs
 from schedview.examples.altplot import make_alt_vs_time_plot
 from schedview.examples.gaps import make_gaps
+from schedview.examples.horizonplot import make_horizon_plot
 from schedview.examples.nightevents import make_night_events
 from schedview.examples.visitmap import make_visit_map
 
@@ -47,4 +48,10 @@ class TestExamples(unittest.TestCase):
         with TemporaryDirectory() as dir:
             report = Path(dir).joinpath("altplot.html").name
             make_alt_vs_time_plot(TEST_ISO_DATE, "baseline", report=report)
+            assert os.path.exists(report)
+
+    def test_horizonplot(self):
+        with TemporaryDirectory() as dir:
+            report = Path(dir).joinpath("horizonplot.html").name
+            make_horizon_plot(TEST_ISO_DATE, "baseline", report=report)
             assert os.path.exists(report)
