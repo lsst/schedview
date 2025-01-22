@@ -3,6 +3,7 @@ import os
 import threading
 from collections import defaultdict
 from collections.abc import Iterable
+from dataclasses import dataclass
 from functools import partial
 from warnings import warn
 
@@ -11,10 +12,101 @@ from lsst_efd_client import EfdClient
 
 from schedview.dayobs import DayObs
 
-DEFAULT_EFD = (
-    "summit_efd" if os.getenv("EXTERNAL_INSTANCE_URL", "") == "https://summit-lsp.lsst.codes" else "usdf_efd"
-)
+try:
+    from lsst.rsp import get_access_token
+except ImportError:
+
+    def get_access_token(token_file: str | None = None) -> str:
+        token = os.environ.get("ACCESS_TOKEN")
+        if token is None and token_file is not None:
+            with open("token_file", "r") as f:
+                token = f.read()
+
+        if not isinstance(token, str):
+            raise ValueError("No access token found.")
+
+        return token
+
+
 SAL_INDEX_GUESSES = defaultdict(partial([[]].__getitem__, 0), {"lsstcomcam": [1, 3], "latiss": [2]})
+
+
+@dataclass
+class ClientConnections:
+    base: str | None
+    efd: EfdClient
+    obsenv: EfdClient
+    auth: tuple[str, str]
+
+
+def get_clients() -> ClientConnections:
+    """Return site-specific client connections.
+
+    Returns
+    -------
+    client_connections : `ClientConnections`
+        A named tuple with the following fields:
+        - `base` : `str`
+            The base URL for the site.
+        - `efd` : `EfdClient`
+            The EFD client for the site.
+        - `obsenv` : `EfdClient`
+            The obsenv EFD client for the site.
+        - `auth` : `tuple`
+            The authentication type and token.
+    """
+    # Set up authentication
+    token = get_access_token()
+    auth = ("user", token)
+    # This authentication is for nightlog, exposurelog, nightreport currently
+    # But I think it's the same underlying info for EfdClient i.e.
+    # https://github.com/lsst/schedview/blob/e11fbd51ee5e22d11fef9a52f66dfcc082181cb6/schedview/app/scheduler_dashboard/influxdb_client.py
+
+    # let's do this like lsst.summit.utils.getSite but simpler
+    site = "UNKNOWN"
+    location = os.getenv("EXTERNAL_INSTANCE_URL", "")
+    if "tucson-teststand" in location:
+        site = "tucson"
+    elif "summit-lsp" in location:
+        site = "summit"
+    elif "base-lsp" in location:
+        site = "base"
+    elif "usdf-rsp" in location:
+        site = "usdf"
+    # If location not set, next step is to check hostname
+    elif location == "":
+        hostname = os.getenv("HOSTNAME", "")
+        interactiveNodes = ("sdfrome", "sdfiana")
+        if hostname.startswith(interactiveNodes):
+            site = "usdf"
+        elif hostname == "htcondor.ls.lsst.org":
+            site = "base"
+        elif hostname == "htcondor.cp.lsst.org":
+            site = "summit"
+
+    match site:
+        case "summit":
+            api_base = "https://summit-lsp.lsst.codes/"
+            efd_client = EfdClient("summit_efd")
+            obsenv_client = EfdClient("summit_efd", db_name="lsst.obsenv")
+        case "tucson":
+            api_base = None
+            efd_client = EfdClient("tucson_teststand_efd")
+            obsenv_client = EfdClient("tucson_teststand_efd", db_name="lsst.obsenv")
+        case "base":
+            api_base = "https://base-lsp.slac.lsst.codes/"
+            efd_client = EfdClient("base_efd")
+            obsenv_client = EfdClient("base_efd", db_name="lsst.obsenv")
+        case _:
+            if site != "usdf":
+                warn(f"Unknown site {site}, defaulting to usdf.")
+                site = "usdf"
+
+            efd_client = EfdClient("usdf_efd")
+            obsenv_client = EfdClient("usdf_efd", db_name="lsst.obsenv")
+            api_base = "https://usdf-rsp.slac.stanford.edu/"
+
+    return ClientConnections(api_base, efd_client, obsenv_client, auth)
 
 
 def _get_efd_client(efd: EfdClient | str | None) -> EfdClient:
@@ -24,22 +116,7 @@ def _get_efd_client(efd: EfdClient | str | None) -> EfdClient:
         case str():
             efd_client = EfdClient(efd)
         case None:
-            try:
-                from lsst.summit.utils.efdUtils import makeEfdClient
-
-                efd_client = makeEfdClient()
-            except ModuleNotFoundError:
-                warn(
-                    "lsst.summit.utils not installed, "
-                    f"falling back on guessing the EFD client: {DEFAULT_EFD}"
-                )
-                efd_client = EfdClient(DEFAULT_EFD)
-            except RuntimeError:
-                warn(
-                    "lsst.summit.utils cannot automatically determine which EFD to use on this host, "
-                    f"falling back on guessing the EFD client: {DEFAULT_EFD}"
-                )
-                efd_client = EfdClient(DEFAULT_EFD)
+            efd_client = get_clients().efd
         case _:
             raise ValueError(f"Cannot translate a {type(efd)} to an EfdClient.")
 

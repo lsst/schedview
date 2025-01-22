@@ -5,6 +5,8 @@ import requests
 
 from schedview.dayobs import DayObs
 
+from .efd import ClientConnections, get_clients
+
 MAX_RETRIES = 2
 
 EXCLUDED_COMPONENTS_FOR_TELESCOPE = {
@@ -13,13 +15,13 @@ EXCLUDED_COMPONENTS_FOR_TELESCOPE = {
 }
 
 
-def _get_with_retries(api_endpoint, params):
-    response = requests.get(api_endpoint, params)
+def _get_with_retries(api_endpoint, auth, params):
+    response = requests.get(api_endpoint, auth=auth, params=params)
     try_number = 1
     while not response.status_code == 200:
         if try_number > MAX_RETRIES:
             response.raise_for_status()
-        response = requests.get(api_endpoint, params)
+        response = requests.get(api_endpoint, auth=auth, params=params)
         try_number += 1
 
     return response.json()
@@ -28,7 +30,7 @@ def _get_with_retries(api_endpoint, params):
 def get_night_report(
     day_obs: DayObs | str | int,
     telescope: Literal["AuxTel", "Simonyi"],
-    api_endpoint: str = "https://usdf-rsp-dev.slac.stanford.edu/nightreport/reports",
+    user_client_connections: ClientConnections | None = None,
     user_params: dict | None = None,
 ) -> list[dict]:
     """Get the night report data for a night of observing.
@@ -39,9 +41,9 @@ def get_night_report(
         The night of observation.
     telescope : `str``
         The telescope for which to get the night report.
-    api_endpoint : `str`, optional
-        The URL for the source fo the night report,
-        by default "https://usdf-rsp-dev.slac.stanford.edu/nightreport/reports"
+    user_client_connections : `ClientConnections` | None, optional
+        The connections to the EFD and other services or None to infer
+        them from the environment. Defaults to None.
     user_params : `dict` | None, optional
         Extra parameters for the night report query
 
@@ -63,14 +65,20 @@ def get_night_report(
     if user_params is not None:
         params.update(user_params)
 
-    return _get_with_retries(api_endpoint, params)
+    client_connection: ClientConnections = (
+        get_clients() if user_client_connections is None else user_client_connections
+    )
+
+    assert isinstance(client_connection.base, str)
+    api_endpoint = "".join([client_connection.base, "nightreport/reports"])
+    return _get_with_retries(api_endpoint, auth=client_connection.auth, params=params)
 
 
 def get_night_narrative(
     day_obs: DayObs | str | int,
     telescope: Literal["AuxTel", "Simonyi"],
     night_only: bool = True,
-    api_endpoint: str = "https://usdf-rsp-dev.slac.stanford.edu/narrativelog/messages",
+    user_client_connections: ClientConnections | None = None,
     user_params: dict | None = None,
 ) -> list[dict]:
     """Get the log messages for a given dayobs.
@@ -83,9 +91,9 @@ def get_night_narrative(
         The telescope for which to get the night report.
     night_only: `bool` optional
         Include only messages between sunset and sunrise, by default True.
-    api_endpoint : `str`, optional
-        The URL for the source fo the night report, by default
-        "https://usdf-rsp-dev.slac.stanford.edu/narrativelog/messages"
+    user_client_connections : `ClientConnections` | None, optional
+        The connections to the EFD and other services or None to infer
+        them from the environment. Defaults to None.
     user_params : `dict` | None, optional
         Extra parameters for the narrativelog query
 
@@ -117,4 +125,10 @@ def get_night_narrative(
     if user_params is not None:
         params.update(user_params)
 
-    return _get_with_retries(api_endpoint, params)
+    client_connection: ClientConnections = (
+        get_clients() if user_client_connections is None else user_client_connections
+    )
+
+    assert isinstance(client_connection.base, str)
+    api_endpoint = "".join([client_connection.base, "narrativelog/messages"])
+    return _get_with_retries(api_endpoint, auth=client_connection.auth, params=params)
