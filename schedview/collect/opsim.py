@@ -212,7 +212,9 @@ def read_ddf_visits(
         The visits and their parameters.
     """
     ddf_field_names = tuple(ddf_locations().keys())
-    constraint = f"target IN {tuple(field_name for field_name in ddf_field_names)}"
+    # Note that this where clause is hard-coded for target_name (v4+)
+    # but other columns in query will be backwards-compatible.
+    constraint = f"target_name IN {tuple(field_name for field_name in ddf_field_names)}"
     visits = read_opsim(
         opsim_uri,
         start_time=start_time,
