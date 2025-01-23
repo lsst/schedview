@@ -211,16 +211,33 @@ def read_ddf_visits(
     visits : `pandas.DataFrame`
         The visits and their parameters.
     """
-    ddf_field_names = [f"DD:{field_name}" for field_name in ddf_locations().keys()]
-    # Note that this where clause is hard-coded for target_name (v4+)
-    # but other columns in query will be backwards-compatible.
-    constraint = f"target_name IN {tuple(field_name for field_name in ddf_field_names)}"
-    visits = read_opsim(
-        opsim_uri,
-        start_time=start_time,
-        end_time=end_time,
-        constraint=constraint,
-        dbcols=dbcols,
-        **kwargs,
-    )
+    try:
+        ddf_field_names = [f"DD:{field_name}" for field_name in ddf_locations().keys()]
+        # Note that this where clause is hard-coded for target_name (v4+)
+        # but other columns in query will be backwards-compatible.
+        constraint = f"target_name IN {tuple(field_name for field_name in ddf_field_names)}"
+        visits = read_opsim(
+            opsim_uri,
+            start_time=start_time,
+            end_time=end_time,
+            constraint=constraint,
+            dbcols=dbcols,
+            **kwargs,
+        )
+    except pd.errors.DatabaseError:
+        # Older database use 'target' not target_name and does not include DD
+        ddf_field_names = [f"{field_name}" for field_name in ddf_locations().keys()]
+        # Note that this where clause is hard-coded for target_name (v4+)
+        # but other columns in query will be backwards-compatible.
+        constraint = f"target IN {tuple(field_name for field_name in ddf_field_names)}"
+        visits = read_opsim(
+            opsim_uri,
+            start_time=start_time,
+            end_time=end_time,
+            constraint=constraint,
+            dbcols=dbcols,
+            **kwargs,
+        )
+        # There are even older databases which do not use target at all,
+        # but we'll leave those for now.
     return visits
