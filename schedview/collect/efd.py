@@ -1,16 +1,21 @@
 import asyncio
+import dataclasses
 import os
 import threading
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
+from typing import Literal
 from warnings import warn
 
 import pandas as pd
+import requests
 from lsst_efd_client import EfdClient
 
 from schedview.dayobs import DayObs
+
+EfdDatabase = Literal["efd", "obsenv"]
 
 try:
     from lsst.rsp import get_access_token
@@ -29,226 +34,256 @@ except ImportError:
 
 
 SAL_INDEX_GUESSES = defaultdict(partial([[]].__getitem__, 0), {"lsstcomcam": [1, 3], "latiss": [2]})
+BASE_URLS = {
+    "summit": "https://summit-lsp.lsst.codes/",
+    "tucson": None,
+    "base": "https://base-lsp.slac.lsst.codes/",
+    "usdf": "https://usdf-rsp.slac.stanford.edu/",
+    "usdf-dev": "https://usdf-rsp-dev.slac.stanford.edu/",
+    "UNKNOWN": "https://usdf-rsp.slac.stanford.edu/",
+}
+
+
+EFD_NAMES = {
+    "summit": "summit_efd",
+    "tucson": "tucson_efd",
+    "base": "base_efd",
+    "usdf": "usdf_efd",
+    "usdf-dev": "usdf_efd",
+    "UNKNOWN": "usdf_efd",
+}
+
+MAX_RETRIES = 2
 
 
 @dataclass
 class ClientConnections:
-    base: str | None
-    efd: EfdClient
-    obsenv: EfdClient
-    auth: tuple[str, str]
+    site: str | None = None
+    base: str | None = None
+    token: str | None = None
+    efd: EfdClient = dataclasses.field(init=False)
+    obsenv: EfdClient = dataclasses.field(init=False)
 
+    @property
+    def auth(self) -> tuple[str, str]:
+        if self.token is None:
+            raise ValueError("No auth token available.")
 
-def get_clients() -> ClientConnections:
-    """Return site-specific client connections.
+        return ("user", self.token)
 
-    Returns
-    -------
-    client_connections : `ClientConnections`
-        A named tuple with the following fields:
-        - `base` : `str`
-            The base URL for the site.
-        - `efd` : `EfdClient`
-            The EFD client for the site.
-        - `obsenv` : `EfdClient`
-            The obsenv EFD client for the site.
-        - `auth` : `tuple`
-            The authentication type and token.
-    """
-    # Set up authentication
-    token = get_access_token()
-    auth = ("user", token)
-    # This authentication is for nightlog, exposurelog, nightreport currently
-    # But I think it's the same underlying info for EfdClient i.e.
-    # https://github.com/lsst/schedview/blob/e11fbd51ee5e22d11fef9a52f66dfcc082181cb6/schedview/app/scheduler_dashboard/influxdb_client.py
+    def __post_init__(self):
+        # Set up authentication
+        if self.token is None:
+            self.token = get_access_token()
 
-    # let's do this like lsst.summit.utils.getSite but simpler
-    site = "UNKNOWN"
-    location = os.getenv("EXTERNAL_INSTANCE_URL", "")
-    if "tucson-teststand" in location:
-        site = "tucson"
-    elif "summit-lsp" in location:
-        site = "summit"
-    elif "base-lsp" in location:
-        site = "base"
-    elif "usdf-rsp" in location:
-        site = "usdf"
-    # If location not set, next step is to check hostname
-    elif location == "":
-        hostname = os.getenv("HOSTNAME", "")
-        interactiveNodes = ("sdfrome", "sdfiana")
-        if hostname.startswith(interactiveNodes):
-            site = "usdf"
-        elif hostname == "htcondor.ls.lsst.org":
-            site = "base"
-        elif hostname == "htcondor.cp.lsst.org":
-            site = "summit"
+        # This authentication is for nightlog, exposurelog,
+        # nightreport currently
+        # But I think it's the same underlying info for EfdClient i.e.
+        # https://github.com/lsst/schedview/blob/e11fbd51ee5e22d11fef9a52f66dfcc082181cb6/schedview/app/scheduler_dashboard/influxdb_client.py
 
-    match site:
-        case "summit":
-            api_base = "https://summit-lsp.lsst.codes/"
-            efd_client = EfdClient("summit_efd")
-            obsenv_client = EfdClient("summit_efd", db_name="lsst.obsenv")
-        case "tucson":
-            api_base = None
-            efd_client = EfdClient("tucson_teststand_efd")
-            obsenv_client = EfdClient("tucson_teststand_efd", db_name="lsst.obsenv")
-        case "base":
-            api_base = "https://base-lsp.slac.lsst.codes/"
-            efd_client = EfdClient("base_efd")
-            obsenv_client = EfdClient("base_efd", db_name="lsst.obsenv")
-        case _:
-            if site != "usdf":
-                warn(f"Unknown site {site}, defaulting to usdf.")
-                site = "usdf"
+        if self.site is None:
+            # Try figuring out the site from EXTERNAL_INSTANCE_URL
+            location = os.getenv("EXTERNAL_INSTANCE_URL", "")
+            if "tucson-teststand" in location:
+                self.site = "tucson"
+            elif "summit-lsp" in location:
+                self.site = "summit"
+            elif "base-lsp" in location:
+                self.site = "base"
+            elif "usdf-rsp" in location:
+                if "dev" in location:
+                    self.site = "usdf-dev"
+                else:
+                    self.site = "usdf"
+            else:
+                warn(f"Could not determine site from EXTERNAL_INSTANCE_URL {location}.")
 
-            efd_client = EfdClient("usdf_efd")
-            obsenv_client = EfdClient("usdf_efd", db_name="lsst.obsenv")
-            api_base = "https://usdf-rsp.slac.stanford.edu/"
+        if self.site is None:
+            # Try figuring out the site from the hostname
+            hostname = os.getenv("HOSTNAME", "")
+            interactiveNodes = ("sdfrome", "sdfiana")
+            if hostname.startswith(interactiveNodes):
+                self.site = "usdf"
+            elif hostname == "htcondor.ls.lsst.org":
+                self.site = "base"
+            elif hostname == "htcondor.cp.lsst.org":
+                self.site = "summit"
+            else:
+                warn(f"Could not deterime site from HOSTNAME {hostname}.")
 
-    return ClientConnections(api_base, efd_client, obsenv_client, auth)
+        if self.site is None and self.base is not None:
+            # Try figuring out the site from the base URL, if the user
+            # supplied one.
+            match self.base:
+                case "https://summit-lsp.lsst.codes/":
+                    self.site = "summit"
+                case "https://tucson-teststand.lsst.codes/":
+                    self.site = "tucson"
+                case "https://base-lsp.slac.lsst.codes/":
+                    self.site = "base"
+                case "https://usdf-rsp.slac.stanford.edu/":
+                    self.site = "usdf"
+                case "https://usdf-rsp-dev.slac.stanford.edu/":
+                    self.site = "usdf-dev"
+                case _:
+                    warn(f"Could not determine site from base {self.base}.")
 
+        if self.site is None:
+            self.site = "UNKNOWN"
 
-def _get_efd_client(efd: EfdClient | str | None) -> EfdClient:
-    match efd:
-        case EfdClient():
-            efd_client = efd
-        case str():
-            efd_client = EfdClient(efd)
-        case None:
-            efd_client = get_clients().efd
-        case _:
-            raise ValueError(f"Cannot translate a {type(efd)} to an EfdClient.")
+        if self.base is None:
+            if self.site in BASE_URLS:
+                self.base = BASE_URLS[self.site]
+            else:
+                warn(f"Unknown site {self.site}, defaulting to usdf base.")
+                self.base = "https://usdf-rsp.slac.stanford.edu/"
 
-    return efd_client
+        try:
+            efd_name = EFD_NAMES[self.site]
+        except KeyError:
+            efd_name = f"{self.site}_efd"
 
+        self.efd = EfdClient(efd_name)
+        self.obsenv = EfdClient(efd_name, db_name="lsst.obsenv")
 
-async def _get_efd_fields_for_topic(efd_client, topic, public_only=True):
-    fields = await efd_client.get_fields(topic)
-    if public_only:
-        fields = [f for f in fields if "private" not in f]
+    async def _get_efd_fields_for_topic(self, topic, public_only=True, database="efd"):
+        client = self.efd if database == "efd" else self.obsenv
 
-    return fields
+        fields = await client.get_fields(topic)
+        if public_only:
+            fields = [f for f in fields if "private" not in f]
 
+        return fields
 
-async def query_efd_topic_for_night(
-    topic: str,
-    day_obs: DayObs | str | int,
-    sal_indexes: tuple[int, ...] = (1, 2, 3),
-    efd: EfdClient | str | None = None,
-    fields: list[str] | None = None,
-) -> pd.DataFrame:
-    """Query and EFD topic for all entries on a night.
+    async def query_efd_topic_for_night(
+        self,
+        topic: str,
+        day_obs: DayObs | str | int,
+        sal_indexes: tuple[int, ...] = (1, 2, 3),
+        fields: list[str] | None = None,
+        database: EfdDatabase = "efd",
+    ) -> pd.DataFrame:
+        """Query and EFD topic for all entries on a night.
 
-    Parameters
-    ----------
-    topic : `str`
-        The topic to query
-    day_obs : `DayObs` or `str` or `int`
-        The date of the start of the night requested.
-    sal_indexes : `tuple[int, ...]`, optional
-        Which SAL indexes to query, by default (1, 2, 3).
-        Can be guessed by instrument with ``SAL_INDEX_GUESSES[instrument]``
-    efd : `EfdClient` or `str`  `None`, optional
-        The EFD client to use, by default None, which creates a new one
-        based on the environment.
-    fields : `list[str]` or `None`, optional
-        Fields to query from the topic, by default None, which queries all
-        fields.
+        Parameters
+        ----------
+        topic : `str`
+            The topic to query
+        day_obs : `DayObs` or `str` or `int`
+            The date of the start of the night requested.
+        sal_indexes : `tuple[int, ...]`, optional
+            Which SAL indexes to query, by default (1, 2, 3).
+            Can be guessed by instrument with ``SAL_INDEX_GUESSES[instrument]``
+        fields : `list[str]` or `None`, optional
+            Fields to query from the topic, by default None, which queries all
+            fields.
+        database : `str`, optional
+            Which EFD database to query: ``efd`` or ``obsenv``,
+            by default ``efd``.
 
-    Returns
-    -------
-    result : `pd.DataFrame`
-        The result of the query
-    """
+        Returns
+        -------
+        result : `pd.DataFrame`
+            The result of the query
+        """
 
-    day_obs = day_obs if isinstance(day_obs, DayObs) else DayObs.from_date(day_obs)
-    efd_client = _get_efd_client(efd)
+        day_obs = day_obs if isinstance(day_obs, DayObs) else DayObs.from_date(day_obs)
+        client = self.efd if database == "efd" else self.obsenv
 
-    if fields is None:
-        fields = await _get_efd_fields_for_topic(efd_client, topic)
+        if fields is None:
+            fields = await self._get_efd_fields_for_topic(topic, database=database)
 
-    if not isinstance(sal_indexes, Iterable):
-        sal_indexes = [sal_indexes]
+        if not isinstance(sal_indexes, Iterable):
+            sal_indexes = [sal_indexes]
 
-    results = []
-    for sal_index in sal_indexes:
-        result = await efd_client.select_time_series(
-            topic, fields, day_obs.start, day_obs.end, index=sal_index
-        )
-        if isinstance(result, pd.DataFrame) and len(result) > 0:
-            results.append(result)
+        results = []
+        for sal_index in sal_indexes:
+            result = await client.select_time_series(
+                topic, fields, day_obs.start, day_obs.end, index=sal_index
+            )
+            if isinstance(result, pd.DataFrame) and len(result) > 0:
+                results.append(result)
 
-    result = pd.concat(results) if len(results) > 0 else pd.DataFrame()
-    result.index.name = "time"
+        result = pd.concat(results) if len(results) > 0 else pd.DataFrame()
+        result.index.name = "time"
 
-    return result
+        return result
 
+    async def query_latest_in_efd_topic(
+        self,
+        topic: str,
+        num_records: int = 6,
+        sal_indexes: tuple[int, ...] = (1, 2, 3),
+        fields: list[str] | None = None,
+        database: EfdDatabase = "efd",
+    ) -> pd.DataFrame:
+        """Query and EFD topic for all entries on a night.
 
-async def query_latest_in_efd_topic(
-    topic: str,
-    num_records: int = 6,
-    sal_indexes: tuple[int, ...] = (1, 2, 3),
-    efd: EfdClient | str | None = None,
-    fields: list[str] | None = None,
-) -> pd.DataFrame:
-    """Query and EFD topic for all entries on a night.
+        Parameters
+        ----------
+        topic : `str`
+            The topic to query
+        num_records : `int`
+            The number of records to return.
+        sal_indexes : `tuple[int, ...]`, optional
+            Which SAL indexes to query, by default (1, 2, 3).
+            Can be guessed by instrument with ``SAL_INDEX_GUESSES[instrument]``
+        fields : `list[str]` or `None`, optional
+            Fields to query from the topic, by default None, which queries all
+            fields.
+        database : `str`, optional
+            Which EFD database to query: ``efd`` or ``obsenv``,
+            by default ``efd``.
 
-    Parameters
-    ----------
-    topic : `str`
-        The topic to query
-    num_records : `int`
-        The number of records to return.
-    sal_indexes : `tuple[int, ...]`, optional
-        Which SAL indexes to query, by default (1, 2, 3).
-        Can be guessed by instrument with ``SAL_INDEX_GUESSES[instrument]``
-    efd : `EfdClient` or `str`  `None`, optional
-        The EFD client to use, by default None, which creates a new one
-        based on the environment.
-    fields : `list[str]` or `None`, optional
-        Fields to query from the topic, by default None, which queries all
-        fields.
+        Returns
+        -------
+        result : `pd.DataFrame`
+            The result of the query
+        """
+        client = self.efd if database == "efd" else self.obsenv
 
-    Returns
-    -------
-    result : `pd.DataFrame`
-        The result of the query
-    """
+        if fields is None:
+            fields = await self._get_efd_fields_for_topic(topic, database=database)
 
-    efd_client = _get_efd_client(efd)
+        if not isinstance(sal_indexes, Iterable):
+            sal_indexes = [sal_indexes]
 
-    if fields is None:
-        fields = await _get_efd_fields_for_topic(efd_client, topic)
+        results = []
+        for sal_index in sal_indexes:
+            result = await client.select_top_n(topic, fields, num_records, index=sal_index)
+            if isinstance(result, pd.DataFrame) and len(result) > 0:
+                results.append(result)
 
-    if not isinstance(sal_indexes, Iterable):
-        sal_indexes = [sal_indexes]
+        result = pd.concat(results) if len(results) > 0 else pd.DataFrame()
 
-    results = []
-    for sal_index in sal_indexes:
-        result = await efd_client.select_top_n(topic, fields, num_records, index=sal_index)
-        if isinstance(result, pd.DataFrame) and len(result) > 0:
-            results.append(result)
+        return result
 
-    result = pd.concat(results) if len(results) > 0 else pd.DataFrame()
+    def sync_query_efd_topic_for_night(self, *args, **kwargs):
+        """Just like query_efd_topic_for_night, but run in a separate thread
+        and block for results, so it can be run within a separate event loop.
+        """
+        # Inspired by https://stackoverflow.com/questions/74703727
+        # Works even in a panel event loop
+        io_loop = asyncio.new_event_loop()
+        io_thread = threading.Thread(target=io_loop.run_forever, name="EFD query thread", daemon=True)
 
-    return result
+        def run_async(coro):
+            if not io_thread.is_alive():
+                io_thread.start()
+            future = asyncio.run_coroutine_threadsafe(coro, io_loop)
+            return future.result()
 
+        result = run_async(self.query_efd_topic_for_night(*args, **kwargs))
+        return result
 
-def sync_query_efd_topic_for_night(*args, **kwargs):
-    """Just like query_efd_topic_for_night, but run in a separate thread
-    and block for results, so it can be run within a separate event loop.
-    """
-    # Inspired by https://stackoverflow.com/questions/74703727
-    # Works even in a panel event loop
-    io_loop = asyncio.new_event_loop()
-    io_thread = threading.Thread(target=io_loop.run_forever, name="EFD query thread", daemon=True)
+    def get_with_retries(self, channel, params):
+        api_endpoint = f"{self.base}{channel}"
+        response = requests.get(api_endpoint, auth=self.auth, params=params)
+        try_number = 1
+        while not response.status_code == 200:
+            if try_number > MAX_RETRIES:
+                response.raise_for_status()
+            response = requests.get(api_endpoint, auth=self.auth, params=params)
+            try_number += 1
 
-    def run_async(coro):
-        if not io_thread.is_alive():
-            io_thread.start()
-        future = asyncio.run_coroutine_threadsafe(coro, io_loop)
-        return future.result()
-
-    result = run_async(query_efd_topic_for_night(*args, **kwargs))
-    return result
+        return response.json()

@@ -5,7 +5,7 @@ import requests
 
 from schedview.dayobs import DayObs
 
-from .efd import ClientConnections, get_clients
+from .efd import ClientConnections
 
 MAX_RETRIES = 2
 
@@ -66,7 +66,7 @@ def get_night_report(
         params.update(user_params)
 
     client_connection: ClientConnections = (
-        get_clients() if user_client_connections is None else user_client_connections
+        ClientConnections() if user_client_connections is None else user_client_connections
     )
 
     assert isinstance(client_connection.base, str)
@@ -126,7 +126,7 @@ def get_night_narrative(
         params.update(user_params)
 
     client_connection: ClientConnections = (
-        get_clients() if user_client_connections is None else user_client_connections
+        ClientConnections() if user_client_connections is None else user_client_connections
     )
 
     assert isinstance(client_connection.base, str)
