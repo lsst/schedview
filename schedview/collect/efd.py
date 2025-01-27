@@ -1,5 +1,4 @@
 import asyncio
-import dataclasses
 import os
 import threading
 from collections import defaultdict
@@ -61,8 +60,6 @@ class ClientConnections:
     site: str | None = None
     base: str | None = None
     token: str | None = None
-    efd: EfdClient = dataclasses.field(init=False)
-    obsenv: EfdClient = dataclasses.field(init=False)
 
     @property
     def auth(self) -> tuple[str, str]:
@@ -72,6 +69,9 @@ class ClientConnections:
         return ("user", self.token)
 
     def __post_init__(self):
+        self.io_loop = None
+        self.io_thread = None
+
         # Set up authentication
         if self.token is None:
             self.token = get_access_token()
@@ -139,12 +139,25 @@ class ClientConnections:
                 self.base = "https://usdf-rsp.slac.stanford.edu/"
 
         try:
-            efd_name = EFD_NAMES[self.site]
+            self.efd_name = EFD_NAMES[self.site]
         except KeyError:
-            efd_name = f"{self.site}_efd"
+            self.efd_name = f"{self.site}_efd"
 
-        self.efd = EfdClient(efd_name)
-        self.obsenv = EfdClient(efd_name, db_name="lsst.obsenv")
+    @property
+    def efd(self) -> EfdClient:
+        # The EfdClient needs to be instantiated within an async function
+        # to work correctly, but we want to be able to instantiate this class
+        # outside of an async function. So instantiate the EfdClient only on
+        # request.
+        return EfdClient(self.efd_name)
+
+    @property
+    def obsenv(self) -> EfdClient:
+        # The EfdClient needs to be instantiated within an async function
+        # to work correctly, but we want to be able to instantiate this class
+        # outside of an async function. So instantiate the EfdClient only on
+        # request.
+        return EfdClient(self.efd_name, db_name="lsst.obsenv")
 
     async def _get_efd_fields_for_topic(self, topic, public_only=True, database="efd"):
         client = self.efd if database == "efd" else self.obsenv
@@ -264,13 +277,21 @@ class ClientConnections:
         """
         # Inspired by https://stackoverflow.com/questions/74703727
         # Works even in a panel event loop
-        io_loop = asyncio.new_event_loop()
-        io_thread = threading.Thread(target=io_loop.run_forever, name="EFD query thread", daemon=True)
+        if self.io_loop is None:
+            self.io_loop = asyncio.new_event_loop()
+
+        if self.io_thread is None:
+            assert isinstance(self.io_loop, asyncio.AbstractEventLoop)
+            self.io_thread = threading.Thread(
+                target=self.io_loop.run_forever, name="EFD query thread", daemon=True
+            )
 
         def run_async(coro):
-            if not io_thread.is_alive():
-                io_thread.start()
-            future = asyncio.run_coroutine_threadsafe(coro, io_loop)
+            assert isinstance(self.io_thread, threading.Thread)
+            assert isinstance(self.io_loop, asyncio.AbstractEventLoop)
+            if not self.io_thread.is_alive():
+                self.io_thread.start()
+            future = asyncio.run_coroutine_threadsafe(coro, self.io_loop)
             return future.result()
 
         result = run_async(self.query_efd_topic_for_night(*args, **kwargs))
