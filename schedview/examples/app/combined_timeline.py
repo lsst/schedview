@@ -7,7 +7,7 @@ import panel as pn
 import param
 
 from schedview import DayObs
-from schedview.collect.efd import SAL_INDEX_GUESSES
+from schedview.collect import SAL_INDEX_GUESSES
 from schedview.collect.timeline import collect_timeline_data
 from schedview.compute.astro import get_median_model_sky, night_events
 from schedview.compute.obsblocks import compute_block_spans

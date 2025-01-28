@@ -5,7 +5,7 @@ import astropy.utils.iers
 
 import schedview.plot.nightreport
 from schedview import DayObs
-from schedview.collect.nightreport import get_night_report
+from schedview.collect import get_night_report
 from schedview.compute.nightreport import best_night_report
 
 

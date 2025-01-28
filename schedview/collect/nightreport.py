@@ -1,13 +1,8 @@
 import datetime
 from typing import Literal
 
-import requests
-
+from schedview.collect import get_from_logdb_with_retries
 from schedview.dayobs import DayObs
-
-from .efd import ClientConnections
-
-MAX_RETRIES = 2
 
 EXCLUDED_COMPONENTS_FOR_TELESCOPE = {
     "AuxTel": ["MTMount", "MainTel"],
@@ -15,22 +10,9 @@ EXCLUDED_COMPONENTS_FOR_TELESCOPE = {
 }
 
 
-def _get_with_retries(api_endpoint, auth, params):
-    response = requests.get(api_endpoint, auth=auth, params=params)
-    try_number = 1
-    while not response.status_code == 200:
-        if try_number > MAX_RETRIES:
-            response.raise_for_status()
-        response = requests.get(api_endpoint, auth=auth, params=params)
-        try_number += 1
-
-    return response.json()
-
-
 def get_night_report(
     day_obs: DayObs | str | int,
     telescope: Literal["AuxTel", "Simonyi"],
-    user_client_connections: ClientConnections | None = None,
     user_params: dict | None = None,
 ) -> list[dict]:
     """Get the night report data for a night of observing.
@@ -41,9 +23,6 @@ def get_night_report(
         The night of observation.
     telescope : `str``
         The telescope for which to get the night report.
-    user_client_connections : `ClientConnections` | None, optional
-        The connections to the EFD and other services or None to infer
-        them from the environment. Defaults to None.
     user_params : `dict` | None, optional
         Extra parameters for the night report query
 
@@ -65,20 +44,14 @@ def get_night_report(
     if user_params is not None:
         params.update(user_params)
 
-    client_connection: ClientConnections = (
-        ClientConnections() if user_client_connections is None else user_client_connections
-    )
-
-    assert isinstance(client_connection.base, str)
-    api_endpoint = "".join([client_connection.base, "nightreport/reports"])
-    return _get_with_retries(api_endpoint, auth=client_connection.auth, params=params)
+    result = get_from_logdb_with_retries(channel="nightreport/reports", params=params)
+    return result
 
 
 def get_night_narrative(
     day_obs: DayObs | str | int,
     telescope: Literal["AuxTel", "Simonyi"],
     night_only: bool = True,
-    user_client_connections: ClientConnections | None = None,
     user_params: dict | None = None,
 ) -> list[dict]:
     """Get the log messages for a given dayobs.
@@ -91,9 +64,6 @@ def get_night_narrative(
         The telescope for which to get the night report.
     night_only: `bool` optional
         Include only messages between sunset and sunrise, by default True.
-    user_client_connections : `ClientConnections` | None, optional
-        The connections to the EFD and other services or None to infer
-        them from the environment. Defaults to None.
     user_params : `dict` | None, optional
         Extra parameters for the narrativelog query
 
@@ -125,10 +95,5 @@ def get_night_narrative(
     if user_params is not None:
         params.update(user_params)
 
-    client_connection: ClientConnections = (
-        ClientConnections() if user_client_connections is None else user_client_connections
-    )
-
-    assert isinstance(client_connection.base, str)
-    api_endpoint = "".join([client_connection.base, "narrativelog/messages"])
-    return _get_with_retries(api_endpoint, auth=client_connection.auth, params=params)
+    result = get_from_logdb_with_retries(channel="narrativelog/messages", params=params)
+    return result

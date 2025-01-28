@@ -4,7 +4,7 @@ import astropy.utils.iers
 import panel as pn
 import param
 
-from schedview.collect.visits import read_visits
+from schedview.collect import read_visits
 from schedview.dayobs import DayObs
 from schedview.plot import create_visit_table
 

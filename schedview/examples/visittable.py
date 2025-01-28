@@ -5,8 +5,8 @@ import bokeh.io
 import pandas as pd
 from bokeh.models.ui.ui_element import UIElement
 
-import schedview.collect.visits
 import schedview.plot
+from schedview.collect import NIGHT_STACKERS, read_visits
 from schedview.dayobs import DayObs
 
 STARTUP_VISIBLE_COLUMNS = ["observationStartMJD", "fieldRA", "fieldDec", "filter"]
@@ -19,9 +19,7 @@ def make_visit_table(
 ) -> UIElement:
 
     day_obs: DayObs = DayObs.from_date(night)
-    visits: pd.DataFrame = schedview.collect.visits.read_visits(
-        day_obs, visit_source, stackers=schedview.collect.visits.NIGHT_STACKERS
-    )
+    visits: pd.DataFrame = read_visits(day_obs, visit_source, stackers=NIGHT_STACKERS)
 
     figure: UIElement = schedview.plot.create_visit_table(
         visits, visible_column_names=STARTUP_VISIBLE_COLUMNS, width=TABLE_WIDTH

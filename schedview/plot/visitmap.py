@@ -10,9 +10,8 @@ from rubin_scheduler.scheduler.model_observatory.model_observatory import ModelO
 from rubin_scheduler.scheduler.schedulers import CoreScheduler  # noqa F401
 from uranography.api import ArmillarySphere, Planisphere, split_healpix_by_resolution
 
-import schedview.collect.scheduler_pickle
 import schedview.compute.astro
-from schedview.collect.stars import load_bright_stars
+from schedview.collect import get_footprint, load_bright_stars, read_opsim
 from schedview.compute.camera import LsstCameraFootprintPerimeter
 
 BAND_COLORS = dict(u="#56b4e9", g="#008060", r="#ff4000", i="#850000", z="#6600cc", y="#222222")
@@ -331,7 +330,7 @@ def create_visit_skymaps(
     end_time = Time(night_events.loc["sunrise", "UTC"])
 
     if isinstance(visits, str):
-        visits = schedview.collect.opsim.read_opsim(visits)
+        visits = read_opsim(visits)
 
     if start_time is not None:
         visits.query(f"observationStartMJD >= {Time(start_time).mjd}", inplace=True)
@@ -343,7 +342,7 @@ def create_visit_skymaps(
         observatory = ModelObservatory(nside=nside, init_load_length=1)
         observatory.sky_model.load_length = 1
 
-    footprint = schedview.collect.footprint.get_footprint(nside)
+    footprint = get_footprint(nside)
     observatory.mjd = end_time.mjd
     conditions = observatory.return_conditions()
     data = {"visits": visits, "footprint": footprint, "conditions": conditions}

@@ -16,10 +16,9 @@ from astropy.time import Time
 # Imported to help sphinx make the link
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory  # noqa F401
 
-import schedview.collect.opsim
-import schedview.collect.scheduler_pickle
 import schedview.compute.astro
 import schedview.compute.scheduler
+from schedview.collect import read_opsim, read_scheduler
 
 __all__ = [
     "plot_survey_rewards",
@@ -98,7 +97,7 @@ def create_survey_reward_plot(
 
     # Collect
     if isinstance(scheduler, str):
-        scheduler, conditions = schedview.collect.scheduler_pickle.read_scheduler(scheduler)
+        scheduler, conditions = read_scheduler(scheduler)
         scheduler.update_conditions(conditions)
 
     if isinstance(additional_visits, str):
@@ -107,9 +106,7 @@ def create_survey_reward_plot(
         )
         start_time = Time(night_events.loc["sunset", "UTC"])
         end_time = Time(night_events.loc["sunrise", "UTC"])
-        additional_visits = schedview.collect.opsim.read_opsim(
-            additional_visits, Time(start_time).iso, Time(end_time).iso
-        )
+        additional_visits = read_opsim(additional_visits, Time(start_time).iso, Time(end_time).iso)
 
     # Compute
     if additional_visits is not None:

@@ -36,7 +36,7 @@ class TestPlotRewards(unittest.TestCase):
 
     def setUp(self):
         rewards_rp = importlib.resources.files("schedview").joinpath("data").joinpath("sample_rewards.h5")
-        self.rewards_df, self.obs_reward = schedview.collect.rewards.read_rewards(rewards_rp)
+        self.rewards_df, self.obs_reward = schedview.collect.read_rewards(rewards_rp)
         self.tier = 3
         self.day_obs_mjd = int(self.rewards_df["queue_start_mjd"].min() - 0.5)
 

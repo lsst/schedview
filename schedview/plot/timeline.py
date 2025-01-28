@@ -266,14 +266,14 @@ class LogMessageTimelinePlotter(TimelinePlotter):
     ----------
     `data`: `list`
         As produced by
-        ``schedview.collect.nightreport import get_night_narrative``
+        ``schedview.collect.get_night_narrative``
 
     Examples
     --------
 
     > import bokeh.plotting
     > from schedview.dayobs import DayObs
-    > from schedview.collect.nightreport import get_night_narrative
+    > from schedview.collect import get_night_narrative
     > from schedview.plot.timeline import LogMessageTimelinePlotter
     >
     > day_obs = DayObs.from_date('2024-12-10')
@@ -846,7 +846,7 @@ def make_timeline_scatterplots(visits, visits_column="seeingFwhmEff", **kwargs):
     Parameters
     ----------
     `visits`: `pandas.DataFrame`
-        One row per visit, as created by `schedview.collect.opsim.read_opsim`.
+        One row per visit, as created by `schedview.collect.read_opsim`.
     `column_name`: `str`
         The name of the column to plot against time.
     **kwargs : `dict`:

@@ -8,7 +8,7 @@ from rubin_scheduler.scheduler.features.conditions import Conditions
 from rubin_scheduler.scheduler.schedulers.core_scheduler import CoreScheduler
 from rubin_scheduler.utils import SURVEY_START_MJD
 
-from schedview.collect.scheduler_pickle import read_scheduler
+from schedview.collect import read_scheduler
 
 MJD_START = SURVEY_START_MJD
 

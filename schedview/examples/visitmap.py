@@ -7,9 +7,9 @@ import uranography.api
 from bokeh.models.ui.ui_element import UIElement
 from rubin_scheduler.scheduler.model_observatory.model_observatory import ModelObservatory
 
-import schedview.collect.visits
 import schedview.compute.visits
 import schedview.plot
+from schedview.collect import NIGHT_STACKERS, get_footprint, read_visits
 from schedview.dayobs import DayObs
 
 
@@ -23,11 +23,9 @@ def make_visit_map(
     day_obs: DayObs = DayObs.from_date(night)
 
     # Collect the data to be shown
-    visits: pd.DataFrame = schedview.collect.visits.read_visits(
-        day_obs, visit_source, stackers=schedview.collect.visits.NIGHT_STACKERS
-    )
+    visits: pd.DataFrame = read_visits(day_obs, visit_source, stackers=NIGHT_STACKERS)
 
-    footprint = schedview.collect.footprint.get_footprint(nside)
+    footprint = get_footprint(nside)
     observatory: ModelObservatory = ModelObservatory(nside=nside, init_load_length=1)
     observatory.mjd = visits.observationStartMJD.max()
     conditions = observatory.return_conditions()

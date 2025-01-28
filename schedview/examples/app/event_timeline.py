@@ -5,7 +5,7 @@ import panel as pn
 import param
 
 from schedview import DayObs
-from schedview.collect.nightreport import get_night_narrative
+from schedview.collect import get_night_narrative
 from schedview.plot import make_timeline_scatterplots
 
 

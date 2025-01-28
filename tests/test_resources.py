@@ -7,9 +7,7 @@ from astropy.time import Time
 from lsst.resources import ResourcePath
 from rubin_sim.data import get_baseline
 
-from schedview.collect.opsim import read_ddf_visits, read_opsim
-from schedview.collect.resources import find_file_resources
-from schedview.collect.rewards import read_rewards
+from schedview.collect import find_file_resources, read_ddf_visits, read_opsim, read_rewards
 
 
 class TestResources(unittest.TestCase):

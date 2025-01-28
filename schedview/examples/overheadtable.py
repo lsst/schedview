@@ -3,11 +3,11 @@ import argparse
 import astropy.utils.iers
 import pandas as pd
 
-import schedview.collect.visits
 import schedview.compute.astro
 import schedview.compute.visits
 import schedview.plot
 from schedview import DayObs
+from schedview.collect import NIGHT_STACKERS, read_visits
 
 
 def make_overhead_table(
@@ -22,9 +22,7 @@ def make_overhead_table(
     night_events: pd.DataFrame = schedview.compute.astro.night_events(day_obs.date)
 
     # Get the visits
-    visits: pd.DataFrame = schedview.collect.visits.read_visits(
-        day_obs, visit_source, stackers=schedview.collect.visits.NIGHT_STACKERS
-    )
+    visits: pd.DataFrame = read_visits(day_obs, visit_source, stackers=NIGHT_STACKERS)
 
     overhead_summary = schedview.compute.visits.compute_overhead_summary(
         visits,
