@@ -165,7 +165,7 @@ def add_instrumental_fwhm(visits):
     # Get a seeing model that applies atmospheric and wavelength corrections,
     # but not instrumental contributions.
     seeing_model = SeeingModel(telescope_seeing=0.0, optical_design_seeing=0.0, camera_seeing=0.0)
-    seeing_indx_dict = {b: i for i, b in enumerate(seeing_model.band_list)}
+    seeing_indx_dict = {b: i for i, b in enumerate(seeing_model.filter_list)}
 
     noninst_seeing = np.array(
         tuple(
