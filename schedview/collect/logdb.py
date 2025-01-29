@@ -21,7 +21,11 @@ def get_from_logdb_with_retries(channel: str, params: dict) -> list[dict]:
     result: `list[dict]`
         The log messages.
     """
-    auth = get_auth()
+    try:
+        auth = get_auth()
+    except ValueError:
+        auth = ("user", None)
+
     api_endpoint = f"{schedview.clientsite.DATASOURCE_BASE_URL}{channel}"
     response = requests.get(api_endpoint, auth=auth, params=params)
     try_number = 1
