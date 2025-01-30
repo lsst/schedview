@@ -15,7 +15,7 @@ from rubin_sim import maf
 import schedview.compute.visits
 import schedview.plot
 import schedview.plot.survey
-from schedview.collect.visits import NIGHT_STACKERS, read_visits
+from schedview.collect.visits import read_visits
 from schedview.dayobs import DayObs
 
 
@@ -51,7 +51,7 @@ def make_accum_depth(
     use_matplotlib: bool = backend == "matplotlib"
 
     # Collect
-    stackers = NIGHT_STACKERS + [maf.stackers.TeffStacker()]
+    stackers = [maf.stackers.TeffStacker()]
     visits: pd.DataFrame = read_visits(day_obs, visit_source, stackers=stackers)
     previous_visits: pd.DataFrame = read_visits(
         DayObs.from_date(day_obs.mjd - 1, int_format="mjd"), visit_source, stackers=stackers, num_nights=10000
