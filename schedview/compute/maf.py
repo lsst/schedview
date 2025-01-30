@@ -20,8 +20,14 @@ def _visits_to_opsim(visits, opsim):
     # we want. Instead, merge the results back into the visits passed to us.
     restored_columns = set(visits.columns) - set(updated_opsim.columns)
     restored_columns.add("observationId")
+    norm_visits = (
+        visits.reset_index()
+        if "observationId" not in visits.columns and visits.index.name == "observationId"
+        else visits
+    )
+
     merged_opsim = updated_opsim.merge(
-        visits.loc[:, list(restored_columns)], on="observationId", suffixes=("", "_orig")
+        norm_visits.loc[:, list(restored_columns)], on="observationId", suffixes=("", "_orig")
     )
 
     # If the round trip change actually changes values in an existing column
