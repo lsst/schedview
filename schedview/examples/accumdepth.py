@@ -58,7 +58,7 @@ def make_accum_depth(
     )
 
     # Compute
-    observatory: ModelObservatory = ModelObservatory(init_load_length=1, mjd=day_obs.mjd)
+    observatory: ModelObservatory = ModelObservatory(no_sky=True, mjd=day_obs.mjd)
 
     # Plot
     teff_key = "eff_time_median" if "eff_time_median" in visits.columns else "t_eff"
