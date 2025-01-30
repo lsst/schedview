@@ -83,7 +83,7 @@ def make_accum_depth(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="FIXME", description="FIXME")
+    parser = argparse.ArgumentParser(prog="accumdepth", description="Plot accumulated depth at a given date.")
     parser.add_argument("date", type=str, help="Evening YYYY-MM-DD")
     parser.add_argument(
         "visit_source", type=str, default="lsstcomcam", help="Instrument or baseline version number"
