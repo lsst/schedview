@@ -1,4 +1,5 @@
 import argparse
+import datetime
 
 import astropy.utils.iers
 import bokeh.embed
@@ -15,13 +16,13 @@ from schedview.dayobs import DayObs
 
 
 def make_visit_map(
-    iso_date: str,
+    iso_date: str | datetime.date,
     visit_source: str,
-    nside: int = 8,
+    nside: int = 16,
     map_classes=[uranography.api.ArmillarySphere, uranography.api.Planisphere],
     report: None | str = None,
 ) -> bokeh.models.UIElement:
-    """_summary_
+    """Make a visit map.
 
     Parameters
     ----------
