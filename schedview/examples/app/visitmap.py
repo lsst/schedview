@@ -18,7 +18,6 @@ def make_visitmap_app():
         pn.Row(visit_source_widget, date_widget),
         pn.bind(make_visit_map, iso_date=date_widget, visit_source=visit_source_widget),
     ).servable()
-    print("TYPE IS:", type(app))
     return app
 
 
