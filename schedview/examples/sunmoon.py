@@ -25,8 +25,8 @@ def make_sunmoon(
 
     Returns
     -------
-    bokeh.models.UIElement
-        _description_
+    resurt: `str`
+        The tables in markdown.
     """
 
     # Parameters
