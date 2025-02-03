@@ -1,4 +1,5 @@
 import argparse
+import datetime
 
 import astropy.utils.iers
 import bokeh.embed
@@ -13,7 +14,7 @@ from schedview.dayobs import DayObs
 
 
 def make_visit_param_vs_time_plot(
-    iso_date: str,
+    iso_date: str | datetime.date,
     visit_source: str,
     report: None | str = None,
 ) -> bokeh.models.UIElement:
@@ -21,7 +22,7 @@ def make_visit_param_vs_time_plot(
 
     Parameters
     ----------
-    iso_date : `str`
+    iso_date : `str` or `datetime.date`
         Local calendar date of the evening on which the night starts,
         in YYYY-MM-DD (ISO 8601) format.
     visit_source : `str`

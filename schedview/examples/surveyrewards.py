@@ -1,4 +1,5 @@
 import argparse
+import datetime
 
 import bokeh.embed
 import bokeh.io
@@ -13,7 +14,7 @@ from schedview.dayobs import DayObs
 
 
 def make_survey_reward_plot(
-    iso_date: str,
+    iso_date: str | datetime.date,
     reward_source: str,
     report: None | str = None,
 ) -> bokeh.models.UIElement:
@@ -21,7 +22,7 @@ def make_survey_reward_plot(
 
     Parameters
     ----------
-    iso_date : `str`
+    iso_date : `str` or `datetime.date`
         Local calendar date of the evening on which the night starts,
         in YYYY-MM-DD (ISO 8601) format.
     reward_source : `str`

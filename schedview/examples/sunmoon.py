@@ -1,4 +1,5 @@
 import argparse
+import datetime
 
 import pandas as pd
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
@@ -9,14 +10,14 @@ from schedview.dayobs import DayObs
 
 
 def make_sunmoon(
-    iso_date: str,
+    iso_date: str | datetime.date,
     report: None | str = None,
 ) -> str:
     """Make sun and moon tables.
 
     Parameters
     ----------
-    iso_date : `str`
+    iso_date : `str` or `datetime.date`
         Local calendar date of the evening on which the night starts,
         in YYYY-MM-DD (ISO 8601) format.
     report : `None` | `str`, optional

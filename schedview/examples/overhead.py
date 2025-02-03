@@ -1,4 +1,5 @@
 import argparse
+import datetime
 from contextlib import redirect_stdout
 
 import astropy.utils.iers
@@ -15,13 +16,13 @@ from schedview.dayobs import DayObs
 
 
 def make_overhead_figures(
-    iso_date: str, visit_source: str, report: None | str = None, min_time: float = 30
+    iso_date: str | datetime.date, visit_source: str, report: None | str = None, min_time: float = 30
 ) -> bokeh.models.UIElement:
     """Make a report including figures on overhead.
 
     Parameters
     ----------
-    iso_date : `str`
+    iso_date : `str` or `datetime.date`
         Local calendar date of the evening on which the night starts,
         in YYYY-MM-DD (ISO 8601) format.
     visit_source : `str`

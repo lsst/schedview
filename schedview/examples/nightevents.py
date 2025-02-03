@@ -1,4 +1,5 @@
 import argparse
+import datetime
 
 import astropy.utils.iers
 import pandas as pd
@@ -10,14 +11,14 @@ from schedview.dayobs import DayObs
 
 
 def make_night_events(
-    iso_date: str,
+    iso_date: str | datetime.date,
     report: None | str = None,
 ) -> str:
     """Sample workflow to create a table of ephemeris events for a night.
 
     Parameters
     ----------
-    iso_date : `str`
+    iso_date : `str` or `datetime.date`
         Local calendar date of the evening on which the night starts,
         in YYYY-MM-DD (ISO 8601) format.
     report : `None` | `str`, optional

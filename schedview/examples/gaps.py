@@ -1,4 +1,5 @@
 import argparse
+import datetime
 
 import astropy.utils.iers
 import pandas as pd
@@ -10,7 +11,7 @@ from schedview.dayobs import DayObs
 
 
 def make_gaps(
-    iso_date: str,
+    iso_date: str | datetime.date,
     visit_source: str,
     report: None | str = None,
 ) -> str:
@@ -18,7 +19,7 @@ def make_gaps(
 
     Parameters
     ----------
-    iso_date : `str`
+    iso_date : `str` or `datetime.date`
         Local calendar date of the evening on which the night starts,
         in YYYY-MM-DD (ISO 8601) format.
     visit_source : `str`

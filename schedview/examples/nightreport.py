@@ -1,4 +1,5 @@
 import argparse
+import datetime
 from typing import Literal
 
 import schedview.collect.nightreport
@@ -8,7 +9,7 @@ from schedview.dayobs import DayObs
 
 
 def make_nightreport(
-    iso_date: str,
+    iso_date: str | datetime.date,
     telescope: Literal["AuxTel", "Simonyi"] = "Simonyi",
     api_endpoint: str = "https://usdf-rsp-dev.slac.stanford.edu/nightreport/reports",
     report: None | str = None,
@@ -17,7 +18,7 @@ def make_nightreport(
 
     Parameters
     ----------
-    iso_date : `str`
+    iso_date : `str` or `datetime.date`
         Local calendar date of the evening on which the night starts,
         in YYYY-MM-DD (ISO 8601) format.
     telescope : `str`
