@@ -56,7 +56,7 @@ def make_visit_map(
 
     # Compute
     observatory: ModelObservatory = ModelObservatory(nside=nside, init_load_length=1)
-    observatory.mjd = visits.observationStartMJD.max()
+    observatory.mjd = day_obs.mean_local_solar_midnight.mjd
     conditions = observatory.return_conditions()
     visits: pd.DataFrame = schedview.compute.visits.add_coords_tuple(visits)
 
