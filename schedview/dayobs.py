@@ -98,7 +98,7 @@ class DayObs:
 
         Returns
         -------
-        day_obs_converter: `DayObsr`
+        day_obs_converter: `DayObs`
             A new instance of the converter.
         """
 
