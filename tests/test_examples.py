@@ -13,12 +13,20 @@ from schedview.examples.accumdepth import make_accum_depth
 from schedview.examples.agemap import make_agemap
 from schedview.examples.altplot import make_alt_vs_time_plot
 from schedview.examples.bfrewards import make_basis_function_reward_plot
+from schedview.examples.ddfcadence import make_ddf_cadence_plot
 from schedview.examples.gaps import make_gaps
 from schedview.examples.horizonplot import make_horizon_plot
+from schedview.examples.narrlog import make_narrative_log
 from schedview.examples.nightevents import make_night_events
+from schedview.examples.nightreport import make_nightreport
+from schedview.examples.overheadhist import make_overhead_hist
+from schedview.examples.overheadtable import make_overhead_table
+from schedview.examples.overheadvsslew import make_overhead_vs_slew_dist
+from schedview.examples.sunmoon import make_sunmoon
 from schedview.examples.surveyrewards import make_survey_reward_plot
 from schedview.examples.visitmap import make_visit_map
 from schedview.examples.visitparam import make_visit_param_vs_time_plot
+from schedview.examples.visittable import make_visit_table
 
 astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
 
@@ -96,4 +104,52 @@ class TestExamples(unittest.TestCase):
         with TemporaryDirectory() as dir:
             report = Path(dir).joinpath("agemap.png").name
             make_agemap(TEST_ISO_DATE, "baseline", report=report)
+            assert os.path.exists(report)
+
+    def test_ddf_cadence_plot(self):
+        with TemporaryDirectory() as dir:
+            report = Path(dir).joinpath("ddfcadence.html").name
+            make_ddf_cadence_plot(TEST_ISO_DATE, "baseline", report=report)
+            assert os.path.exists(report)
+
+    def test_narrative_log(self):
+        with TemporaryDirectory() as dir:
+            report = Path(dir).joinpath("narrlog.txt").name
+            make_narrative_log(TEST_ISO_DATE, "Simonyi", report=report)
+            assert os.path.exists(report)
+
+    def test_nightreport(self):
+        with TemporaryDirectory() as dir:
+            report = Path(dir).joinpath("nightreport.txt").name
+            make_nightreport(TEST_ISO_DATE, "Simonyi", report=report)
+            assert os.path.exists(report)
+
+    def test_overhead_hist(self):
+        with TemporaryDirectory() as dir:
+            report = Path(dir).joinpath("overhead_hist.html").name
+            make_overhead_hist(TEST_ISO_DATE, "baseline", report=report)
+            assert os.path.exists(report)
+
+    def test_overhead_vs_slew_dist(self):
+        with TemporaryDirectory() as dir:
+            report = Path(dir).joinpath("overhead_vs_slew_dist.html").name
+            make_overhead_vs_slew_dist(TEST_ISO_DATE, "baseline", report=report)
+            assert os.path.exists(report)
+
+    def test_overhead_table(self):
+        with TemporaryDirectory() as dir:
+            report = Path(dir).joinpath("overhead_table.html").name
+            make_overhead_table(TEST_ISO_DATE, "baseline", report=report)
+            assert os.path.exists(report)
+
+    def test_sunmoon(self):
+        with TemporaryDirectory() as dir:
+            report = Path(dir).joinpath("sunmoon.txt").name
+            make_sunmoon(TEST_ISO_DATE, report=report)
+            assert os.path.exists(report)
+
+    def test_visit_table(self):
+        with TemporaryDirectory() as dir:
+            report = Path(dir).joinpath("visit_table.html").name
+            make_visit_table(TEST_ISO_DATE, "baseline", report=report)
             assert os.path.exists(report)
