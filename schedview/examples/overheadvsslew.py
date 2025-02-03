@@ -13,7 +13,7 @@ from schedview.collect.visits import NIGHT_STACKERS, read_visits
 from schedview.dayobs import DayObs
 
 
-def make_overhead_hist(
+def make_overhead_vs_slew_dist(
     iso_date: str | datetime.date,
     visit_source: str,
     report: None | str = None,
@@ -68,4 +68,4 @@ if __name__ == "__main__":
 
     astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
 
-    make_overhead_hist(args.date, args.visit_source, args.report)
+    make_overhead_vs_slew_dist(args.date, args.visit_source, args.report)
