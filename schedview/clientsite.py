@@ -9,13 +9,8 @@ DATASOURCE_BASE_URL = None
 EFD_NAME = None
 
 
-def guess_site(base: str | None = None) -> str:
+def guess_site() -> str:
     """Try to guess the site from the environment.
-
-    Parameters
-    ----------
-    base : `str` or `None`, optional
-        The base URL for queries, by default None
 
     Returns
     -------
@@ -53,23 +48,6 @@ def guess_site(base: str | None = None) -> str:
             site = "summit"
         else:
             warn(f"Could not deterime site from HOSTNAME {hostname}.")
-
-    if site is None and base is not None:
-        # Try figuring out the site from the base URL, if the user
-        # supplied one.
-        match base:
-            case "https://summit-lsp.lsst.codes/":
-                site = "summit"
-            case "https://tucson-teststand.lsst.codes/":
-                site = "tucson"
-            case "https://base-lsp.slac.lsst.codes/":
-                site = "base"
-            case "https://usdf-rsp.slac.stanford.edu/":
-                site = "usdf"
-            case "https://usdf-rsp-dev.slac.stanford.edu/":
-                site = "usdf-dev"
-            case _:
-                warn(f"Could not determine site from base {base}.")
 
     if site is None:
         site = "local"
