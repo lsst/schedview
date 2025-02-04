@@ -10,10 +10,10 @@ from .visits import visits_tooltips
 
 DEFAULT_EVENT_LABELS = {
     "sunset": "sunset",
-    "sun_n12_setting": "sun alt=-12" + "\u00B0",
-    "sun_n18_setting": "sun alt=-18" + "\u00B0",
-    "sun_n18_rising": "sun alt=-18" + "\u00B0",
-    "sun_n12_rising": "sun alt=-12" + "\u00B0",
+    "sun_n12_setting": "sun alt=-12" + "\u00b0",
+    "sun_n18_setting": "sun alt=-18" + "\u00b0",
+    "sun_n18_rising": "sun alt=-18" + "\u00b0",
+    "sun_n12_rising": "sun alt=-12" + "\u00b0",
     "sunrise": "sunrise",
     "moonrise": "moonrise",
     "moonset": "moonset",
