@@ -1,4 +1,3 @@
-import asyncio
 import json
 import os
 import string
@@ -22,7 +21,7 @@ from rubin_sim.data import get_baseline
 from schedview.collect import read_opsim
 from schedview.compute.astro import get_median_model_sky, night_events
 from schedview.dayobs import DayObs
-from schedview.examples.timeline import run_full_timeline_pipeline
+from schedview.examples.timeline import make_timeline
 from schedview.plot.timeline import (
     BlockSpanTimelinePlotter,
     BlockStatusTimelinePlotter,
@@ -69,7 +68,7 @@ class TestTimelinePlotters(TestCase):
 
     @unittest.skip("Slow and depends on real consdb and EFD")
     def test_example(self):
-        ui_element = asyncio.run(run_full_timeline_pipeline("2025-11-21"))
+        ui_element = make_timeline("2024-12-10", "lsstcomcam", "Simonyi")
         assert is_plottable_bokeh(ui_element)
 
     def test_generic_plotter(self):

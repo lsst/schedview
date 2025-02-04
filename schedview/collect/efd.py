@@ -1,53 +1,25 @@
 import asyncio
-import os
 import threading
 from collections import defaultdict
 from collections.abc import Iterable
-from functools import partial
-from warnings import warn
+from functools import cache, partial
+from typing import Literal
 
 import pandas as pd
 from lsst_efd_client import EfdClient
 
+import schedview.clientsite
 from schedview.dayobs import DayObs
 
-DEFAULT_EFD = (
-    "summit_efd" if os.getenv("EXTERNAL_INSTANCE_URL", "") == "https://summit-lsp.lsst.codes" else "usdf_efd"
-)
+EfdDatabase = Literal["efd", "lsst.obsenv"]
+
 SAL_INDEX_GUESSES = defaultdict(partial([[]].__getitem__, 0), {"lsstcomcam": [1, 3], "latiss": [2]})
 
 
-def _get_efd_client(efd: EfdClient | str | None) -> EfdClient:
-    match efd:
-        case EfdClient():
-            efd_client = efd
-        case str():
-            efd_client = EfdClient(efd)
-        case None:
-            try:
-                from lsst.summit.utils.efdUtils import makeEfdClient
+async def _get_efd_fields_for_topic(topic: str, public_only: bool = True, db_name: EfdDatabase = "efd"):
+    client = EfdClient(schedview.clientsite.EFD_NAME, db_name=db_name)
 
-                efd_client = makeEfdClient()
-            except ModuleNotFoundError:
-                warn(
-                    "lsst.summit.utils not installed, "
-                    f"falling back on guessing the EFD client: {DEFAULT_EFD}"
-                )
-                efd_client = EfdClient(DEFAULT_EFD)
-            except RuntimeError:
-                warn(
-                    "lsst.summit.utils cannot automatically determine which EFD to use on this host, "
-                    f"falling back on guessing the EFD client: {DEFAULT_EFD}"
-                )
-                efd_client = EfdClient(DEFAULT_EFD)
-        case _:
-            raise ValueError(f"Cannot translate a {type(efd)} to an EfdClient.")
-
-    return efd_client
-
-
-async def _get_efd_fields_for_topic(efd_client, topic, public_only=True):
-    fields = await efd_client.get_fields(topic)
+    fields = await client.get_fields(topic)
     if public_only:
         fields = [f for f in fields if "private" not in f]
 
@@ -58,8 +30,8 @@ async def query_efd_topic_for_night(
     topic: str,
     day_obs: DayObs | str | int,
     sal_indexes: tuple[int, ...] = (1, 2, 3),
-    efd: EfdClient | str | None = None,
-    fields: list[str] | None = None,
+    fields: list[str] | None = ["*"],
+    db_name: EfdDatabase = "efd",
 ) -> pd.DataFrame:
     """Query and EFD topic for all entries on a night.
 
@@ -72,12 +44,11 @@ async def query_efd_topic_for_night(
     sal_indexes : `tuple[int, ...]`, optional
         Which SAL indexes to query, by default (1, 2, 3).
         Can be guessed by instrument with ``SAL_INDEX_GUESSES[instrument]``
-    efd : `EfdClient` or `str`  `None`, optional
-        The EFD client to use, by default None, which creates a new one
-        based on the environment.
     fields : `list[str]` or `None`, optional
-        Fields to query from the topic, by default None, which queries all
-        fields.
+        Fields to query from the topic, by default ['*'].
+    db_name : `str`, optional
+        Which EFD db_name to query: ``efd`` or ``obsenv``,
+        by default ``efd``.
 
     Returns
     -------
@@ -86,19 +57,17 @@ async def query_efd_topic_for_night(
     """
 
     day_obs = day_obs if isinstance(day_obs, DayObs) else DayObs.from_date(day_obs)
-    efd_client = _get_efd_client(efd)
+    client = EfdClient(schedview.clientsite.EFD_NAME, db_name=db_name)
 
     if fields is None:
-        fields = await _get_efd_fields_for_topic(efd_client, topic)
+        fields = await _get_efd_fields_for_topic(topic, db_name=db_name)
 
     if not isinstance(sal_indexes, Iterable):
         sal_indexes = [sal_indexes]
 
     results = []
     for sal_index in sal_indexes:
-        result = await efd_client.select_time_series(
-            topic, fields, day_obs.start, day_obs.end, index=sal_index
-        )
+        result = await client.select_time_series(topic, fields, day_obs.start, day_obs.end, index=sal_index)
         if isinstance(result, pd.DataFrame) and len(result) > 0:
             results.append(result)
 
@@ -111,9 +80,9 @@ async def query_efd_topic_for_night(
 async def query_latest_in_efd_topic(
     topic: str,
     num_records: int = 6,
-    sal_indexes: tuple[int, ...] = (1, 2, 3),
-    efd: EfdClient | str | None = None,
-    fields: list[str] | None = None,
+    sal_indexes: tuple[int, ...] | None = None,
+    fields: list[str] | None = ["*"],
+    db_name: EfdDatabase = "efd",
 ) -> pd.DataFrame:
     """Query and EFD topic for all entries on a night.
 
@@ -123,55 +92,71 @@ async def query_latest_in_efd_topic(
         The topic to query
     num_records : `int`
         The number of records to return.
-    sal_indexes : `tuple[int, ...]`, optional
-        Which SAL indexes to query, by default (1, 2, 3).
+    sal_indexes : `tuple[int, ...]` or `None`, optional
+        Which SAL indexes to query, by default None, which gets data
+        for all indexes.
         Can be guessed by instrument with ``SAL_INDEX_GUESSES[instrument]``
-    efd : `EfdClient` or `str`  `None`, optional
-        The EFD client to use, by default None, which creates a new one
-        based on the environment.
     fields : `list[str]` or `None`, optional
-        Fields to query from the topic, by default None, which queries all
-        fields.
+        Fields to query from the topic, by default ['*'].
+    db_name : `str`, optional
+        Which EFD db_name to query: ``efd`` or ``obsenv``,
+        by default ``efd``.
 
     Returns
     -------
     result : `pd.DataFrame`
         The result of the query
     """
-
-    efd_client = _get_efd_client(efd)
+    client = EfdClient(schedview.clientsite.EFD_NAME, db_name=db_name)
 
     if fields is None:
-        fields = await _get_efd_fields_for_topic(efd_client, topic)
+        fields = await _get_efd_fields_for_topic(topic, db_name=db_name)
 
-    if not isinstance(sal_indexes, Iterable):
-        sal_indexes = [sal_indexes]
+    if sal_indexes is None:
+        result = await client.select_top_n(topic, fields, num_records)
+        assert isinstance(result, pd.DataFrame)
+    else:
+        if not isinstance(sal_indexes, Iterable):
+            sal_indexes = [sal_indexes]
 
-    results = []
-    for sal_index in sal_indexes:
-        result = await efd_client.select_top_n(topic, fields, num_records, index=sal_index)
-        if isinstance(result, pd.DataFrame) and len(result) > 0:
-            results.append(result)
+        results = []
+        assert isinstance(sal_indexes, Iterable)
+        for sal_index in sal_indexes:
+            result = await client.select_top_n(topic, fields, num_records, index=sal_index)
+            if isinstance(result, pd.DataFrame) and len(result) > 0:
+                results.append(result)
 
-    result = pd.concat(results) if len(results) > 0 else pd.DataFrame()
+        result = pd.concat(results) if len(results) > 0 else pd.DataFrame()
 
     return result
+
+
+@cache
+def _loop_thread_for_efd_query() -> tuple[asyncio.AbstractEventLoop, threading.Thread]:
+    # Make an event loop in a threead to run async calls.
+    # The use of this function is paired with _run_async, below.
+    # See https://stackoverflow.com/questions/74703727
+    # Use the cache decorator to avoid creating a new loop & thread each time,
+    # and instead just use the same ones each time.
+    io_loop = asyncio.new_event_loop()
+    io_thread = threading.Thread(target=io_loop.run_forever, name="EFD query thread", daemon=True)
+    return (io_loop, io_thread)
+
+
+def _run_async(coro):
+    # Run the async call in its own thread to keep it from getting tangled
+    # up in the panel event loop, if there is one.
+    # Inspired by https://stackoverflow.com/questions/74703727
+    io_loop, io_thread = _loop_thread_for_efd_query()
+    if not io_thread.is_alive():
+        io_thread.start()
+    future = asyncio.run_coroutine_threadsafe(coro, io_loop)
+    return future.result()
 
 
 def sync_query_efd_topic_for_night(*args, **kwargs):
     """Just like query_efd_topic_for_night, but run in a separate thread
     and block for results, so it can be run within a separate event loop.
     """
-    # Inspired by https://stackoverflow.com/questions/74703727
-    # Works even in a panel event loop
-    io_loop = asyncio.new_event_loop()
-    io_thread = threading.Thread(target=io_loop.run_forever, name="EFD query thread", daemon=True)
-
-    def run_async(coro):
-        if not io_thread.is_alive():
-            io_thread.start()
-        future = asyncio.run_coroutine_threadsafe(coro, io_loop)
-        return future.result()
-
-    result = run_async(query_efd_topic_for_night(*args, **kwargs))
+    result = _run_async(query_efd_topic_for_night(*args, **kwargs))
     return result

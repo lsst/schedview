@@ -1,5 +1,4 @@
-"""Developer utilities to query the EFD for schedulers, and download them.
-"""
+"""Developer utilities to query the EFD for schedulers, and download them."""
 
 import argparse
 import asyncio

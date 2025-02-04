@@ -5,10 +5,10 @@ import unittest.mock
 import astropy.utils.iers
 import requests.models
 
-import schedview.collect.nightreport
 import schedview.compute.nightreport
 import schedview.plot.nightreport
 import schedview.plot.timeline
+from schedview.collect import get_night_narrative, get_night_report
 
 MOCK_NIGHTREPORT_RESPONSE = [
     {
@@ -94,24 +94,24 @@ astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
 
 class TestNightReport(unittest.TestCase):
 
-    @unittest.mock.patch("schedview.collect.nightreport.requests.get")
+    @unittest.mock.patch("schedview.collect.logdb.requests.get")
     def test_get_night_report(self, mock_requests_get):
         response_to_get = requests.models.Response()
         response_to_get.status_code = 200
         response_to_get.json = unittest.mock.MagicMock(return_value=MOCK_NIGHTREPORT_RESPONSE)
         mock_requests_get.return_value = response_to_get
 
-        night_report = schedview.collect.nightreport.get_night_report(TEST_DAY_OBS, "Simonyi")
+        night_report = get_night_report(TEST_DAY_OBS, "Simonyi")
         assert json.dumps(night_report) == json.dumps(MOCK_NIGHTREPORT_RESPONSE)
 
-    @unittest.mock.patch("schedview.collect.nightreport.requests.get")
+    @unittest.mock.patch("schedview.collect.logdb.requests.get")
     def test_get_night_narrative(self, mock_requests_get):
         response_to_get = requests.models.Response()
         response_to_get.status_code = 200
         response_to_get.json = unittest.mock.MagicMock(return_value=MOCK_NARRATIVE_RESPONSE)
         mock_requests_get.return_value = response_to_get
 
-        night_narrative = schedview.collect.nightreport.get_night_narrative(TEST_DAY_OBS, "Simonyi")
+        night_narrative = get_night_narrative(TEST_DAY_OBS, "Simonyi")
         assert json.dumps(night_narrative) == json.dumps(MOCK_NARRATIVE_RESPONSE)
 
     def test_best_night_report(self):

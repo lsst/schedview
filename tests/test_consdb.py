@@ -3,7 +3,7 @@ import unittest
 import pandas as pd
 from rubin_sim import maf
 
-from schedview.collect.consdb import read_consdb
+from schedview.collect import read_consdb
 
 
 class TestConsdb(unittest.TestCase):

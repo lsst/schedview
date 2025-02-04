@@ -1,11 +1,8 @@
 import datetime
 from typing import Literal
 
-import requests
-
+from schedview.collect import get_from_logdb_with_retries
 from schedview.dayobs import DayObs
-
-MAX_RETRIES = 2
 
 EXCLUDED_COMPONENTS_FOR_TELESCOPE = {
     "AuxTel": ["MTMount", "MainTel"],
@@ -13,22 +10,9 @@ EXCLUDED_COMPONENTS_FOR_TELESCOPE = {
 }
 
 
-def _get_with_retries(api_endpoint, params):
-    response = requests.get(api_endpoint, params)
-    try_number = 1
-    while not response.status_code == 200:
-        if try_number > MAX_RETRIES:
-            response.raise_for_status()
-        response = requests.get(api_endpoint, params)
-        try_number += 1
-
-    return response.json()
-
-
 def get_night_report(
     day_obs: DayObs | str | int,
     telescope: Literal["AuxTel", "Simonyi"],
-    api_endpoint: str = "https://usdf-rsp-dev.slac.stanford.edu/nightreport/reports",
     user_params: dict | None = None,
 ) -> list[dict]:
     """Get the night report data for a night of observing.
@@ -39,9 +23,6 @@ def get_night_report(
         The night of observation.
     telescope : `str``
         The telescope for which to get the night report.
-    api_endpoint : `str`, optional
-        The URL for the source fo the night report,
-        by default "https://usdf-rsp-dev.slac.stanford.edu/nightreport/reports"
     user_params : `dict` | None, optional
         Extra parameters for the night report query
 
@@ -63,14 +44,14 @@ def get_night_report(
     if user_params is not None:
         params.update(user_params)
 
-    return _get_with_retries(api_endpoint, params)
+    result = get_from_logdb_with_retries(channel="nightreport/reports", params=params)
+    return result
 
 
 def get_night_narrative(
     day_obs: DayObs | str | int,
     telescope: Literal["AuxTel", "Simonyi"],
     night_only: bool = True,
-    api_endpoint: str = "https://usdf-rsp-dev.slac.stanford.edu/narrativelog/messages",
     user_params: dict | None = None,
 ) -> list[dict]:
     """Get the log messages for a given dayobs.
@@ -83,9 +64,6 @@ def get_night_narrative(
         The telescope for which to get the night report.
     night_only: `bool` optional
         Include only messages between sunset and sunrise, by default True.
-    api_endpoint : `str`, optional
-        The URL for the source fo the night report, by default
-        "https://usdf-rsp-dev.slac.stanford.edu/narrativelog/messages"
     user_params : `dict` | None, optional
         Extra parameters for the narrativelog query
 
@@ -117,4 +95,5 @@ def get_night_narrative(
     if user_params is not None:
         params.update(user_params)
 
-    return _get_with_retries(api_endpoint, params)
+    result = get_from_logdb_with_retries(channel="narrativelog/messages", params=params)
+    return result

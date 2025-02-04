@@ -13,7 +13,7 @@ def night_report_markdown(night_report: dict, heading_level=1) -> str:
     ----------
     night_report : `dict`
         A night report, as retured as an element of the list returned by
-        `schedview.collect.nightreport.get_night_report`.
+        `schedview.collect.get_night_report`.
     heading_level : `int`, optional
         The markdown heading level for the highest level heading
         to use, by default 1
@@ -70,7 +70,7 @@ def narrative_message_markdown(message: dict, heading_level=1) -> str:
     ----------
     message : `dict`
         A message, as retured as an element of the list returned by
-        `schedview.collect.nightreport.get_night_narrative`.
+        `schedview.collect.get_night_narrative`.
     heading_level : `int`, optional
         The markdown heading level for the highest level heading
         to use, by default 1
@@ -135,7 +135,7 @@ def narrative_message_html(message: dict, heading_level=1, scrolling=False) -> s
     ----------
     message : `dict`
         A night report, as retured as an element of the list returned by
-        `schedview.collect.nightreport.get_night_report`.
+        `schedview.collect.get_night_report`.
     heading_level : `int`, optional
         The markdown heading level for the highest level heading
         to use, by default 1
@@ -216,7 +216,7 @@ def scrolling_narrative_messages_html(
     ----------
     messages : `list`
         A night report, as retured as an element of the list returned by
-        `schedview.collect.nightreport.get_night_report`.
+        `schedview.collect.get_night_report`.
     height : `str`
         The height of the display.
     heading_level : `int`, optional

@@ -5,7 +5,7 @@ def best_night_report(night_reports) -> dict:
     ----------
     night_reports: `list[dict]`
         A list of dictionaries of night reports, as returned by
-        `schedview.collect.nightreport.get_night_report`.
+        `schedview.collect.get_night_report`.
 
     Returns
     -------

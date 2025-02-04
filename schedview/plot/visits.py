@@ -13,8 +13,8 @@ from astropy.time import Time
 # Imported to help sphinx make the link
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory  # noqa F401
 
-import schedview.collect.opsim
 import schedview.compute.astro
+from schedview.collect import read_opsim
 
 from .colors import PLOT_FILTER_CMAP
 
@@ -97,7 +97,7 @@ def plot_visits(visits):
     Parameters
     ----------
     visits : `pandas.DataFrame`
-        One row per visit, as created by `schedview.collect.opsim.read_opsim`
+        One row per visit, as created by `schedview.collect.read_opsim`
 
     Returns
     -------
@@ -116,7 +116,7 @@ def create_visit_explorer(visits, night_date, observatory=None, timezone="Chile/
     Parameters
     ----------
     visits : `str` or `pandas.DataFrame`
-        One row per visit, as created by `schedview.collect.opsim.read_opsim`,
+        One row per visit, as created by `schedview.collect.read_opsim`,
         or the name of a file from which such visits should be loaded.
     night_date : `datetime.date`
         The calendar date in the evening local time.
@@ -142,7 +142,7 @@ def create_visit_explorer(visits, night_date, observatory=None, timezone="Chile/
 
     # Collect
     if isinstance(visits, str):
-        visits = schedview.collect.opsim.read_opsim(visits, Time(start_time).iso, Time(end_time).iso)
+        visits = read_opsim(visits, Time(start_time).iso, Time(end_time).iso)
 
     # Plot
     data = {"visits": visits}

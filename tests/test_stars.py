@@ -1,6 +1,6 @@
 import unittest
 
-from schedview.collect.stars import load_bright_stars
+from schedview.collect import load_bright_stars
 
 
 class TestStars(unittest.TestCase):
