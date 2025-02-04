@@ -30,7 +30,7 @@ async def query_efd_topic_for_night(
     topic: str,
     day_obs: DayObs | str | int,
     sal_indexes: tuple[int, ...] = (1, 2, 3),
-    fields: list[str] | None = None,
+    fields: list[str] | None = ["*"],
     db_name: EfdDatabase = "efd",
 ) -> pd.DataFrame:
     """Query and EFD topic for all entries on a night.
@@ -45,8 +45,7 @@ async def query_efd_topic_for_night(
         Which SAL indexes to query, by default (1, 2, 3).
         Can be guessed by instrument with ``SAL_INDEX_GUESSES[instrument]``
     fields : `list[str]` or `None`, optional
-        Fields to query from the topic, by default None, which queries all
-        fields.
+        Fields to query from the topic, by default ['*'].
     db_name : `str`, optional
         Which EFD db_name to query: ``efd`` or ``obsenv``,
         by default ``efd``.
@@ -82,7 +81,7 @@ async def query_latest_in_efd_topic(
     topic: str,
     num_records: int = 6,
     sal_indexes: tuple[int, ...] | None = None,
-    fields: list[str] | None = None,
+    fields: list[str] | None = ["*"],
     db_name: EfdDatabase = "efd",
 ) -> pd.DataFrame:
     """Query and EFD topic for all entries on a night.
@@ -98,8 +97,7 @@ async def query_latest_in_efd_topic(
         for all indexes.
         Can be guessed by instrument with ``SAL_INDEX_GUESSES[instrument]``
     fields : `list[str]` or `None`, optional
-        Fields to query from the topic, by default None, which queries all
-        fields.
+        Fields to query from the topic, by default ['*'].
     db_name : `str`, optional
         Which EFD db_name to query: ``efd`` or ``obsenv``,
         by default ``efd``.
