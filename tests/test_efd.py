@@ -24,4 +24,9 @@ class TestEfdAccess(unittest.TestCase):
     @unittest.skip("Skipping test that requires EFD access")
     def test_sync_query_efd_topic_for_night(self):
         data = sync_query_efd_topic_for_night(self.test_topic, self.test_date, self.test_sal_indexes)
+        assert len(data) > 0
         assert isinstance(data, pd.DataFrame)
+
+        all_indexes_data = sync_query_efd_topic_for_night(self.test_topic, self.test_date)
+        assert len(all_indexes_data) >= len(data)
+        assert isinstance(all_indexes_data, pd.DataFrame)

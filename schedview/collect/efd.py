@@ -81,7 +81,7 @@ async def query_efd_topic_for_night(
 async def query_latest_in_efd_topic(
     topic: str,
     num_records: int = 6,
-    sal_indexes: tuple[int, ...] = (1, 2, 3),
+    sal_indexes: tuple[int, ...] | None = None,
     fields: list[str] | None = None,
     db_name: EfdDatabase = "efd",
 ) -> pd.DataFrame:
@@ -93,8 +93,9 @@ async def query_latest_in_efd_topic(
         The topic to query
     num_records : `int`
         The number of records to return.
-    sal_indexes : `tuple[int, ...]`, optional
-        Which SAL indexes to query, by default (1, 2, 3).
+    sal_indexes : `tuple[int, ...]` or `None`, optional
+        Which SAL indexes to query, by default None, which gets data
+        for all indexes.
         Can be guessed by instrument with ``SAL_INDEX_GUESSES[instrument]``
     fields : `list[str]` or `None`, optional
         Fields to query from the topic, by default None, which queries all
@@ -113,16 +114,21 @@ async def query_latest_in_efd_topic(
     if fields is None:
         fields = await _get_efd_fields_for_topic(topic, db_name=db_name)
 
-    if not isinstance(sal_indexes, Iterable):
-        sal_indexes = [sal_indexes]
+    if sal_indexes is None:
+        result = await client.select_top_n(topic, fields, num_records)
+        assert isinstance(result, pd.DataFrame)
+    else:
+        if not isinstance(sal_indexes, Iterable):
+            sal_indexes = [sal_indexes]
 
-    results = []
-    for sal_index in sal_indexes:
-        result = await client.select_top_n(topic, fields, num_records, index=sal_index)
-        if isinstance(result, pd.DataFrame) and len(result) > 0:
-            results.append(result)
+        results = []
+        assert isinstance(sal_indexes, Iterable)
+        for sal_index in sal_indexes:
+            result = await client.select_top_n(topic, fields, num_records, index=sal_index)
+            if isinstance(result, pd.DataFrame) and len(result) > 0:
+                results.append(result)
 
-    result = pd.concat(results) if len(results) > 0 else pd.DataFrame()
+        result = pd.concat(results) if len(results) > 0 else pd.DataFrame()
 
     return result
 
