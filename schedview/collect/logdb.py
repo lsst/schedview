@@ -22,6 +22,8 @@ def get_from_logdb_with_retries(channel: str, params: dict) -> list[dict]:
         The log messages.
     """
     try:
+        # Note that get_auth is cached, so it does not actually read the
+        # token every time.
         auth = get_auth()
     except ValueError:
         auth = ("user", None)
