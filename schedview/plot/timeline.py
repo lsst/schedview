@@ -49,7 +49,7 @@ from bokeh.models.plots import Plot
 import schedview.compute.nightreport
 import schedview.plot.nightreport
 
-from .colors import PLOT_FILTER_CMAP
+from .colors import make_band_cmap
 
 
 class TimelinePlotter:
@@ -491,12 +491,14 @@ class VisitTimelinePlotter(TimelinePlotter):
 
     @property
     def _make_glyph_kwargs(self) -> dict:
+        band_cmap = make_band_cmap()
+
         glyph_kwargs = {
             "y": self.factor_column,
             "left": "obs_start",
             "right": "obs_end",
-            "line_color": PLOT_FILTER_CMAP,
-            "fill_color": PLOT_FILTER_CMAP,
+            "line_color": band_cmap,
+            "fill_color": band_cmap,
             "line_alpha": 1.0,
             "fill_alpha": 0.5,
             "height": "scaled_alt",

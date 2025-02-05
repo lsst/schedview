@@ -17,11 +17,13 @@ astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
 TEST_ISO_DATE = str(DayObs.from_date("2024-12-05"))
 TEST_TELESCOPE = "Simonyi"
 TEST_VISIT_SOURCE = "lsstcomcam"
+USE_EFD = os.environ.get("TEST_WITH_EFD", "F").upper() in ("T", "TRUE", "1")
+USE_CONSDB = os.environ.get("TEST_WITH_CONSDB", "F").upper() in ("T", "TRUE", "1")
 
 
 class TestLogExamples(unittest.TestCase):
 
-    @unittest.skip("Skipping test that requires EFD access")
+    @unittest.skipUnless(USE_EFD, "Skipping test that requires EFD access")
     def test_nightevents(self):
         with TemporaryDirectory() as dir:
             report = str(Path(dir).joinpath("nightevents.txt").name)
@@ -30,21 +32,21 @@ class TestLogExamples(unittest.TestCase):
                 content = report_io.read()
                 assert len(content.split("\n")) == 12
 
-    @unittest.skip("Skipping test that requires consdb access")
+    @unittest.skipUnless(USE_CONSDB, "Skipping test that requires consdb access")
     def test_narrative_log(self):
         with TemporaryDirectory() as dir:
             report = str(Path(dir).joinpath("narrlog.txt").name)
             make_narrative_log(TEST_ISO_DATE, TEST_TELESCOPE, report=report)
             assert os.path.exists(report)
 
-    @unittest.skip("Skipping test that requires consdb access")
+    @unittest.skipUnless(USE_CONSDB, "Skipping test that requires consdb access")
     def test_nightreport(self):
         with TemporaryDirectory() as dir:
             report = str(Path(dir).joinpath("nightreport.txt").name)
             make_nightreport(TEST_ISO_DATE, TEST_TELESCOPE, report=report)
             assert os.path.exists(report)
 
-    @unittest.skip("Skipping test that requires EFD access")
+    @unittest.skipUnless(USE_EFD, "Skipping test that requires EFD access")
     def test_timeline(self):
         with TemporaryDirectory() as dir:
             report = str(Path(dir).joinpath("timeline.html").name)

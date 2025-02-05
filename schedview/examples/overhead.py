@@ -1,17 +1,24 @@
 import argparse
 import datetime
+from contextlib import redirect_stdout
 
 import astropy.utils.iers
+import bokeh.embed
+import bokeh.io
+import bokeh.layouts
+import bokeh.models
 import pandas as pd
 
+import schedview.compute.visits
+import schedview.plot
 from schedview.collect.visits import NIGHT_STACKERS, read_visits
 from schedview.dayobs import DayObs
 
 
-def make_overhead_table(
+def make_overhead_figures(
     iso_date: str | datetime.date, visit_source: str, report: None | str = None, min_time: float = 30
-) -> str:
-    """Create a table of overheads between visits.
+) -> bokeh.models.UIElement:
+    """Make a report including figures on overhead.
 
     Parameters
     ----------
@@ -27,8 +34,8 @@ def make_overhead_table(
 
     Returns
     -------
-    result : `str`
-        The table of long overheads.
+    result: `dict`
+        A dictionary of the figures related to overhead.
     """
 
     # Parameters
@@ -51,19 +58,33 @@ def make_overhead_table(
     )
 
     # Plot
-    result: str = long_gap_visits.to_markdown()
+    histogram: bokeh.models.UIElement = schedview.plot.create_overhead_histogram(visits)
+    vsslew: bokeh.models.UIElement = schedview.plot.plot_overhead_vs_slew_distance(visits)
+    table: str = long_gap_visits.to_html()
+    result = {
+        "histogram": histogram,
+        "vsslew": vsslew,
+        "table": table,
+    }
 
     # Report
     if report is not None:
         with open(report, "w") as report_io:
-            print(result, file=report_io)
+            with redirect_stdout(report_io):
+                print("<html><body>")
+                print(f"<h1>Overhead between visits for {day_obs}</h1>")
+                print("<h2>Plots</h2>")
+                print(bokeh.embed.file_html(bokeh.layouts.row([histogram, vsslew])))
+                print("<h2>Table</h2>")
+                print(table)
+                print("<html><body>")
 
     return result
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog="overheadtable", description="Create a table of long overheads between visits for a night."
+        prog="overheadhist", description="Make a histogram of overhead between visits."
     )
     parser.add_argument("date", type=str, help="Evening YYYY-MM-DD")
     parser.add_argument(
@@ -75,4 +96,4 @@ if __name__ == "__main__":
 
     astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
 
-    make_overhead_table(args.date, args.visit_source, args.report, args.dt)
+    make_overhead_figures(args.date, args.visit_source, args.report, args.dt)

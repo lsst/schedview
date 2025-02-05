@@ -4,7 +4,7 @@ from xml.etree import ElementTree as et
 import bokeh
 import numpy as np
 
-from .colors import PLOT_FILTER_CMAP
+from .colors import make_band_cmap
 
 
 def create_overhead_summary_table(overhead_summary, html=True):
@@ -126,11 +126,14 @@ def plot_overhead_vs_slew_distance(visits, plot=None, **kwargs):
             x_axis_label="slew distance (deg.)",
         )
 
-    circle_kwargs = {"color": PLOT_FILTER_CMAP, "fill_alpha": 0.3, "marker": "circle"}
+    band_column = "band" if "band" in visits else "filter"
+    band_cmap = make_band_cmap(band_column)
+
+    circle_kwargs = {"color": band_cmap, "fill_alpha": 0.3, "marker": "circle"}
     circle_kwargs.update(kwargs)
 
-    for band in PLOT_FILTER_CMAP.transform.factors:
-        these_visits = visits.query(f'filter == "{band}"')
+    for band in band_cmap.transform.factors:
+        these_visits = visits.query(f'{band_column} == "{band}"')
 
         if len(these_visits) > 0:
             plot.scatter(

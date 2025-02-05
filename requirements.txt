@@ -12,6 +12,7 @@ panel>=1.1.0
 param
 pytz
 skyproj
+tabulate
 uranography>=1.1.0
 rubin-scheduler
 rubin-sim>=2

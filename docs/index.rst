@@ -15,4 +15,5 @@ Contents
    usage
    tutorials
    architecture
+   examples
    api

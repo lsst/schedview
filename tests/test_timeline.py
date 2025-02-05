@@ -3,6 +3,7 @@ import os
 import string
 import time
 import unittest
+from importlib.util import find_spec
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -40,6 +41,9 @@ from schedview.plot.timeline import (
 astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
 
 WRITE_TIMEOUT_SECONDS = 20
+USE_EFD = os.environ.get("TEST_WITH_EFD", "F").upper() in ("T", "TRUE", "1")
+USE_CONSDB = os.environ.get("TEST_WITH_CONSDB", "F").upper() in ("T", "TRUE", "1")
+HAVE_TS = find_spec("lsst.ts") is not None
 
 
 def is_plottable_bokeh(plot):
@@ -66,7 +70,7 @@ class TestTimelinePlotters(TestCase):
     num_events = 5
     rng = np.random.default_rng(6563)
 
-    @unittest.skip("Slow and depends on real consdb and EFD")
+    @unittest.skipUnless(USE_CONSDB and USE_EFD, "Slow and depends on real consdb and EFD")
     def test_example(self):
         ui_element = make_timeline("2024-12-10", "lsstcomcam", "Simonyi")
         assert is_plottable_bokeh(ui_element)
@@ -185,7 +189,7 @@ class TestTimelinePlotters(TestCase):
         plotter = ModelSkyTimelinePlotter(median_model_sky)
         assert is_plottable_bokeh(plotter.plot)
 
-    @unittest.skip("Needs lsst.ts module missing from test environment")
+    @unittest.skipUnless(HAVE_TS, "Needs lsst.ts module missing from test environment")
     def test_scipts_logevent_timeline_plotter(self):
         num_events = 3
         mjds = self.rng.uniform(61000.2, 61001.4, num_events)
@@ -196,7 +200,7 @@ class TestTimelinePlotters(TestCase):
         plotter = ScriptQueueLogeventScriptTimelinePlotter(data)
         assert is_plottable_bokeh(plotter.plot)
 
-    @unittest.skip("Needs lsst.ts module missing from test environment")
+    @unittest.skipUnless(HAVE_TS, "Needs lsst.ts module missing from test environment")
     def test_scipts_logevent_span_timeline_plotter(self):
         num_events = 3
         mjds = self.rng.uniform(61000.2, 61001.4, num_events)

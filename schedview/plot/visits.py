@@ -16,7 +16,7 @@ from rubin_scheduler.scheduler.model_observatory import ModelObservatory  # noqa
 import schedview.compute.astro
 from schedview.collect import read_opsim
 
-from .colors import PLOT_FILTER_CMAP
+from .colors import make_band_cmap
 
 
 def visits_tooltips(weather: bool = False) -> list:
@@ -194,10 +194,13 @@ def plot_visit_param_vs_time(
     circle_kwargs = {"fill_alpha": 0.3, "marker": "circle"}
     circle_kwargs.update(kwargs)
 
+    band_column = "band" if "band" in visits else "filter"
+    band_cmap = make_band_cmap(band_column)
+
     timeline = plot.scatter(
         x="start_date",
         y=column_name,
-        color=PLOT_FILTER_CMAP,
+        color=band_cmap,
         source=data,
         legend_group="filter",
         **circle_kwargs,

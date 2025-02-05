@@ -1,5 +1,5 @@
 import argparse
-from datetime import date
+import datetime
 
 import astropy.utils.iers
 import bokeh.embed
@@ -12,20 +12,17 @@ import schedview.plot
 from schedview.collect.visits import NIGHT_STACKERS, read_visits
 from schedview.dayobs import DayObs
 
-STARTUP_VISIBLE_COLUMNS = ["observationStartMJD", "fieldRA", "fieldDec", "filter"]
-TABLE_WIDTH = 1024
 
-
-def make_visit_table(
-    iso_date: str | date,
+def make_overhead_vs_slew_dist(
+    iso_date: str | datetime.date,
     visit_source: str,
     report: None | str = None,
 ) -> bokeh.models.UIElement:
-    """Make a table of visits for a night.
+    """Plot overhead between visits vs. slew distance.
 
     Parameters
     ----------
-    iso_date : `str` or `date`
+    iso_date : `str` or `datetime.date`
         Local calendar date of the evening on which the night starts,
         in YYYY-MM-DD (ISO 8601) format.
     visit_source : `str`
@@ -36,7 +33,7 @@ def make_visit_table(
     Returns
     -------
     result: `bokeh.models.UIElement`
-        The interactive table.
+        The histogram.
     """
 
     # Parameters
@@ -48,9 +45,7 @@ def make_visit_table(
     # Compute
 
     # Plot
-    result: bokeh.models.UIElement = schedview.plot.create_visit_table(
-        visits, visible_column_names=STARTUP_VISIBLE_COLUMNS, width=TABLE_WIDTH
-    )
+    result: bokeh.models.UIElement = schedview.plot.plot_overhead_vs_slew_distance(visits)
 
     # Report
     if report is not None:
@@ -61,7 +56,9 @@ def make_visit_table(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="visittable", description="Make a table of visits for a night.")
+    parser = argparse.ArgumentParser(
+        prog="overheadvsslew", description="Plot overhead between visits vs. slew distance."
+    )
     parser.add_argument("date", type=str, help="Evening YYYY-MM-DD")
     parser.add_argument(
         "visit_source", type=str, default="lsstcomcam", help="Instrument or baseline version number"
@@ -71,5 +68,4 @@ if __name__ == "__main__":
 
     astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
 
-    if len(args.report) > 0:
-        make_visit_table(args.date, args.visit_source, args.report)
+    make_overhead_vs_slew_dist(args.date, args.visit_source, args.report)

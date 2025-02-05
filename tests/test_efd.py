@@ -1,9 +1,12 @@
 import asyncio
+import os
 import unittest
 
 import pandas as pd
 
 from schedview.collect import query_efd_topic_for_night, sync_query_efd_topic_for_night
+
+USE_EFD = os.environ.get("TEST_WITH_EFD", "F").upper() in ("T", "TRUE", "1")
 
 
 class TestEfdAccess(unittest.TestCase):
@@ -11,7 +14,7 @@ class TestEfdAccess(unittest.TestCase):
     test_date = "2024-12-10"
     test_sal_indexes = (1, 2, 3)
 
-    @unittest.skip("Skipping test that requires EFD access")
+    @unittest.skipUnless(USE_EFD, "Skipping test that requires EFD access")
     def test_query_efd_topic_for_night(self):
         async def waited_query_efd_topic_for_night(topic, date, sal_indexes):
             return await query_efd_topic_for_night(topic, date, sal_indexes)
@@ -21,7 +24,7 @@ class TestEfdAccess(unittest.TestCase):
         )
         assert isinstance(data, pd.DataFrame)
 
-    @unittest.skip("Skipping test that requires EFD access")
+    @unittest.skipUnless(USE_EFD, "Skipping test that requires EFD access")
     def test_sync_query_efd_topic_for_night(self):
         data = sync_query_efd_topic_for_night(self.test_topic, self.test_date, self.test_sal_indexes)
         assert len(data) > 0
