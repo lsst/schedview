@@ -81,7 +81,8 @@ class EventTimelineDashboard(param.Parameterized):
             )
         )
 
-        events["block_spans"] = compute_block_spans(events["block_status"])
+        if len(events["block_status"]) > 0:
+            events["block_spans"] = compute_block_spans(events["block_status"])
         events["model_sky"] = get_median_model_sky(day_obs)
         events["sun"] = night_events(day_obs.date)
         self.events = events
