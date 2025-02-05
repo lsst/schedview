@@ -1,3 +1,4 @@
+import os
 import unittest
 
 import pandas as pd
@@ -5,10 +6,12 @@ from rubin_sim import maf
 
 from schedview.collect import read_consdb
 
+USE_CONSDB = os.environ.get("TEST_WITH_CONSDB", "F").upper() in ("T", "TRUE", "1")
+
 
 class TestConsdb(unittest.TestCase):
 
-    @unittest.skip("avoid requiring access to consdb for tests.")
+    @unittest.skipUnless(USE_CONSDB, "avoid requiring access to consdb for tests.")
     def test_consdb_read_consdb(self):
         day_obs: str = "2024-06-26"
         stackers = [

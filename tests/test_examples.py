@@ -31,6 +31,7 @@ from schedview.examples.visittable import make_visit_table
 astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
 
 TEST_ISO_DATE = str(DayObs.from_date(int(SURVEY_START_MJD), int_format="mjd"))
+USE_CONSDB = os.environ.get("TEST_WITH_CONSDB", "F").upper() in ("T", "TRUE", "1")
 
 
 class TestExamples(unittest.TestCase):
@@ -112,12 +113,14 @@ class TestExamples(unittest.TestCase):
             make_ddf_cadence_plot(TEST_ISO_DATE, "baseline", report=report)
             assert os.path.exists(report)
 
+    @unittest.skipUnless(USE_CONSDB, "Skipping test requiring consdb access.")
     def test_narrative_log(self):
         with TemporaryDirectory() as dir:
             report = Path(dir).joinpath("narrlog.txt").name
             make_narrative_log(TEST_ISO_DATE, "Simonyi", report=report)
             assert os.path.exists(report)
 
+    @unittest.skipUnless(USE_CONSDB, "Skipping test requiring consdb access.")
     def test_nightreport(self):
         with TemporaryDirectory() as dir:
             report = Path(dir).joinpath("nightreport.txt").name
