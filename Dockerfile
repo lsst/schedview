@@ -1,24 +1,42 @@
-# Follow https://micromamba-docker.readthedocs.io/en/latest/
-
-# Base container
-FROM mambaorg/micromamba:2.0.3
+# Base
+FROM almalinux:9-minimal
+      
+# Config
+WORKDIR /work
 
 # Container construction
-COPY --chown=$MAMBA_USER:$MAMBA_USER . /home/${MAMBA_USER}/schedview
-RUN micromamba install -y -n base -f /home/${MAMBA_USER}/schedview/container_environment.yaml && \
-    micromamba clean --all --yes
-ARG MAMBA_DOCKERFILE_ACTIVATE=1
-RUN python -m pip install /home/$MAMBA_USER/schedview --no-deps
-ARG TEST_DATA_DIR=/home/${MAMBA_USER}/schedview/test_data
-ARG TEST_DATA_INDEX=https://s3df.slac.stanford.edu/data/rubin/sim-data/sched_pickles/test_snapshots.html
-RUN mkdir -p ${TEST_DATA_DIR} && \
-    wget --no-parent --directory-prefix=${TEST_DATA_DIR} --no-directories --recursive ${TEST_DATA_INDEX}
+
+# When run in the schedview github action, the "." directory comes from
+# a cache that includes schedview and rubin_sim_data
+COPY . schedview
+
+# Install conda, then use it to install everything but schedview itself
+RUN curl -sSL https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -o miniforge.sh && \
+  chmod +x miniforge.sh && \
+  ./miniforge.sh -b -p /work/miniconda && \
+  source /work/miniconda/bin/activate && \
+  conda init --system
+RUN source /work/miniconda/bin/activate && \
+  conda config --set solver libmamba && \
+  conda env update --file /work/schedview/container_environment.yaml && \
+  conda clean --all --yes
+
+# Install schedview itself using pip to get the version copied into the
+# the container, in the COPY clause above, so it matches the branch or tag
+# on which the github action to build the container is run, rather than
+# a version of schedview from the conda channel.
+# Note that dependency versions can be set the container_environment.yaml
+# file above, as defined in the same branch or tag version of schedview.
+RUN source /work/miniconda/bin/activate && \
+  python -m pip install /work/schedview --no-deps
 
 # Container execution
-ENV RUBIN_SIM_DATA_DIR=/home/${MAMBA_USER}/schedview/rubin_sim_data
+ENV RUBIN_SIM_DATA_DIR=/work/schedview/rubin_sim_data
 ENV SCHEDULER_SNAPSHOT_DASHBOARD_PORT=8080
 ENV LSST_DISABLE_BUCKET_VALIDATION=1
 ENV LSST_S3_USE_THREADS=False
 ENV S3_ENDPOINT_URL=https://s3dfrgw.slac.stanford.edu
 ENV SIMS_SKYBRIGHTNESS_DATA=https://s3df.slac.stanford.edu/groups/rubin/static/sim-data/sims_skybrightness_pre/h5_2023_09_12_small/
-CMD prenight --port 8080
+ENTRYPOINT ["/work/schedview/docker_entrypoint.sh"]
+CMD ["scheduler_dashboard", "--lfa"]
+
