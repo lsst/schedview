@@ -3,9 +3,10 @@ import threading
 from collections import defaultdict
 from collections.abc import Iterable
 from functools import cache, partial
-from typing import Literal
+from typing import Literal, Sequence
 
 import pandas as pd
+from astropy.time import Time, TimeDelta
 from lsst_efd_client import EfdClient
 
 import schedview.clientsite
@@ -109,6 +110,7 @@ async def query_latest_in_efd_topic(
     sal_indexes: tuple[int, ...] | None = None,
     fields: list[str] | None = ["*"],
     db_name: EfdDatabase = "efd",
+    time_cut: Time | None = None,
 ) -> pd.DataFrame:
     """Query and EFD topic for all entries on a night.
 
@@ -127,6 +129,9 @@ async def query_latest_in_efd_topic(
     db_name : `str`, optional
         Which EFD db_name to query: ``efd`` or ``obsenv``,
         by default ``efd``.
+    time_cut: `astropy.time.Time` or `None`, optional
+        Use a time cut instead of the most recent entry.
+        (default is `None`)
 
     Returns
     -------
@@ -139,7 +144,7 @@ async def query_latest_in_efd_topic(
         fields = await _get_efd_fields_for_topic(topic, db_name=db_name)
 
     if sal_indexes is None:
-        result = await client.select_top_n(topic, fields, num_records)
+        result = await client.select_top_n(topic, fields, num_records, time_cut=time_cut)
         assert isinstance(result, pd.DataFrame)
     else:
         if not isinstance(sal_indexes, Iterable):
@@ -148,7 +153,7 @@ async def query_latest_in_efd_topic(
         results = []
         assert isinstance(sal_indexes, Iterable)
         for sal_index in sal_indexes:
-            result = await client.select_top_n(topic, fields, num_records, index=sal_index)
+            result = await client.select_top_n(topic, fields, num_records, index=sal_index, time_cut=time_cut)
             if isinstance(result, pd.DataFrame) and len(result) > 0:
                 results.append(result)
 
@@ -186,3 +191,131 @@ def sync_query_efd_topic_for_night(*args, **kwargs):
     """
     result = _run_async(query_efd_topic_for_night(*args, **kwargs))
     return result
+
+
+def sync_query_latest_in_efd_topic(*args, **kwargs):
+    """Just like query_latest_in_efd_topic, but run in a separate thread
+    and block for results, so it can be run within a separate event loop.
+    """
+    result = _run_async(query_latest_in_efd_topic(*args, **kwargs))
+    return result
+
+
+def make_version_table_for_time(items: str | Sequence[str], time_cut=None):
+    """Query for the version of something being used at a given time.
+
+    Parameters
+    ----------
+    items : `str` | `Sequence`
+        The things to get the version of.
+    time_cut : `Time` | `None`, optional
+        The time at which you want the version.
+
+    Returns
+    -------
+    versions : `pd.DataFrame`
+        The table of versions as of the requested time.
+    """
+    if isinstance(items, str):
+        items = [items]
+    assert isinstance(items, Iterable)
+
+    all_scheduler_items = [
+        "cloudModel",
+        "downtimeModel",
+        "observatoryLocation",
+        "observatoryModel",
+        "scheduler",
+        "seeingModel",
+        "skybrightnessModel",
+        "rubin_scheduler",
+    ]
+
+    if items == "*" or (len(items) == 1 and items[0] == "*"):
+        obsenv_items = "*"
+        scheduler_items = all_scheduler_items
+    else:
+        items = [items] if isinstance(items, str) else items
+        obsenv_items = [i for i in items if i not in all_scheduler_items]
+        scheduler_items = [i for i in items if i in all_scheduler_items]
+
+    # We will collect our versions for multiple queries, which will be
+    # combined later.
+    # Initialize a list of the results of the various queries:
+    collected_versions = []
+
+    # Start with obsenv
+    topic: str = "lsst.obsenv.summary"
+    db_name: str = "lsst.obsenv"
+    if len(obsenv_items) > 0:
+        collected_versions.append(
+            sync_query_latest_in_efd_topic(
+                topic, num_records=1, db_name=db_name, fields=obsenv_items, time_cut=time_cut
+            )
+        )
+
+    # Now scheduler items
+    topic = "lsst.sal.Scheduler.logevent_dependenciesVersions"
+    db_name = "efd"
+    if len(scheduler_items) > 0:
+        requested_scheduler_items = []
+        for item in scheduler_items:
+            requested_scheduler_items.append("version" if item == "rubin_scheduler" else item)
+        collected_versions.append(
+            sync_query_latest_in_efd_topic(
+                topic, num_records=1, db_name=db_name, fields=requested_scheduler_items, time_cut=time_cut
+            ).rename(columns={"version": "rubin_scheduler"})
+        )
+
+        # Hack to guess rubin_scheduler version from available columns
+        # if version is missing a value
+        if "rubin_scheduler" in scheduler_items and collected_versions[-1]["rubin_scheduler"].iloc[0] == "":
+            collected_versions[-1].drop("rubin_scheduler", axis=1, inplace=True)
+            alt_field = "seeingModel"
+            collected_versions.append(
+                sync_query_latest_in_efd_topic(
+                    topic, num_records=1, db_name=db_name, fields=[alt_field], time_cut=time_cut
+                ).rename(columns={alt_field: "rubin_scheduler"})
+            )
+
+    # Reshape returned values to have one row for each versioned item.
+    version_tables = []
+    for collected_df in collected_versions:
+        config_time = collected_df.index[0]
+        version_tables.append(collected_df.T)
+        version_tables[-1].columns = ["version"]
+        version_tables[-1]["time"] = config_time
+
+    # Combine the versions from our various queries into a single DataFrame,
+    result = pd.concat(version_tables)
+
+    return result
+
+
+def get_version_at_time(item: str, time_cut: Time | None = None, max_age: TimeDelta | None = None):
+    """Query for the version of something being used at a given time.
+
+    Parameters
+    ----------
+    items : `str`
+        The thing to get the version of.
+    time_cut : `Time` | `None`, optional
+        The time at which you want the version.
+    max_age : `TimeDelta` | `None`, optional
+        The most time between the requested cut and the time the version was
+        recorded to consider it valid.
+
+    Returns
+    -------
+    version : `str`
+        The version of the requested item.
+    """
+    versions = make_version_table_for_time(item, time_cut)
+
+    if max_age is not None:
+        version_time = Time(versions.loc[item, "time"])
+        age = (Time.now() - version_time) if time_cut is None else (time_cut - version_time)
+        if age > max_age:
+            raise ValueError(f"Most recent version record is too old, recorded at {version_time}")
+
+    return versions.loc[item, "version"]
