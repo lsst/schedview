@@ -6,7 +6,7 @@ from functools import cache, partial
 from typing import Literal
 
 import pandas as pd
-from astropy.time import Time
+from astropy.time import Time, TimeDelta
 from lsst_efd_client import EfdClient
 
 import schedview.clientsite
@@ -192,3 +192,93 @@ def sync_query_efd_topic_for_night(*args, **kwargs):
     """
     result = _run_async(query_efd_topic_for_night(*args, **kwargs))
     return result
+
+
+def sync_query_latest_in_efd_topic(*args, **kwargs):
+    """Just like query_latest_in_efd_topic, but run in a separate thread
+    and block for results, so it can be run within a separate event loop.
+    """
+    result = _run_async(query_latest_in_efd_topic(*args, **kwargs))
+    return result
+
+
+def make_version_table_for_time(time_cut=None):
+    """Query for the versions used as of a given time.
+
+    Parameters
+    ----------
+    time_cut : `Time` | `None`, optional
+        The time at which you want the version.
+
+    Returns
+    -------
+    versions : `pd.DataFrame`
+        The table of versions as of the requested time.
+    """
+    # We will collect our versions for multiple queries, which will be
+    # combined later.
+    # Initialize a list of the results of the various queries:
+    collected_versions = []
+
+    # Start with obsenv
+    topic: str = "lsst.obsenv.summary"
+    db_name: str = "lsst.obsenv"
+    collected_versions.append(
+        sync_query_latest_in_efd_topic(topic, num_records=1, db_name=db_name, fields="*", time_cut=time_cut)
+    )
+
+    # Now scheduler items
+    topic = "lsst.sal.Scheduler.logevent_dependenciesVersions"
+    db_name = "efd"
+    collected_versions.append(
+        sync_query_latest_in_efd_topic(
+            topic, num_records=1, db_name=db_name, fields="*", time_cut=time_cut
+        ).rename(columns={"version": "rubin_scheduler"})
+    )
+
+    # Hack to guess rubin_scheduler version from available columns
+    # if version is missing a value
+    if collected_versions[-1]["rubin_scheduler"].iloc[0] == "":
+        collected_versions[-1]["rubin_scheduler"] = collected_versions[-1]["seeingModel"]
+
+    # Reshape returned values to have one row for each versioned item.
+    version_tables = []
+    for collected_df in collected_versions:
+        config_time = collected_df.index[0]
+        version_tables.append(collected_df.T)
+        version_tables[-1].columns = ["version"]
+        version_tables[-1]["time"] = config_time
+
+    # Combine the versions from our various queries into a single DataFrame,
+    result = pd.concat(version_tables)
+
+    return result
+
+
+def get_version_at_time(item: str, time_cut: Time | None = None, max_age: TimeDelta | None = None):
+    """Query for the version of something being used at a given time.
+
+    Parameters
+    ----------
+    item : `str`
+        The thing to get the version of.
+    time_cut : `Time` | `None`, optional
+        The time at which you want the version.
+    max_age : `TimeDelta` | `None`, optional
+        The most time between the requested cut and the time the version was
+        recorded to consider it valid.
+
+    Returns
+    -------
+    version : `str`
+        The version of the requested item.
+    """
+    versions = make_version_table_for_time(time_cut)
+
+    if max_age is not None:
+        version_time = Time(versions.loc[item, "time"])
+        age = (Time.now() - version_time) if time_cut is None else (time_cut - version_time)
+        if age > max_age:
+            raise ValueError(f"Most recent version record is too old, recorded at {version_time}")
+
+    return versions.loc[item, "version"]
