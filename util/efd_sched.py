@@ -10,8 +10,9 @@ import re
 import astropy.units as u
 from astropy.time import Time, TimeDelta
 from lsst.resources import ResourcePath
-from lsst_efd_client import EfdClient
 from rubin_scheduler.utils import Site
+
+from schedview.collect import make_efd_client
 
 LOCAL_ROOT_URI = {"usdf": "s3://rubin:", "summit": "https://s3.cp.lsst.org/"}
 
@@ -37,7 +38,7 @@ async def query_schedulers_in_window(desired_time, efd="usdf_efd", time_window=T
     start_time = desired_time - (time_window / 2)
     end_time = desired_time + (time_window / 2)
 
-    efd_client = EfdClient(efd)
+    efd_client = make_efd_client()
     topic = "lsst.sal.Scheduler.logevent_largeFileObjectAvailable"
     fields = ["url"]
     scheduler_urls = await efd_client.select_time_series(topic, fields, start_time, end_time)

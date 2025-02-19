@@ -5,8 +5,9 @@ import astropy.units as u
 import pandas as pd
 from astropy.time import Time, TimeDelta
 from lsst.resources import ResourcePath
-from lsst_efd_client import EfdClient
 from rubin_scheduler.skybrightness_pre.sky_model_pre import SkyModelPre
+
+from schedview.collect import make_efd_client
 
 LOCAL_ROOT_URI = {"usdf": "s3://rubin:", "summit": "https://s3.cp.lsst.org/"}
 
@@ -46,7 +47,7 @@ async def query_night_schedulers(reference_time_utc, selected_telescope=None, ef
     start_time = Time(start_datetime_utc)
     end_time = reference_time_utc
 
-    efd_client = EfdClient(efd)
+    efd_client = make_efd_client()
     topic = "lsst.sal.Scheduler.logevent_largeFileObjectAvailable"
     fields = ["url"]
     scheduler_urls = await efd_client.select_time_series(

@@ -8,6 +8,7 @@ __all__ = [
     "get_night_narrative",
     "get_night_report",
     "load_bright_stars",
+    "make_efd_client",
     "query_efd_topic_for_night",
     "read_consdb",
     "read_ddf_visits",
