@@ -44,7 +44,7 @@ class TestEfdAccess(unittest.TestCase):
     @unittest.skipUnless(USE_EFD, "Skipping test that requires EFD access")
     def test_make_version_table_for_time(self):
         time_cut = Time("2024-12-05T12:00:00Z")
-        result = make_version_table_for_time("*", time_cut=time_cut)
+        result = make_version_table_for_time(time_cut)
         for item in ("ts_config_ocs", "cloudModel", "rubin_scheduler"):
             assert isinstance(result.loc[item, "version"], str)
             assert isinstance(result.loc[item, "time"], pd.Timestamp)

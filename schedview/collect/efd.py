@@ -3,7 +3,7 @@ import threading
 from collections import defaultdict
 from collections.abc import Iterable
 from functools import cache, partial
-from typing import Literal, Sequence
+from typing import Literal
 
 import pandas as pd
 from astropy.time import Time, TimeDelta
@@ -201,13 +201,11 @@ def sync_query_latest_in_efd_topic(*args, **kwargs):
     return result
 
 
-def make_version_table_for_time(items: str | Sequence[str], time_cut=None):
-    """Query for the version of something being used at a given time.
+def make_version_table_for_time(time_cut=None):
+    """Query for the versions used as of a given time.
 
     Parameters
     ----------
-    items : `str` | `Sequence`
-        The things to get the version of.
     time_cut : `Time` | `None`, optional
         The time at which you want the version.
 
@@ -216,29 +214,6 @@ def make_version_table_for_time(items: str | Sequence[str], time_cut=None):
     versions : `pd.DataFrame`
         The table of versions as of the requested time.
     """
-    if isinstance(items, str):
-        items = [items]
-    assert isinstance(items, Iterable)
-
-    all_scheduler_items = [
-        "cloudModel",
-        "downtimeModel",
-        "observatoryLocation",
-        "observatoryModel",
-        "scheduler",
-        "seeingModel",
-        "skybrightnessModel",
-        "rubin_scheduler",
-    ]
-
-    if items == "*" or (len(items) == 1 and items[0] == "*"):
-        obsenv_items = "*"
-        scheduler_items = all_scheduler_items
-    else:
-        items = [items] if isinstance(items, str) else items
-        obsenv_items = [i for i in items if i not in all_scheduler_items]
-        scheduler_items = [i for i in items if i in all_scheduler_items]
-
     # We will collect our versions for multiple queries, which will be
     # combined later.
     # Initialize a list of the results of the various queries:
@@ -247,36 +222,23 @@ def make_version_table_for_time(items: str | Sequence[str], time_cut=None):
     # Start with obsenv
     topic: str = "lsst.obsenv.summary"
     db_name: str = "lsst.obsenv"
-    if len(obsenv_items) > 0:
-        collected_versions.append(
-            sync_query_latest_in_efd_topic(
-                topic, num_records=1, db_name=db_name, fields=obsenv_items, time_cut=time_cut
-            )
-        )
+    collected_versions.append(
+        sync_query_latest_in_efd_topic(topic, num_records=1, db_name=db_name, fields="*", time_cut=time_cut)
+    )
 
     # Now scheduler items
     topic = "lsst.sal.Scheduler.logevent_dependenciesVersions"
     db_name = "efd"
-    if len(scheduler_items) > 0:
-        requested_scheduler_items = []
-        for item in scheduler_items:
-            requested_scheduler_items.append("version" if item == "rubin_scheduler" else item)
-        collected_versions.append(
-            sync_query_latest_in_efd_topic(
-                topic, num_records=1, db_name=db_name, fields=requested_scheduler_items, time_cut=time_cut
-            ).rename(columns={"version": "rubin_scheduler"})
-        )
+    collected_versions.append(
+        sync_query_latest_in_efd_topic(
+            topic, num_records=1, db_name=db_name, fields="*", time_cut=time_cut
+        ).rename(columns={"version": "rubin_scheduler"})
+    )
 
-        # Hack to guess rubin_scheduler version from available columns
-        # if version is missing a value
-        if "rubin_scheduler" in scheduler_items and collected_versions[-1]["rubin_scheduler"].iloc[0] == "":
-            collected_versions[-1].drop("rubin_scheduler", axis=1, inplace=True)
-            alt_field = "seeingModel"
-            collected_versions.append(
-                sync_query_latest_in_efd_topic(
-                    topic, num_records=1, db_name=db_name, fields=[alt_field], time_cut=time_cut
-                ).rename(columns={alt_field: "rubin_scheduler"})
-            )
+    # Hack to guess rubin_scheduler version from available columns
+    # if version is missing a value
+    if collected_versions[-1]["rubin_scheduler"].iloc[0] == "":
+        collected_versions[-1]["rubin_scheduler"] = collected_versions[-1]["seeingModel"]
 
     # Reshape returned values to have one row for each versioned item.
     version_tables = []
@@ -297,7 +259,7 @@ def get_version_at_time(item: str, time_cut: Time | None = None, max_age: TimeDe
 
     Parameters
     ----------
-    items : `str`
+    item : `str`
         The thing to get the version of.
     time_cut : `Time` | `None`, optional
         The time at which you want the version.
@@ -310,7 +272,7 @@ def get_version_at_time(item: str, time_cut: Time | None = None, max_age: TimeDe
     version : `str`
         The version of the requested item.
     """
-    versions = make_version_table_for_time(item, time_cut)
+    versions = make_version_table_for_time(time_cut)
 
     if max_age is not None:
         version_time = Time(versions.loc[item, "time"])
