@@ -16,8 +16,34 @@ EfdDatabase = Literal["efd", "lsst.obsenv"]
 SAL_INDEX_GUESSES = defaultdict(partial([[]].__getitem__, 0), {"lsstcomcam": [1, 3], "latiss": [2]})
 
 
+def make_efd_client(efd_name: str | None = None, *args, **kwargs):
+    """Factor to create and EFD client.
+
+    Parameters
+    ----------
+    efd_name : `str` or `None`
+        Name of the EFD instance for which to retrieve credentials.
+        If None, use ``schedview.clientsite.EFD_NAME``.
+        By default, None.
+    *args
+        As `lsst_efd_client.EfdClient
+    **kwargs
+        As `lsst_efd_client.EfdClient
+
+    Returns
+    -------
+    client : `lsst_efd_client.EfdClient`
+        An EfdClient
+    """
+    if efd_name is None:
+        efd_name = schedview.clientsite.EFD_NAME
+
+    assert isinstance(efd_name, str)
+    return EfdClient(efd_name, *args, **kwargs)
+
+
 async def _get_efd_fields_for_topic(topic: str, public_only: bool = True, db_name: EfdDatabase = "efd"):
-    client = EfdClient(schedview.clientsite.EFD_NAME, db_name=db_name)
+    client = make_efd_client(db_name=db_name)
 
     fields = await client.get_fields(topic)
     if public_only:
@@ -57,7 +83,7 @@ async def query_efd_topic_for_night(
     """
 
     day_obs = day_obs if isinstance(day_obs, DayObs) else DayObs.from_date(day_obs)
-    client = EfdClient(schedview.clientsite.EFD_NAME, db_name=db_name)
+    client = make_efd_client(db_name=db_name)
 
     if fields is None:
         fields = await _get_efd_fields_for_topic(topic, db_name=db_name)
@@ -107,7 +133,7 @@ async def query_latest_in_efd_topic(
     result : `pd.DataFrame`
         The result of the query
     """
-    client = EfdClient(schedview.clientsite.EFD_NAME, db_name=db_name)
+    client = make_efd_client(db_name=db_name)
 
     if fields is None:
         fields = await _get_efd_fields_for_topic(topic, db_name=db_name)
