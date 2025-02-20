@@ -9,7 +9,7 @@ from rubin_scheduler.skybrightness_pre.sky_model_pre import SkyModelPre
 
 from schedview.collect import make_efd_client
 
-LOCAL_ROOT_URI = {"usdf": "s3://rubin:", "summit": "https://s3.cp.lsst.org/"}
+LOCAL_ROOT_URI = {"usdf": "s3://", "summit": "https://s3.cp.lsst.org/"}
 
 
 async def query_night_schedulers(reference_time_utc, selected_telescope=None, efd=None):

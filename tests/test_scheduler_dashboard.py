@@ -595,7 +595,7 @@ class TestLFAModeE2E(unittest.TestCase):
         expect(page.get_by_text("Snapshots loaded!!").first).to_be_visible()
 
         # Select snapshot file.
-        snapshot = "s3://rubin:rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T00:33:05.127.p"
+        snapshot = "s3://rubinobs-lfa-cp/Scheduler:2/Scheduler:2/2024/03/11/Scheduler:2_Scheduler:2_2024-03-12T00:33:05.127.p"
         page.get_by_role("combobox").nth(1).select_option(snapshot)
 
         # Check loading indicator.

@@ -34,4 +34,4 @@ COLOR_PALETTES = [color for color in bokeh.palettes.__palettes__ if "256" in col
 DEFAULT_COLOR_PALETTE = "Viridis256"
 DEFAULT_NSIDE = 16
 PACKAGE_DATA_DIR = importlib.resources.files("schedview.data").as_posix()
-LFA_DATA_DIR = "s3://rubin:"
+LFA_DATA_DIR = "s3://"
