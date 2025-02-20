@@ -1,5 +1,5 @@
 from io import StringIO
-from xml.etree import ElementTree as et
+from xml.etree import ElementTree as ET
 
 import bokeh
 import numpy as np
@@ -44,15 +44,15 @@ def create_overhead_summary_table(overhead_summary, html=True):
 
     with StringIO() as result_io:
         if html:
-            summary = et.Element("dl")
+            summary = ET.Element("dl")
             for stat_key in overhead_summary:
-                name_el = et.Element("dt")
+                name_el = ET.Element("dt")
                 name_el.text = stat_name[stat_key]
-                value_el = et.Element("dd")
+                value_el = ET.Element("dd")
                 value_el.text = stat_str_template[stat_key].format(overhead_summary[stat_key])
                 summary.append(name_el)
                 summary.append(value_el)
-            et.ElementTree(summary).write(result_io, encoding="unicode", method="html")
+            ET.ElementTree(summary).write(result_io, encoding="unicode", method="html")
         else:
             for stat_key in overhead_summary:
                 print(
