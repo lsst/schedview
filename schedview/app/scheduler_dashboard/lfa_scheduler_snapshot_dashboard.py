@@ -43,6 +43,9 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
         default=None, objects={"All": None, "Simonyi": 1, "Auxtel": 2}, doc="Source Telescope", precedence=2
     )
 
+    # Set in the URL
+    max_snapshot_mjd = param.Number(default=None)
+
     # Summary widget and Reward widget heights are different in this mode
     # because there are more data loading parameters.
     _summary_widget_height = 310
@@ -87,8 +90,45 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
         self.show_loading_indicator = False
         return scheduler_urls
 
+    @pn.depends("pickles_date", watch=True)
+    def update_max_snapshot_mjd(self):
+        # If the date is set with the dashboard, update the URL
+        self.logger.debug("UPDATE: max_snapshot_mjd from pickles_date")
+        self._do_not_trigger_update = True
+        new_max_snapshot_mjd = Time(
+            Timestamp(
+                self.pickles_date,
+                tzinfo=ZoneInfo(DEFAULT_TIMEZONE),
+            )
+        ).mjd
+        if self.max_snapshot_mjd is None or abs(new_max_snapshot_mjd - self.max_snapshot_mjd) > 1.0 / (
+            24 * 60 * 60
+        ):
+            self.max_snapshot_mjd = new_max_snapshot_mjd
+        self._do_not_trigger_update = False
+
+    @pn.depends("max_snapshot_mjd", watch=True)
+    def update_pickles_date_from_url(self):
+        self.logger.debug("UPDATE: pickles_date from max_snapshot_mjd")
+
+        # Begrudgingly accept YYYYMMDDhhmmss instead of MJD
+        if len(str(self.max_snapshot_mjd)) == 14:
+            self.max_snapshot_mjd = Time(datetime.strptime(str(self.max_snapshot_mjd), "%Y%m%d%H%M%S")).mjd
+
+        # If the URL parameter is set, update the value in the display
+        old_max_snapshot_mjd = Time(
+            Timestamp(
+                self.pickles_date,
+                tzinfo=ZoneInfo(DEFAULT_TIMEZONE),
+            )
+        ).mjd
+        if abs(self.max_snapshot_mjd - old_max_snapshot_mjd) > 1.0 / (24 * 60 * 60):
+            self.pickles_date = Time(self.max_snapshot_mjd, format="mjd").to_datetime()
+            self.logger.debug("Set pickles_date to {self.pickles_date}")
+
     @pn.depends("pickles_date", "telescope", watch=True)
     async def get_scheduler_list(self):
+        self.logger.debug(f"Updating scheduler list for pickles_date of {self.pickles_date}")
         selected_time = self.pickles_date
         selected_tel = self.telescope
         pn.state.notifications.clear()
