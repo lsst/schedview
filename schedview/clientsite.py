@@ -7,6 +7,7 @@ from warnings import warn
 
 DATASOURCE_BASE_URL = None
 EFD_NAME = None
+LFA_SCHEME_NETLOC = None
 
 
 def guess_site() -> str:
