@@ -13,3 +13,4 @@ from ..logdb import get_from_logdb_with_retries
 
 schedview.clientsite.DATASOURCE_BASE_URL = "https://summit-lsp.lsst.codes/"
 schedview.clientsite.EFD_NAME = "summit_efd"
+schedview.clientsite.LFA_SCHEME_NETLOC = "https://s3.cp.lsst.org"
