@@ -13,3 +13,4 @@ from ..logdb import get_from_logdb_with_retries
 
 schedview.clientsite.DATASOURCE_BASE_URL = "https://usdf-rsp-dev.slac.stanford.edu/"
 schedview.clientsite.EFD_NAME = "usdf_efd"
+schedview.clientsite.LFA_SCHEME_NETLOC = "s3:/"

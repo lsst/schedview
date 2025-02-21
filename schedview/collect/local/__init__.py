@@ -16,6 +16,7 @@ from ..logdb import get_from_logdb_with_retries
 
 schedview.clientsite.DATASOURCE_BASE_URL = "https://usdf-rsp.slac.stanford.edu/"
 schedview.clientsite.EFD_NAME = "usdf_efd"
+schedview.clientsite.LFA_SCHEME_NETLOC = "s3:/"
 
 if "SCHEDVIEW_DATASOURCE_URL" in os.environ:
     schedview.clientsite.DATASOURCE_BASE_URL = os.environ["SCHEDVIEW_DATASOURCE_URL"]
