@@ -130,6 +130,10 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
     async def get_scheduler_list(self):
         self.logger.debug(f"Updating scheduler list for pickles_date of {self.pickles_date}")
         selected_time = self.pickles_date
+
+        if self.telescope not in (None, 1, 2):
+            self.telescope = None
+
         selected_tel = self.telescope
         pn.state.notifications.clear()
         pn.state.notifications.info("Loading snapshots...")
