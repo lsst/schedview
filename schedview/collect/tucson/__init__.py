@@ -12,3 +12,4 @@ from ..logdb import get_from_logdb_with_retries
 
 schedview.clientsite.DATASOURCE_BASE_URL = None
 schedview.clientsite.EFD_NAME = "tucson_efd"
+schedview.clientsite.LFA_SCHEME_NETLOC = "s3:/"
