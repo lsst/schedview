@@ -6,10 +6,6 @@ import importlib.resources
 import lzma
 import os
 import pickle
-import urllib
-import urllib.request
-from pathlib import Path
-from tempfile import TemporaryDirectory
 
 from lsst.resources import ResourcePath
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
@@ -87,26 +83,13 @@ def read_scheduler(file_name_or_url=None):
     if file_name_or_url is None:
         file_name_or_url = sample_pickle()
 
-    if Path(file_name_or_url).is_file():
-        scheduler_resource_path = ResourcePath(file_name_or_url)
-        with scheduler_resource_path.as_local() as local_scheduler_resource:
-            (scheduler, conditions) = read_local_scheduler_pickle(local_scheduler_resource.ospath)
-    else:
-        with TemporaryDirectory() as directory:
-            with urllib.request.urlopen(file_name_or_url) as url_io:
-                content = url_io.read()
+    scheduler_resource_path = ResourcePath(file_name_or_url)
+    if scheduler_resource_path.scheme == "s3":
+        os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
+        scheduler_resource_path.use_threads = False
 
-            # Infer a file name
-            parsed_url = urllib.parse.urlparse(file_name_or_url)
-            origin_path = Path(parsed_url.path)
-            origin_name = origin_path.name
-            name = origin_name if len(origin_name) > 0 else "scheduler.pickle"
-            path = Path(directory).joinpath(name)
-
-            with open(path, "wb") as file_io:
-                file_io.write(content)
-
-            scheduler, conditions = read_local_scheduler_pickle(str(path))
+    with scheduler_resource_path.as_local() as local_scheduler_resource:
+        (scheduler, conditions) = read_local_scheduler_pickle(local_scheduler_resource.ospath)
 
     return scheduler, conditions
 
