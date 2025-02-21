@@ -6,6 +6,7 @@ from functools import cache, partial
 from typing import Literal
 
 import pandas as pd
+from astropy.time import Time
 from lsst_efd_client import EfdClient
 
 import schedview.clientsite
@@ -109,6 +110,7 @@ async def query_latest_in_efd_topic(
     sal_indexes: tuple[int, ...] | None = None,
     fields: list[str] | None = ["*"],
     db_name: EfdDatabase = "efd",
+    time_cut: Time | None = None,
 ) -> pd.DataFrame:
     """Query and EFD topic for all entries on a night.
 
@@ -127,6 +129,10 @@ async def query_latest_in_efd_topic(
     db_name : `str`, optional
         Which EFD db_name to query: ``efd`` or ``obsenv``,
         by default ``efd``.
+    time_cut: `astropy.time.Time` or `None`, optional
+        Use a time cut instead of the most recent entry.
+        Must be at an integer number of seconds: no partial seconds.
+        (default is `None`)
 
     Returns
     -------
@@ -139,7 +145,7 @@ async def query_latest_in_efd_topic(
         fields = await _get_efd_fields_for_topic(topic, db_name=db_name)
 
     if sal_indexes is None:
-        result = await client.select_top_n(topic, fields, num_records)
+        result = await client.select_top_n(topic, fields, num_records, time_cut=time_cut)
         assert isinstance(result, pd.DataFrame)
     else:
         if not isinstance(sal_indexes, Iterable):
@@ -148,7 +154,7 @@ async def query_latest_in_efd_topic(
         results = []
         assert isinstance(sal_indexes, Iterable)
         for sal_index in sal_indexes:
-            result = await client.select_top_n(topic, fields, num_records, index=sal_index)
+            result = await client.select_top_n(topic, fields, num_records, index=sal_index, time_cut=time_cut)
             if isinstance(result, pd.DataFrame) and len(result) > 0:
                 results.append(result)
 
