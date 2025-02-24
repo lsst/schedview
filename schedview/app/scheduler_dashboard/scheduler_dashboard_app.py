@@ -125,7 +125,7 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     # Load pickles from S3 bucket.
     elif from_lfa:
         scheduler = LFASchedulerSnapshotDashboard()
-        url_sync_map["max_snapshot_mjd"] = "maxmjd"
+        url_sync_map["dayobs"] = "dayobs"
         url_sync_map["telescope"] = "telescope"
 
     # Restrict files to data_directory.

@@ -7,6 +7,7 @@ import param
 from astropy.time import Time
 from pandas import Timestamp
 
+from schedview import DayObs
 from schedview.app.scheduler_dashboard.constants import DEFAULT_TIMEZONE
 from schedview.app.scheduler_dashboard.unrestricted_scheduler_snapshot_dashboard import (
     SchedulerSnapshotDashboard,
@@ -44,7 +45,7 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
     )
 
     # Set in the URL
-    max_snapshot_mjd = param.Number(default=None)
+    dayobs = param.Number(default=None)
 
     # Summary widget and Reward widget heights are different in this mode
     # because there are more data loading parameters.
@@ -91,46 +92,36 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
         return scheduler_urls
 
     @pn.depends("pickles_date", watch=True)
-    def update_max_snapshot_mjd(self):
+    def update_dayobs(self):
         # If the date is set with the dashboard, update the URL
-        self.logger.debug("UPDATE: max_snapshot_mjd from pickles_date")
+        self.logger.debug("UPDATE: dayobs from pickles_date")
         self._do_not_trigger_update = True
-        new_max_snapshot_mjd = Time(
-            Timestamp(
-                self.pickles_date,
-                tzinfo=ZoneInfo(DEFAULT_TIMEZONE),
-            )
-        ).mjd
-        if self.max_snapshot_mjd is None or abs(new_max_snapshot_mjd - self.max_snapshot_mjd) > 1.0 / (
-            24 * 60 * 60
-        ):
-            self.max_snapshot_mjd = new_max_snapshot_mjd
+        dayobs = DayObs.from_date(self.pickles_date)
+
+        if self.dayobs != dayobs.yyyymmdd:
+            self.dayobs = dayobs.yyyymmdd
+
         self._do_not_trigger_update = False
 
-    @pn.depends("max_snapshot_mjd", watch=True)
+    @pn.depends("dayobs", watch=True)
     def update_pickles_date_from_url(self):
-        self.logger.debug("UPDATE: pickles_date from max_snapshot_mjd")
+        self.logger.debug("UPDATE: pickles_date from dayobs")
 
-        # Begrudgingly accept YYYYMMDDhhmmss instead of MJD
-        if len(str(self.max_snapshot_mjd)) == 14:
-            self.max_snapshot_mjd = Time(datetime.strptime(str(self.max_snapshot_mjd), "%Y%m%d%H%M%S")).mjd
+        try:
+            dayobs = DayObs.from_date(self.dayobs)
+        except ValueError:
+            dayobs = DayObs.from_time(self.dayobs)
 
-        # If the URL parameter is set, update the value in the display
-        old_max_snapshot_mjd = Time(
-            Timestamp(
-                self.pickles_date,
-                tzinfo=ZoneInfo(DEFAULT_TIMEZONE),
-            )
-        ).mjd
-        if abs(self.max_snapshot_mjd - old_max_snapshot_mjd) > 1.0 / (24 * 60 * 60):
-            self.pickles_date = Time(self.max_snapshot_mjd, format="mjd").to_datetime()
-            self.logger.debug("Set pickles_date to {self.pickles_date}")
+        if self.dayobs != DayObs.from_date(self.pickles_date).yyyymmdd:
+            self.dayobs = dayobs.yyyymmdd
+            self.pickles_date = dayobs.end.datetime
 
     @pn.depends("pickles_date", "telescope", watch=True)
     async def get_scheduler_list(self):
         self.logger.debug(f"Updating scheduler list for pickles_date of {self.pickles_date}")
         selected_time = self.pickles_date
 
+        # If the telescope is set on the URL, it might not be a valid value.
         if self.telescope not in (None, 1, 2):
             self.telescope = None
 
