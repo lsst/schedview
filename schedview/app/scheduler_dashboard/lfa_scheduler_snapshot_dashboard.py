@@ -1,5 +1,6 @@
 import asyncio
 import os
+import typing
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -53,7 +54,7 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
     mjd_cut = param.Number(allow_None=True)
 
     # Load the most recent snapshot as of the cut
-    load_latest = param.Boolean(default=False, allow_None=False)
+    load_latest: param.Boolean = param.Boolean(default=False, allow_None=False)
 
     # Summary widget and Reward widget heights are different in this mode
     # because there are more data loading parameters.
@@ -91,7 +92,7 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
             )
         )
         self.show_loading_indicator = True
-        self._debugging_message = "Starting retrieving snapshots"
+        self._debugging_message = "Starting to retrieve snapshots"
         self.logger.debug("Starting retrieving snapshots")
 
         # Make sure our time does not include partial seconds
@@ -137,7 +138,7 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
 
         scheduler_urls = [] if scheduler_url_df.empty else scheduler_url_df["url"]
         self.logger.debug("Finished retrieving snapshots")
-        self._debugging_message = "Finished retrieving snapshots"
+        self._debugging_message = "Snapshots retrieved"
         self.show_loading_indicator = False
         return scheduler_urls
 
@@ -163,8 +164,6 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
     @pn.depends("datetime_cut", "telescope", watch=True)
     def get_scheduler_list(self):
         self.logger.debug("Creating task to update scheduler snapshot list")
-        self.param["scheduler_fname"].objects = [""]
-        self.clear_dashboard()
         asyncio.create_task(self._async_get_scheduler_list())
 
     async def _async_get_scheduler_list(self):
@@ -186,10 +185,22 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
         schedulers = [""]
         schedulers[1:] = await self.query_schedulers(selected_time, selected_tel)
         self.param["scheduler_fname"].objects = schedulers
-        self.clear_dashboard()
+
         if len(schedulers) > 1:
             pn.state.notifications.success("Snapshots loaded!!")
-            if self.load_latest:
-                self.scheduler_fname = self.param["scheduler_fname"].objects[1]
         else:
             pn.state.notifications.info("No snapshots found for selected night!!", duration=0)
+
+        # use typing.cast to convince linter that param.Boolean
+        # is truthy or falsy.
+        load_first_scheduler = typing.cast(bool, self.load_latest) and len(schedulers) > 1
+        if load_first_scheduler:
+            self.scheduler_fname = self.param["scheduler_fname"].objects[1]
+            # If we are auto-loading, do not clear the dashboard,
+            # because if the desired snapshot is already loaded,
+            # panel will not replace it, and if it is not already
+            # loaded, the callback to update it will clear it
+            # as necessary.
+        else:
+            # Autoload not replacing dashboard contents, so clear it.
+            self.clear_dashboard()
