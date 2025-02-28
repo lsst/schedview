@@ -29,6 +29,7 @@ async def query_night_schedulers(reference_time_utc, selected_telescope=None, ef
     schedulers : `list`
         A list of the schedulers for the night
     """
+    assert False
     if efd is None:
         lfa_site = os.environ.get("LSST_SITE", "usdf")
         efd = f"{lfa_site}_efd"
