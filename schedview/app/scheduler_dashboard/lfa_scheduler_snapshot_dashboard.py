@@ -164,6 +164,10 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
     @pn.depends("datetime_cut", "telescope", watch=True)
     def get_scheduler_list(self):
         self.logger.debug("Creating task to update scheduler snapshot list")
+        assert pn.state.notifications is not None, "Panel notifications not properly set up."
+        pn.state.notifications.clear()
+        pn.state.notifications.info("Preparing to update the list of snapshots")
+        self.show_loading_indicator = True
         asyncio.create_task(self._async_get_scheduler_list())
 
     async def _async_get_scheduler_list(self):
@@ -178,7 +182,7 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
         # Appease type checker
         assert pn.state.notifications is not None, "Panel notifications not properly set up."
         pn.state.notifications.clear()
-        pn.state.notifications.info("Loading snapshots...")
+        pn.state.notifications.info("Loading snapshots list")
         os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
         # add an empty option at index 0 to be the default
         # selection upon loading snapshot list
@@ -187,9 +191,9 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
         self.param["scheduler_fname"].objects = schedulers
 
         if len(schedulers) > 1:
-            pn.state.notifications.success("Snapshots loaded!!")
+            pn.state.notifications.success("Snapshot list loaded!!")
         else:
-            pn.state.notifications.info("No snapshots found for selected night!!", duration=0)
+            pn.state.notifications.info("No snapshots found for selected time!!", duration=0)
 
         # use typing.cast to convince linter that param.Boolean
         # is truthy or falsy.
@@ -202,5 +206,6 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
             # loaded, the callback to update it will clear it
             # as necessary.
         else:
-            # Autoload not replacing dashboard contents, so clear it.
             self.clear_dashboard()
+
+        self.show_loading_indicator = False
