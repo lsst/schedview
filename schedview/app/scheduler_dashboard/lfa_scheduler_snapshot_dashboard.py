@@ -1,3 +1,4 @@
+import asyncio
 import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -160,7 +161,13 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
             self.datetime_cut = datetime_cut.datetime
 
     @pn.depends("datetime_cut", "telescope", watch=True)
-    async def get_scheduler_list(self):
+    def get_scheduler_list(self):
+        self.logger.debug("Creating task to update scheduler snapshot list")
+        self.param["scheduler_fname"].objects = [""]
+        self.clear_dashboard()
+        asyncio.create_task(self._async_get_scheduler_list())
+
+    async def _async_get_scheduler_list(self):
         self.logger.debug(f"Updating scheduler list for datetime_cut of {self.datetime_cut}")
         selected_time = self.datetime_cut
 
