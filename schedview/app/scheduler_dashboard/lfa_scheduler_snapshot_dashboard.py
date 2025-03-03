@@ -1,4 +1,3 @@
-import asyncio
 import os
 import typing
 from datetime import datetime
@@ -19,7 +18,6 @@ from schedview.dayobs import DayObs
 
 SNAPSHOT_TOPIC = "lsst.sal.Scheduler.logevent_largeFileObjectAvailable"
 NUM_SNAPSHOTS = 100
-BACKGROUND_TASKS = set()
 
 
 class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
@@ -169,12 +167,7 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
         pn.state.notifications.clear()
         pn.state.notifications.info("Preparing to update the list of snapshots")
         self.show_loading_indicator = True
-        task = asyncio.create_task(self._async_get_scheduler_list())
-
-        # See https://docs.python.org/3/library/asyncio-task.html#creating-tasks
-        # for rationale behind saving tasks in BACKGROUND_TASKS.
-        BACKGROUND_TASKS.add(task)
-        task.add_done_callback(BACKGROUND_TASKS.discard)
+        param.parameterized.async_executor(self._async_get_scheduler_list)
 
     async def _async_get_scheduler_list(self):
         self.logger.debug(f"Updating scheduler list for datetime_cut of {self.datetime_cut}")
