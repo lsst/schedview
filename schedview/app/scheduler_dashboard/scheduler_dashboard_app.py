@@ -133,7 +133,10 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
     else:
         scheduler = RestrictedSchedulerSnapshotDashboard(data_dir=data_dir)
 
-    pn.state.location.sync(scheduler, url_sync_map)
+    # If there is no location (URL) to sync to (e.g. during some tests),
+    # do not try to sync to it.
+    if pn.state.location is not None:
+        pn.state.location.sync(scheduler, url_sync_map)
 
     # Show dashboard as busy when scheduler.show_loading_spinner is True.
     @pn.depends(loading=scheduler.param.show_loading_indicator, watch=True)
