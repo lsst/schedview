@@ -1,78 +1,9 @@
-import os
-from datetime import datetime, timedelta, timezone
-
-import astropy.units as u
 import pandas as pd
-from astropy.time import Time, TimeDelta
+from astropy.time import Time
 from lsst.resources import ResourcePath
 from rubin_scheduler.skybrightness_pre.sky_model_pre import SkyModelPre
 
-from schedview.collect import make_efd_client
-
 LOCAL_ROOT_URI = {"usdf": "s3://", "summit": "https://s3.cp.lsst.org/"}
-
-
-async def query_night_schedulers(reference_time_utc, selected_telescope=None, efd=None):
-    """Query the EFD for the night schedulers till reference time
-
-    Parameters
-    ----------
-    reference_time_utc : `astropy.time.Time`
-        selected reference time in UTC
-    efd : `str` or `None`
-        The name of the EFD to query, usdf_efd or summit_efd
-        If None, it derives it from the LSST_SITE environment variable,
-        and if that is not set, uses usdf_efd.
-
-    Returns
-    -------
-    schedulers : `list`
-        A list of the schedulers for the night
-    """
-    assert False
-    if efd is None:
-        lfa_site = os.environ.get("LSST_SITE", "usdf")
-        efd = f"{lfa_site}_efd"
-    else:
-        lfa_site = efd.split("_")[0]
-
-    # Use DOYOBS rollover as defined in SITCOMTN-32
-    dayobs_tz = timezone(timedelta(hours=+12), "dayobs")
-    reference_datetime_dayobs_tz = reference_time_utc.datetime.astimezone(dayobs_tz)
-    start_datetime_utc = datetime(
-        reference_datetime_dayobs_tz.year,
-        reference_datetime_dayobs_tz.month,
-        reference_datetime_dayobs_tz.day,
-        tzinfo=dayobs_tz,
-    ).astimezone(timezone(timedelta(hours=0), "UTC"))
-    start_time = Time(start_datetime_utc)
-    end_time = reference_time_utc
-
-    efd_client = make_efd_client()
-    topic = "lsst.sal.Scheduler.logevent_largeFileObjectAvailable"
-    fields = ["url"]
-    scheduler_urls = await efd_client.select_time_series(
-        topic, fields, start_time, end_time, index=selected_telescope
-    )
-
-    # If there are no entries this night, give the night before.
-    if scheduler_urls.empty:
-        start_time = start_time - TimeDelta(1 * u.day)
-        scheduler_urls = await efd_client.select_time_series(
-            topic, fields, start_time, end_time, index=selected_telescope
-        )
-
-    # If there are no entries this night either, give up.
-    if not scheduler_urls.empty:
-        # index data by time
-        scheduler_urls.index.name = "time"
-        scheduler_urls = scheduler_urls.reset_index()
-        # reverse schedulers order to show most recent one first
-        scheduler_urls = scheduler_urls.sort_index(ascending=False)
-        scheduler_urls["url"] = scheduler_urls["url"].apply(lambda x: localize_scheduler_url(x, lfa_site))
-        # return only URLs
-        return scheduler_urls["url"]
-    return []
 
 
 def localize_scheduler_url(scheduler_url, site="usdf"):
