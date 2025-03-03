@@ -533,7 +533,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
             Record of success or failure of reading scheduler from file/URL.
         """
         try:
-            self._debugging_message = "Starting to load scheduler."
+            self._debugging_message = "Starting to load scheduler from " + self.scheduler_fname
             pn.state.notifications.info("Scheduler loading...", duration=0)
 
             os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
