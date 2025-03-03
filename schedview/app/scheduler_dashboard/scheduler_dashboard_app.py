@@ -102,6 +102,9 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         del kwargs["lfa"]
 
     scheduler = None
+    url_sync_map = {
+        "nside": "nside",
+    }
 
     # Accept pickle files from url or any path.
     if from_urls:
@@ -114,27 +117,26 @@ def scheduler_app(date_time=None, scheduler_pickle=None, **kwargs):
         if scheduler_pickle is not None:
             scheduler.scheduler_fname = scheduler_pickle
 
-        # Sync url parameters only if the files aren't restricted.
-        if pn.state.location is not None:
-            pn.state.location.sync(
-                scheduler,
-                {
-                    "scheduler_fname": "scheduler",
-                    "nside": "nside",
-                    "url_mjd": "mjd",
-                },
-            )
+        # If allowing loading of arbitrary URLs, allow sync of those as
+        # well
+        url_sync_map["scheduler_fname"] = "scheduler"
+        url_sync_map["url_mjd"] = "mjd"
 
     # Load pickles from S3 bucket.
     elif from_lfa:
         scheduler = LFASchedulerSnapshotDashboard()
+        url_sync_map["mjd_cut"] = "mjdcut"
+        url_sync_map["load_latest"] = "load"
+        url_sync_map["telescope"] = "telescope"
 
     # Restrict files to data_directory.
     else:
         scheduler = RestrictedSchedulerSnapshotDashboard(data_dir=data_dir)
-        # data_loading_widgets = {
-        #     "widget_datetime": pn.widgets.DatetimePicker,
-        # }
+
+    # If there is no location (URL) to sync to (e.g. during some tests),
+    # do not try to sync to it.
+    if pn.state.location is not None:
+        pn.state.location.sync(scheduler, url_sync_map)
 
     # Show dashboard as busy when scheduler.show_loading_spinner is True.
     @pn.depends(loading=scheduler.param.show_loading_indicator, watch=True)

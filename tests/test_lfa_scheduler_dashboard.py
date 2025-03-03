@@ -15,7 +15,7 @@ from schedview.app.scheduler_dashboard.scheduler_dashboard_app import LFASchedul
 async def test_get_scheduler_list():
     scheduler = LFASchedulerSnapshotDashboard()
     scheduler.telescope = None
-    await scheduler.get_scheduler_list()
+    await scheduler._async_get_scheduler_list()
     # No snapshots should be retreived if it isn't an LFA environment
     # the dropdown has one empty option
     assert len(scheduler.param.scheduler_fname.objects) >= 1
@@ -27,8 +27,8 @@ async def test_get_scheduler_list_in_USDF():
     scheduler = LFASchedulerSnapshotDashboard()
 
     scheduler.telescope = None
-    scheduler.pickles_date = datetime(2024, 10, 1, 21, 26, 23)
-    await scheduler.get_scheduler_list()
+    scheduler.datetime_cut = datetime(2024, 10, 1, 21, 26, 23)
+    await scheduler._async_get_scheduler_list()
     # make sure it's a LFA environment by checking
     # the env variables needed for LFA mode are set
     if os.environ.get("AWS_SHARED_CREDENTIALS_FILE") and os.environ.get("S3_ENDPOINT_URL"):

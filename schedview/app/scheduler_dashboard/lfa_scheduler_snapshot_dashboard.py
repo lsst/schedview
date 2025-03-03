@@ -1,17 +1,23 @@
 import os
+import typing
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import pandas as pd
 import panel as pn
 import param
-from astropy.time import Time
+from astropy.time import Time, TimeDelta
 from pandas import Timestamp
 
 from schedview.app.scheduler_dashboard.constants import DEFAULT_TIMEZONE
 from schedview.app.scheduler_dashboard.unrestricted_scheduler_snapshot_dashboard import (
     SchedulerSnapshotDashboard,
 )
-from schedview.app.scheduler_dashboard.utils import query_night_schedulers
+from schedview.collect.efd import query_efd_topic_for_night, query_latest_in_efd_topic
+from schedview.dayobs import DayObs
+
+SNAPSHOT_TOPIC = "lsst.sal.Scheduler.logevent_largeFileObjectAvailable"
+NUM_SNAPSHOTS = 100
 
 
 class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
@@ -32,7 +38,7 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
         precedence=3,
     )
 
-    pickles_date = param.Date(
+    datetime_cut = param.Date(
         default=datetime.now(),
         label="Snapshot selection cutoff date and time",
         doc="Show snapshots that are recent as of this date and time in the scheduler snapshot file dropdown",
@@ -43,6 +49,12 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
         default=None, objects={"All": None, "Simonyi": 1, "Auxtel": 2}, doc="Source Telescope", precedence=2
     )
 
+    # Set in the URL
+    mjd_cut = param.Number(allow_None=True)
+
+    # Load the most recent snapshot as of the cut
+    load_latest: param.Boolean = param.Boolean(default=False, allow_None=False)
+
     # Summary widget and Reward widget heights are different in this mode
     # because there are more data loading parameters.
     _summary_widget_height = 310
@@ -50,7 +62,7 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
 
     data_loading_parameters = [
         "scheduler_fname",
-        "pickles_date",
+        "datetime_cut",
         "telescope",
         "widget_datetime",
         "widget_tier",
@@ -58,7 +70,7 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
     # Set specific widget props for data loading parameters
     # in LFA mode.
     data_loading_widgets = {
-        "pickles_date": pn.widgets.DatetimePicker,
+        "datetime_cut": pn.widgets.DatetimePicker,
         "widget_datetime": pn.widgets.DatetimePicker,
     }
     # Set the data loading parameter section height in LFA mode.
@@ -79,28 +91,120 @@ class LFASchedulerSnapshotDashboard(SchedulerSnapshotDashboard):
             )
         )
         self.show_loading_indicator = True
-        self._debugging_message = "Starting retrieving snapshots"
+        self._debugging_message = "Starting to retrieve snapshots"
         self.logger.debug("Starting retrieving snapshots")
-        scheduler_urls = await query_night_schedulers(selected_time, selected_tel)
+
+        # Make sure our time does not include partial seconds
+        if selected_time is None:
+            time_cut = None
+        else:
+            # Change the "format" of Time to make it work without modifying the
+            # object that was passed in.
+            time_cut = Time(selected_time)
+            time_cut.format = "isot"
+
+        # If the time cut is the end of a DayObs, try getting all data for
+        # the whole dayobs.
+        day_obs = DayObs.from_time(time_cut - TimeDelta(1e-8, format="jd"))
+
+        # Define it here to make type hinting happy
+        scheduler_url_df: pd.DataFrame = pd.DataFrame()
+
+        if day_obs.end == time_cut:
+            self.logger.debug(f"Retrieving snapshots for {day_obs.yyyymmdd}")
+            scheduler_url_df = await query_efd_topic_for_night(
+                topic=SNAPSHOT_TOPIC,
+                day_obs=day_obs,
+                sal_indexes=selected_tel,
+                fields=["url"],
+            )
+            if not scheduler_url_df.empty:
+                self.logger.debug(f"Retrieved {len(scheduler_url_df)} snapshots for {day_obs.yyyymmdd}")
+
+        if scheduler_url_df.empty or len(scheduler_url_df) < NUM_SNAPSHOTS:
+            if time_cut is None:
+                self.logger.debug(f"Retrieving the latest {NUM_SNAPSHOTS} snapshots.")
+            else:
+                self.logger.debug(f"Retrieving {NUM_SNAPSHOTS} snapshots before {time_cut.isot}")
+
+            scheduler_url_df = await query_latest_in_efd_topic(
+                topic=SNAPSHOT_TOPIC,
+                num_records=NUM_SNAPSHOTS,
+                sal_indexes=selected_tel,
+                fields=["url"],
+                time_cut=time_cut,
+            )
+
+        scheduler_urls = [] if scheduler_url_df.empty else scheduler_url_df["url"]
         self.logger.debug("Finished retrieving snapshots")
-        self._debugging_message = "Finished retrieving snapshots"
+        self._debugging_message = "Snapshots retrieved"
         self.show_loading_indicator = False
         return scheduler_urls
 
-    @pn.depends("pickles_date", "telescope", watch=True)
-    async def get_scheduler_list(self):
-        selected_time = self.pickles_date
-        selected_tel = self.telescope
+    @pn.depends("datetime_cut", watch=True)
+    def update_mjd_cut(self):
+        # If the date is set with the dashboard, update the URL
+        self.logger.debug("UPDATE: mjd_cut from datetime_cut")
+        self._do_not_trigger_update = True
+        mjd_cut = Time(self.datetime_cut).mjd
+
+        if self.mjd_cut != mjd_cut:
+            self.mjd_cut = mjd_cut
+
+        self._do_not_trigger_update = False
+
+    @pn.depends("mjd_cut", watch=True)
+    def update_datetime_cut_from_url(self):
+        self.logger.debug("UPDATE: datetime_cut from mjd_cut")
+        datetime_cut = Time(self.mjd_cut, format="mjd")
+        if self.datetime_cut != datetime_cut.datetime:
+            self.datetime_cut = datetime_cut.datetime
+
+    @pn.depends("datetime_cut", "telescope", watch=True)
+    def get_scheduler_list(self):
+        self.logger.debug("Creating task to update scheduler snapshot list")
+        assert pn.state.notifications is not None, "Panel notifications not properly set up."
         pn.state.notifications.clear()
-        pn.state.notifications.info("Loading snapshots...")
+        pn.state.notifications.info("Preparing to update the list of snapshots")
+        self.show_loading_indicator = True
+        param.parameterized.async_executor(self._async_get_scheduler_list)
+
+    async def _async_get_scheduler_list(self):
+        self.logger.debug(f"Updating scheduler list for datetime_cut of {self.datetime_cut}")
+        selected_time = self.datetime_cut
+
+        # If the telescope is set on the URL, it might not be a valid value.
+        if self.telescope not in (None, 1, 2):
+            self.telescope = None
+
+        selected_tel = self.telescope
+        # Appease type checker
+        assert pn.state.notifications is not None, "Panel notifications not properly set up."
+        pn.state.notifications.clear()
+        pn.state.notifications.info("Loading snapshots list")
         os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
         # add an empty option at index 0 to be the default
         # selection upon loading snapshot list
         schedulers = [""]
         schedulers[1:] = await self.query_schedulers(selected_time, selected_tel)
         self.param["scheduler_fname"].objects = schedulers
-        self.clear_dashboard()
+
         if len(schedulers) > 1:
-            pn.state.notifications.success("Snapshots loaded!!")
+            pn.state.notifications.success("Snapshot list loaded!!")
         else:
-            pn.state.notifications.info("No snapshots found for selected night!!", duration=0)
+            pn.state.notifications.info("No snapshots found for selected time!!", duration=0)
+
+        # use typing.cast to convince linter that param.Boolean
+        # is truthy or falsy.
+        load_first_scheduler = typing.cast(bool, self.load_latest) and len(schedulers) > 1
+        if load_first_scheduler:
+            self.scheduler_fname = self.param["scheduler_fname"].objects[1]
+            # If we are auto-loading, do not clear the dashboard,
+            # because if the desired snapshot is already loaded,
+            # panel will not replace it, and if it is not already
+            # loaded, the callback to update it will clear it
+            # as necessary.
+        else:
+            self.clear_dashboard()
+
+        self.show_loading_indicator = False
