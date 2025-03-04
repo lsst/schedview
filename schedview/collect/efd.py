@@ -252,6 +252,13 @@ def make_version_table_for_time(time_cut=None):
     # Combine the versions from our various queries into a single DataFrame,
     result = pd.concat(version_tables)
 
+    nonproduct_rows = [
+        c
+        for c in result.index
+        if c.startswith("private_") or c in ["salIndex", "priority", "SchedulerID", "timestamp"]
+    ]
+    result.drop(nonproduct_rows, axis=0, inplace=True)
+
     return result
 
 
