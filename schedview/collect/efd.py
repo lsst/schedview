@@ -131,7 +131,6 @@ async def query_latest_in_efd_topic(
         by default ``efd``.
     time_cut: `astropy.time.Time` or `None`, optional
         Use a time cut instead of the most recent entry.
-        Must be at an integer number of seconds: no partial seconds.
         (default is `None`)
 
     Returns
@@ -140,6 +139,10 @@ async def query_latest_in_efd_topic(
         The result of the query
     """
     client = make_efd_client(db_name=db_name)
+
+    # select_to_n only works when fromat=isot
+    if time_cut is not None and time_cut.format != "isot":
+        time_cut = Time(time_cut, format="isot")
 
     if fields is None:
         fields = await _get_efd_fields_for_topic(topic, db_name=db_name)
