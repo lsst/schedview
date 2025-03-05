@@ -2,7 +2,9 @@ import schedview.clientsite
 
 from ..efd import (
     SAL_INDEX_GUESSES,
+    get_version_at_time,
     make_efd_client,
+    make_version_table_for_time,
     query_efd_topic_for_night,
     sync_query_efd_topic_for_night,
 )
