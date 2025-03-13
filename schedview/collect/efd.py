@@ -265,7 +265,7 @@ def make_version_table_for_time(time_cut=None):
     return result
 
 
-def get_version_at_time(item: str, time_cut: Time | None = None, max_age: TimeDelta | None = None):
+def get_version_at_time(item: str, time_cut: Time | None = None, max_age: TimeDelta | None = None) -> str:
     """Query for the version of something being used at a given time.
 
     Parameters
@@ -291,4 +291,10 @@ def get_version_at_time(item: str, time_cut: Time | None = None, max_age: TimeDe
         if age > max_age:
             raise ValueError(f"Most recent version record is too old, recorded at {version_time}")
 
-    return versions.loc[item, "version"]
+    version = versions.loc[item, "version"]
+    if not isinstance(version, str):
+        raise ValueError(
+            f"Invalid version name for {item} in consdb: expected a string, got a {type(version)}"
+        )
+
+    return version
