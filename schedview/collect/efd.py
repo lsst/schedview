@@ -6,6 +6,8 @@ from functools import cache, partial
 from typing import Literal
 
 import pandas as pd
+import requests
+import yaml
 from astropy.time import Time, TimeDelta
 from lsst_efd_client import EfdClient
 
@@ -298,3 +300,42 @@ def get_version_at_time(item: str, time_cut: Time | None = None, max_age: TimeDe
         )
 
     return version
+
+
+async def get_scheduler_config(
+    ts_config_ocs_version: str, sal_indexes: tuple[int, ...] | None = None, time_cut: Time | None = None
+) -> str:
+
+    latest_config_df = await query_latest_in_efd_topic(
+        topic="lsst.sal.Scheduler.logevent_configurationApplied",
+        fields=["SchedulerId", "configurations", "salIndex", "schemaVersion", "url", "version"],
+        sal_indexes=sal_indexes,
+        time_cut=time_cut,
+        num_records=1,
+    )
+    config_fname = latest_config_df["configurations"].iloc[0].split(",")[-1]
+    schema_version = latest_config_df["schemaVersion"].iloc[0]
+
+    scheduler_config_ocs_url = "/".join(
+        [
+            "https://raw.githubusercontent.com",
+            "lsst-ts",
+            "ts_config_ocs",
+            ts_config_ocs_version,
+            "Scheduler",
+            schema_version,
+            config_fname,
+        ]
+    )
+
+    response = requests.get(scheduler_config_ocs_url, allow_redirects=True)
+    scheduler_config_ocs = yaml.safe_load(response.content.decode("utf-8"))
+
+    scheduler_config = scheduler_config_ocs["auxtel"]["feature_scheduler_driver_configuration"][
+        "scheduler_config"
+    ]
+
+    relative_scheduler_config = scheduler_config[
+        scheduler_config.find("/ts_config_ocs/Scheduler/feature_scheduler") + 1 :
+    ]
+    return relative_scheduler_config
