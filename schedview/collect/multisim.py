@@ -1,7 +1,7 @@
 import astropy
 import astropy.time
 import pandas as pd
-import rubin_scheduler
+import rubin_sim
 from lsst.resources import ResourcePath
 from rubin_sim import maf
 
@@ -26,7 +26,7 @@ def read_multiple_opsims(archive_uri: str, sim_date: str, day_obs_mjd: int):
     visits : `pandas.DataFrame`
         Data on the visits.
     """
-    sims_metadata = rubin_scheduler.sim_archive.read_archived_sim_metadata(
+    sims_metadata = rubin_sim.sim_archive.read_archived_sim_metadata(
         archive_uri, latest=sim_date, num_nights=1
     )
 

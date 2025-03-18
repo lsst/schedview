@@ -1,5 +1,5 @@
 from lsst.resources import ResourcePath
-from rubin_scheduler.sim_archive import read_archived_sim_metadata
+from rubin_sim.sim_archive import read_archived_sim_metadata
 
 
 def find_file_resources(base_resource_uri, file_filter=None):
