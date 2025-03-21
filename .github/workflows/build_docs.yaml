@@ -18,24 +18,24 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
-          python-version: "3.11"
-          channels: conda-forge
-          channel-priority: strict
+          python-version: "3.12"
+          miniforge-version: latest
+          channels: conda-forge,defaults
           show-channel-urls: true
 
       - name: Configure and install requirements and documenteer
         shell: bash -l {0}
         run: |
           conda config --set always_yes yes
-          conda install --quiet --file=requirements.txt
-          conda install --quiet pip
+          conda install --yes --file=requirements.txt
+          conda install --yes pip
           pip install "documenteer[guide]"
 
       - name: Install schedview
         shell: bash -l {0}
         run: |
           echo `pwd`
-          python -m pip install .
+          python -m pip install . --no-deps
 
       - name: Check conda and documenteer
         shell: bash -l {0}
