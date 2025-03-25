@@ -13,6 +13,7 @@ Contents
    introduction
    installation
    usage
+   prenight_sim_generation
    tutorials
    architecture
    examples
