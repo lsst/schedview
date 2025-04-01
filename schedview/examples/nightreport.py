@@ -50,7 +50,7 @@ def make_nightreport(
     # Report
     if report is not None:
         with open(report, "w") as report_io:
-            print(report, file=report_io)
+            print(result, file=report_io)
 
     return result
 
@@ -59,7 +59,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="nightreport", description="Print the night report as markdown.")
     parser.add_argument("date", type=str, help="Evening YYYY-MM-DD")
     parser.add_argument("--telescope", type=str, default="Simonyi", help="Telescope, Simonyi or AuxTel")
-    parser.add_argument("--report", type=str, help="output file name")
+    parser.add_argument("--report", type=str, default=None, help="output file name")
     args = parser.parse_args()
 
-    make_nightreport(args.date, args.telescope, args.report)
+    result = make_nightreport(args.date, args.telescope, args.report)
+
+    if args.report is None:
+        print(result)
