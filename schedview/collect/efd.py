@@ -97,8 +97,15 @@ async def query_efd_topic_for_night(
         sal_indexes = [sal_indexes]
 
     results = []
-    for sal_index in sal_indexes:
-        result = await client.select_time_series(topic, fields, day_obs.start, day_obs.end, index=sal_index)
+    if len(sal_indexes) > 0:
+        for sal_index in sal_indexes:
+            result = await client.select_time_series(
+                topic, fields, day_obs.start, day_obs.end, index=sal_index
+            )
+            if isinstance(result, pd.DataFrame) and len(result) > 0:
+                results.append(result)
+    else:
+        result = await client.select_time_series(topic, fields, day_obs.start, day_obs.end)
         if isinstance(result, pd.DataFrame) and len(result) > 0:
             results.append(result)
 

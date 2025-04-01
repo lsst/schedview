@@ -50,7 +50,7 @@ def get_night_report(
 
 def get_night_narrative(
     day_obs: DayObs | str | int,
-    telescope: Literal["AuxTel", "Simonyi"],
+    telescope: Literal["AuxTel", "Simonyi"] | None,
     night_only: bool = True,
     user_params: dict | None = None,
 ) -> list[dict]:
@@ -60,7 +60,7 @@ def get_night_narrative(
     ----------
     day_obs: `DayObs` | `str` | `int`
         The night of observation.
-    telescope : `str``
+    telescope : `str`` | ``None``
         The telescope for which to get the night report.
     night_only: `bool` optional
         Include only messages between sunset and sunrise, by default True.
@@ -88,9 +88,11 @@ def get_night_narrative(
         "has_date_begin": True,
         "min_date_begin": min_date_begin_time.to_datetime(),
         "max_date_begin": max_date_begin_time.to_datetime(),
-        "exclude_components": EXCLUDED_COMPONENTS_FOR_TELESCOPE[telescope],
         "order_by": "date_begin",
     }
+
+    if telescope is not None:
+        params["exclude_components"] = EXCLUDED_COMPONENTS_FOR_TELESCOPE[telescope]
 
     if user_params is not None:
         params.update(user_params)
