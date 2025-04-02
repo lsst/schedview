@@ -16,7 +16,9 @@ from schedview.dayobs import DayObs
 
 EfdDatabase = Literal["efd", "lsst.obsenv"]
 
-SAL_INDEX_GUESSES = defaultdict(partial([[]].__getitem__, 0), {"lsstcomcam": [1, 3], "latiss": [2]})
+SAL_INDEX_GUESSES = defaultdict(
+    partial([[]].__getitem__, 0), {"lsstcam": [1, 3], "lsstcomcam": [1, 3], "latiss": [2]}
+)
 
 
 def make_efd_client(efd_name: str | None = None, *args, **kwargs):
@@ -29,9 +31,9 @@ def make_efd_client(efd_name: str | None = None, *args, **kwargs):
         If None, use ``schedview.clientsite.EFD_NAME``.
         By default, None.
     *args
-        As `lsst_efd_client.EfdClient
+        As `lsst_efd_client.EfdClient`
     **kwargs
-        As `lsst_efd_client.EfdClient
+        As `lsst_efd_client.EfdClient`
 
     Returns
     -------
@@ -305,6 +307,27 @@ def get_version_at_time(item: str, time_cut: Time | None = None, max_age: TimeDe
 async def get_scheduler_config(
     ts_config_ocs_version: str, sal_indexes: tuple[int, ...] | None = None, time_cut: Time | None = None
 ) -> str:
+    """Get the relative path of the scheduler configuration script.
+
+    Parameters
+    ----------
+    ts_config_ocs_version : `str`
+        The version of ts_config_ocs from which to fetch the configuration.
+        Must be a valid string representing the git branch or tag.
+    sal_indexes : `tuple` of `int` or `None`
+        Optional. SAL indexes to filter results by.
+        Default is None (no filtering).
+        Example: (1, 3)
+    time_cut : `astropy.time.Time` or `None`
+        The time cut for the query. Default is None, which
+        uses the current time.
+
+    Returns
+    -------
+    config_script_path : `str`
+        The relative path to the scheduler configuration script.
+
+    """
 
     latest_config_df = await query_latest_in_efd_topic(
         topic="lsst.sal.Scheduler.logevent_configurationApplied",
@@ -313,7 +336,15 @@ async def get_scheduler_config(
         time_cut=time_cut,
         num_records=1,
     )
+
+    # Find the name of the yaml configuration file for the FBS
+    # This is typically saved in the last comma-separated values in the
+    # "configurations" field from
+    # lsst.sal.Scheduler.logevent_configurationApplied
     config_fname = latest_config_df["configurations"].iloc[0].split(",")[-1]
+
+    # schema_version tracks the directory where the above yaml
+    # configuration file should live inside of ts_config_ocs/Scheduler
     schema_version = latest_config_df["schemaVersion"].iloc[0]
 
     scheduler_config_ocs_url = "/".join(
@@ -331,10 +362,17 @@ async def get_scheduler_config(
     response = requests.get(scheduler_config_ocs_url, allow_redirects=True)
     scheduler_config_ocs = yaml.safe_load(response.content.decode("utf-8"))
 
+    # Find the path to actual python configuration file
+    # for the FBS referenced in the yaml file
     scheduler_config = scheduler_config_ocs["auxtel"]["feature_scheduler_driver_configuration"][
         "scheduler_config"
     ]
 
+    # Find the path to the FBS python configuration,
+    # relative to ts_config_ocs/Scheduler/feature_scheduler
+    # The "+1" skips the initial "/", resulting in a relative path,
+    # while still only matching when ts_config_ocs is the full
+    # name of the higest-level named directory.
     relative_scheduler_config = scheduler_config[
         scheduler_config.find("/ts_config_ocs/Scheduler/feature_scheduler") + 1 :
     ]

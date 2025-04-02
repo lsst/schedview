@@ -20,7 +20,9 @@ def scheduler_config_at_time_cli():
         prog="scheduler_config_at_time",
         description="Get the scheduler configuration script path the observatory as of a given time.",
     )
-    parser.add_argument("instrument", type=str, help="The instrument being scheduled.")
+    parser.add_argument(
+        "instrument", type=str, help="The instrument being scheduled (lsstcam, latiss, or lsstcomcam)."
+    )
     parser.add_argument(
         "--datetime",
         type=str,
