@@ -10,8 +10,10 @@ import schedview.compute.visits
 
 try:
     from rubin_sim import maf
+
+    HAVE_MAF = True
 except ModuleNotFoundError:
-    pass
+    HAVE_MAF = True
 
 
 class TestComputeVisits(unittest.TestCase):
@@ -27,11 +29,15 @@ class TestComputeVisits(unittest.TestCase):
         visits = schedview.compute.visits.add_coords_tuple(self.visits)
         self.assertEqual(len(visits["coords"].iloc[0]), 2)
 
-    @unittest.skipUnless("maf" in locals(), "No maf installation")
+    @unittest.skipUnless(HAVE_MAF, "No maf installation")
     def test_add_maf_metric(self):
         constraint = None
         visits = schedview.compute.visits.add_maf_metric(
-            self.visits, maf.TeffMetric(), "teff", constraint, "fiveSigmaDepth"
+            self.visits,
+            maf.SumMetric(col="t_eff", metric_name="Total Teff"),
+            "teff",
+            constraint,
+            "fiveSigmaDepth",
         )
         self.assertIn("teff", visits.columns)
 
