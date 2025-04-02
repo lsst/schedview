@@ -11,6 +11,7 @@ from schedview.plot import create_cadence_plot
 
 try:
     from rubin_sim import maf
+
     HAVE_MAF = True
 except ModuleNotFoundError:
     HAVE_MAF = False
