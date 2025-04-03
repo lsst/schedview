@@ -16,21 +16,18 @@ jobs:
       - name: Install conda
         uses: conda-incubator/setup-miniconda@v3
         with:
-          python-version: "3.11"
           auto-update-conda: true
+          python-version: "3.12"
+          miniforge-version: latest
           channels: conda-forge,defaults
-          miniforge-variant: Miniforge3
-          use-mamba: true
-          channel-priority: strict
           show-channel-urls: true
-          activate-environment: rubin-sim
 
       - name: Install rubin-scheduler/rubin-sim
         id: rs-install
         shell: bash -l {0}
         run: |
-          mamba install --quiet rubin-sim
-          mamba list rubin-scheduler | grep -v "#" | awk '{print $2}' > ${{ github.workspace }}/rs_version
+          conda install --yes rubin-sim
+          conda list rubin-scheduler | grep -v "#" | awk '{print $2}' > ${{ github.workspace }}/rs_version
           echo "rs-version" `cat ${{ github.workspace }}/rs_version`
           echo "rs-version=`cat ${{ github.workspace }}/rs_version`" >> $GITHUB_OUTPUT
 
