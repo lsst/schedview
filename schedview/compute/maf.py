@@ -87,6 +87,9 @@ def compute_metric_by_visit(visits, metric, constraint=""):
     values : `pandas.Series`
         The metric values.
     """
+    if "observationId" not in visits.columns and visits.index.name == "observationId":
+        visits = visits.reset_index()
+
     slicer = maf.OneDSlicer("observationId", bin_size=1)
     metric_bundle = maf.MetricBundle(slicer=slicer, metric=metric, constraint=constraint)
 

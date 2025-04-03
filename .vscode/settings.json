@@ -1,10 +1,37 @@
 {
+    "editor.rulers": [
+        79,
+        110
+    ],
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.coverage.*": true,
+        "**/.pytest_cache": true,
+        "**/.sconf_temp": true,
+        "**/.sconsign.dblite": true,
+        "**/.tests": true,
+        "**/*.o": true,
+        "**/*.os": true
+    },
+    "files.watcherExclude": {
+        "**/__pycache__": true
+    },
+    "[restructuredtext]": {
+        "editor.wordWrap": "wordWrapColumn",
+    },
+    "search.useGlobalIgnoreFiles": true,
     "python.testing.pytestArgs": [
         "."
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
     "python.envFile": "${workspaceFolder}/.env",
-    "python.formatting.provider": "black",
-    "esbonio.sphinx.confDir": ""
+    "files.trimTrailingWhitespace": true,
+    "pylint.enabled": false,
+    "flake8.enabled": false,
+    "ruff.enable": true,
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true
+      }
 }

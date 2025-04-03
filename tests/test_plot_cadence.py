@@ -11,13 +11,15 @@ from schedview.plot import create_cadence_plot
 
 try:
     from rubin_sim import maf
+
+    HAVE_MAF = True
 except ModuleNotFoundError:
-    pass
+    HAVE_MAF = False
 
 
 class TestPlotCadence(TestCase):
 
-    @unittest.skipUnless("maf" in locals(), "No rubin_sim.maf installation")
+    @unittest.skipUnless(HAVE_MAF, "No rubin_sim.maf installation")
     def test_create_cadence_plot(self):
         stackers = [
             maf.stackers.ObservationStartDatetime64Stacker(),
