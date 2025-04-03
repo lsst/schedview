@@ -119,6 +119,7 @@ def plot_airmass_vs_time(
     fig.circle(
         "start_date",
         "airmass",
+        radius=0.2,
         source=visits_ds,
         color={"field": "filter", "transform": filter_color_mapper},
         legend_field="filter",
