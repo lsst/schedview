@@ -11,6 +11,7 @@ from rubin_scheduler.scheduler.schedulers import CoreScheduler  # noqa F401
 from uranography.api import ArmillarySphere, Planisphere, split_healpix_by_resolution
 
 import schedview.compute.astro
+from schedview import band_column
 from schedview.collect import get_footprint, load_bright_stars, read_opsim
 from schedview.compute.camera import LsstCameraFootprintPerimeter
 
@@ -34,7 +35,7 @@ VISIT_COLUMNS = [
     "start_date",
     "observationStartMJD",
     "observationStartLST",
-    "filter",
+    "band",
     "fieldRA",
     "fieldDec",
     "rotSkyPos",
@@ -70,8 +71,8 @@ def plot_visit_skymaps(
             The visit declination in degrees (`float`).
         ``"observationStartMJD"``
             The visit start MJD (`float`).
-        ``"filter"``
-            The visit filter (`str`)
+        ``"band"``
+            The visit band (`str`)
 
     footprint : `numpy.array`
         A healpix map of the footprint.
@@ -164,7 +165,13 @@ def plot_visit_skymaps(
     )
 
     for band in "ugrizy":
-        band_visits = visits.reset_index().loc[visits.reset_index()["filter"] == band, VISIT_COLUMNS].copy()
+        visit_columns = [
+            "filter" if (c == "band" and "band" not in visits.columns) else c for c in VISIT_COLUMNS
+        ]
+
+        band_visits = (
+            visits.reset_index().loc[visits.reset_index()[band_column(visits)] == band, visit_columns].copy()
+        )
 
         if len(band_visits) < 1:
             continue
@@ -297,7 +304,7 @@ def create_visit_skymaps(
             The visit declination in degrees (`float`).
         ``"observationStartMJD"``
             The visit start MJD (`float`).
-        ``"filter"``
+        ``"band"``
             The visit filter (`str`)
 
         If a string, the file name of the opsim database from which the

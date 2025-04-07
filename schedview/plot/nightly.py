@@ -5,6 +5,8 @@ import bokeh.models
 import colorcet
 import numpy as np
 
+from schedview import band_column
+
 from .visitmap import BAND_COLORS
 from .visits import visits_tooltips
 
@@ -113,7 +115,7 @@ def plot_airmass_vs_time(
     filter_color_mapper = bokeh.models.CategoricalColorMapper(
         factors=tuple(band_colors.keys()),
         palette=tuple(band_colors.values()),
-        name="filter",
+        name=band_column(visits),
     )
     fig.line("start_date", "airmass", source=visits_ds, color="gray")
     fig.circle(
@@ -121,8 +123,8 @@ def plot_airmass_vs_time(
         "airmass",
         radius=0.2,
         source=visits_ds,
-        color={"field": "filter", "transform": filter_color_mapper},
-        legend_field="filter",
+        color={"field": band_column(visits), "transform": filter_color_mapper},
+        legend_field=band_column(visits),
         name="visit_airmass",
     )
 
@@ -235,14 +237,17 @@ def plot_alt_vs_time(
 
         if "note_and_filter" not in visits_ds.column_names:
             note_and_filter = tuple(
-                [f"{n} in {f}" for n, f in zip(visits_ds.data[note_column], visits_ds.data["filter"])]
+                [
+                    f"{n} in {f}"
+                    for n, f in zip(visits_ds.data[note_column], visits_ds.data[band_column(visits)])
+                ]
             )
             visits_ds.add(note_and_filter, "note_and_filter")
 
     filter_marker_mapper = bokeh.models.CategoricalMarkerMapper(
         factors=tuple(band_shapes.keys()),
         markers=tuple(band_shapes.values()),
-        name="filter",
+        name=band_column(visits),
     )
 
     fig.line(time_column, "altitude", source=visits_ds, color="gray")
@@ -251,9 +256,9 @@ def plot_alt_vs_time(
             time_column,
             "altitude",
             source=visits_ds,
-            marker={"field": "filter", "transform": filter_marker_mapper},
+            marker={"field": band_column(visits), "transform": filter_marker_mapper},
             size=5,
-            legend_field="filter",
+            legend_field=band_column(visits),
             name="visit_altitude",
         )
     else:
@@ -262,7 +267,7 @@ def plot_alt_vs_time(
             "altitude",
             source=visits_ds,
             color={"field": note_column, "transform": note_color_mapper},
-            marker={"field": "filter", "transform": filter_marker_mapper},
+            marker={"field": band_column(visits), "transform": filter_marker_mapper},
             size=5,
             legend_field="note_and_filter",
             name="visit_altitude",
@@ -446,14 +451,17 @@ def plot_polar_alt_az(visits, band_shapes=BAND_SHAPES, figure=None, legend=True,
 
         if "note_and_filter" not in visits_ds.column_names:
             note_and_filter = tuple(
-                [f"{n} in {f}" for n, f in zip(visits_ds.data[note_column], visits_ds.data["filter"])]
+                [
+                    f"{n} in {f}"
+                    for n, f in zip(visits_ds.data[note_column], visits_ds.data[band_column(visits)])
+                ]
             )
             visits_ds.add(note_and_filter, "note_and_filter")
 
     filter_marker_mapper = bokeh.models.CategoricalMarkerMapper(
         factors=tuple(band_shapes.keys()),
         markers=tuple(band_shapes.values()),
-        name="filter",
+        name=band_column(visits),
     )
 
     polar_transform = bokeh.models.PolarTransform(
@@ -466,9 +474,9 @@ def plot_polar_alt_az(visits, band_shapes=BAND_SHAPES, figure=None, legend=True,
             polar_transform.y,
             polar_transform.x,
             source=visits_ds,
-            marker={"field": "filter", "transform": filter_marker_mapper},
+            marker={"field": band_column(visits), "transform": filter_marker_mapper},
             size=5,
-            legend_field="filter",
+            legend_field=band_column(visits),
             name="visit_altitude",
         )
     else:
@@ -477,7 +485,7 @@ def plot_polar_alt_az(visits, band_shapes=BAND_SHAPES, figure=None, legend=True,
             polar_transform.x,
             source=visits_ds,
             color={"field": note_column, "transform": note_color_mapper},
-            marker={"field": "filter", "transform": filter_marker_mapper},
+            marker={"field": band_column(visits), "transform": filter_marker_mapper},
             size=5,
             legend_field="note_and_filter",
             name="visit_altitude",

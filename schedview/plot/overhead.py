@@ -1,8 +1,14 @@
+# Allow import of ElementTree as ET following the recommendation in the
+# official python docs.
+# ruff: noqa: N817
+
 from io import StringIO
 from xml.etree import ElementTree as ET
 
 import bokeh
 import numpy as np
+
+from schedview import band_column
 
 from .colors import make_band_cmap
 
@@ -126,14 +132,13 @@ def plot_overhead_vs_slew_distance(visits, plot=None, **kwargs):
             x_axis_label="slew distance (deg.)",
         )
 
-    band_column = "band" if "band" in visits else "filter"
-    band_cmap = make_band_cmap(band_column)
+    band_cmap = make_band_cmap(band_column(visits))
 
     circle_kwargs = {"color": band_cmap, "fill_alpha": 0.3, "marker": "circle"}
     circle_kwargs.update(kwargs)
 
     for band in band_cmap.transform.factors:
-        these_visits = visits.query(f'{band_column} == "{band}"')
+        these_visits = visits.query(f'{band_column(visits)} == "{band}"')
 
         if len(these_visits) > 0:
             plot.scatter(

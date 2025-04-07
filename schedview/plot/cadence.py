@@ -2,6 +2,8 @@ import bokeh
 import numpy as np
 from astropy.time import Time
 
+from schedview import band_column
+
 from .colors import make_band_cmap
 
 
@@ -38,7 +40,7 @@ def create_cadence_plot(
         The bokeh plot with cadence plots for all targets.
     """
     if cmap is None:
-        cmap = make_band_cmap("band" if "band" in nightly_totals else "filter")
+        cmap = make_band_cmap(band_column(nightly_totals))
 
     if targets is None:
         targets = tuple(nightly_totals.index.get_level_values("target_name").unique())
