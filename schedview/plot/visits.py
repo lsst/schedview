@@ -202,7 +202,7 @@ def plot_visit_param_vs_time(
         y=column_name,
         color=band_cmap,
         source=data,
-        legend_group="filter",
+        legend_group=band_column,
         **circle_kwargs,
     )
 

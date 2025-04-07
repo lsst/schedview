@@ -11,6 +11,7 @@ pandas
 panel>=1.1.0
 param
 pytz
+scikit-learn
 skyproj
 tabulate
 uranography>=1.1.0
