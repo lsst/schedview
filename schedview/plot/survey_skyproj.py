@@ -9,6 +9,7 @@ from astropy.coordinates import SkyCoord
 # Import ModelObservatory to make sphinx happy
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory  # noqa F401
 
+from schedview import band_column
 from schedview.compute.camera import LsstCameraFootprintPerimeter
 
 DEFAULT_MAP_KWARGS = {"cmap": colorcet.cm.blues}
@@ -84,7 +85,7 @@ def map_visits_over_healpix(visits, map_hpix, model_observatory, night_events, a
     visits : `pd.DataFrame`
         A DataFrame of visits, with columns ``fieldRA`` and ``fieldDec``,
         with the coordinates (in degrees), ``observationStartMJD`` with the
-        MJD of the start of each visit, and ``filter`` with the band
+        MJD of the start of each visit, and ``band`` with the band
         (as a string).
     map_hpix : `numpy.ndarray`
         The healpixel array to show.
@@ -169,7 +170,7 @@ def create_hpix_visit_map_grid(
     visits : `pd.DataFrame`
         A DataFrame of visits, with columns ``fieldRA`` and ``fieldDec``,
         with the coordinates (in degrees), ``observationStartMJD`` with the
-        MJD of the start of each visit, and ``filter`` with the band
+        MJD of the start of each visit, and ``band`` with the band
         (as a string).
     hpix_maps : `dict` [`str`, `numpy.ndarray`]
         The healpixel array to show.
@@ -205,7 +206,7 @@ def create_hpix_visit_map_grid(
         fig = plt.figure(figsize=(plot_width, plot_height))
 
     for band_idx, band in enumerate(hpix_maps.keys()):
-        visits_in_band = visits.query(f"filter == '{band}'")
+        visits_in_band = visits.query(f"{band_column(visits)} == '{band}'")
         axes = fig.add_subplot(num_rows, num_columns, band_idx + 1)
         axes.set_title(band, loc="left")
         new_axes = map_visits_over_healpix(
