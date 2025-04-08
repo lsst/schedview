@@ -107,7 +107,7 @@ def count_visits_by_sim(
     visits: pd.DataFrame,
     sim_identifier_column: str = "sim_index",
     visit_spec_columns: tuple[str, ...] = ("fieldRA", "fieldDec", "band", "visitExposureTime"),
-    nside: int = 32,
+    nside: int = 2**18,
 ) -> pd.DataFrame:
     """Count the numbers of visits on each field in each simulation.
 
@@ -336,6 +336,7 @@ def compute_matched_visit_delta_statistics(
     sim_identifier_reference_value: int | str = 1,
     sim_identifier_column: str = "sim_index",
     visit_spec_columns: tuple[str, ...] = ("fieldRA", "fieldDec", "band", "visitExposureTime"),
+    nside: int = 2**18,
 ) -> pd.DataFrame:
     """Compute statistics on time differencse in visits matched across sims.
 
@@ -363,6 +364,14 @@ def compute_matched_visit_delta_statistics(
         ``count``, ``mean``, ``std``, ``min``, ``25%``, ``50%``, ``75%``,
         ``max``.
     """
+
+    if nside is not None and nside > 0:
+        visits = visits.copy()
+        hpid = hp.ang2pix(nside, visits.fieldRA, visits.fieldDec, lonlat=True)
+        ra, decl = hp.pix2ang(nside, hpid, lonlat=True)
+        visits["hp_ra"] = ra
+        visits["hp_decl"] = decl
+        visit_spec_columns = visit_spec_columns + ("hp_ra", "hp_decl")
 
     delta_stats_list = []
 
