@@ -37,7 +37,7 @@
             "size": 10,
             "xlabel": "H.A. (hours)",
             "hover_cols": [
-                "start_date",
+                "start_timestamp",
                 "band",
                 "skyBrightness",
                 "sunAlt",
@@ -58,7 +58,7 @@
             "y": "skyBrightness",
             "y_label": "sky brightness (mag/sq arcsec)",
             "hover_cols": [
-                "start_date",
+                "start_timestamp",
                 "sunAlt",
                 "moonAlt",
                 "moonPhase",

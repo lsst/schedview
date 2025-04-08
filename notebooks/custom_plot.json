@@ -3,7 +3,7 @@
         "name": "Seeing",
         "settings": {
             "kind": "scatter",
-            "x": "start_date",
+            "x": "start_timestamp",
             "y": [
                 "seeingFwhmEff",
                 "seeingFwhm500",

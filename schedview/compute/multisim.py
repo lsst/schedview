@@ -1,6 +1,7 @@
 import itertools
 import math
 
+import healpy as hp
 import numpy as np
 import pandas as pd
 
@@ -23,7 +24,7 @@ def often_repeated_fields(visits: pd.DataFrame, min_counts: int = 4):
             The filter.
         ``sim_index``
             An ``int`` identifying which simulation a visit came from.
-        ``start_date``
+        ``start_timestamp``
             The starting ``datetime64[ns, UTC]`` for the visit.
         ``label``
             The ``str`` label for the simulation.
@@ -76,11 +77,11 @@ def often_repeated_fields(visits: pd.DataFrame, min_counts: int = 4):
     """
     field_repeats: pd.DataFrame = visits.groupby(
         ["fieldRA", "fieldDec", band_column(visits), "sim_index"]
-    ).agg({"start_date": ["count", "min", "max"], "label": "first"})
+    ).agg({"start_timestamp": ["count", "min", "max"], "label": "first"})
     column_map: dict[tuple[str, str], str] = {
-        ("start_date", "count"): "count",
-        ("start_date", "min"): "first_time",
-        ("start_date", "max"): "last_time",
+        ("start_timestamp", "count"): "count",
+        ("start_timestamp", "min"): "first_time",
+        ("start_timestamp", "max"): "last_time",
         ("label", "first"): "label",
     }
     # type hinting doesn't recognize that the column names in a multiindex
@@ -105,7 +106,8 @@ def often_repeated_fields(visits: pd.DataFrame, min_counts: int = 4):
 def count_visits_by_sim(
     visits: pd.DataFrame,
     sim_identifier_column: str = "sim_index",
-    visit_spec_columns: tuple[str, ...] = ("fieldRA", "fieldDec", "band", "visitExposureTime"),
+    visit_spec_columns: tuple = ("fieldHpid", "band", "visitExposureTime"),
+    nside: int = 2**18,
 ) -> pd.DataFrame:
     """Count the numbers of visits on each field in each simulation.
 
@@ -120,8 +122,12 @@ def count_visits_by_sim(
     sim_identifier_column : `str`, optional
         A column that uniquely identifies visits, by default "sim_index"
     visit_spec_columns : `tuple`[`str`], optional
-        Columns that, together, uniquely identify a field that can be visited,
-        by default ("fieldRA", "fieldDec", "band", "visitExposureTime")
+        Columns that, together, uniquely identify a field that can be visited.
+        If fieldHpid is included but not a column, and fieldRA and fieldDec
+        are, it will be computed on the fly.
+        by default ("fieldHpid", "band", "visitExposureTime").
+    nside : `int`
+        nside to use if fieldHpid is to be computed on the fly.
 
     Returns
     -------
@@ -140,10 +146,20 @@ def count_visits_by_sim(
     if "filter" in visit_spec_columns and "filter" not in visits.columns:
         visit_spec_columns = tuple("band" if c == "filter" else c for c in visit_spec_columns)
 
+    if "fieldHpid" in visit_spec_columns and "fieldHpid" not in visits.columns:
+        visits = visits.copy()
+        hpid = hp.ang2pix(nside, visits.fieldRA, visits.fieldDec, lonlat=True)
+        ra, decl = hp.pix2ang(nside, hpid, lonlat=True)
+        visits["hp_ra"] = ra
+        visits["hp_decl"] = decl
+        visit_spec_columns = tuple(c for c in visit_spec_columns if c != "fieldHpid") + ("hp_ra", "hp_decl")
+
+    grouping_columns = [sim_identifier_column] + list(visit_spec_columns)
+
     visit_counts = (
-        visits.groupby([sim_identifier_column] + list(visit_spec_columns))
+        visits.groupby(grouping_columns)
         .count()
-        .iloc[:, 0]
+        .loc[:, "start_timestamp"]
         .rename("count")
         .reset_index()
         .pivot(index=list(visit_spec_columns), columns=[sim_identifier_column], values="count")
@@ -320,7 +336,8 @@ def compute_matched_visit_delta_statistics(
     visits: pd.DataFrame,
     sim_identifier_reference_value: int | str = 1,
     sim_identifier_column: str = "sim_index",
-    visit_spec_columns: tuple[str, ...] = ("fieldRA", "fieldDec", "band", "visitExposureTime"),
+    visit_spec_columns: tuple[str, ...] = ("fieldHpid", "band", "visitExposureTime"),
+    nside: int = 2**18,
 ) -> pd.DataFrame:
     """Compute statistics on time differencse in visits matched across sims.
 
@@ -334,10 +351,13 @@ def compute_matched_visit_delta_statistics(
     sim_identifier_column : `str`, optional
         Column that in visits that identifies simulations,
         by default "sim_index".
-    visit_spec_columns : `tuple[str, ...]`, optional
-        Columns in ``visits`` whose values need to match to be matched
-        across simulations,
-        by default ("fieldRA", "fieldDec", "band", "visitExposureTime")
+    visit_spec_columns : `tuple`[`str`], optional
+        Columns that, together, uniquely identify a field that can be visited.
+        If fieldHpid is included but not a column, and fieldRA and fieldDec
+        are columns, fieldHpid will be computed on the fly.
+        by default ("fieldHpid", "band", "visitExposureTime").
+    nside : `int`
+        nside to use if fieldHpid is to be computed on the fly.
 
     Returns
     -------
@@ -349,6 +369,14 @@ def compute_matched_visit_delta_statistics(
         ``max``.
     """
 
+    if "fieldHpid" in visit_spec_columns and "fieldHpid" not in visits.columns:
+        visits = visits.copy()
+        hpid = hp.ang2pix(nside, visits.fieldRA, visits.fieldDec, lonlat=True)
+        ra, decl = hp.pix2ang(nside, hpid, lonlat=True)
+        visits["hp_ra"] = ra
+        visits["hp_decl"] = decl
+        visit_spec_columns = tuple(c for c in visit_spec_columns if c != "fieldHpid") + ("hp_ra", "hp_decl")
+
     delta_stats_list = []
 
     def _compute_best_match_delta_stats(
@@ -357,7 +385,7 @@ def compute_matched_visit_delta_statistics(
         sim_identifier_column: str | int = "sim_index",
     ) -> pd.Series:
         these_matches = match_visits_across_sims(
-            these_visits.set_index(sim_identifier_column).start_date, sim_identifier_values
+            these_visits.set_index(sim_identifier_column).start_timestamp, sim_identifier_values
         )
         return these_matches.loc[:, "delta"].describe()
 

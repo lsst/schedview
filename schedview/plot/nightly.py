@@ -117,9 +117,9 @@ def plot_airmass_vs_time(
         palette=tuple(band_colors.values()),
         name=band_column(visits),
     )
-    fig.line("start_date", "airmass", source=visits_ds, color="gray")
+    fig.line("start_timestamp", "airmass", source=visits_ds, color="gray")
     fig.circle(
-        "start_date",
+        "start_timestamp",
         "airmass",
         radius=0.2,
         source=visits_ds,
@@ -131,7 +131,7 @@ def plot_airmass_vs_time(
     hover_tool = bokeh.models.HoverTool()
     hover_tool.renderers = fig.select({"name": "visit_airmass"})
     hover_tool.tooltips = visits_tooltips()
-    hover_tool.formatters = {"@start_date": "datetime"}
+    hover_tool.formatters = {"@start_timestamp": "datetime"}
     fig.add_tools(hover_tool)
 
     plot_airmass_limit = np.round(np.max(visits.airmass), 1) + 0.1
@@ -203,7 +203,7 @@ def plot_alt_vs_time(
             scheduler_note_present = "scheduler_note" in visits
         note_column = "scheduler_note" if scheduler_note_present else "note"
 
-    for time_column in "start_date", "observationStartDatetime64":
+    for time_column in "start_timestamp", "observationStartDatetime64":
         if isinstance(visits, bokeh.models.ColumnDataSource):
             if time_column in visits.data:
                 break
@@ -276,7 +276,7 @@ def plot_alt_vs_time(
     hover_tool = bokeh.models.HoverTool()
     hover_tool.renderers = fig.select({"name": "visit_altitude"})
     hover_tool.tooltips = visits_tooltips()
-    hover_tool.formatters = {"@start_date": "datetime"}
+    hover_tool.formatters = {"@start_timestamp": "datetime"}
     fig.add_tools(hover_tool)
 
     fig.y_range = bokeh.models.Range1d(0, 90)
@@ -497,7 +497,7 @@ def plot_polar_alt_az(visits, band_shapes=BAND_SHAPES, figure=None, legend=True,
     hover_tool = bokeh.models.HoverTool()
     hover_tool.renderers = fig.select({"name": "visit_altitude"})
     hover_tool.tooltips = visits_tooltips()
-    hover_tool.formatters = {"@start_date": "datetime"}
+    hover_tool.formatters = {"@start_timestamp": "datetime"}
     fig.add_tools(hover_tool)
 
     if legend:

@@ -47,25 +47,57 @@ def generate_sim_indicators(sim_labels: List[str]) -> SimIndicators:
     if len(factors) > len(all_colors):
         all_colors = all_colors * int(ceil(len(factors) / len(all_colors)))
 
-    palette = colorcet.palette["glasbey"][:num_sims]
+    if "Completed" in factors:
+        # If one of the labels is "Completed," make sure it is black.
+        palette = colorcet.palette["glasbey"][: num_sims - 1]
+        palette.insert(list(factors).index("Completed"), "#000000")
+    else:
+        palette = colorcet.palette["glasbey"][:num_sims]
     color_mapper = bokeh.models.CategoricalColorMapper(factors=factors, palette=palette, name="simulation")
 
     color_dict = dict(zip(factors, palette))
 
-    # Some bokeh symbols have the same outer shape but different inner
-    # markings, but these are harder to distinguish, so put them at the end.
-    all_markers = [m for m in bokeh.core.enums.MarkerType if "_" not in m] + [
-        m for m in bokeh.core.enums.MarkerType if "_" in m
+    # Order them my how easily I can tell them apart when small
+    all_markers = [
+        "circle",
+        "triangle",
+        "inverted_triangle",
+        "square",
+        "diamond",
+        "plus",
+        "star",
+        "square_pin",
+        "triangle_pin",
+        "hex_dot",
+        "square_x",
+        "circle_y",
+        "diamond_cross",
+        "triangle_dot",
+        "circle_x",
+        "square_cross",
+        "diamond_dot",
+        "square_dot",
+        "star_dot",
+        "circle_cross",
+        "hex",
+        "circle_dot",
     ]
-    # dot is hard to see
-    all_markers.remove("dot")
+
     # If there are more factors than markers, repeat markers.
     if len(factors) > len(all_markers):
         all_markers = all_markers * int(ceil(len(factors) / len(all_markers)))
 
+    # If one of the labels is "Completed", make sure it is marked with an
+    # asterisk
+    if "Completed" in factors:
+        used_markers = all_markers[: num_sims - 1]
+        used_markers.insert(list(factors).index("Completed"), "asterisk")
+    else:
+        used_markers = all_markers[:num_sims]
+
     marker_mapper = bokeh.models.CategoricalMarkerMapper(
         factors=factors,
-        markers=all_markers[:num_sims],
+        markers=used_markers,
         name="simulation",
     )
 
@@ -111,7 +143,7 @@ def plot_alt_airmass_vs_time(
             frame_height=633,
         )
 
-    scatter_kwargs = dict(x="start_date", y="altitude", legend_group="label", source=visits_ds)
+    scatter_kwargs = dict(x="start_timestamp", y="altitude", legend_group="label", source=visits_ds)
     scatter_kwargs.update(scatter_user_kwargs)
     fig.scatter(**scatter_kwargs)
 
