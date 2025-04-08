@@ -1,6 +1,7 @@
 import itertools
 import math
 
+import healpy as hp
 import numpy as np
 import pandas as pd
 
@@ -106,6 +107,7 @@ def count_visits_by_sim(
     visits: pd.DataFrame,
     sim_identifier_column: str = "sim_index",
     visit_spec_columns: tuple[str, ...] = ("fieldRA", "fieldDec", "band", "visitExposureTime"),
+    nside: int = 32,
 ) -> pd.DataFrame:
     """Count the numbers of visits on each field in each simulation.
 
@@ -122,6 +124,9 @@ def count_visits_by_sim(
     visit_spec_columns : `tuple`[`str`], optional
         Columns that, together, uniquely identify a field that can be visited,
         by default ("fieldRA", "fieldDec", "band", "visitExposureTime")
+    nside : `int` or `None`
+        If nside is not None and greater than 0, match fields with common
+        hpids, as computed from fieldRA and fieldDec.
 
     Returns
     -------
@@ -140,10 +145,16 @@ def count_visits_by_sim(
     if "filter" in visit_spec_columns and "filter" not in visits.columns:
         visit_spec_columns = tuple("band" if c == "filter" else c for c in visit_spec_columns)
 
+    if nside is not None and nside > 0:
+        visits = visits.assign(hpid=hp.ang2pix(nside, visits.fieldRA, visits.fieldDec, lonlat=True))
+        visit_spec_columns = list(visit_spec_columns) + ["hpid"]
+
+    grouping_columns = [sim_identifier_column] + list(visit_spec_columns)
+
     visit_counts = (
-        visits.groupby([sim_identifier_column] + list(visit_spec_columns))
+        visits.groupby(grouping_columns)
         .count()
-        .iloc[:, 0]
+        .loc[:, "start_date"]
         .rename("count")
         .reset_index()
         .pivot(index=list(visit_spec_columns), columns=[sim_identifier_column], values="count")
