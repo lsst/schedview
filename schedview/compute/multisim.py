@@ -106,7 +106,7 @@ def often_repeated_fields(visits: pd.DataFrame, min_counts: int = 4):
 def count_visits_by_sim(
     visits: pd.DataFrame,
     sim_identifier_column: str = "sim_index",
-    visit_spec_columns: tuple[str, ...] = ("fieldRA", "fieldDec", "band", "visitExposureTime"),
+    visit_spec_columns: tuple = ("fieldHpid", "band", "visitExposureTime"),
     nside: int = 2**18,
 ) -> pd.DataFrame:
     """Count the numbers of visits on each field in each simulation.
@@ -122,11 +122,12 @@ def count_visits_by_sim(
     sim_identifier_column : `str`, optional
         A column that uniquely identifies visits, by default "sim_index"
     visit_spec_columns : `tuple`[`str`], optional
-        Columns that, together, uniquely identify a field that can be visited,
-        by default ("fieldRA", "fieldDec", "band", "visitExposureTime")
-    nside : `int` or `None`
-        If nside is not None and greater than 0, match fields with common
-        hpids, as computed from fieldRA and fieldDec.
+        Columns that, together, uniquely identify a field that can be visited.
+        If fieldHpid is included but not a column, and fieldRA and fieldDec
+        are, it will be computed on the fly.
+        by default ("fieldHpid", "band", "visitExposureTime").
+    nside : `int`
+        nside to use if fieldHpid is to be computed on the fly.
 
     Returns
     -------
@@ -145,13 +146,13 @@ def count_visits_by_sim(
     if "filter" in visit_spec_columns and "filter" not in visits.columns:
         visit_spec_columns = tuple("band" if c == "filter" else c for c in visit_spec_columns)
 
-    if nside is not None and nside > 0:
+    if "fieldHpid" in visit_spec_columns and "fieldHpid" not in visits.columns:
         visits = visits.copy()
         hpid = hp.ang2pix(nside, visits.fieldRA, visits.fieldDec, lonlat=True)
         ra, decl = hp.pix2ang(nside, hpid, lonlat=True)
         visits["hp_ra"] = ra
         visits["hp_decl"] = decl
-        visit_spec_columns = visit_spec_columns + ("hp_ra", "hp_decl")
+        visit_spec_columns = tuple(c for c in visit_spec_columns if c != "fieldHpid") + ("hp_ra", "hp_decl")
 
     grouping_columns = [sim_identifier_column] + list(visit_spec_columns)
 
@@ -335,7 +336,7 @@ def compute_matched_visit_delta_statistics(
     visits: pd.DataFrame,
     sim_identifier_reference_value: int | str = 1,
     sim_identifier_column: str = "sim_index",
-    visit_spec_columns: tuple[str, ...] = ("fieldRA", "fieldDec", "band", "visitExposureTime"),
+    visit_spec_columns: tuple[str, ...] = ("fieldHpid", "band", "visitExposureTime"),
     nside: int = 2**18,
 ) -> pd.DataFrame:
     """Compute statistics on time differencse in visits matched across sims.
@@ -350,10 +351,13 @@ def compute_matched_visit_delta_statistics(
     sim_identifier_column : `str`, optional
         Column that in visits that identifies simulations,
         by default "sim_index".
-    visit_spec_columns : `tuple[str, ...]`, optional
-        Columns in ``visits`` whose values need to match to be matched
-        across simulations,
-        by default ("fieldRA", "fieldDec", "band", "visitExposureTime")
+    visit_spec_columns : `tuple`[`str`], optional
+        Columns that, together, uniquely identify a field that can be visited.
+        If fieldHpid is included but not a column, and fieldRA and fieldDec
+        are columns, fieldHpid will be computed on the fly.
+        by default ("fieldHpid", "band", "visitExposureTime").
+    nside : `int`
+        nside to use if fieldHpid is to be computed on the fly.
 
     Returns
     -------
@@ -365,13 +369,13 @@ def compute_matched_visit_delta_statistics(
         ``max``.
     """
 
-    if nside is not None and nside > 0:
+    if "fieldHpid" in visit_spec_columns and "fieldHpid" not in visits.columns:
         visits = visits.copy()
         hpid = hp.ang2pix(nside, visits.fieldRA, visits.fieldDec, lonlat=True)
         ra, decl = hp.pix2ang(nside, hpid, lonlat=True)
         visits["hp_ra"] = ra
         visits["hp_decl"] = decl
-        visit_spec_columns = visit_spec_columns + ("hp_ra", "hp_decl")
+        visit_spec_columns = tuple(c for c in visit_spec_columns if c != "fieldHpid") + ("hp_ra", "hp_decl")
 
     delta_stats_list = []
 
