@@ -17,7 +17,7 @@ def read_consdb(
     # empty recarray with the correct dtypes.
     visit_records: np.recarray = (
         consdb_visits.merged_opsim_consdb.to_records()
-        if len(consdb_visits.opsim) > 0
+        if len(consdb_visits.consdb_visits) > 0
         else ObservationArray()[0:0]
     )
     for stacker in stackers:
