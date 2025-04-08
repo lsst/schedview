@@ -38,7 +38,7 @@
             "xlabel": "H.A. (hours)",
             "hover_cols": [
                 "start_date",
-                "filter",
+                "band",
                 "skyBrightness",
                 "sunAlt",
                 "moonAlt",
@@ -52,7 +52,7 @@
     {
         "name": "sky brightness vs. moon distance",
         "settings": {
-            "by": "filter",
+            "by": "band",
             "kind": "scatter",
             "x": "moonDistance",
             "y": "skyBrightness",

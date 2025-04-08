@@ -14,7 +14,7 @@ from schedview.collect.visits import read_visits
 from schedview.dayobs import DayObs
 from schedview.plot import create_visit_table
 
-STARTUP_VISIBLE_COLUMNS = ["observationStartMJD", "fieldRA", "fieldDec", "filter"]
+STARTUP_VISIBLE_COLUMNS = ["observationStartMJD", "fieldRA", "fieldDec", "band"]
 TABLE_WIDTH = 1024
 MAP_CLASSES = [uranography.api.ArmillarySphere, uranography.api.Planisphere]
 

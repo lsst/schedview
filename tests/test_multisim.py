@@ -29,7 +29,7 @@ class TestMultisim(unittest.TestCase):
                 "fieldId": np.arange(NUM_TEST_FIELDS),
                 "fieldRA": rng.uniform(10, 30, NUM_TEST_FIELDS),
                 "fieldDec": rng.uniform(-90, -70, NUM_TEST_FIELDS),
-                "filter": rng.choice(bands, NUM_TEST_FIELDS),
+                "band": rng.choice(bands, NUM_TEST_FIELDS),
                 "visitExposureTime": 30,
             }
         )
@@ -58,7 +58,7 @@ class TestMultisim(unittest.TestCase):
             self.visits,
             min_counts=min_counts,
         )
-        field_spec_columns = ["fieldRA", "fieldDec", "filter"]
+        field_spec_columns = ["fieldRA", "fieldDec", "band"]
         assert np.all(often_repeated_field_stats.groupby(field_spec_columns)["count"].max() >= min_counts)
 
         field_ids = self.fields.set_index(field_spec_columns).loc[
@@ -73,7 +73,7 @@ class TestMultisim(unittest.TestCase):
             assert row["count"] == specified_count
 
     def test_count_visits_by_sim(self):
-        visit_spec_columns = ("fieldRA", "fieldDec", "filter", "visitExposureTime")
+        visit_spec_columns = ("fieldRA", "fieldDec", "band", "visitExposureTime")
         counts_df = schedview.compute.multisim.count_visits_by_sim(
             self.visits, visit_spec_columns=visit_spec_columns
         )
@@ -147,7 +147,7 @@ class TestMultisim(unittest.TestCase):
         assert tuple(matched_visit_stats.index.names) == (
             "fieldRA",
             "fieldDec",
-            "filter",
+            "band",
             "visitExposureTime",
             "sim_index",
         )

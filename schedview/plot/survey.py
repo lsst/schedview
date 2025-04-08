@@ -17,6 +17,7 @@ from matplotlib.figure import Figure
 from uranography.api import HorizonMap, Planisphere, make_zscale_linear_cmap
 
 import schedview.compute.astro
+from schedview import band_column
 from schedview.compute.camera import LsstCameraFootprintPerimeter
 from schedview.compute.maf import compute_hpix_metric_in_bands
 
@@ -449,7 +450,7 @@ def create_metric_visit_map_grid(
     if len(metric_visits):
         metric_hpix = compute_hpix_metric_in_bands(metric_visits, metric, nside=nside)
     else:
-        metric_hpix = {b: np.zeros(hp.nside2npix(nside)) for b in visits["filter"].unique()}
+        metric_hpix = {b: np.zeros(hp.nside2npix(nside)) for b in visits[band_column(visits)].unique()}
 
     if len(visits):
         if use_matplotlib:
@@ -471,3 +472,5 @@ def create_metric_visit_map_grid(
             return map_grid
     else:
         print("No visits")
+
+    return None

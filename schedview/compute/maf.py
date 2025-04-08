@@ -6,6 +6,8 @@ import pandas as pd
 from rubin_scheduler.scheduler.utils import SchemaConverter
 from rubin_sim import maf
 
+from schedview.util import band_column
+
 __all__ = ["compute_metric_by_visit"]
 
 
@@ -121,15 +123,15 @@ def compute_hpix_metric_in_bands(visits, metric, constraint="", nside=32):
         visits in the input visit DataFrame.
     """
     # Do only the filters we actually used
-    used_filters = visits["filter"].unique()
+    used_bands = visits[band_column(visits)].unique()
 
     bundles = {}
-    for this_filter in used_filters:
-        this_constraint = f"filter == '{this_filter}'"
+    for this_band in used_bands:
+        this_constraint = f"{band_column(visits)} == '{this_band}'"
         if len(constraint) > 0:
             this_constraint += f" AND {constraint}"
         slicer = maf.HealpixSlicer(nside=nside, verbose=False)
-        bundles[this_filter] = maf.MetricBundle(metric, slicer, this_constraint)
+        bundles[this_band] = maf.MetricBundle(metric, slicer, this_constraint)
 
     compute_metric(visits, bundles)
     metric_values = {b: bundles[b].metric_values for b in bundles if bundles[b].metric_values is not None}

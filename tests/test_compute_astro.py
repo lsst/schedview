@@ -16,7 +16,7 @@ class TestComputeAstro(unittest.TestCase):
                     "observationStartMJD": [mjd - 0.1, mjd, mjd + 0.1],
                     "fieldRA": [0, 0, 0],
                     "fieldDec": [0, 0, 0],
-                    "filter": ["r", "i", "z"],
+                    "band": ["r", "i", "z"],
                 }
             )
             computed_night = compute_central_night(visits)

@@ -12,7 +12,7 @@ import schedview.plot
 from schedview.collect.visits import NIGHT_STACKERS, read_visits
 from schedview.dayobs import DayObs
 
-STARTUP_VISIBLE_COLUMNS = ["observationStartMJD", "fieldRA", "fieldDec", "filter"]
+STARTUP_VISIBLE_COLUMNS = ["observationStartMJD", "fieldRA", "fieldDec", "band"]
 TABLE_WIDTH = 1024
 
 

@@ -14,6 +14,7 @@ from astropy.time import Time
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory  # noqa F401
 
 import schedview.compute.astro
+from schedview import band_column
 from schedview.collect import read_opsim
 
 from .colors import make_band_cmap
@@ -30,7 +31,7 @@ def visits_tooltips(weather: bool = False) -> list:
         ),
         ("flush by mjd", "@flush_by_mjd{00000.00}"),
         ("Scheduler note", "@scheduler_note"),
-        ("Filter", "@filter"),
+        ("Band", "@band"),
         (
             "Field coordinates",
             "RA=@fieldRA" + deg + ", Decl=@fieldDec" + deg + ", Az=@azimuth" + deg + ", Alt=@altitude" + deg,
@@ -194,15 +195,14 @@ def plot_visit_param_vs_time(
     circle_kwargs = {"fill_alpha": 0.3, "marker": "circle"}
     circle_kwargs.update(kwargs)
 
-    band_column = "band" if "band" in visits else "filter"
-    band_cmap = make_band_cmap(band_column)
+    band_cmap = make_band_cmap(band_column(visits))
 
     timeline = plot.scatter(
         x="start_date",
         y=column_name,
         color=band_cmap,
         source=data,
-        legend_group=band_column,
+        legend_group=band_column(visits),
         **circle_kwargs,
     )
 
@@ -254,7 +254,7 @@ def create_visit_table(
         "observationStartMJD",
         "fieldRA",
         "fieldDec",
-        "filter",
+        "band",
     ],
     show: bool = True,
     **data_table_kwargs: Optional[Any],
@@ -268,7 +268,7 @@ def create_visit_table(
     visible_column_names : `list[str]`
         The columns to display, by default
         ['observationId', 'observationStartMJD',
-        'fieldRA', 'fieldDec', 'filter']
+        'fieldRA', 'fieldDec', 'band']
     show : `bool`
         Show the plot?, by default True
 

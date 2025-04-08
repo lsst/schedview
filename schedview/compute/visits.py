@@ -5,6 +5,7 @@ from astropy.time import Time
 from rubin_scheduler.site_models import SeeingModel
 
 import schedview.compute
+from schedview import band_column
 
 
 def add_day_obs(visits):
@@ -101,8 +102,8 @@ def add_overhead(visits):
     slew_time_col_index = tuple(visits.columns).index("slewTime")
     visits.insert(slew_time_col_index + 1, "overhead", overhead)
 
-    filter_col_index = tuple(visits.columns).index("filter")
-    previous_filter = visits["filter"].shift(1)
+    filter_col_index = tuple(visits.columns).index(band_column(visits))
+    previous_filter = visits[band_column(visits)].shift(1)
     visits.insert(filter_col_index + 1, "previous_filter", previous_filter)
     return visits
 
@@ -169,7 +170,9 @@ def add_instrumental_fwhm(visits):
 
     noninst_seeing = np.array(
         tuple(
-            seeing_model(v.seeingFwhm500, v.airmass)["fwhmEff"][seeing_indx_dict[v["filter"]]].item()
+            seeing_model(v.seeingFwhm500, v.airmass)["fwhmEff"][
+                seeing_indx_dict[v[band_column(visits)]]
+            ].item()
             for i, v in visits.iterrows()
         )
     )
@@ -194,7 +197,7 @@ def accum_teff_by_night(visits):
             (`str`),
         ``"teff"``
             The effective exposure time (`float`).
-        ``"filter"``
+        ``band_column(visits)``
             The filter (`str`).
         ``"target_name"``
             The target name (`str`).
@@ -220,9 +223,11 @@ def accum_teff_by_night(visits):
             f"{teff_col} column not found for visits; use the rubin_sim.maf.stackers.TeffStacker."
         )
 
-    nightly_teff = visits.groupby(["target_name", day_obs_col, "filter"])[teff_col].sum().reset_index()
     nightly_teff = (
-        nightly_teff.pivot(index=["target_name", day_obs_col], columns="filter", values=teff_col)
+        visits.groupby(["target_name", day_obs_col, band_column(visits)])[teff_col].sum().reset_index()
+    )
+    nightly_teff = (
+        nightly_teff.pivot(index=["target_name", day_obs_col], columns=band_column(visits), values=teff_col)
         .fillna(0.0)
         .reset_index()
         .set_index(["target_name", day_obs_col])

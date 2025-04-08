@@ -11,6 +11,7 @@ import pandas as pd
 
 import schedview.compute.visits
 import schedview.plot
+from schedview import band_column
 from schedview.collect.visits import NIGHT_STACKERS, read_visits
 from schedview.dayobs import DayObs
 
@@ -49,11 +50,11 @@ def make_overhead_figures(
         if time_column in visits:
             break
 
-    visits["previous_filter"] = visits["filter"].shift(1)
+    visits["previous_band"] = visits[band_column(visits)].shift(1)
     long_gap_visits: pd.DataFrame = (
         visits.sort_values("overhead", ascending=False)
         .query(f"overhead>{min_time}")
-        .loc[:, [time_column, "overhead", "slewDistance", "filter", "previous_filter"]]
+        .loc[:, [time_column, "overhead", "slewDistance", band_column(visits), "previous_band"]]
         .sort_values(time_column)
     )
 
