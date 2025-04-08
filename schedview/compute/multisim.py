@@ -146,8 +146,12 @@ def count_visits_by_sim(
         visit_spec_columns = tuple("band" if c == "filter" else c for c in visit_spec_columns)
 
     if nside is not None and nside > 0:
-        visits = visits.assign(hpid=hp.ang2pix(nside, visits.fieldRA, visits.fieldDec, lonlat=True))
-        visit_spec_columns = list(visit_spec_columns) + ["hpid"]
+        visits = visits.copy()
+        hpid = hp.ang2pix(nside, visits.fieldRA, visits.fieldDec, lonlat=True)
+        ra, decl = hp.pix2ang(nside, hpid, lonlat=True)
+        visits["hp_ra"] = ra
+        visits["hp_decl"] = decl
+        visit_spec_columns = visit_spec_columns + ("hp_ra", "hp_decl")
 
     grouping_columns = [sim_identifier_column] + list(visit_spec_columns)
 
