@@ -839,7 +839,7 @@ def make_multitimeline(plot: Plot | None = None, **kwargs) -> Plot:
     return plot
 
 
-def make_timeline_scatterplots(visits, visits_column="seeingFwhmEff", **kwargs):
+def make_timeline_scatterplots(visits, visits_column="altitude", **kwargs):
     """Create a figure with a timeline plot (as created by
     `schedview.plot.timeline.make_multitimeline`) and a visit scatterplot
     (as created by `schedview.plot.visits.plot_visit_param_vs_time`)
@@ -868,9 +868,16 @@ def make_timeline_scatterplots(visits, visits_column="seeingFwhmEff", **kwargs):
 
     timeline_plot = make_multitimeline(**kwargs)
 
-    visit_plot = bokeh.plotting.figure(
-        x_range=timeline_plot.x_range, y_axis_label=visits_column, x_axis_label="Time (UTC)", name="visit"
-    )
+    figure_kwargs = {"y_axis_label": visits_column, "x_axis_label": "Time (UTC)", "name": "visit"}
+    try:
+        figure_kwargs["x_range"] = timeline_plot.x_range
+    except AttributeError:
+        # If there was no timeline data, timeline_plot.x_range
+        # would not have been set.
+        pass
+
+    visit_plot = bokeh.plotting.figure(**figure_kwargs)
+
     visit_param_vs_time = schedview.plot.plot_visit_param_vs_time(
         visits, visits_column, show_column_selector=True, plot=visit_plot
     )
