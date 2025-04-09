@@ -47,7 +47,12 @@ def generate_sim_indicators(sim_labels: List[str]) -> SimIndicators:
     if len(factors) > len(all_colors):
         all_colors = all_colors * int(ceil(len(factors) / len(all_colors)))
 
-    palette = colorcet.palette["glasbey"][:num_sims]
+    if "Completed" in factors:
+        # If one of the labels is "Completed," make sure it is black.
+        palette = colorcet.palette["glasbey"][: num_sims - 1]
+        palette.insert(list(factors).index("Completed"), "#000000")
+    else:
+        palette = colorcet.palette["glasbey"][:num_sims]
     color_mapper = bokeh.models.CategoricalColorMapper(factors=factors, palette=palette, name="simulation")
 
     color_dict = dict(zip(factors, palette))
@@ -59,13 +64,28 @@ def generate_sim_indicators(sim_labels: List[str]) -> SimIndicators:
     ]
     # dot is hard to see
     all_markers.remove("dot")
+
+    # If we want to mark Completed with circle_cross and avoid confusion,
+    # remove circle_cross and cross from markers available to other sims
+    all_markers.remove("circle_cross")
+    all_markers.remove("cross")
+    all_markers.remove("circle")
+
     # If there are more factors than markers, repeat markers.
     if len(factors) > len(all_markers):
         all_markers = all_markers * int(ceil(len(factors) / len(all_markers)))
 
+    # If one of the labels is "Completed", make sure it is marked with a
+    # a circle
+    if "Completed" in factors:
+        used_markers = all_markers[: num_sims - 1]
+        used_markers.insert(list(factors).index("Completed"), "circle_cross")
+    else:
+        used_markers = all_markers[:num_sims]
+
     marker_mapper = bokeh.models.CategoricalMarkerMapper(
         factors=factors,
-        markers=all_markers[:num_sims],
+        markers=used_markers,
         name="simulation",
     )
 
