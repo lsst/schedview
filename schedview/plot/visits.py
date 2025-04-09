@@ -158,22 +158,31 @@ def plot_visit_param_vs_time(
     plot: bokeh.plotting.figure | None = None,
     show_column_selector: bool = False,
     hovertool: bool = True,
+    color_transform: bokeh.models.mappers.CategoricalColorMapper | None = None,
+    marker_transform: bokeh.models.mappers.CategoricalMarkerMapper | None = None,
     **kwargs,
 ) -> bokeh.models.ui.ui_element.UIElement:
     """Plot a column in the visit table vs. time.
 
     Parameters
     ----------
-    `visits`: `pandas.DataFrame`
+    visits: `pandas.DataFrame`
         One row per visit, as created by `schedview.collect.opsim.read_opsim`.
-    `column_name`: `str`
+    column_name: `str`
         The name of the column to plot against time.
-    `plot`: `bokeh.plotting.figure` or None
+    plot: `bokeh.plotting.figure` or None
         The figure on which to plot the visits. None creates a new
         figure. Defaults to None.
-    `show_column_selector`: `bool`
+    show_column_selector: `bool`
         Include a drop-down to select which column to plot?
         Defaults to False.
+    color_transform: `CategoricalColorMapper` or None
+        The color mapper from band to color.
+    marker_transform: `CategoricalMarkerMapper` or None
+        The marker mapper from label to marker.
+    **kwargs
+        Additional keyword arguments to be passed to
+        `bokeh.plotting.figure.scatter`.
 
     Returns
     -------
@@ -192,25 +201,84 @@ def plot_visit_param_vs_time(
         else bokeh.models.ColumnDataSource(visits)
     )
 
-    circle_kwargs = {"fill_alpha": 0.3, "marker": "circle"}
-    circle_kwargs.update(kwargs)
+    scatter_kwargs = {"fill_alpha": 0.3}
 
-    band_cmap = make_band_cmap(band_column(visits))
+    if color_transform is None:
+        scatter_kwargs["color"] = make_band_cmap(band_column(visits))
+    else:
+        scatter_kwargs["color"] = {"field": band_column(visits), "transform": color_transform}
+
+    if marker_transform is not None:
+        scatter_kwargs["marker"] = {"field": "label", "transform": marker_transform}
+
+    scatter_kwargs.update(kwargs)
 
     timeline = plot.scatter(
         x="start_date",
         y=column_name,
-        color=band_cmap,
         source=data,
-        legend_group=band_column(visits),
-        **circle_kwargs,
+        **scatter_kwargs,
     )
 
     plot.xaxis[0].formatter = bokeh.models.DatetimeTickFormatter(hours="%H:%M")
 
-    legend = plot.legend[0]
-    legend.orientation = "horizontal"
+    # Bokeh's fully automatic legend creation can't make legends for
+    # color and marker independently. So, follow
+    # https://discourse.bokeh.org/t/representing-data-with-two-categories-by-both-color-and-marker-shape/4122/4
+    # Plot some fake points with colors, make them invisible,
+    # and make a legend for them.
+    # Then, do something analogous for makers (if needed).
+
+    # Generate placement for sample points.
+    # This needs to be in the plot to avoid messing up the axis limits,
+    # but otherwise does not matter, because the points will be invisible.
+    sample_x, sample_y = visits["start_date"].iloc[0], visits[column_name].iloc[0]
+
+    # Create an invisible renderer to drive color legend:
+    sample_color_renderer = plot.rect(
+        x=sample_x,
+        y=sample_y,
+        height=1,
+        width=1,
+        fill_alpha=scatter_kwargs["fill_alpha"],
+        color=scatter_kwargs["color"].transform.palette,
+    )
+    sample_color_renderer.visible = False
+
+    legend = bokeh.models.Legend(
+        items=[
+            bokeh.models.LegendItem(
+                label=scatter_kwargs["color"].transform.factors[i], renderers=[sample_color_renderer], index=i
+            )
+            for i in range(len(scatter_kwargs["color"].transform.factors))
+        ],
+        location="bottom_center",
+        orientation="horizontal",
+    )
     plot.add_layout(legend, "below")
+
+    if isinstance(marker_transform, bokeh.models.CategoricalMarkerMapper):
+        # create an invisible renderer to drive shape legend
+        sample_marker_renderer = plot.scatter(
+            x=sample_x,
+            y=sample_y,
+            fill_alpha=scatter_kwargs["fill_alpha"],
+            color="black",
+            marker=marker_transform.markers,
+        )
+        sample_marker_renderer.visible = False
+
+        legend = bokeh.models.Legend(
+            items=[
+                bokeh.models.LegendItem(
+                    label=marker_transform.factors[i], renderers=[sample_marker_renderer], index=i
+                )
+                for i in range(len(marker_transform.factors))
+            ],
+            location="bottom_left",
+            orientation="vertical",
+        )
+        plot.add_layout(legend, "below")
 
     if hovertool:
         hover_tool = bokeh.models.HoverTool(

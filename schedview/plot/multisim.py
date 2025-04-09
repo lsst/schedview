@@ -62,8 +62,9 @@ def generate_sim_indicators(sim_labels: List[str]) -> SimIndicators:
     all_markers = [m for m in bokeh.core.enums.MarkerType if "_" not in m] + [
         m for m in bokeh.core.enums.MarkerType if "_" in m
     ]
-    # dot is hard to see
+    # dot and dash hard to see
     all_markers.remove("dot")
+    all_markers.remove("dash")
 
     # If we want to mark Completed with circle_cross and avoid confusion,
     # remove circle_cross and cross from markers available to other sims
