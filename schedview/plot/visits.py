@@ -5,6 +5,7 @@ import bokeh.io
 import bokeh.layouts
 import bokeh.models
 import bokeh.plotting
+import bokeh.transform
 import hvplot
 import numpy as np
 import pandas as pd
@@ -206,7 +207,9 @@ def plot_visit_param_vs_time(
     if color_transform is None:
         scatter_kwargs["color"] = make_band_cmap(band_column(visits))
     else:
-        scatter_kwargs["color"] = {"field": band_column(visits), "transform": color_transform}
+        scatter_kwargs["color"] = bokeh.transform.factor_cmap(
+            band_column(visits), color_transform.palette, color_transform.factors
+        )
 
     if marker_transform is not None:
         scatter_kwargs["marker"] = {"field": "label", "transform": marker_transform}
