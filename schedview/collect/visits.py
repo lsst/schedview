@@ -20,6 +20,7 @@ NIGHT_STACKERS = [
     maf.HourAngleStacker(),
     maf.stackers.ObservationStartDatetime64Stacker(),
     maf.stackers.OverheadStacker(),
+    maf.stackers.HealpixStacker(),
     maf.stackers.DayObsISOStacker(),
 ]
 
