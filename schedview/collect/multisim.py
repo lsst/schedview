@@ -9,7 +9,7 @@ from ..compute.visits import add_coords_tuple
 from .opsim import all_visits_columns, read_opsim
 
 
-def read_multiple_opsims(archive_uri: str, sim_date: str, day_obs_mjd: int):
+def read_multiple_opsims(archive_uri: str, sim_date: str, day_obs_mjd: int, stackers: list | None):
     """Read results of multiple simulations for a time period from an archive.
 
     Parameters
@@ -20,6 +20,8 @@ def read_multiple_opsims(archive_uri: str, sim_date: str, day_obs_mjd: int):
         The date on which the simulations to be run.
     day_obs_mjd : `int`
         The day_obs MJD of the first night for which to load visits.
+    stackers : `list` or `None`
+        A list of stackers to apply.
 
     Returns
     -------
@@ -46,17 +48,20 @@ def read_multiple_opsims(archive_uri: str, sim_date: str, day_obs_mjd: int):
 
         sim_rp = ResourcePath(sim_uri).join(sim_metadata["files"]["observations"]["name"])
 
-        these_visits = read_opsim(
-            sim_rp,
-            constraint=f"FLOOR(observationStartMJD-0.5)={day_obs_mjd}",
-            stackers=[
+        if stackers is None:
+            stackers = [
                 maf.stackers.TeffStacker(),
                 maf.stackers.ObservationStartDatetime64Stacker(),
                 maf.stackers.DayObsStacker(),
                 maf.stackers.DayObsMJDStacker(),
                 maf.stackers.DayObsISOStacker(),
                 maf.stackers.OverheadStacker(),
-            ],
+            ]
+
+        these_visits = read_opsim(
+            sim_rp,
+            constraint=f"FLOOR(observationStartMJD-0.5)={day_obs_mjd}",
+            stackers=stackers,
             dbcols=all_visits_columns(),
         )
         these_visits = add_coords_tuple(these_visits)
