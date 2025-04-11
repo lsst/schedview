@@ -158,6 +158,7 @@ def plot_visit_param_vs_time(
     column_name: str,
     plot: bokeh.plotting.figure | None = None,
     show_column_selector: bool = False,
+    show_sim_selector: bool = False,
     hovertool: bool = True,
     color_transform: bokeh.models.mappers.CategoricalColorMapper | None = None,
     marker_transform: bokeh.models.mappers.CategoricalMarkerMapper | None = None,
@@ -196,13 +197,7 @@ def plot_visit_param_vs_time(
     # Make mypy happy
     assert isinstance(plot, bokeh.plotting.figure)
 
-    data = (
-        visits
-        if isinstance(visits, bokeh.models.ColumnarDataSource)
-        else bokeh.models.ColumnDataSource(visits)
-    )
-
-    scatter_kwargs = {"fill_alpha": 0.3}
+    scatter_kwargs = {}
 
     if color_transform is None:
         scatter_kwargs["color"] = make_band_cmap(band_column(visits))
@@ -216,10 +211,20 @@ def plot_visit_param_vs_time(
 
     scatter_kwargs.update(kwargs)
 
+    if isinstance(visits, bokeh.models.ColumnarDataSource):
+        data = visits
+    elif "label" in visits.columns:
+        # Label marks whether visits are simulated or completed.
+        data = bokeh.models.ColumnDataSource(visits.assign(sim_fill_alpha=0.5, sim_line_alpha=1.0))
+    else:
+        data = bokeh.models.ColumnDataSource(visits.assign(label="", sim_fill_alpha=0.5, sim_line_alpha=1.0))
+
     timeline = plot.scatter(
         x="start_date",
         y=column_name,
         source=data,
+        fill_alpha="sim_fill_alpha",
+        line_alpha="sim_line_alpha",
         **scatter_kwargs,
     )
 
@@ -243,7 +248,8 @@ def plot_visit_param_vs_time(
         y=sample_y,
         height=1,
         width=1,
-        fill_alpha=scatter_kwargs["fill_alpha"],
+        fill_alpha=0.5,
+        line_alpha=1,
         color=scatter_kwargs["color"].transform.palette,
     )
     sample_color_renderer.visible = False
@@ -265,7 +271,8 @@ def plot_visit_param_vs_time(
         sample_marker_renderer = plot.scatter(
             x=sample_x,
             y=sample_y,
-            fill_alpha=scatter_kwargs["fill_alpha"],
+            fill_alpha=0.5,
+            line_alpha=1.0,
             color="black",
             marker=marker_transform.markers,
         )
@@ -302,7 +309,7 @@ def plot_visit_param_vs_time(
 
         column_selector = bokeh.models.Select(value=column_name, options=options, name="visitcolselect")
 
-        timeline_callback = bokeh.models.CustomJS(
+        column_selector_callback = bokeh.models.CustomJS(
             args={"timeline": timeline, "data": data, "yaxis": plot.yaxis[0]},
             code="""
                 timeline.glyph.y.field = this.value
@@ -310,8 +317,42 @@ def plot_visit_param_vs_time(
                 data.change.emit()
             """,
         )
-        column_selector.js_on_change("value", timeline_callback)
-        ui_element = bokeh.layouts.column([column_selector, plot])
+        column_selector.js_on_change("value", column_selector_callback)
+
+    if show_sim_selector:
+        if "label" not in data.column_names:
+            raise ValueError("A sim selector needs the label column")
+        options = ["All"] + list(o for o in np.unique(data.data["label"]) if o != "Completed")
+        default_sim = "All"
+        sim_selector = bokeh.models.Select(value=default_sim, options=options, name="simselect")
+
+        sim_selector_callback = bokeh.models.CustomJS(
+            args={"data": data},
+            code="""
+                for (let i = 0; i < data.data['label'].length; i++) {
+                    if (data.data['label'][i] === 'Completed') {
+                        data.data['sim_fill_alpha'][i] = 0.5;
+                        data.data['sim_line_alpha'][i] = 1.0;
+                    } else if (['All', data.data['label'][i]].includes(this.value)) {
+                        data.data['sim_fill_alpha'][i] = 0.2;
+                        data.data['sim_line_alpha'][i] = 0.8;
+                    } else {
+                        data.data['sim_fill_alpha'][i] = 0.0;
+                        data.data['sim_line_alpha'][i] = 0.0;
+                    }
+                }
+                data.change.emit()
+            """,
+        )
+        sim_selector.js_on_change("value", sim_selector_callback)
+
+    if show_column_selector or show_sim_selector:
+        selector_row_contents = []
+        if show_column_selector:
+            selector_row_contents.append(column_selector)
+        if show_sim_selector:
+            selector_row_contents.append(sim_selector)
+        ui_element = bokeh.layouts.column([bokeh.layouts.row(selector_row_contents), plot])
     else:
         ui_element = plot
 
