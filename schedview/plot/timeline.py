@@ -883,7 +883,7 @@ def make_timeline_scatterplots(visits, visits_column="altitude", marker_transfor
         visits_column,
         show_column_selector=True,
         plot=visit_plot,
-        size=5,
+        size=10,
         marker_transform=marker_transform,
     )
 
