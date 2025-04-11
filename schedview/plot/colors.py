@@ -12,16 +12,59 @@ PLOT_BAND_COLORS = {
     "y": "#5d0000",
 }
 
-# Extra colors from the same Glasbey palette from which the RTN-045
-# colors were drawn:
-#  glasbey.create_palette(
-#     palette_size=12,
-#     colorblind_safe=True,
-#     cvd_severity=100
-#  )
-# So, these should be distinct, even for color blind users,
-# to the extent glasbey can do it.
-EXTRA_COLORS = ["#3d7555", "#20ebff", "#0400fb", "#102da2", "#4171ff", "#791059", "#f335e7"]
+# Use
+# glasbey.extend_palette(
+#    PLOT_BAND_COLORS.values(),
+#    palette_size=48,
+#    colorblind_safe=True,
+#    grid_size=256
+# )
+# to generate extra colors, attempting to get distinguishable ones, even
+# for the color blind.
+EXTRA_COLORS = [
+    "#0000b6",
+    "#04e9ff",
+    "#006200",
+    "#750065",
+    "#ff3ce6",
+    "#d75d47",
+    "#bc3c7f",
+    "#04f0bd",
+    "#6302ac",
+    "#b408b9",
+    "#81b000",
+    "#ff79b9",
+    "#640500",
+    "#65a9ff",
+    "#b20000",
+    "#00f468",
+    "#009236",
+    "#0135ff",
+    "#2ac879",
+    "#d43cff",
+    "#ff864e",
+    "#95085e",
+    "#ff95ff",
+    "#f721b0",
+    "#9401d0",
+    "#ad0e8a",
+    "#370091",
+    "#7c04ff",
+    "#7a0890",
+    "#bf54b1",
+    "#f94f00",
+    "#b45900",
+    "#d783ff",
+    "#0893d7",
+    "#b4c900",
+    "#862113",
+    "#8f5bd0",
+    "#fe75d6",
+    "#1aaf49",
+    "#006bbb",
+    "#0c03fb",
+    "#7b9000",
+]
 
 
 def make_band_cmap(
