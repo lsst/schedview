@@ -197,7 +197,18 @@ def plot_visit_param_vs_time(
     # Make mypy happy
     assert isinstance(plot, bokeh.plotting.figure)
 
-    scatter_kwargs = {}
+    if isinstance(visits, bokeh.models.ColumnarDataSource):
+        data = visits
+    elif "label" in visits.columns:
+        # Label marks whether visits are simulated or completed.
+        data = bokeh.models.ColumnDataSource(visits.assign(sim_alpha=1.0))
+    else:
+        data = bokeh.models.ColumnDataSource(visits.assign(label="", sim_alpha=1.0))
+
+    scatter_kwargs = {
+        "fill_alpha": 0.0,
+        "line_alpha": "sim_alpha" if "sim_alpha" in data.data else 1.0,
+    }
 
     if color_transform is None:
         scatter_kwargs["color"] = make_band_cmap(band_column(visits))
@@ -211,20 +222,10 @@ def plot_visit_param_vs_time(
 
     scatter_kwargs.update(kwargs)
 
-    if isinstance(visits, bokeh.models.ColumnarDataSource):
-        data = visits
-    elif "label" in visits.columns:
-        # Label marks whether visits are simulated or completed.
-        data = bokeh.models.ColumnDataSource(visits.assign(sim_fill_alpha=0.5, sim_line_alpha=1.0))
-    else:
-        data = bokeh.models.ColumnDataSource(visits.assign(label="", sim_fill_alpha=0.5, sim_line_alpha=1.0))
-
     timeline = plot.scatter(
         x="start_date",
         y=column_name,
         source=data,
-        fill_alpha="sim_fill_alpha",
-        line_alpha="sim_line_alpha",
         **scatter_kwargs,
     )
 
@@ -248,7 +249,7 @@ def plot_visit_param_vs_time(
         y=sample_y,
         height=1,
         width=1,
-        fill_alpha=0.5,
+        fill_alpha=1,
         line_alpha=1,
         color=scatter_kwargs["color"].transform.palette,
     )
@@ -271,7 +272,7 @@ def plot_visit_param_vs_time(
         sample_marker_renderer = plot.scatter(
             x=sample_x,
             y=sample_y,
-            fill_alpha=0.5,
+            fill_alpha=0.0,
             line_alpha=1.0,
             color="black",
             marker=marker_transform.markers,
@@ -331,14 +332,11 @@ def plot_visit_param_vs_time(
             code="""
                 for (let i = 0; i < data.data['label'].length; i++) {
                     if (data.data['label'][i] === 'Completed') {
-                        data.data['sim_fill_alpha'][i] = 0.5;
-                        data.data['sim_line_alpha'][i] = 1.0;
+                        data.data['sim_alpha'][i] = 1.0;
                     } else if (['All', data.data['label'][i]].includes(this.value)) {
-                        data.data['sim_fill_alpha'][i] = 0.2;
-                        data.data['sim_line_alpha'][i] = 0.8;
+                        data.data['sim_alpha'][i] = 0.8;
                     } else {
-                        data.data['sim_fill_alpha'][i] = 0.0;
-                        data.data['sim_line_alpha'][i] = 0.0;
+                        data.data['sim_alpha'][i] = 0.0;
                     }
                 }
                 data.change.emit()
