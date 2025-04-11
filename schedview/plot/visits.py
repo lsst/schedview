@@ -198,15 +198,15 @@ def plot_visit_param_vs_time(
     assert isinstance(plot, bokeh.plotting.figure)
 
     if isinstance(visits, bokeh.models.ColumnarDataSource):
-        data = visits
+        source = visits
     else:
-        data = bokeh.models.ColumnDataSource(visits)
+        source = bokeh.models.ColumnDataSource(visits)
 
-    if "label" not in data.data:
-        data.data["label"] = np.full_like(data.data["start_date"], "")
+    if "label" not in source.data:
+        source.data["label"] = np.full_like(source.data["start_date"], "")
 
-    if "sim_alpha" not in data.data:
-        data.data["sim_alpha"] = np.full_like(data.data["start_date"], 1.0, dtype=np.float64)
+    if "sim_alpha" not in source.data:
+        source.data["sim_alpha"] = np.full_like(source.data["start_date"], 1.0, dtype=np.float64)
 
     scatter_kwargs = {"fill_alpha": 0.0, "line_alpha": "sim_alpha"}
 
@@ -225,7 +225,7 @@ def plot_visit_param_vs_time(
     timeline = plot.scatter(
         x="start_date",
         y=column_name,
-        source=data,
+        source=source,
         **scatter_kwargs,
     )
 
@@ -302,8 +302,8 @@ def plot_visit_param_vs_time(
         options = []
         # Use a loop instead of a list comprehension to make it easier
         # to appease mypy
-        for k in data.column_names:
-            column_data = data.data[k]
+        for k in source.column_names:
+            column_data = source.data[k]
             assert isinstance(column_data, np.ndarray)
             if np.issubdtype(column_data.dtype, np.number):
                 options.append(k)
@@ -311,35 +311,35 @@ def plot_visit_param_vs_time(
         column_selector = bokeh.models.Select(value=column_name, options=options, name="visitcolselect")
 
         column_selector_callback = bokeh.models.CustomJS(
-            args={"timeline": timeline, "data": data, "yaxis": plot.yaxis[0]},
+            args={"timeline": timeline, "source": source, "yaxis": plot.yaxis[0]},
             code="""
                 timeline.glyph.y.field = this.value
                 yaxis.axis_label = this.value
-                data.change.emit()
+                source.change.emit()
             """,
         )
         column_selector.js_on_change("value", column_selector_callback)
 
     if show_sim_selector:
-        if "label" not in data.column_names:
+        if "label" not in source.column_names:
             raise ValueError("A sim selector needs the label column")
-        options = ["All"] + list(o for o in np.unique(data.data["label"]) if o != "Completed")
+        options = ["All"] + list(o for o in np.unique(source.data["label"]) if o != "Completed")
         default_sim = "All"
         sim_selector = bokeh.models.Select(value=default_sim, options=options, name="simselect")
 
         sim_selector_callback = bokeh.models.CustomJS(
-            args={"data": data},
+            args={"source": source},
             code="""
-                for (let i = 0; i < data.data['label'].length; i++) {
-                    if (data.data['label'][i] === 'Completed') {
-                        data.data['sim_alpha'][i] = 1.0;
-                    } else if (['All', data.data['label'][i]].includes(this.value)) {
-                        data.data['sim_alpha'][i] = 0.8;
+                for (let i = 0; i < source.data['label'].length; i++) {
+                    if (source.data['label'][i] === 'Completed') {
+                        source.data['sim_alpha'][i] = 1.0;
+                    } else if (['All', source.data['label'][i]].includes(this.value)) {
+                        source.data['sim_alpha'][i] = 0.8;
                     } else {
-                        data.data['sim_alpha'][i] = 0.0;
+                        source.data['sim_alpha'][i] = 0.0;
                     }
                 }
-                data.change.emit()
+                source.change.emit()
             """,
         )
         sim_selector.js_on_change("value", sim_selector_callback)
