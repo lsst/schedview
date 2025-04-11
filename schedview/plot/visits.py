@@ -199,16 +199,16 @@ def plot_visit_param_vs_time(
 
     if isinstance(visits, bokeh.models.ColumnarDataSource):
         data = visits
-    elif "label" in visits.columns:
-        # Label marks whether visits are simulated or completed.
-        data = bokeh.models.ColumnDataSource(visits.assign(sim_alpha=1.0))
     else:
-        data = bokeh.models.ColumnDataSource(visits.assign(label="", sim_alpha=1.0))
+        data = bokeh.models.ColumnDataSource(visits)
 
-    scatter_kwargs = {
-        "fill_alpha": 0.0,
-        "line_alpha": "sim_alpha" if "sim_alpha" in data.data else 1.0,
-    }
+    if "label" not in data.data:
+        data.data["label"] = np.full_like(data.data["start_date"], "")
+
+    if "sim_alpha" not in data.data:
+        data.data["sim_alpha"] = np.full_like(data.data["start_date"], 1.0, dtype=np.float64)
+
+    scatter_kwargs = {"fill_alpha": 0.0, "line_alpha": "sim_alpha"}
 
     if color_transform is None:
         scatter_kwargs["color"] = make_band_cmap(band_column(visits))
