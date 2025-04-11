@@ -21,12 +21,15 @@ NIGHT_STACKERS = [
     maf.stackers.ObservationStartDatetime64Stacker(),
     maf.stackers.OverheadStacker(),
     maf.stackers.HealpixStacker(),
+    maf.stackers.TeffStacker(filter_col="band"),
+    maf.stackers.DayObsStacker(),
+    maf.stackers.DayObsMJDStacker(),
     maf.stackers.DayObsISOStacker(),
 ]
 
 DDF_STACKERS = [
     maf.stackers.ObservationStartDatetime64Stacker(),
-    maf.stackers.TeffStacker(),
+    maf.stackers.TeffStacker(filter_col="band"),
     maf.stackers.DayObsISOStacker(),
 ]
 
