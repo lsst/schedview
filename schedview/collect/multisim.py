@@ -3,13 +3,15 @@ import astropy.time
 import pandas as pd
 import rubin_sim
 from lsst.resources import ResourcePath
-from rubin_sim import maf
 
+from ..collect.visits import NIGHT_STACKERS
 from ..compute.visits import add_coords_tuple
 from .opsim import all_visits_columns, read_opsim
 
 
-def read_multiple_opsims(archive_uri: str, sim_date: str, day_obs_mjd: int, stackers: list | None):
+def read_multiple_opsims(
+    archive_uri: str, sim_date: str, day_obs_mjd: int, stackers: list | None = NIGHT_STACKERS
+):
     """Read results of multiple simulations for a time period from an archive.
 
     Parameters
@@ -47,16 +49,6 @@ def read_multiple_opsims(archive_uri: str, sim_date: str, day_obs_mjd: int, stac
             continue
 
         sim_rp = ResourcePath(sim_uri).join(sim_metadata["files"]["observations"]["name"])
-
-        if stackers is None:
-            stackers = [
-                maf.stackers.TeffStacker(),
-                maf.stackers.ObservationStartDatetime64Stacker(),
-                maf.stackers.DayObsStacker(),
-                maf.stackers.DayObsMJDStacker(),
-                maf.stackers.DayObsISOStacker(),
-                maf.stackers.OverheadStacker(),
-            ]
 
         these_visits = read_opsim(
             sim_rp,
