@@ -839,7 +839,7 @@ def make_multitimeline(plot: Plot | None = None, **kwargs) -> Plot:
     return plot
 
 
-def make_timeline_scatterplots(visits, visits_column="altitude", marker_transform=None, **kwargs):
+def make_timeline_scatterplots(visits, visits_column="altitude", user_param_plot_kwargs=None, **kwargs):
     """Create a figure with a timeline plot (as created by
     `schedview.plot.timeline.make_multitimeline`) and a visit scatterplot
     (as created by `schedview.plot.visits.plot_visit_param_vs_time`)
@@ -878,13 +878,12 @@ def make_timeline_scatterplots(visits, visits_column="altitude", marker_transfor
 
     visit_plot = bokeh.plotting.figure(**figure_kwargs)
 
+    param_plot_kwargs = {"size": 10, "show_column_selector": True}
+    if user_param_plot_kwargs is not None:
+        param_plot_kwargs.update(user_param_plot_kwargs)
+
     visit_param_vs_time = schedview.plot.plot_visit_param_vs_time(
-        visits,
-        visits_column,
-        show_column_selector=True,
-        plot=visit_plot,
-        size=10,
-        marker_transform=marker_transform,
+        visits, visits_column, plot=visit_plot, **param_plot_kwargs
     )
 
     ui_element = bokeh.layouts.gridplot([[timeline_plot, visit_param_vs_time]])
