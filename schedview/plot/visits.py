@@ -241,7 +241,10 @@ def plot_visit_param_vs_time(
     # Generate placement for sample points.
     # This needs to be in the plot to avoid messing up the axis limits,
     # but otherwise does not matter, because the points will be invisible.
-    sample_x, sample_y = visits["start_date"].iloc[0], visits[column_name].iloc[0]
+    # Do not use data to get the sample y value, because the user can
+    # change which data is getting plotted. Use a nan instead, which
+    # will be ignored by the limit calculation.
+    sample_x, sample_y = visits["start_date"].iloc[0], np.nan
 
     # Create an invisible renderer to drive color legend:
     sample_color_renderer = plot.rect(
