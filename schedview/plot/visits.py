@@ -194,6 +194,10 @@ def plot_visit_param_vs_time(
     if plot is None:
         plot = bokeh.plotting.figure(y_axis_label=column_name, x_axis_label="Time (UTC)")
 
+    if len(visits) == 0:
+        plot.text(x=0.5, y=0.5, text="No visits.")
+        return plot
+
     # Make mypy happy
     assert isinstance(plot, bokeh.plotting.figure)
 
