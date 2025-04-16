@@ -305,11 +305,12 @@ def plot_visit_param_vs_time(
         plot.add_tools(hover_tool)
 
     if show_column_selector:
+        ignored_columns = {"level_0", "index", "sim_alpha", "sim_index"}
         # Only offer numeric fields as options
         options = []
         # Use a loop instead of a list comprehension to make it easier
         # to appease mypy
-        for k in source.column_names:
+        for k in sorted(set(source.column_names) - ignored_columns):
             column_data = source.data[k]
             assert isinstance(column_data, np.ndarray)
             if np.issubdtype(column_data.dtype, np.number):
