@@ -12,15 +12,21 @@ def read_consdb(
     **kwargs,
 ) -> pd.DataFrame:
     consdb_visits = load_consdb_visits(instrument, *args, **kwargs)
-    # If the return is empty, to_records won't be able to determine the
-    # right dtypes, so use ObservationArray()[0:0] instead to make the
-    # empty recarray with the correct dtypes.
-    visit_records: np.recarray = (
-        consdb_visits.merged_opsim_consdb.to_records()
-        if len(consdb_visits.consdb_visits) > 0
-        else ObservationArray()[0:0]
-    )
+    if len(consdb_visits.consdb_visits) > 0:
+        visit_records: np.recarray = consdb_visits.merged_opsim_consdb.to_records()
+    else:
+        # If the return is empty, to_records won't be able to determine the
+        # right dtypes, so use ObservationArray()[0:0] instead to make the
+        # empty recarray with the correct dtypes.
+        # But, that will be missing start_date required by other stuff
+        # so add it with the correct dtype.
+        visit_records = (
+            pd.DataFrame(ObservationArray()[0:0])
+            .assign(start_date=pd.Series(dtype=np.dtype("<M8[ns]")))
+            .to_records()
+        )
     for stacker in stackers:
         visit_records = stacker.run(visit_records)
     visits = pd.DataFrame(visit_records)
+
     return visits
