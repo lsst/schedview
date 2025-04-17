@@ -24,7 +24,7 @@ def often_repeated_fields(visits: pd.DataFrame, min_counts: int = 4):
             The filter.
         ``sim_index``
             An ``int`` identifying which simulation a visit came from.
-        ``start_date``
+        ``start_timestamp``
             The starting ``datetime64[ns, UTC]`` for the visit.
         ``label``
             The ``str`` label for the simulation.
@@ -77,11 +77,11 @@ def often_repeated_fields(visits: pd.DataFrame, min_counts: int = 4):
     """
     field_repeats: pd.DataFrame = visits.groupby(
         ["fieldRA", "fieldDec", band_column(visits), "sim_index"]
-    ).agg({"start_date": ["count", "min", "max"], "label": "first"})
+    ).agg({"start_timestamp": ["count", "min", "max"], "label": "first"})
     column_map: dict[tuple[str, str], str] = {
-        ("start_date", "count"): "count",
-        ("start_date", "min"): "first_time",
-        ("start_date", "max"): "last_time",
+        ("start_timestamp", "count"): "count",
+        ("start_timestamp", "min"): "first_time",
+        ("start_timestamp", "max"): "last_time",
         ("label", "first"): "label",
     }
     # type hinting doesn't recognize that the column names in a multiindex
@@ -159,7 +159,7 @@ def count_visits_by_sim(
     visit_counts = (
         visits.groupby(grouping_columns)
         .count()
-        .loc[:, "start_date"]
+        .loc[:, "start_timestamp"]
         .rename("count")
         .reset_index()
         .pivot(index=list(visit_spec_columns), columns=[sim_identifier_column], values="count")
@@ -385,7 +385,7 @@ def compute_matched_visit_delta_statistics(
         sim_identifier_column: str | int = "sim_index",
     ) -> pd.Series:
         these_matches = match_visits_across_sims(
-            these_visits.set_index(sim_identifier_column).start_date, sim_identifier_values
+            these_visits.set_index(sim_identifier_column).start_timestamp, sim_identifier_values
         )
         return these_matches.loc[:, "delta"].describe()
 

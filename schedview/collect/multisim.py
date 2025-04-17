@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import rubin_sim
 from lsst.resources import ResourcePath
+from rubin_scheduler.scheduler.utils import ObservationArray, SchemaConverter
 
-from rubin_scheduler.scheduler.utils import ObservationArray
 from ..collect.visits import NIGHT_STACKERS
 from ..compute.visits import add_coords_tuple
 from .opsim import all_visits_columns, read_opsim
@@ -81,8 +81,8 @@ def read_multiple_opsims(
         visits = pd.concat(visits_list)
     else:
         # Make a DataFrame with the expected columns and no rows.
-        visits = pd.DataFrame(ObservationArray()[0:0])
-        visits["start_date"] = pd.Series(dtype=np.dtype("<M8[ns]"))
+        visits = SchemaConverter().obs2opsim(ObservationArray()[0:0])
+        visits["start_timestamp"] = pd.Series(dtype=np.dtype("<M8[ns]"))
         visits["sim_date"] = pd.Series()
         visits["sim_index"] = pd.Series(dtype=np.dtype("int64"))
         for key in sim_metadata_keys:

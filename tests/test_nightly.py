@@ -19,7 +19,7 @@ def _load_sample_visits():
     if "observationStartMJD" not in visits.columns and "mjd" in visits.columns:
         visits["observationStartMJD"] = visits["mjd"]
 
-    visits["start_date"] = pd.to_datetime(
+    visits["start_timestamp"] = pd.to_datetime(
         visits["observationStartMJD"] + 2400000.5, origin="julian", unit="D", utc=True
     )
     return visits
@@ -36,7 +36,7 @@ class TestNightly(unittest.TestCase):
     def test_plot_airmass_vs_time(self):
         visits = _load_sample_visits()
         astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
-        almanac_events = _create_almanac(visits["start_date"].dt.date[0])
+        almanac_events = _create_almanac(visits["start_timestamp"].dt.date[0])
 
         fig = schedview.plot.nightly.plot_airmass_vs_time(visits, almanac_events)
 

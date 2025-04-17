@@ -143,7 +143,7 @@ def plot_alt_airmass_vs_time(
             frame_height=633,
         )
 
-    scatter_kwargs = dict(x="start_date", y="altitude", legend_group="label", source=visits_ds)
+    scatter_kwargs = dict(x="start_timestamp", y="altitude", legend_group="label", source=visits_ds)
     scatter_kwargs.update(scatter_user_kwargs)
     fig.scatter(**scatter_kwargs)
 

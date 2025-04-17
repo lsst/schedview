@@ -26,7 +26,7 @@ def visits_tooltips(weather: bool = False) -> list:
     tooltips = [
         (
             "Start time",
-            "@start_date{%F %T} UTC (mjd=@observationStartMJD{00000.00}, LST=@observationStartLST"
+            "@start_timestamp{%F %T} UTC (mjd=@observationStartMJD{00000.00}, LST=@observationStartLST"
             + deg
             + ")",
         ),
@@ -107,7 +107,7 @@ def plot_visits(visits):
         The figure itself.
     """
     visit_explorer = hvplot.explorer(
-        visits, kind="scatter", x="start_date", y="airmass", by=["scheduler_note"]
+        visits, kind="scatter", x="start_timestamp", y="airmass", by=["scheduler_note"]
     )
     return visit_explorer
 
@@ -207,10 +207,10 @@ def plot_visit_param_vs_time(
         source = bokeh.models.ColumnDataSource(visits)
 
     if "label" not in source.data:
-        source.data["label"] = np.full_like(source.data["start_date"], "")
+        source.data["label"] = np.full_like(source.data["start_timestamp"], "")
 
     if "sim_alpha" not in source.data:
-        source.data["sim_alpha"] = np.full_like(source.data["start_date"], 1.0, dtype=np.float64)
+        source.data["sim_alpha"] = np.full_like(source.data["start_timestamp"], 1.0, dtype=np.float64)
 
     scatter_kwargs = {"fill_alpha": 0.0, "line_alpha": "sim_alpha"}
 
@@ -227,7 +227,7 @@ def plot_visit_param_vs_time(
     scatter_kwargs.update(kwargs)
 
     timeline = plot.scatter(
-        x="start_date",
+        x="start_timestamp",
         y=column_name,
         source=source,
         **scatter_kwargs,
@@ -248,7 +248,7 @@ def plot_visit_param_vs_time(
     # Do not use data to get the sample y value, because the user can
     # change which data is getting plotted. Use a nan instead, which
     # will be ignored by the limit calculation.
-    sample_x, sample_y = visits["start_date"].iloc[0], np.nan
+    sample_x, sample_y = visits["start_timestamp"].iloc[0], np.nan
 
     # Create an invisible renderer to drive color legend:
     sample_color_renderer = plot.rect(
@@ -300,7 +300,7 @@ def plot_visit_param_vs_time(
 
     if hovertool:
         hover_tool = bokeh.models.HoverTool(
-            renderers=[timeline], tooltips=visits_tooltips(), formatters={"@start_date": "datetime"}
+            renderers=[timeline], tooltips=visits_tooltips(), formatters={"@start_timestamp": "datetime"}
         )
         plot.add_tools(hover_tool)
 
@@ -403,11 +403,15 @@ def create_visit_table(
     )
 
     date_columns = []
-    date_colname = "start_date" if "start_date" in data.column_names else "observationStartDatetime64"
+    date_colname = (
+        "start_timestamp" if "start_timestamp" in data.column_names else "observationStartDatetime64"
+    )
     if date_colname in data.column_names:
         date_columns = [
             bokeh.models.TableColumn(
-                field="start_date", title="UTC Time", formatter=bokeh.models.DateFormatter(format="%H:%M:%S")
+                field="start_timestamp",
+                title="UTC Time",
+                formatter=bokeh.models.DateFormatter(format="%H:%M:%S"),
             )
         ]
         visible_column_names.insert(0, date_colname)

@@ -64,7 +64,7 @@ class ExampleCompoundVisitDashboard(param.Parameterized):
     def visit_explorer(self):
         if self.visits is None:
             return "No visits"
-        ui_element = hvplot.explorer(self.visits, kind="scatter", x="start_date", y="airmass")
+        ui_element = hvplot.explorer(self.visits, kind="scatter", x="start_timestamp", y="airmass")
         return ui_element
 
     @param.depends("visits")

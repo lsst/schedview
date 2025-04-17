@@ -5,7 +5,6 @@ from datetime import date
 
 import astropy.time
 import astropy.utils.iers
-import bokeh
 import numpy as np
 import pandas as pd
 import panel as pn
@@ -99,12 +98,12 @@ class CombinedTimelineDashboard(param.Parameterized):
         completed_visits = schedview.collect.visits.read_visits(
             day_obs, visit_origin, stackers=schedview.collect.visits.NIGHT_STACKERS
         )
-        completed_visits["start_date"] = pd.to_datetime(
-            completed_visits["start_date"], format="ISO8601"
+        completed_visits["start_timestamp"] = pd.to_datetime(
+            completed_visits["start_timestamp"], format="ISO8601"
         ).dt.tz_localize("UTC")
 
         obs_start_time = (
-            astropy.time.Time(completed_visits.start_date.min())
+            astropy.time.Time(completed_visits.start_timestamp.min())
             if len(completed_visits) > 0
             else day_obs.start
         )
