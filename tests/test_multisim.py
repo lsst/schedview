@@ -145,8 +145,8 @@ class TestMultisim(unittest.TestCase):
     def test_compute_matched_visit_delta_statistics(self):
         matched_visit_stats = schedview.compute.multisim.compute_matched_visit_delta_statistics(self.visits)
         assert set(matched_visit_stats.index.names) == {
-            "fieldRA",
-            "fieldDec",
+            "hp_ra",
+            "hp_decl",
             "band",
             "visitExposureTime",
             "sim_index",
