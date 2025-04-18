@@ -22,7 +22,6 @@ NIGHT_STACKERS = [
     maf.stackers.ObservationStartTimestampStacker(),
     maf.stackers.OverheadStacker(),
     maf.stackers.HealpixStacker(),
-    maf.stackers.TeffStacker(filter_col="band"),
     maf.stackers.DayObsStacker(),
     maf.stackers.DayObsMJDStacker(),
     maf.stackers.DayObsISOStacker(),
