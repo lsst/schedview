@@ -21,7 +21,7 @@ def scheduler_config_at_time_cli():
         description="Get the scheduler configuration script path the observatory as of a given time.",
     )
     parser.add_argument(
-        "instrument", type=str, help="The instrument being scheduled (lsstcam, latiss, or lsstcomcam)."
+        "what_scheduled", type=str, help="Which scheduler config (simonyi, maintel, ocs, or auxtel)."
     )
     parser.add_argument(
         "--datetime",
@@ -37,10 +37,9 @@ def scheduler_config_at_time_cli():
     time_cut = Time(args.datetime)
     ts_config_ocs_version = schedview.collect.get_version_at_time("ts_config_ocs", time_cut)
 
-    sal_indexes = schedview.collect.SAL_INDEX_GUESSES[args.instrument]
     loop = asyncio.get_event_loop()
     scheduler_config = loop.run_until_complete(
-        schedview.collect.get_scheduler_config(ts_config_ocs_version, sal_indexes, time_cut)
+        schedview.collect.get_scheduler_config(ts_config_ocs_version, args.what_scheduled, time_cut)
     )
 
     print(scheduler_config)

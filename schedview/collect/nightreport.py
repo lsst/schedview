@@ -36,7 +36,7 @@ def get_night_report(
     day_obs = DayObs.from_date(day_obs)
 
     params = {
-        "telescopes": telescope,
+        "telescope": telescope,
         "min_day_obs": day_obs.yyyymmdd,
         "max_day_obs": DayObs.from_date(day_obs.date + datetime.timedelta(days=1)).yyyymmdd,
         "is_valid": "true",

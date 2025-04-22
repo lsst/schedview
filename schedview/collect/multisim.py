@@ -1,3 +1,5 @@
+from typing import Literal
+
 import astropy
 import astropy.time
 import numpy as np
@@ -12,7 +14,11 @@ from .opsim import all_visits_columns, read_opsim
 
 
 def read_multiple_opsims(
-    archive_uri: str, sim_date: str, day_obs_mjd: int, stackers: list | None = NIGHT_STACKERS
+    archive_uri: str,
+    sim_date: str,
+    day_obs_mjd: int,
+    stackers: list | None = NIGHT_STACKERS,
+    telescope: Literal["AuxTel", "Simonyi", "auxtel", "simonyi", "maintel"] = "simonyi",
 ):
     """Read results of multiple simulations for a time period from an archive.
 
@@ -26,28 +32,41 @@ def read_multiple_opsims(
         The day_obs MJD of the first night for which to load visits.
     stackers : `list` or `None`
         A list of stackers to apply.
+    telescope : `str`
+        The telescope te read simulations for (Simonyi or Auxtel)
 
     Returns
     -------
     visits : `pandas.DataFrame`
         Data on the visits.
     """
+
+    telescope = "simonyi" if telescope.lower() in ("simonyi", "maintel") else "auxtel"
+    assert telescope in ("simonyi", "auxtel")
+
     sims_metadata = rubin_sim.sim_archive.read_archived_sim_metadata(
         archive_uri, latest=sim_date, num_nights=1
     )
 
-    sim_metadata_keys = [
-        "label",
-        "opsim_config_branch",
-        "opsim_config_repository",
-        "opsim_config_script",
-        "scheduler_version",
-        "sim_runner_kwargs",
-        "tags",
-    ]
-
     visits_list = []
     for sim_uri, sim_metadata in sims_metadata.items():
+        if "telescope" not in sim_metadata or sim_metadata["telescope"] != telescope:
+            # This sim is for the wrong telescope, so skip it.
+            continue
+
+        version_key = (
+            "opsim_config_version" if "opsim_config_version" in sim_metadata else "opsim_config_branch"
+        )
+        sim_metadata_keys = [
+            "label",
+            version_key,
+            "opsim_config_repository",
+            "opsim_config_script",
+            "scheduler_version",
+            "sim_runner_kwargs",
+            "tags",
+        ]
+
         first_day_obs_mjd = astropy.time.Time(sim_metadata["simulated_dates"]["first"]).mjd
         last_day_obs_mjd = astropy.time.Time(sim_metadata["simulated_dates"]["last"]).mjd
 
@@ -83,8 +102,17 @@ def read_multiple_opsims(
         # Make a DataFrame with the expected columns and no rows.
         visits = SchemaConverter().obs2opsim(ObservationArray()[0:0])
         visits["start_timestamp"] = pd.Series(dtype=np.dtype("<M8[ns]"))
-        visits["sim_date"] = pd.Series()
         visits["sim_index"] = pd.Series(dtype=np.dtype("int64"))
-        for key in sim_metadata_keys:
+        expected_sim_metadata_keys = [
+            "sim_date",
+            "label",
+            "opsim_config_version",
+            "opsim_config_repository",
+            "opsim_config_script",
+            "scheduler_version",
+            "sim_runner_kwargs",
+            "tags",
+        ]
+        for key in expected_sim_metadata_keys:
             visits[key] = pd.Series()
     return visits
