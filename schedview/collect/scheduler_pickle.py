@@ -8,11 +8,13 @@ import os
 import pickle
 import urllib
 import urllib.request
+from collections.abc import Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from lsst.resources import ResourcePath
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
+from rubin_scheduler.scheduler.schedulers.core_scheduler import CoreScheduler
 
 try:
     PICKLE_FNAME = os.environ["SCHED_PICKLE"]
@@ -50,14 +52,20 @@ def read_local_scheduler_pickle(file_name):
     else:
         opener = open
 
-    try:
-        with opener(file_name, "rb") as pio:
-            scheduler, conditions = pickle.load(pio)
+    with opener(file_name, "rb") as pio:
+        pickle_content = pickle.load(pio)
 
-    except TypeError:
-        with opener(file_name, "rb") as pio:
-            scheduler = pickle.load(pio)
+    match pickle_content:
+        case CoreScheduler():
+            scheduler = pickle_content
+            conditions = None
+        case Sequence():
+            scheduler = pickle_content[0]
+            conditions = pickle_content[1] if len(pickle_content) >= 2 else None
+        case _:
+            raise ValueError(f"Unrecognized content in pickle {file_name}")
 
+    if conditions is None:
         try:
             conditions = scheduler.conditions
         except AttributeError:

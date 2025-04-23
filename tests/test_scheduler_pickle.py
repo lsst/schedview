@@ -32,6 +32,21 @@ class TestSchedulerPickle(unittest.TestCase):
         self.assertIsInstance(scheduler, CoreScheduler)
         self.assertIsInstance(conditions, Conditions)
 
+    def test_extra_scheduler(self):
+        # Test if we can read a pickle with extra stuff in it.
+        scheduler, conditions = read_scheduler()
+        extra_content = "I am a fish."
+        with TemporaryDirectory() as data_dir:
+            content = (scheduler, conditions, extra_content)
+            sample_path = os.path.join(data_dir, "sample_scheduler.pickle")
+            with open(sample_path, "wb") as file_io:
+                pickle.dump(content, file_io)
+
+            scheduler, conditions = read_scheduler(sample_path)
+
+        self.assertIsInstance(scheduler, CoreScheduler)
+        self.assertIsInstance(conditions, Conditions)
+
 
 if __name__ == "__main__":
     unittest.main()
