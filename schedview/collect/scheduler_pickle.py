@@ -22,13 +22,16 @@ except KeyError:
     PICKLE_FNAME = None
 
 
-def read_local_scheduler_pickle(file_name):
+def read_local_scheduler_pickle(file_name, everything=False):
     """Read an instance of a scheduler object from a pickle.
 
     Parameters
     ----------
     file_name : `str`
         The name of the pickle file from which to load the scheduler.
+    everything : `bool`
+        Return everything in the pickle as it is stored instead of following
+        the standard return.
 
     Returns
     -------
@@ -54,6 +57,9 @@ def read_local_scheduler_pickle(file_name):
 
     with opener(file_name, "rb") as pio:
         pickle_content = pickle.load(pio)
+
+    if everything:
+        return pickle_content
 
     match pickle_content:
         case CoreScheduler():

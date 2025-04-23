@@ -43,9 +43,14 @@ class TestSchedulerPickle(unittest.TestCase):
                 pickle.dump(content, file_io)
 
             scheduler, conditions = read_scheduler(sample_path)
+            everything = read_scheduler(sample_path, everything=True)
 
         self.assertIsInstance(scheduler, CoreScheduler)
         self.assertIsInstance(conditions, Conditions)
+
+        self.assertIsInstance(everything[0], CoreScheduler)
+        self.assertIsInstance(everything[1], Conditions)
+        self.assertEqual(everything[2], extra_content)
 
 
 if __name__ == "__main__":
