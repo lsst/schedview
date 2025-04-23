@@ -80,13 +80,16 @@ def read_local_scheduler_pickle(file_name, everything=False):
     return [scheduler, conditions]
 
 
-def read_scheduler(file_name_or_url=None):
+def read_scheduler(file_name_or_url=None, everything=False):
     """Read an instance of a scheduler object from a pickle.
 
     Parameters
     ----------
     file_name : `str`
         The name or URL of the pickle file from which to load the scheduler.
+    everything : `bool`
+        Return everything in the pickle as it is stored instead of following
+        the standard return.
 
     Returns
     -------
@@ -104,7 +107,11 @@ def read_scheduler(file_name_or_url=None):
     if Path(file_name_or_url).is_file():
         scheduler_resource_path = ResourcePath(file_name_or_url)
         with scheduler_resource_path.as_local() as local_scheduler_resource:
-            (scheduler, conditions) = read_local_scheduler_pickle(local_scheduler_resource.ospath)
+            if everything:
+                contents = read_local_scheduler_pickle(local_scheduler_resource.ospath, everything=True)
+                return contents
+            else:
+                (scheduler, conditions) = read_local_scheduler_pickle(local_scheduler_resource.ospath)
     else:
         with TemporaryDirectory() as directory:
             with urllib.request.urlopen(file_name_or_url) as url_io:
@@ -120,7 +127,11 @@ def read_scheduler(file_name_or_url=None):
             with open(path, "wb") as file_io:
                 file_io.write(content)
 
-            scheduler, conditions = read_local_scheduler_pickle(str(path))
+            if everything:
+                contents = read_local_scheduler_pickle(str(path), everything=True)
+                return contents
+            else:
+                scheduler, conditions = read_local_scheduler_pickle(str(path))
 
     return scheduler, conditions
 
