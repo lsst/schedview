@@ -980,7 +980,9 @@ class SchedulerSnapshotDashboard(param.Parameterized):
             self._sky_map_base.plot.legend.padding = 15  # Space around inside edge.
             self._sky_map_base.plot.legend.title_standoff = 10  # Space between title and items.
             self._sky_map_base.plot.legend.click_policy = "hide"  # Hide elements when clicked.
-            self._sky_map_base.plot.add_layout(self._sky_map_base.plot.legend[0], "right")
+            moved_legend = self._sky_map_base.plot.legend[0].clone()
+            self._sky_map_base.plot.legend[0].destroy()
+            self._sky_map_base.plot.add_layout(moved_legend, "right")
             self._sky_map_base.plot.right[0].location = "center_right"
 
             self._debugging_message = "Finished creating sky map base."

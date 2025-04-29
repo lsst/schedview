@@ -190,7 +190,9 @@ def plot_rewards(
                     )
                 plot.line(x="obs_mjd", y="reward", color=color, source=fill_source)
 
-    plot.add_layout(plot.legend[0], "left")
+    moved_legend = plot.legend[0].clone()
+    plot.legend[0].destroy()
+    plot.add_layout(moved_legend, "left")
     return plot
 
 

@@ -138,7 +138,9 @@ def plot_airmass_vs_time(
     fig.y_range = bokeh.models.Range1d(plot_airmass_limit, 1)
     fig.xaxis[0].ticker = bokeh.models.DatetimeTicker()
     fig.xaxis[0].formatter = bokeh.models.DatetimeTickFormatter(hours="%H:%M")
-    fig.add_layout(fig.legend[0], "left")
+    moved_legend = fig.legend[0].clone()
+    fig.legend[0].destroy()
+    fig.add_layout(moved_legend, "left")
 
     if almanac_events is not None:
         _add_almanac_events(fig, almanac_events, event_labels, event_colors)
@@ -283,7 +285,9 @@ def plot_alt_vs_time(
     fig.xaxis[0].ticker = bokeh.models.DatetimeTicker()
     fig.xaxis[0].formatter = bokeh.models.DatetimeTickFormatter(hours="%H:%M")
 
-    fig.add_layout(fig.legend[0], "left")
+    moved_legend = fig.legend[0].clone()
+    fig.legend[0].destroy()
+    fig.add_layout(moved_legend, "left")
 
     fig.yaxis[0].ticker.desired_num_ticks = 10
 
@@ -501,7 +505,9 @@ def plot_polar_alt_az(visits, band_shapes=BAND_SHAPES, figure=None, legend=True,
     fig.add_tools(hover_tool)
 
     if legend:
-        fig.add_layout(fig.legend[0], "left")
+        moved_legend = fig.legend[0].clone()
+        fig.legend[0].destroy()
+        fig.add_layout(moved_legend, "left")
     else:
         fig.legend.visible = False
 

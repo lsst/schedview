@@ -79,9 +79,10 @@ def create_cadence_plot(
         )
 
         if last_plot:
-            legend = this_plot.legend[0]
-            legend.orientation = "horizontal"
-            this_plot.add_layout(legend, "below")
+            moved_legend = this_plot.legend[0].clone()
+            this_plot.legend[0].destroy()
+            moved_legend.orientation = "horizontal"
+            this_plot.add_layout(moved_legend, "below")
 
         cadence_plots.append(this_plot)
 
