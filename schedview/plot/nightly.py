@@ -7,7 +7,7 @@ import numpy as np
 
 from schedview import band_column
 
-from .visitmap import BAND_COLORS
+from .colors import PLOT_BAND_COLORS
 from .visits import visits_tooltips
 
 DEFAULT_EVENT_LABELS = {
@@ -65,7 +65,7 @@ def _add_almanac_events(fig, almanac_events, event_labels, event_colors):
 def plot_airmass_vs_time(
     visits,
     almanac_events,
-    band_colors=BAND_COLORS,
+    band_colors=PLOT_BAND_COLORS,
     event_labels=DEFAULT_EVENT_LABELS,
     event_colors=DEFAULT_EVENT_COLORS,
     figure=None,
