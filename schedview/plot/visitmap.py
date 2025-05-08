@@ -26,13 +26,13 @@ BAND_HATCH_PATTERNS = dict(
 )
 BAND_HATCH_SCALES = dict(u=6, g=6, r=6, i=6, z=12, y=12)
 VISIT_TOOLTIPS = (
-    "@observationId: @start_date{%F %T} UTC (mjd=@observationStartMJD{00000.0000}, "
+    "@observationId: @start_timestamp{%F %T} UTC (mjd=@observationStartMJD{00000.0000}, "
     + "LST=@observationStartLST\u00b0), band=@filter, RA=@fieldRA\u00b0, Decl=@fieldDec\u00b0, "
     + "PA=@paraAngle\u00b0, Az=@azimuth\u00b0, Alt=@altitude\u00b0"
 )
 VISIT_COLUMNS = [
     "observationId",
-    "start_date",
+    "start_timestamp",
     "observationStartMJD",
     "observationStartLST",
     "band",
@@ -214,7 +214,7 @@ def plot_visit_skymaps(
             hover_tool = bokeh.models.HoverTool()
             hover_tool.renderers = list(plot.select({"name": "visit_patches"}))
             hover_tool.tooltips = VISIT_TOOLTIPS
-            hover_tool.formatters = {"@start_date": "datetime"}
+            hover_tool.formatters = {"@start_timestamp": "datetime"}
             plot.add_tools(hover_tool)
 
     for spheremap in spheremaps:

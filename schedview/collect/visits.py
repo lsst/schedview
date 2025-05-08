@@ -19,13 +19,18 @@ OPSIMDB_TEMPLATE = (
 NIGHT_STACKERS = [
     maf.HourAngleStacker(),
     maf.stackers.ObservationStartDatetime64Stacker(),
+    maf.stackers.ObservationStartTimestampStacker(),
     maf.stackers.OverheadStacker(),
+    maf.stackers.HealpixStacker(),
+    maf.stackers.DayObsStacker(),
+    maf.stackers.DayObsMJDStacker(),
     maf.stackers.DayObsISOStacker(),
 ]
 
 DDF_STACKERS = [
     maf.stackers.ObservationStartDatetime64Stacker(),
-    maf.stackers.TeffStacker(),
+    maf.stackers.ObservationStartTimestampStacker(),
+    maf.stackers.TeffStacker(filter_col="band"),
     maf.stackers.DayObsISOStacker(),
 ]
 
@@ -33,7 +38,7 @@ DDF_STACKERS = [
 def read_visits(
     day_obs: str | int | DayObs,
     visit_source: str,
-    stackers: list[maf.stackers.base_stacker.BaseStacker] = [],
+    stackers: list[maf.stackers.base_stacker.BaseStacker] = [maf.stackers.ObservationStartTimestampStacker()],
     num_nights: int = 1,
 ) -> pd.DataFrame:
 

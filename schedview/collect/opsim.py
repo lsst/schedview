@@ -68,6 +68,7 @@ def read_opsim(
     end_time=None,
     constraint=None,
     dbcols=None,
+    stackers: list[maf.BaseStacker] = [maf.ObservationStartTimestampStacker()],
     **kwargs,
 ):
     """Read visits from an opsim database.
@@ -137,46 +138,20 @@ def read_opsim(
             norm_columns, used_column_map = _normalize_opsim_columns(obs_path, dbcols)
 
             try:
-                try:
-                    visits = pd.DataFrame(
-                        maf.get_sim_data(sim_connection, constraint, norm_columns, **kwargs)
-                    )
-                except UserWarning:
-                    warn("No visits match constraints.")
-                    visits = (
-                        SchemaConverter()
-                        .obs2opsim(rubin_scheduler.scheduler.utils.ObservationArray())
-                        .iloc[0:-1]
-                    )
-                    if "observationId" not in visits.columns and "ID" in visits.columns:
-                        visits.rename(columns={"ID": "observationId"}, inplace=True)
-            except NameError as e:
-                if e.name == "maf" and e.args == ("name 'maf' is not defined",):
-                    if len(kwargs) > 0:
-                        raise NotImplementedError(
-                            f"Argument {list(kwargs)[0]} not supported without rubin_sim installed"
-                        )
-
-                    query = f'SELECT {", ".join(norm_columns)} FROM observations'
-                    if constraint:
-                        query += f" WHERE {constraint}"
-                    visits = pd.read_sql(query, sim_connection)
-                else:
-                    raise e
+                visits = pd.DataFrame(
+                    maf.get_sim_data(sim_connection, constraint, norm_columns, stackers=stackers, **kwargs)
+                )
+            except UserWarning:
+                warn("No visits match constraints.")
+                visits = (
+                    SchemaConverter().obs2opsim(rubin_scheduler.scheduler.utils.ObservationArray()).iloc[0:-1]
+                )
+                if "observationId" not in visits.columns and "ID" in visits.columns:
+                    visits.rename(columns={"ID": "observationId"}, inplace=True)
 
             # If we replaced modern columns with legacy ones in the query,
             # update the column names.
             visits.rename(columns=used_column_map, inplace=True)
-
-            if "start_date" not in visits:
-                if "observationStartDatetime64" in visits:
-                    visits["start_date"] = pd.to_datetime(
-                        visits.observationStartDatetime64, unit="ns", utc=True
-                    )
-                elif "observationStartMJD" in visits:
-                    visits["start_date"] = pd.to_datetime(
-                        visits.observationStartMJD + 2400000.5, origin="julian", unit="D", utc=True
-                    )
 
     visits.set_index("observationId", inplace=True)
 

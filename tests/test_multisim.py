@@ -40,13 +40,13 @@ class TestMultisim(unittest.TestCase):
             these_sim_visits = self.fields.loc[this_sim_fields, :].copy()
             these_sim_visits["sim_index"] = sim_index
             these_sim_visits["label"] = f"sim{sim_index}"
-            these_sim_visits["start_date"] = (
+            these_sim_visits["start_timestamp"] = (
                 pd.to_datetime("2025-09-15T02:00:00Z")
                 + pd.to_timedelta(rng.uniform(-10, 10), unit="m")
                 + pd.to_timedelta(np.arange(len(these_sim_visits)), unit="m")
                 + pd.to_timedelta(rng.uniform(-15, 15, len(these_sim_visits)), unit="s")
             )
-            these_sim_visits.sort_values("start_date", inplace=True)
+            these_sim_visits.sort_values("start_timestamp", inplace=True)
             these_sim_visits.index = pd.Index(np.arange(sim_nvisits), name="observationId")
             sim_visits_dfs.append(these_sim_visits)
 
@@ -122,7 +122,7 @@ class TestMultisim(unittest.TestCase):
                 )
 
     def test_match_visits_across_sims(self):
-        start_times = self.visits.set_index(["fieldId", "sim_index"])["start_date"]
+        start_times = self.visits.set_index(["fieldId", "sim_index"])["start_timestamp"]
         matched_visits = schedview.compute.multisim.match_visits_across_sims(
             start_times.loc[4, :], sim_indexes=(0, 1)
         )
@@ -144,13 +144,13 @@ class TestMultisim(unittest.TestCase):
 
     def test_compute_matched_visit_delta_statistics(self):
         matched_visit_stats = schedview.compute.multisim.compute_matched_visit_delta_statistics(self.visits)
-        assert tuple(matched_visit_stats.index.names) == (
-            "fieldRA",
-            "fieldDec",
+        assert set(matched_visit_stats.index.names) == {
+            "hp_ra",
+            "hp_decl",
             "band",
             "visitExposureTime",
             "sim_index",
-        )
+        }
         assert tuple(matched_visit_stats.columns) == (
             "count",
             "mean",
