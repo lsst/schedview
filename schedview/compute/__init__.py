@@ -17,6 +17,7 @@ __all__ = [
     "count_visits_by_sim",
     "match_visits_across_sims",
     "compute_matched_visit_delta_statistics",
+    "munge_sim_archive_metadata",
 ]
 
 from .astro import compute_sun_moon_positions, convert_evening_date_to_night_of_survey, night_events
@@ -35,6 +36,7 @@ from .scheduler import (
     make_unique_survey_name,
     replay_visits,
 )
+from .sim_archive import munge_sim_archive_metadata
 from .survey import compute_maps, make_survey_reward_df
 
 try:
