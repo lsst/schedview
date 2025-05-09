@@ -145,8 +145,9 @@ def plot_overhead_vs_slew_distance(visits, plot=None, **kwargs):
                 x="slewDistance", y="overhead", source=these_visits, legend_label=band, **circle_kwargs
             )
 
-    legend = plot.legend[0]
-    legend.orientation = "horizontal"
-    plot.add_layout(legend, "below")
+    moved_legend = plot.legend[0].clone()
+    plot.legend[0].destroy()
+    moved_legend.orientation = "horizontal"
+    plot.add_layout(moved_legend, "below")
 
     return plot

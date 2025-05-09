@@ -157,7 +157,9 @@ def plot_alt_airmass_vs_time(
     fig.xaxis[0].ticker = bokeh.models.DatetimeTicker()
     fig.xaxis[0].formatter = bokeh.models.DatetimeTickFormatter(hours="%H:%M")
 
-    fig.add_layout(fig.legend[0], "below")
+    moved_legend = fig.legend[0].clone()
+    fig.legend[0].destroy()
+    fig.add_layout(moved_legend, "below")
     return fig
 
 
@@ -223,5 +225,7 @@ def overplot_kernel_density_estimates(
 
         fig.varea(x_points, prob_density, 0, **varea_kwargs)
 
-    fig.add_layout(fig.legend[0], "below")
+    moved_legend = fig.legend[0].clone()
+    fig.legend[0].destroy()
+    fig.add_layout(moved_legend, "below")
     return fig
