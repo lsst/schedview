@@ -14,8 +14,8 @@ import schedview.compute.astro
 from schedview import band_column
 from schedview.collect import get_footprint, load_bright_stars, read_opsim
 from schedview.compute.camera import LsstCameraFootprintPerimeter
+from schedview.plot import PLOT_BAND_COLORS
 
-BAND_COLORS = dict(u="#56b4e9", g="#008060", r="#ff4000", i="#850000", z="#6600cc", y="#222222")
 BAND_HATCH_PATTERNS = dict(
     u="dot",
     g="ring",
@@ -27,9 +27,11 @@ BAND_HATCH_PATTERNS = dict(
 BAND_HATCH_SCALES = dict(u=6, g=6, r=6, i=6, z=12, y=12)
 VISIT_TOOLTIPS = (
     "@observationId: @start_timestamp{%F %T} UTC (mjd=@observationStartMJD{00000.0000}, "
-    + "LST=@observationStartLST\u00b0), band=@filter, RA=@fieldRA\u00b0, Decl=@fieldDec\u00b0, "
+    + "LST=@observationStartLST\u00b0), band=@band, RA=@fieldRA\u00b0, Decl=@fieldDec\u00b0, "
     + "PA=@paraAngle\u00b0, Az=@azimuth\u00b0, Alt=@altitude\u00b0"
 )
+
+
 VISIT_COLUMNS = [
     "observationId",
     "start_timestamp",
@@ -192,13 +194,13 @@ def plot_visit_skymaps(
                 dict(
                     fill_alpha=0,
                     hatch_alpha=bokeh.transform.transform("mjd", past_future_transform),
-                    hatch_color=BAND_COLORS[band],
+                    hatch_color=PLOT_BAND_COLORS[band],
                     hatch_pattern=BAND_HATCH_PATTERNS[band],
                     hatch_scale=BAND_HATCH_SCALES[band],
                 )
             )
         else:
-            patches_kwargs.update(dict(fill_color=BAND_COLORS[band]))
+            patches_kwargs.update(dict(fill_color=PLOT_BAND_COLORS[band]))
 
         visit_ds = spheremaps[0].add_patches(
             band_visits,
