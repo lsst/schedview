@@ -32,7 +32,11 @@ def munge_sim_archive_metadata(sim_metadata, day_obs, archive_uri):
     # Let mypy know we've done that.
     assert isinstance(day_obs, str)
 
-    marked_for_deletion = []
+    marked_for_exclusion = []
+    # a list of simulations that either lack the necessary metadata, or
+    # do not have visits for the day_obs requested, and so should not be
+    # included in the returned dictionary.
+
     for sim_uri in sim_metadata:
         try:
             first_day_obs = sim_metadata[sim_uri]["simulated_dates"]["first_day_obs"]
@@ -68,7 +72,7 @@ def munge_sim_archive_metadata(sim_metadata, day_obs, archive_uri):
 
                 sim_metadata[sim_uri]["simulated_dates"]["last_day_obs"] = last_day_obs
             except KeyError:
-                marked_for_deletion.append(sim_uri)
+                marked_for_exclusion.append(sim_uri)
                 continue
 
         if first_day_obs <= day_obs <= last_day_obs:
@@ -85,9 +89,9 @@ def munge_sim_archive_metadata(sim_metadata, day_obs, archive_uri):
             sim_metadata[sim_uri]["simulated_dates"]["first_day_obs"] = first_day_obs
 
         else:
-            marked_for_deletion.append(sim_uri)
+            marked_for_exclusion.append(sim_uri)
 
-    for out_of_range_uri in marked_for_deletion:
+    for out_of_range_uri in marked_for_exclusion:
         del sim_metadata[out_of_range_uri]
 
     # Sort the simulations, most recent first.
