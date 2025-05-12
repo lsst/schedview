@@ -14,7 +14,7 @@ BASE_PRENIGHT_URL = urllib.parse.urlunparse(
 )
 
 
-def tabulate_sim_archive_metadata(sim_metadata, day_obs=None):
+def make_html_table_of_sim_archive_metadata(sim_metadata, day_obs=None):
     """Create an HTML table of simulations given simulation metadata.
 
     Parameters

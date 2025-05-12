@@ -1,7 +1,7 @@
 from xml.etree import ElementTree
 
 from schedview.compute.sim_archive import munge_sim_archive_metadata
-from schedview.plot.sim_archive import tabulate_sim_archive_metadata
+from schedview.plot.sim_archive import make_html_table_of_sim_archive_metadata
 
 TEST_SIM_ARCHIVE_RAW_METADATA = {
     "s3://rubin:rubin-scheduler-prenight/opsim/2025-01-04/1/": {
@@ -66,7 +66,7 @@ def test_sim_archive_metadata():
     for sim_md in munged_sim_archive_metadata.values():
         assert "first_day_obs" in sim_md["simulated_dates"]
 
-    sim_archive_table = tabulate_sim_archive_metadata(munged_sim_archive_metadata)
+    sim_archive_table = make_html_table_of_sim_archive_metadata(munged_sim_archive_metadata)
 
     # Parse the html table, and make sure the outermost take is a table.
     # Because we are using the xml parser that comes with python intsead of a
