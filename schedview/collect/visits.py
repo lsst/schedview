@@ -34,6 +34,13 @@ DDF_STACKERS = [
     maf.stackers.DayObsISOStacker(),
 ]
 
+OLD_DDF_STACKERS = [
+    maf.stackers.ObservationStartDatetime64Stacker(),
+    maf.stackers.ObservationStartTimestampStacker(),
+    maf.stackers.TeffStacker(filter_col="filter"),
+    maf.stackers.DayObsISOStacker(),
+]
+
 
 def read_visits(
     day_obs: str | int | DayObs,

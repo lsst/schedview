@@ -1,6 +1,6 @@
 # Base
 FROM almalinux:9-minimal
-      
+
 # Config
 WORKDIR /work
 
@@ -39,4 +39,3 @@ ENV S3_ENDPOINT_URL=https://s3dfrgw.slac.stanford.edu
 ENV SIMS_SKYBRIGHTNESS_DATA=https://s3df.slac.stanford.edu/groups/rubin/static/sim-data/sims_skybrightness_pre/h5_2023_09_12_small/
 ENTRYPOINT ["/work/schedview/docker_entrypoint.sh"]
 CMD ["scheduler_dashboard", "--lfa"]
-

@@ -28,11 +28,13 @@ class CombinedTimelineDashboard(param.Parameterized):
 
     # Parameters set in the UI
     evening_date = param.Date(
-        default=date(2025, 4, 2),
+        default=date(2025, 4, 27),
         label="Date",
         doc="Day obs (local calendar date of sunset for the night)",
     )
-    visit_origin = param.String(default="latiss", label="Instrument", doc="Instrument")
+    visit_origin = param.Selector(
+        default="lsstcam", objects=["latiss", "lsstcam"], label="Instrument", doc="Instrument"
+    )
 
     # Derived parameters
     day_obs = param.Parameter()
@@ -98,38 +100,44 @@ class CombinedTimelineDashboard(param.Parameterized):
         completed_visits = schedview.collect.visits.read_visits(
             day_obs, visit_origin, stackers=schedview.collect.visits.NIGHT_STACKERS
         )
-        completed_visits["start_timestamp"] = pd.to_datetime(
-            completed_visits["start_timestamp"], format="ISO8601"
-        ).dt.tz_localize("UTC")
+        if len(completed_visits) > 0:
+            completed_visits["start_timestamp"] = pd.to_datetime(
+                completed_visits["start_timestamp"], format="ISO8601"
+            )
+            if completed_visits["start_timestamp"].dt.tz is None:
+                completed_visits["start_timestamp"] = completed_visits["start_timestamp"].dt.tz_localize(
+                    "UTC"
+                )
 
-        obs_start_time = (
-            astropy.time.Time(completed_visits.start_timestamp.min())
-            if len(completed_visits) > 0
-            else day_obs.start
-        )
+            obs_start_time = (
+                astropy.time.Time(completed_visits.start_timestamp.min())
+                if len(completed_visits) > 0
+                else day_obs.start
+            )
 
-        ts_config_ocs_version = schedview.collect.efd.get_version_at_time("ts_config_ocs", obs_start_time)
-        sal_indexes = schedview.collect.efd.SAL_INDEX_GUESSES[visit_origin]
-        opsim_config_script = self._run_async_io(
-            schedview.collect.get_scheduler_config(ts_config_ocs_version, sal_indexes, obs_start_time)
-        )
-        completed_visits["filter"] = completed_visits["band"]
-        completed_visits["sim_date"] = None
-        completed_visits["sim_index"] = 0
-        completed_visits["label"] = "Completed"
-        completed_visits["opsim_config_branch"] = ts_config_ocs_version
-        completed_visits["opsim_config_repository"] = None
-        completed_visits["opsim_config_script"] = opsim_config_script
-        completed_visits["scheduler_version"] = schedview.collect.efd.get_version_at_time(
-            "rubin_scheduler", obs_start_time
-        )
-        completed_visits["sim_runner_kwargs"] = {}
+            ts_config_ocs_version = schedview.collect.efd.get_version_at_time("ts_config_ocs", obs_start_time)
+            sal_indexes = schedview.collect.efd.SAL_INDEX_GUESSES[visit_origin]
+            opsim_config_script = self._run_async_io(
+                schedview.collect.get_scheduler_config(ts_config_ocs_version, telescope, obs_start_time)
+            )
+            completed_visits["filter"] = completed_visits["band"]
+            completed_visits["sim_date"] = None
+            completed_visits["sim_index"] = 0
+            completed_visits["label"] = "Completed"
+            completed_visits["opsim_config_branch"] = ts_config_ocs_version
+            completed_visits["opsim_config_repository"] = None
+            completed_visits["opsim_config_script"] = opsim_config_script
+            completed_visits["scheduler_version"] = schedview.collect.efd.get_version_at_time(
+                "rubin_scheduler", obs_start_time
+            )
+            completed_visits["sim_runner_kwargs"] = {}
 
         simulated_visits = schedview.collect.multisim.read_multiple_opsims(
             self.archive_uri,
             day_obs.start,
             day_obs.mjd,
             stackers=schedview.collect.visits.NIGHT_STACKERS,
+            telescope=telescope,
         ).query(f'sim_date == "{day_obs}"')
         visits = pd.concat([completed_visits, simulated_visits])
         events["visits"] = visits

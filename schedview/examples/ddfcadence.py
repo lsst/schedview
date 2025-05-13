@@ -8,7 +8,7 @@ import pandas as pd
 
 import schedview.compute.visits
 import schedview.plot
-from schedview.collect.visits import read_ddf_visits
+from schedview.collect.visits import OLD_DDF_STACKERS, read_ddf_visits
 from schedview.dayobs import DayObs
 
 
@@ -42,7 +42,14 @@ def make_ddf_cadence_plot(
     day_obs: DayObs = DayObs.from_date(iso_date)
 
     # Collect
-    visits: pd.DataFrame = read_ddf_visits(day_obs, visit_source, num_nights=nights)
+    try:
+        visits: pd.DataFrame = read_ddf_visits(day_obs, visit_source, num_nights=nights)
+    except ValueError:
+        # Maybe it is an old simulation with filter instead of band, so give
+        # that a try
+        visits: pd.DataFrame = read_ddf_visits(
+            day_obs, visit_source, num_nights=nights, stackers=OLD_DDF_STACKERS
+        )
 
     # Compute
     nightly_ddf = schedview.compute.visits.accum_teff_by_night(visits)

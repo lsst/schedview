@@ -32,6 +32,8 @@ __all__ = [
     "create_visit_table",
     "generate_sim_indicators",
     "overplot_kernel_density_estimates",
+    "make_timeline_scatterplots",
+    "make_html_table_of_sim_archive_metadata",
 ]
 
 from .cadence import create_cadence_plot
@@ -54,6 +56,7 @@ from .scheduler import (
     SchedulerNotebookDisplay,
     make_logger,
 )
+from .sim_archive import make_html_table_of_sim_archive_metadata
 from .survey import create_hpix_visit_map_grid, map_survey_healpix, map_visits_over_hpix
 from .timeline import make_timeline_scatterplots
 from .visitmap import create_visit_skymaps, plot_visit_planisphere, plot_visit_skymaps
