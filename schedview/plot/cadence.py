@@ -1,5 +1,6 @@
 import bokeh
 import numpy as np
+import pandas as pd
 from astropy.time import Time
 
 from schedview import band_column
@@ -48,6 +49,20 @@ def create_cadence_plot(
     date_factors = [Time(mjd, format="mjd").iso[:10] for mjd in np.arange(start_dayobs_mjd, end_dayobs_mjd)]
     band_factors = cmap.transform.factors
 
+    # If we have columns whose names are bands, we an use those directly as
+    # the heights of our bars. If not, expect a DataFrame with a multi-indexed
+    # column as returned by
+    # schedview.compute.visits.accum_stats_by_target_band_night
+    # and flatten it, making the t_eff columns the new columns with the
+    # names of the bands (and so will get mapped to bar height below).
+    have_band_columns = np.any(tuple(b in band_factors for b in nightly_totals.columns))
+    if not have_band_columns:
+        assert isinstance(nightly_totals.columns, pd.MultiIndex)
+        nightly_totals = nightly_totals.copy()
+        nightly_totals.columns = [
+            c[1] if c[0] == "t_eff" else f"{c[1]}_{c[0]}" for c in nightly_totals.columns.to_flat_index()
+        ]
+
     cadence_plots = []
 
     plot_kwargs = {
@@ -68,7 +83,7 @@ def create_cadence_plot(
         this_plot.xaxis.major_label_orientation = "vertical"
 
         kwargs = {"legend_label": band_factors} if last_plot else {}
-        this_plot.vbar_stack(
+        renderers = this_plot.vbar_stack(
             stackers=band_factors,
             x="day_obs_iso8601",
             width=0.9,
@@ -77,6 +92,31 @@ def create_cadence_plot(
             fill_alpha=0.3,
             **kwargs,
         )
+
+        for band, renderer in zip(band_factors, renderers):
+            hover_tool = bokeh.models.HoverTool(
+                tooltips=[
+                    ("Day obs", "@day_obs_iso8601"),
+                    ("Band", f"{band}"),
+                    ("Start time", f"@{band}_start_timestamp" + "{%Y-%m-%d %H:%M:%S}"),
+                    ("Num. visits", f"@{band}_count"),
+                    ("Total exposure time", f"@{band}_visitExposureTime"),
+                    ("Median single visit depth", f"@{band}_fiveSigmaDepth"),
+                    ("Median sky brightness", f"@{band}_skyBrightness"),
+                    ("Median sun alt", f"@{band}_sunAlt"),
+                    ("Median moon alt", f"@{band}_moonAlt"),
+                    ("Median moon phase", f"@{band}_moonPhase"),
+                    ("Median moon distance", f"@{band}_moonDistance"),
+                    ("Median airmass", f"@{band}_airmass"),
+                    ("Median FWHM (eff)", f"@{band}_seeingFwhmEff"),
+                    ("Median cloud", f"@{band}_cloud"),
+                ],
+                formatters={
+                    f"@{band}_start_timestamp": "datetime",
+                },
+                renderers=[renderer],
+            )
+            this_plot.add_tools(hover_tool)
 
         if last_plot:
             moved_legend = this_plot.legend[0].clone()

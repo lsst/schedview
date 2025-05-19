@@ -48,7 +48,7 @@ class TestComputeVisits(unittest.TestCase):
         self.assertIn("inst_fwhm", visits.columns)
 
     @unittest.skipUnless("maf" in locals(), "No maf installation")
-    def test_accum_teff_by_night(self):
+    def test_accum_stats_by_target_band_night(self):
         stackers = [
             maf.stackers.ObservationStartDatetime64Stacker(),
             maf.stackers.TeffStacker(),
@@ -56,7 +56,7 @@ class TestComputeVisits(unittest.TestCase):
         ]
 
         visits = schedview.collect.read_ddf_visits(self.visit_db_fname, stackers=stackers)
-        night_teff = schedview.compute.visits.accum_teff_by_night(visits)
+        night_teff = schedview.compute.visits.accum_stats_by_target_band_night(visits)
         self.assertEqual(night_teff.index.names[0], "target_name")
         self.assertEqual(night_teff.index.names[1], "day_obs_iso8601")
         for col_name in night_teff.columns:
