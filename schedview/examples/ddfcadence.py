@@ -52,7 +52,7 @@ def make_ddf_cadence_plot(
         )
 
     # Compute
-    nightly_ddf = schedview.compute.visits.accum_teff_by_night(visits)
+    nightly_ddf = schedview.compute.visits.accum_stats_by_target_band_night(visits)
 
     # Plot
     result: bokeh.models.UIElement = schedview.plot.create_cadence_plot(

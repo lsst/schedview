@@ -1,4 +1,5 @@
 import datetime
+import warnings
 
 import numpy as np
 from astropy.time import Time
@@ -184,6 +185,85 @@ def add_instrumental_fwhm(visits):
     return visits
 
 
+def accum_stats_by_target_band_night(visits):
+    """Create a DataFrame of accumulated statistics by target/band/night.
+
+    Parameters
+    ----------
+    visits : `pandas.DataFrame`
+        A DataFrame of visits with (at least) the following columns:
+
+        ``"day_obs_iso8601"``
+            The day_obs (as defined in SITCOMTN-32) in YYYY-MM-DD format
+            (`str`),
+        ``"teff"``
+            The effective exposure time (`float`).
+        ``band_column(visits)``
+            The filter (`str`).
+        ``"target_name"``
+            The target name (`str`).
+
+    Returns
+    -------
+    accum_stats : `pandas.DataFrame`
+        A `pandas.DataFrame` with the `target` as its index, `day_obs_iso8601`
+        as its first column, and a multi-level index of other stats by band.
+    """
+    day_obs_col = "day_obs_iso8601"
+    teff_col = "t_eff"
+
+    if day_obs_col not in visits:
+        raise ValueError(
+            f"{day_obs_col} column not found for visits; use the rubin_sim.maf.stackers.DayObsISOStacker."
+        )
+
+    if teff_col not in visits:
+        warnings.warn(f"{teff_col} column not found for visits; use the rubin_sim.maf.stackers.TeffStacker.")
+
+    agg_func = {
+        teff_col: "sum",
+        "start_timestamp": "min",
+        "count": "sum",
+        "visitExposureTime": "sum",
+        "fiveSigmaDepth": "median",
+        "skyBrightness": "median",
+        "sunAlt": "median",
+        "moonAlt": "median",
+        "moonPhase": "median",
+        "moonDistance": "median",
+        "airmass": "median",
+        "seeingFwhmEff": "median",
+        "cloud": "median",
+    }
+    # Get rid of columns we do not have in the visits
+    for column in list(agg_func):
+        if column not in ["count"] + list(visits.columns):
+            del agg_func[column]
+
+    accum_stats = (
+        visits.assign(count=1)
+        .groupby(["target_name", day_obs_col, band_column(visits)])
+        .agg(agg_func)
+        .reset_index()
+    )
+
+    accum_stats = (
+        accum_stats.pivot(
+            index=["target_name", day_obs_col], columns=band_column(visits), values=agg_func.keys()
+        )
+        .reset_index()
+        .set_index(["target_name", day_obs_col])
+    )
+
+    # If there are no visits for a given night, the t_eff and count are 0
+    for band in visits[band_column(visits)].unique():
+        if teff_col in visits:
+            accum_stats.loc[:, (teff_col, band)] = accum_stats.loc[:, (teff_col, band)].fillna(0)
+        accum_stats.loc[:, ("count", band)] = accum_stats.loc[:, ("count", band)].fillna(0)
+
+    return accum_stats
+
+
 def accum_teff_by_night(visits):
     """Create a DataFrame of accumulated t_eff by target/band/night.
 
@@ -204,32 +284,9 @@ def accum_teff_by_night(visits):
 
     Returns
     -------
-    nightly_teff : `pandas.DataFrame`
+    accum_teff : `pandas.DataFrame`
         A `pandas.DataFrame` with the `target` as its index, `day_obs_iso8601`
-        as its first column, and filter names for its remaining columns.
-        Values for the columns with filter names are the total effective
-        exposure times for all exposures with that target on that night.
+        as its first column, columns with the t_eff for each band.
     """
-    day_obs_col = "day_obs_iso8601"
-    teff_col = "t_eff"
-
-    if day_obs_col not in visits:
-        raise ValueError(
-            f"{day_obs_col} column not found for visits; use the rubin_sim.maf.stackers.DayObsISOStacker."
-        )
-
-    if teff_col not in visits:
-        raise ValueError(
-            f"{teff_col} column not found for visits; use the rubin_sim.maf.stackers.TeffStacker."
-        )
-
-    nightly_teff = (
-        visits.groupby(["target_name", day_obs_col, band_column(visits)])[teff_col].sum().reset_index()
-    )
-    nightly_teff = (
-        nightly_teff.pivot(index=["target_name", day_obs_col], columns=band_column(visits), values=teff_col)
-        .fillna(0.0)
-        .reset_index()
-        .set_index(["target_name", day_obs_col])
-    )
-    return nightly_teff
+    stats_by_night = accum_stats_by_target_band_night(visits)
+    return stats_by_night.loc[:, "t_eff"]

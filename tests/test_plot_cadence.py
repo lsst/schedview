@@ -29,7 +29,7 @@ class TestPlotCadence(TestCase):
 
         visit_db_fname = get_baseline()
         visits = schedview.collect.read_ddf_visits(visit_db_fname, stackers=stackers)
-        night_totals = schedview.compute.visits.accum_teff_by_night(visits)
+        night_totals = schedview.compute.visits.accum_stats_by_target_band_night(visits)
         start_dayobs_mjd = np.floor(visits.observationStartMJD.min())
         end_dayobs_mjd = start_dayobs_mjd + 365
         plot = create_cadence_plot(night_totals, start_dayobs_mjd, end_dayobs_mjd)
