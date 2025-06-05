@@ -15,6 +15,7 @@ from schedview import band_column
 from schedview.collect import get_footprint, load_bright_stars, read_opsim
 from schedview.compute.camera import LsstCameraFootprintPerimeter
 from schedview.plot import PLOT_BAND_COLORS
+from .footprint import add_footprint_to_skymaps
 
 BAND_HATCH_PATTERNS = dict(
     u="dot",
@@ -105,8 +106,6 @@ def plot_visit_skymaps(
     if camera_perimeter == "LSST":
         camera_perimeter = LsstCameraFootprintPerimeter()
 
-    nside_low = NSIDE_LOW
-
     spheremaps = [mc(mjd=conditions.mjd) for mc in map_classes]
 
     # Add an MJD slider to the reference (first) projection
@@ -119,17 +118,7 @@ def plot_visit_skymaps(
     for spheremap in spheremaps[1:]:
         spheremap.sliders["mjd"] = spheremaps[0].sliders["mjd"]
 
-    cmap = bokeh.transform.linear_cmap("value", "Greys256", int(np.ceil(np.nanmax(footprint) * 2)), 0)
-
-    nside_high = hp.npix2nside(footprint.shape[0])
-    footprint_high, footprint_low = split_healpix_by_resolution(footprint, nside_low, nside_high)
-
-    healpix_high_ds, cmap, glyph = spheremaps[0].add_healpix(footprint_high, nside=nside_high, cmap=cmap)
-    healpix_low_ds, cmap, glyph = spheremaps[0].add_healpix(footprint_low, nside=nside_low, cmap=cmap)
-
-    for spheremap in spheremaps[1:]:
-        spheremap.add_healpix(healpix_high_ds, nside=nside_high, cmap=cmap)
-        spheremap.add_healpix(healpix_low_ds, nside=nside_low, cmap=cmap)
+    add_footprint_to_skymaps(footprint, spheremaps)
 
     # Transforms for recent, past, future visits
     past_future_js = """
