@@ -1,9 +1,117 @@
 import healpy as hp
 import pandas as pd
 import numpy as np
+import warnings
 
 
-def find_healpix_area_edges(healpix_map, region_value=None):
+def _build_lines(edges):
+    # Do not modify the passed in DataFrame.
+    edges = edges.copy()
+    lowest_vertex = pd.concat([edges.lower_vertex, edges.higher_vertex]).min()
+    edges["unused"] = True
+    lines = []
+    line_vertexes = [lowest_vertex]
+    while True:
+        edge_mask = np.logical_and(edges.unused, edges.lower_vertex == line_vertexes[-1])
+        if np.any(edge_mask):
+            next_vertex_column = "higher_vertex"
+        else:
+            edge_mask = np.logical_and(edges.unused, edges.higher_vertex == line_vertexes[-1])
+            next_vertex_column = "lower_vertex"
+
+        if not np.any(edge_mask):
+            # We've reached the end of this line
+            # Can this line connect with the start of another one?
+            lines.append(line_vertexes)
+            if np.any(edges.unused):
+                lowest_vertex = pd.concat(
+                    [edges.loc[edges.unused, "lower_vertex"], edges.loc[edges.unused, "higher_vertex"]]
+                ).min()
+                line_vertexes = [lowest_vertex]
+                continue
+            else:
+                break
+
+        available_edges = edges.loc[edge_mask, :]
+        next_edge_index = available_edges.index[0]
+        next_edge = available_edges.iloc[0, :]
+        next_vertex = available_edges.loc[next_edge_index, next_vertex_column]
+        line_vertexes.append(next_vertex)
+        edges.loc[next_edge_index, "unused"] = False
+    return lines
+
+
+def _vertex_angle(vertex1, vertex2, unique_vertexes):
+    x1, y1, z1 = unique_vertexes.loc[vertex1, ["x", "y", "z"]]
+    x2, y2, z2 = unique_vertexes.loc[vertex2, ["x", "y", "z"]]
+    linear_distance = np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2 + (z1 - z2) ** 2)
+    angle = np.degrees(2 * np.arcsin(linear_distance / 2))
+    return angle
+
+
+def _separate_loops(lines, loops, tolerance=0.0, unique_vertexes=None):
+    for line_index, line in enumerate(lines):
+        if line[0] == line[-1]:
+            loops.append(line)
+            del lines[line_index]
+        elif unique_vertexes is not None and _vertex_angle(line[0], line[-1], unique_vertexes) < tolerance:
+            # If we're close, just call it a match.
+            line.append(line[0])
+            loops.append(line)
+            del lines[line_index]
+
+
+def _join_lines(lines, tolerance=0.0, unique_vertexes=None):
+    done = False
+
+    def join_lines_once(lines, tolerance=0.0, unique_vertexes=None):
+        for line1_idx, line1 in enumerate(lines[:-1]):
+            for line2_idx, line2 in enumerate(lines[line1_idx + 1 :]):
+                if line1[0] == line2[0]:
+                    line2[0:0] = list(reversed(line1[1:]))
+                    del lines[line1_idx]
+                    return True
+                if line1[0] == line2[-1]:
+                    line2.extend(line1[1:])
+                    del lines[line1_idx]
+                    return True
+                if line1[-1] == line2[0]:
+                    line1.extend(line2[1:])
+                    del lines[line2_idx]
+                    return True
+                if line1[-1] == line2[-1]:
+                    line1.extend(list(reversed(line2)[1:]))
+                    del lines[line2_idx]
+                    return True
+
+                if tolerance > 0 and unique_vertexes is not None:
+                    if _vertex_angle(line1[0], line2[0], unique_vertexes) < tolerance:
+                        line2[0:0] = list(reversed(line1))
+                        del lines[line1_idx]
+                        return True
+                    if _vertex_angle(line1[0], line2[-1], unique_vertexes) < tolerance:
+                        line2.extend(line1)
+                        del lines[line1_idx]
+                        return True
+                    if _vertex_angle(line1[-1], line2[0], unique_vertexes) < tolerance:
+                        line1.extend(line2)
+                        del lines[line2_idx]
+                        return True
+                    if (
+                        line1[-1] == line2[-1]
+                        or _vertex_angle(line1[-1], line2[-1], unique_vertexes) < tolerance
+                    ):
+                        line1.extend(list(reversed(line2)))
+                        del lines[line2_idx]
+                        return True
+
+        return False
+
+    while not done:
+        done = not join_lines_once(lines, tolerance, unique_vertexes)
+
+
+def find_healpix_area_polygons(healpix_map, region_value=None):
     npix = healpix_map.shape[0]
     nside = hp.npix2nside(npix)
     hpids = np.arange(npix)
@@ -104,11 +212,47 @@ def find_healpix_area_edges(healpix_map, region_value=None):
     map_edges["end_coords"] = unique_vertexes.loc[map_edges["higher_vertex"].values, "eq_coords"].values
     map_edges.drop(columns=["lower_vertex", "higher_vertex"])
 
-    requested_edge_mask = (
-        np.full(len(map_edges), True, dtype=bool)
-        if region_value is None
-        else np.logical_or(map_edges.region_lower == region_value, map_edges.region_higher == region_value)
-    )
-    requested_edges = map_edges.loc[requested_edge_mask, :]
+    # Separate the edges into distinct dataframes stored in a dictionary
+    region_edges = {}
+    for region_name in np.unique(healpix_map):
+        edge_mask = np.logical_or(
+            map_edges.region_lower == region_name, map_edges.region_higher == region_name
+        )
+        region_edges[region_name] = map_edges.loc[edge_mask, :]
 
-    return requested_edges
+    region_loops = {}
+    for region_name in region_edges:
+        lines = _build_lines(region_edges[region_name])
+        loops = []
+
+        # By itself, _build_lines connects edge segments into lines, but
+        # not fully connected. So, we need to go through and paste them
+        # together.
+
+        for tolerance in (0, hp.max_pixrad(nside, degrees=True), 1, 2, 4, 5, 6):
+            for num_iterations in range(100):
+                nlines = len(lines)
+                nloops = len(loops)
+                # Merge lines that can be connected by their ends
+                _join_lines(lines, tolerance=tolerance, unique_vertexes=unique_vertexes)
+
+                # Identify any lines that end at their beginning, and declare them
+                # done by adding them to loops and taking them out of lines.
+                _separate_loops(lines, loops, tolerance=tolerance, unique_vertexes=unique_vertexes)
+
+                # If nothing has changed, we've done all we can do
+                # (at this tolerance)
+                stabilized = len(lines) == nlines and len(loops) == nloops
+                if stabilized:
+                    break
+
+        if not stabilized:
+            warnings.warn("Loop finding could not stabilize")
+        region_loops[region_name] = loops
+
+    # Replace vertex ids with ra, decl coordinate pairs
+    for region_name in region_loops:
+        for i, loop in enumerate(region_loops[region_name]):
+            region_loops[region_name][i] = unique_vertexes.loc[loop, "eq_coords"].values
+
+    return region_loops
