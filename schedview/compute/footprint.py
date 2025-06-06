@@ -127,7 +127,7 @@ def find_healpix_area_polygons(healpix_map, region_value=None):
         )
         .swaplevel(0, 1, axis="columns")
         .sort_index(axis="columns")
-        .stack(level="pix_vertex")
+        .stack(level="pix_vertex", future_stack=True)
     )
 
     # Number unique vertexes, so vertexes from seporate healpixels
