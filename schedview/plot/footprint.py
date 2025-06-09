@@ -43,13 +43,16 @@ def add_footprint_to_skymaps(footprint, spheremaps):
     return spheremaps
 
 
-def add_footprint_outlines_to_skymaps(footprint, spheremaps, colormap=None, filled=False, **line_kwargs):
+def add_footprint_outlines_to_skymaps(
+    footprint_polygons, spheremaps, colormap=None, filled=False, **line_kwargs
+):
     """Add the footprint to a skymap
 
     Parameters
     ----------
-    footprint : `numpy.array`
-        A healpix map of the footprint with regions labeled as strings.
+    footprint_polygons : `pd.DataFrame`
+        A pandas DataFrame with RA, decl columns with polygon vertices, and
+        region and loop_id index levels.
     spherermaps : `list` of `uranography.SphereMap`
         The map to add the footprint to
     colormap : `dict`
@@ -61,13 +64,9 @@ def add_footprint_outlines_to_skymaps(footprint, spheremaps, colormap=None, fill
             'The "filled" option does yet work correctly when the polygon crosses a projection discontinuity.'
         )
 
-    if np.issubdtype(footprint.dtype, np.number):
-        outside = hp.UNSEEN if hp.UNSEEN in footprint else 0
-    else:
-        outside = ""
-
+    outside = ""
     if colormap is None:
-        regions = [r for r in np.unique(footprint) if r != outside]
+        regions = [r for r in footprint_polygons.index.get_level_values("region").unique() if r != outside]
         # Try palettes from the "colorblind" section in the bokeh docs
         try:
             palette = bokeh.palettes.Colorblind[len(regions)]
@@ -76,22 +75,21 @@ def add_footprint_outlines_to_skymaps(footprint, spheremaps, colormap=None, fill
 
         colormap = {r: c for r, c in zip(regions, palette)}
 
-    footprint_polygon_df = find_healpix_area_polygons(footprint)
-    footprint_polygons = {}
-    for region_name, loop_id in set(footprint_polygon_df.index.values.tolist()):
-        if region_name not in footprint_polygons:
-            footprint_polygons[region_name] = {}
-        footprint_polygons[region_name][loop_id] = (
-            footprint_polygon_df.loc[(region_name, loop_id), ["RA", "decl"]]
+    footprint_regions = {}
+    for region_name, loop_id in set(footprint_polygons.index.values.tolist()):
+        if region_name not in footprint_regions:
+            footprint_regions[region_name] = {}
+        footprint_regions[region_name][loop_id] = (
+            footprint_polygons.loc[(region_name, loop_id), ["RA", "decl"]]
             .apply(tuple, axis="columns")
             .tolist()
         )
 
     for spheremap in spheremaps:
-        for region_name in footprint_polygons:
+        for region_name in footprint_regions:
             if region_name == outside:
                 continue
-            for this_loop in footprint_polygons[region_name].values():
+            for this_loop in footprint_regions[region_name].values():
                 loop_ds = bokeh.models.ColumnDataSource({"coords": this_loop})
                 if filled:
                     spheremap.plot.patch(
