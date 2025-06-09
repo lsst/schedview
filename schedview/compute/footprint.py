@@ -1,5 +1,6 @@
 import healpy as hp
 import pandas as pd
+import shapely
 import numpy as np
 import warnings
 
@@ -111,7 +112,7 @@ def _join_lines(lines, tolerance=0.0, unique_vertexes=None):
         done = not join_lines_once(lines, tolerance, unique_vertexes)
 
 
-def find_healpix_area_polygons(healpix_map, region_value=None):
+def find_healpix_area_polygons(healpix_map, simplify_tolerance=0.0):
     npix = healpix_map.shape[0]
     nside = hp.npix2nside(npix)
     hpids = np.arange(npix)
@@ -255,10 +256,32 @@ def find_healpix_area_polygons(healpix_map, region_value=None):
     for region_name in region_loops:
         if region_name == "":
             continue
-        for i, loop in enumerate(region_loops[region_name]):
-            this_loop_df = unique_vertexes.loc[loop, ["RA", "decl", "x", "y", "z"]]
-            this_loop_df.loc[:, ["region", "loop"]] = region_name, i
+        for loop_id, loop in enumerate(region_loops[region_name]):
+            if simplify_tolerance > 0.0:
+                # Reduce the number of points used to define the polygon, if requested.
+                loop_shape = shapely.Polygon(unique_vertexes.loc[loop, ["x", "y", "z"]].values.tolist())
+                simplified_loop_shape = shapely.simplify(loop_shape, tolerance=simplify_tolerance)
+                simplified_loop_vec = np.array(simplified_loop_shape.exterior.coords)
+                simplified_loop_eq = hp.vec2ang(simplified_loop_vec, lonlat=True)
+                num_points = simplified_loop_vec.shape[0]
+                this_loop_df = pd.DataFrame(
+                    {
+                        "region": [region_name] * num_points,
+                        "loop": [loop_id] * num_points,
+                        "RA": simplified_loop_eq[0],
+                        "decl": simplified_loop_eq[1],
+                        "x": simplified_loop_vec[:, 0],
+                        "y": simplified_loop_vec[:, 1],
+                        "z": simplified_loop_vec[:, 2],
+                    }
+                )
+            else:
+                # Otherwise, just use the loop as is
+                this_loop_df = unique_vertexes.loc[loop, ["RA", "decl", "x", "y", "z"]]
+                this_loop_df.loc[:, ["region", "loop"]] = region_name, loop_id
+
             loop_dfs.append(this_loop_df)
+
     region_loop_df = pd.concat(loop_dfs).reset_index(drop=True).set_index(["region", "loop"])
 
     return region_loop_df
