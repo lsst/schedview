@@ -1,20 +1,20 @@
 from warnings import warn
 
 import bokeh
-import healpy as hp
 import numpy as np
 from astropy.time import Time
 
 # Imported to help sphinx make the link
 from rubin_scheduler.scheduler.model_observatory.model_observatory import ModelObservatory
 from rubin_scheduler.scheduler.schedulers import CoreScheduler  # noqa F401
-from uranography.api import ArmillarySphere, Planisphere, split_healpix_by_resolution
+from uranography.api import ArmillarySphere, Planisphere
 
 import schedview.compute.astro
 from schedview import band_column
 from schedview.collect import get_footprint, load_bright_stars, read_opsim
 from schedview.compute.camera import LsstCameraFootprintPerimeter
 from schedview.plot import PLOT_BAND_COLORS
+
 from .footprint import add_footprint_to_skymaps
 
 BAND_HATCH_PATTERNS = dict(

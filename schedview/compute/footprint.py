@@ -1,11 +1,15 @@
+import warnings
+
 import healpy as hp
+import numpy as np
 import pandas as pd
 import shapely
-import numpy as np
-import warnings
 
 
 def _build_lines(edges):
+    # Connect edges into continuous lines by matching ends of segments
+    # (each edge) to each other.
+
     # Do not modify the passed in DataFrame.
     edges = edges.copy()
     lowest_vertex = pd.concat([edges.lower_vertex, edges.higher_vertex]).min()
@@ -35,7 +39,6 @@ def _build_lines(edges):
 
         available_edges = edges.loc[edge_mask, :]
         next_edge_index = available_edges.index[0]
-        next_edge = available_edges.iloc[0, :]
         next_vertex = available_edges.loc[next_edge_index, next_vertex_column]
         line_vertexes.append(next_vertex)
         edges.loc[next_edge_index, "unused"] = False
@@ -113,6 +116,28 @@ def _join_lines(lines, tolerance=0.0, unique_vertexes=None):
 
 
 def find_healpix_area_polygons(healpix_map, simplify_tolerance=0.0):
+    """Return a DataFrame with verticies on polygons that define footprint
+    regions.
+
+    Parameters
+    ----------
+    healpix_map : `np.array`
+        The healpix array that defines the footprint.
+    simplify_tolerance : `float`
+        A value passed to `shapely.simplify` to reduce the number of points
+        used in the polygon. A value of 0 does no reduction, and so vertices
+        correspond to end of edges between healpixels at the resolution of
+        the map provided.
+
+    Returns
+    -------
+    region_loops : `pandas.DataFrame`
+        A DataFrame that with R.A., decl columns that give the equatorial
+        coordiantes of polygons outlining footprint regions, and x, y, z
+        values for the healpy vectors for those points. Two levels of
+        a `pandas.MultiIndex` identify which polygon of which region each
+        vertex belongs to.
+    """
     npix = healpix_map.shape[0]
     nside = hp.npix2nside(npix)
     hpids = np.arange(npix)
@@ -237,8 +262,9 @@ def find_healpix_area_polygons(healpix_map, simplify_tolerance=0.0):
                 # Merge lines that can be connected by their ends
                 _join_lines(lines, tolerance=tolerance, unique_vertexes=unique_vertexes)
 
-                # Identify any lines that end at their beginning, and declare them
-                # done by adding them to loops and taking them out of lines.
+                # Identify any lines that end at their beginning, and declare
+                # them done by adding them to loops and taking them out of
+                # lines.
                 _separate_loops(lines, loops, tolerance=tolerance, unique_vertexes=unique_vertexes)
 
                 # If nothing has changed, we've done all we can do
@@ -258,7 +284,8 @@ def find_healpix_area_polygons(healpix_map, simplify_tolerance=0.0):
             continue
         for loop_id, loop in enumerate(region_loops[region_name]):
             if simplify_tolerance > 0.0:
-                # Reduce the number of points used to define the polygon, if requested.
+                # Reduce the number of points used to define the polygon.
+                # if requested.
                 loop_shape = shapely.Polygon(unique_vertexes.loc[loop, ["x", "y", "z"]].values.tolist())
                 simplified_loop_shape = shapely.simplify(loop_shape, tolerance=simplify_tolerance)
                 simplified_loop_vec = np.array(simplified_loop_shape.exterior.coords)

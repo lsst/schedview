@@ -1,13 +1,9 @@
-from warnings import warn
+import warnings
 
 import bokeh
 import healpy as hp
 import numpy as np
-import warnings
-from astropy.time import Time
-
 from uranography.api import split_healpix_by_resolution
-from schedview.compute.footprint import find_healpix_area_polygons
 
 NSIDE_LOW = 8
 
