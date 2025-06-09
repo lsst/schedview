@@ -1,14 +1,14 @@
 import unittest
-import numpy as np
-import healpy as hp
-from rubin_scheduler.scheduler.utils import get_current_footprint
-from schedview.compute.footprint import find_healpix_area_polygons
-from schedview.plot.footprint import add_footprint_outlines_to_skymaps, add_footprint_outlines_to_skymaps
-import schedview.compute.footprint
-from uranography.api import Planisphere, ArmillarySphere
-from tempfile import TemporaryDirectory
 from pathlib import Path
+from tempfile import TemporaryDirectory
+
 import bokeh.plotting
+import healpy as hp
+import numpy as np
+from rubin_scheduler.scheduler.utils import get_current_footprint
+from uranography.api import ArmillarySphere, Planisphere
+
+import schedview.compute.footprint
 
 NSIDE = 16
 
@@ -19,8 +19,8 @@ class TestFootprint(unittest.TestCase):
         footprint_regions = get_current_footprint(NSIDE)[1]
         footprint_polygons = schedview.compute.footprint.find_healpix_area_polygons(footprint_regions)
 
-        # Make sure we have a reasonable number of regions, but make sure we can still
-        # pass the test if the footprint varies reasonably.
+        # Make sure we have a reasonable number of regions, but make sure we
+        # can still pass the test if the footprint varies reasonably.
         assert 5 < len(footprint_polygons.index.get_level_values("region").unique()) < 100
 
         # Make sure there are a reasonable number of vertexes in each loop,
