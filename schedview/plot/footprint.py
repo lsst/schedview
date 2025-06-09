@@ -60,14 +60,25 @@ def add_footprint_outlines_to_skymaps(
             'The "filled" option does yet work correctly when the polygon crosses a projection discontinuity.'
         )
 
+    if "region" not in footprint_polygons.index.names:
+        footprint_polygons = footprint_polygons.assign(region="only").set_index("region", append=True).copy()
+
+    if "loop" not in footprint_polygons.index.names:
+        footprint_polygons = footprint_polygons.assign(loop=0).set_index("loop", append=True).copy()
+
+    footprint_polygons = footprint_polygons.reorder_levels(["region", "loop"]).copy()
+
     outside = ""
     if colormap is None:
         regions = [r for r in footprint_polygons.index.get_level_values("region").unique() if r != outside]
-        # Try palettes from the "colorblind" section in the bokeh docs
-        try:
-            palette = bokeh.palettes.Colorblind[len(regions)]
-        except KeyError:
-            palette = bokeh.palettes.TolRainbow[len(regions)]
+        if len(regions) == 1:
+            palette = ["black"]
+        else:
+            # Try palettes from the "colorblind" section in the bokeh docs
+            try:
+                palette = bokeh.palettes.Colorblind[len(regions)]
+            except KeyError:
+                palette = bokeh.palettes.TolRainbow[len(regions)]
 
         colormap = {r: c for r, c in zip(regions, palette)}
 
