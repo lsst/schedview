@@ -27,8 +27,10 @@ BAND_HATCH_PATTERNS = dict(
 BAND_HATCH_SCALES = dict(u=6, g=6, r=6, i=6, z=12, y=12)
 VISIT_TOOLTIPS = (
     "@observationId: @start_timestamp{%F %T} UTC (mjd=@observationStartMJD{00000.0000}, "
-    + "LST=@observationStartLST\u00b0), band=@band, RA=@fieldRA\u00b0, Decl=@fieldDec\u00b0, "
-    + "PA=@paraAngle\u00b0, Az=@azimuth\u00b0, Alt=@altitude\u00b0"
+    + "LST=@observationStartLST\u00b0): "
+    + "@observation_reason (@science_program), "
+    + "in @band at \u03b1,\u03b4=@fieldRA\u00b0,@fieldDec\u00b0; "
+    + "q=@paraAngle\u00b0; a,A=@azimuth\u00b0,@altitude\u00b0"
 )
 
 
@@ -44,6 +46,8 @@ VISIT_COLUMNS = [
     "paraAngle",
     "azimuth",
     "altitude",
+    "observation_reason",
+    "science_program",
 ]
 
 NSIDE_LOW = 8
