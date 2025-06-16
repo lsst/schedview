@@ -53,8 +53,15 @@ def read_consdb(
         )
 
     consdb_visits = load_consdb_visits(instrument, *args, **kwargs)
+
     if len(consdb_visits.consdb_visits) > 0:
-        visit_records: np.recarray = consdb_visits.merged_opsim_consdb.to_records()
+        # Make sure the visits are in order so the overhead stacker works.
+        # Filter out visits with a None visit_id: it breaks the sorting,
+        # and if visit_id is None, it means something went very wrong
+        # with that visit anyway.
+        visit_records: np.recarray = (
+            consdb_visits.merged_opsim_consdb.query("visit_id.notnull()").sort_values("visit_id").to_records()
+        )
     else:
         # If the array is empty, pass back an empty array with the correct
         # columns and types.
