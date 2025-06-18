@@ -52,8 +52,7 @@ def read_consdb(
             "This may break plots that rely on the time."
         )
 
-    consdb_visits = load_consdb_visits(instrument, *args, **kwargs)
-
+    consdb_visits = load_consdb_visits(instrument, *args, url=url, **kwargs)
     if len(consdb_visits.consdb_visits) > 0:
         # Make sure the visits are in order so the overhead stacker works.
         # Filter out visits with a None visit_id: it breaks the sorting,
