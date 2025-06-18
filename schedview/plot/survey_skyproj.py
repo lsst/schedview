@@ -110,7 +110,16 @@ def map_visits_over_healpix(visits, map_hpix, model_observatory, night_events, a
         fig = plt.figure()
         axes = fig.add_subplot(1, 1, 1)
 
-    sky_map = skyproj.LaeaSkyproj(ax=axes, lat_0=-np.degrees(np.arccos(np.finfo(float).resolution)), lon_0=0)
+    # skyproj.LaeaSkyproj cannot handle a max decl extent of excactly 90,
+    # but it is not important for us to get particularly close.
+    # It also cannot handle lat_0 of exactly -90, but seems to need it to
+    # be very close to run without throwing an exception.
+    sky_map = skyproj.LaeaSkyproj(
+        ax=axes,
+        lat_0=-89.9999999999999,
+        lon_0=0,
+        extent=[0.0, 360.0, -90, 89],
+    )
 
     hpxmap_kwargs = {"cmap": colorcet.cm.blues}
     hpxmap_kwargs.update(kwargs)
