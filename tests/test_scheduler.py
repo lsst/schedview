@@ -10,7 +10,7 @@ from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 from schedview.collect import sample_pickle
 from schedview.plot.scheduler import DEFAULT_MJD, SchedulerDisplay
 
-NSIDE = 8
+NSIDE = 32
 MJD_SCHED = DEFAULT_MJD
 astropy.utils.iers.conf.iers_degraded_accuracy = "warn"
 
