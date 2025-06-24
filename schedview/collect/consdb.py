@@ -30,6 +30,13 @@ def read_consdb(
     url: `str`
         The endpoint URL for the consdb to use. By default, infer from
         schedview.clientsite.DATASOURCE_BASE_URL.
+    **kwargs
+        Additional keyword arguments passed to `load_consdb_visits`
+        Ane of these is ``token_file``, the name of the file from which
+        to load the consdb access token, which defaults to `None`, which
+        uses `lsst.rsp.get_access_token` (if available) or the `ACCESS_TOKEN`
+        environment variable.
+
     Returns
     -------
     visits : `pandas.DataFrame`
