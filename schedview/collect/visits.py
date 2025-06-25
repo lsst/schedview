@@ -47,7 +47,32 @@ def read_visits(
     visit_source: str,
     stackers: list[maf.stackers.base_stacker.BaseStacker] = [maf.stackers.ObservationStartTimestampStacker()],
     num_nights: int = 1,
+    **kwargs,
 ) -> pd.DataFrame:
+    """Read visits from a variety of possible sources.
+
+    Parameters
+    ----------
+    day_obs : `str` or `int` or `DayObs`
+        The night of observing as a dayobs.
+    visit_source : `str`
+        ``baseline`` to load from the current baseline, an instrument name
+        to query the consdb, or a file name to load from an opsim output file.
+        Values of known instruments are found in
+        `rubin_scheduler.utils.consdb.KNOWN_INSTRUMENTS`.
+    stackers : `list` of `maf.stackers.base_stacker.BaseStacker` subclasses
+        The stackers to apply.
+    num_nights : `int`
+        The number of nights to loadp
+    **kwargs
+        Keyword arguments to be passed to `read_consdb`
+
+    Returns
+    -------
+    visits : `pd.DataFrame`
+        A `pd.DataFrame` of visits.
+
+    """
 
     if visit_source in KNOWN_INSTRUMENTS:
         visits = read_consdb(
@@ -72,7 +97,30 @@ def read_visits(
 
 
 def read_ddf_visits(*args, **kwargs) -> pd.DataFrame:
+    """Read DDF visits from a variety of possible sources.
 
+    Parameters
+    ----------
+    day_obs : `str` or `int` or `DayObs`
+        The night of observing as a dayobs.
+    visit_source : `str`
+        ``baseline`` to load from the current baseline, an instrument name
+        to query the consdb, or a file name to load from an opsim output file.
+        Values of known instruments are found in
+        `rubin_scheduler.utils.consdb.KNOWN_INSTRUMENTS`.
+    stackers : `list` of `maf.stackers.base_stacker.BaseStacker` subclasses
+        The stackers to apply.
+    num_nights : `int`
+        The number of nights to loadp
+    **kwargs
+        Keyword arguments to be passed to `read_consdb`
+
+    Returns
+    -------
+    visits : `pd.DataFrame`
+        A `pd.DataFrame` of visits.
+
+    """
     if "stackers" not in kwargs:
         kwargs["stackers"] = DDF_STACKERS
 
