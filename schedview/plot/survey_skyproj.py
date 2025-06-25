@@ -214,7 +214,14 @@ def create_hpix_visit_map_grid(
         plot_width = 5.1 * num_columns
         fig = plt.figure(figsize=(plot_width, plot_height))
 
-    for band_idx, band in enumerate(hpix_maps.keys()):
+    present_bands = hpix_maps.keys()
+    # Bands should be in wavelength order for standard bands, and the rest
+    # should come after in alphabetical order.
+    bands = [b for b in "ugrizy" if b in present_bands] + sorted(
+        b for b in "ugrizy" if b not in present_bands
+    )
+
+    for band_idx, band in enumerate(bands):
         visits_in_band = visits.query(f"{band_column(visits)} == '{band}'")
         axes = fig.add_subplot(num_rows, num_columns, band_idx + 1)
         axes.set_title(band, loc="left")
