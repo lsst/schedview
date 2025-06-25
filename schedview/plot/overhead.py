@@ -1,6 +1,5 @@
 # Allow import of ElementTree as ET following the recommendation in the
 # official python docs.
-# ruff: noqa: N817
 
 from io import StringIO
 from xml.etree import ElementTree as ET

@@ -218,7 +218,7 @@ def create_hpix_visit_map_grid(
     # Bands should be in wavelength order for standard bands, and the rest
     # should come after in alphabetical order.
     bands = [b for b in "ugrizy" if b in present_bands] + sorted(
-        b for b in "ugrizy" if b not in present_bands
+        b for b in present_bands if b not in "ugrizy"
     )
 
     for band_idx, band in enumerate(bands):
