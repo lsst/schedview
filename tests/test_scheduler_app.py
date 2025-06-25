@@ -8,7 +8,7 @@ import bokeh.plotting
 from schedview.app.sched_maps.sched_maps import SchedulerDisplayApp
 from schedview.collect import sample_pickle
 
-NSIDE = 8
+NSIDE = 32
 
 
 class TestSchedMaps(unittest.TestCase):
