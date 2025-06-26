@@ -1,3 +1,4 @@
+import re
 import pandas as pd
 from lsst.resources import ResourcePath
 from rubin_scheduler.utils import ddf_locations
@@ -83,12 +84,18 @@ def read_visits(
         )
     else:
         if visit_source == "baseline":
-            baseline_opsim_rp = ResourcePath(get_baseline())
+            # Special case of the current baseline.
+            opsim_rp = ResourcePath(get_baseline())
+        elif re.search(r'^(\d+\.)*\d+$', visit_source):
+            # If the value was just a version # like 4.3.5 (or 4.3),
+            # Map it into the appropriate file at USDF storage.
+            opsim_rp = ResourcePath(OPSIMDB_TEMPLATE.format(sim_version=visit_source))
         else:
-            baseline_opsim_rp = ResourcePath(OPSIMDB_TEMPLATE.format(sim_version=visit_source))
+            # Read from whatever file is specified.
+            opsim_rp = ResourcePath(visit_source)
         mjd: int = DayObs.from_date(day_obs).mjd
         visits = read_opsim(
-            baseline_opsim_rp,
+            opsim_rp,
             constraint=f"FLOOR(observationStartMJD-0.5)<={mjd}"
             + f" AND FLOOR(observationStartMJD-0.5)>({mjd-num_nights})",
             stackers=stackers,
@@ -126,16 +133,15 @@ def read_ddf_visits(*args, **kwargs) -> pd.DataFrame:
 
     all_visits = read_visits(*args, **kwargs)
 
-    ddf_field_names = tuple(ddf_locations().keys())
-    # Different versions of the schedule include a DD: prefix, or not.
-    # Catch them all.
-    ddf_field_names = ddf_field_names + tuple([f"DD:{n}" for n in ddf_field_names])
-
     # Figure out which column has the target names.
     target_column_name = "target_name" if "target_name" in all_visits.columns else "target"
     if target_column_name not in all_visits.columns:
         raise ValueError("Cannot find a column in visits with which to identify DDF fields.")
 
-    ddf_visits = all_visits.loc[all_visits[target_column_name].isin(ddf_field_names)]
+    ddf_field_names = tuple(ddf_locations().keys())
+    ddf_visits = []
+    for ddf_name in ddf_field_names:
+        ddf_visits.append(all_visits.query(f"{target_column_name}.str.contains('{ddf_name}')"))
+    ddf_visits = pd.concat(ddf_visits)
 
     return ddf_visits

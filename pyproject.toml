@@ -38,8 +38,8 @@ dependencies = [
     "pytz",
     "skyproj",
     "tabulate",
-    "rubin-scheduler",
-    "rubin-sim",
+    "rubin-scheduler >= 3.11.0",
+    "rubin-sim >= 2.2.4",
     "uranography >= 1.1.0 ",
 ]
 
