@@ -1,4 +1,5 @@
 import re
+
 import pandas as pd
 from lsst.resources import ResourcePath
 from rubin_scheduler.utils import ddf_locations
@@ -86,7 +87,7 @@ def read_visits(
         if visit_source == "baseline":
             # Special case of the current baseline.
             opsim_rp = ResourcePath(get_baseline())
-        elif re.search(r'^(\d+\.)*\d+$', visit_source):
+        elif re.search(r"^(\d+\.)*\d+$", visit_source):
             # If the value was just a version # like 4.3.5 (or 4.3),
             # Map it into the appropriate file at USDF storage.
             opsim_rp = ResourcePath(OPSIMDB_TEMPLATE.format(sim_version=visit_source))
