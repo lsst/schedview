@@ -8,7 +8,7 @@ import pandas as pd
 
 
 def find_reports(
-    report_dir: str = " /sdf/data/rubin/shared/scheduler/reports",
+    report_dir: str = "/sdf/data/rubin/shared/scheduler/reports",
     url_base: str = "https://usdf-rsp-int.slac.stanford.edu/schedview-static-pages",
 ) -> pd.DataFrame:
     """Find staticic schedview reports by walking the report directory.
