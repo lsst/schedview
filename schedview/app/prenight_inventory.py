@@ -31,6 +31,11 @@ def get_prenight_table(
     ----------
     day_obs : `schedview.DayObs`
         The date for which to get pre-night simulations.
+    archive_uri : `str`
+        The URL for the archive in which to look for simulations.
+    num_nights : `int`
+        Then number of nights before the requested night for which to look
+        for simulatiotns.
 
     Returns
     -------
@@ -39,13 +44,19 @@ def get_prenight_table(
     """
 
     # Make sure conditions are met.
-    if os.environ["LSST_DISABLE_BUCKET_VALIDATION"] != "1":
-        raise RuntimeError("Environment variable LSST_DISABLE_BUCKET_VALIDATION must be set to 1")
-    if "S3_ENDPOINT_URL" not in os.environ:
-        raise RuntimeError(
-            "Environment variable  S3_ENDPOINT_URL must be set, "
-            + "perhaps to https://s3dfrgw.slac.stanford.edu/ ."
-        )
+    if archive_uri.startswith("s3://rubin:rubin-scheduler-prenight"):
+        # If the archive is the standard USDF one, fail with an informative
+        # error if the environment is not set up to do that.
+        # Otherwise, it will fail with an uninformative error.
+        if os.environ["LSST_DISABLE_BUCKET_VALIDATION"] != "1":
+            raise RuntimeError("Environment variable LSST_DISABLE_BUCKET_VALIDATION must be set to 1")
+
+    if archive_uri.startswith("s3:"):
+        if "S3_ENDPOINT_URL" not in os.environ:
+            raise RuntimeError(
+                "Environment variable  S3_ENDPOINT_URL must be set, "
+                + "perhaps to https://s3dfrgw.slac.stanford.edu/ ."
+            )
 
     # Collect
     raw_sim_metadata = read_archived_sim_metadata(
