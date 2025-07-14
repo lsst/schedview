@@ -79,8 +79,8 @@ def create_cadence_plot(
         plot_kwargs["title"] = target
         plot_kwargs["x_axis_location"] = "below" if last_plot else None
         this_plot = bokeh.plotting.figure(**plot_kwargs)
-
         this_plot.xaxis.major_label_orientation = "vertical"
+        this_plot.xaxis.major_label_policy = bokeh.models.NoOverlap()
 
         kwargs = {"legend_label": band_factors} if last_plot else {}
         renderers = this_plot.vbar_stack(
