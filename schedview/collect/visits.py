@@ -82,6 +82,7 @@ def read_visits(
             stackers=stackers,
             day_obs=DayObs.from_date(day_obs).date.isoformat(),
             num_nights=num_nights,
+            **kwargs,
         )
     else:
         if visit_source == "baseline":
