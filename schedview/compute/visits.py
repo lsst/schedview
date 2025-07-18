@@ -185,7 +185,7 @@ def add_instrumental_fwhm(visits):
     return visits
 
 
-def accum_stats_by_target_band_night(visits):
+def accum_stats_by_target_band_night(visits, target_column="target_name"):
     """Create a DataFrame of accumulated statistics by target/band/night.
 
     Parameters
@@ -202,6 +202,8 @@ def accum_stats_by_target_band_night(visits):
             The filter (`str`).
         ``"target_name"``
             The target name (`str`).
+    target_column : `str`
+        Column name of target, defaults to target_name.
 
     Returns
     -------
@@ -242,17 +244,17 @@ def accum_stats_by_target_band_night(visits):
 
     accum_stats = (
         visits.assign(count=1)
-        .groupby(["target_name", day_obs_col, band_column(visits)])
+        .groupby([target_column, day_obs_col, band_column(visits)])
         .agg(agg_func)
         .reset_index()
     )
 
     accum_stats = (
         accum_stats.pivot(
-            index=["target_name", day_obs_col], columns=band_column(visits), values=agg_func.keys()
+            index=[target_column, day_obs_col], columns=band_column(visits), values=agg_func.keys()
         )
         .reset_index()
-        .set_index(["target_name", day_obs_col])
+        .set_index([target_column, day_obs_col])
     )
 
     # If there are no visits for a given night, the t_eff and count are 0

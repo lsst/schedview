@@ -143,7 +143,9 @@ def read_ddf_visits(*args, **kwargs) -> pd.DataFrame:
     ddf_field_names = tuple(ddf_locations().keys())
     ddf_visits = []
     for ddf_name in ddf_field_names:
-        ddf_visits.append(all_visits.query(f"{target_column_name}.str.contains('{ddf_name}')"))
+        this_field_visits = all_visits.query(f"{target_column_name}.str.contains('{ddf_name}')")
+        this_field_visits["field_name"] = ddf_name
+        ddf_visits.append(this_field_visits)
     ddf_visits = pd.concat(ddf_visits)
 
     return ddf_visits
