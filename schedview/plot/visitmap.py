@@ -1,21 +1,24 @@
+from collections import defaultdict
 from warnings import warn
 
 import bokeh
 import numpy as np
 from astropy.time import Time
-
-# Imported to help sphinx make the link
 from rubin_scheduler.scheduler.model_observatory.model_observatory import ModelObservatory
 from rubin_scheduler.scheduler.schedulers import CoreScheduler  # noqa F401
+
+# Imported to help sphinx make the link
+from rubin_scheduler.scheduler.utils import get_current_footprint
 from uranography.api import ArmillarySphere, Planisphere
 
 import schedview.compute.astro
 from schedview import band_column
-from schedview.collect import get_footprint, load_bright_stars, read_opsim
+from schedview.collect import load_bright_stars, read_opsim
 from schedview.compute.camera import LsstCameraFootprintPerimeter
+from schedview.compute.footprint import find_healpix_area_polygons
 from schedview.plot import PLOT_BAND_COLORS
 
-from .footprint import add_footprint_to_skymaps
+from .footprint import add_footprint_outlines_to_skymaps, add_footprint_to_skymaps
 
 BAND_HATCH_PATTERNS = dict(
     u="dot",
@@ -64,6 +67,7 @@ def plot_visit_skymaps(
     nside_low=8,
     show_stars=False,
     map_classes=[ArmillarySphere, Planisphere],
+    footprint_outline=None,
 ):
     """Plot visits on a map of the sky.
 
@@ -81,7 +85,7 @@ def plot_visit_skymaps(
         ``"band"``
             The visit band (`str`)
 
-    footprint : `numpy.array`
+    footprint : `numpy.array` or `None`
         A healpix map of the footprint.
     conditions : `rubin_scheduler.scheduler.features.conditions.Conditions`
         The conditions for the night, which determines the start and end
@@ -99,6 +103,9 @@ def plot_visit_skymaps(
         healpix map.
     show_stars : `bool`
         Show stars? (Defaults to False)
+    footprint_outline : `bool` or `None`
+        Outline the footprint instead of filling it in (much faster to render).
+        Defaults to True.
 
     Returns
     -------
@@ -122,7 +129,13 @@ def plot_visit_skymaps(
     for spheremap in spheremaps[1:]:
         spheremap.sliders["mjd"] = spheremaps[0].sliders["mjd"]
 
-    add_footprint_to_skymaps(footprint, spheremaps)
+    if footprint_outline is not None:
+        add_footprint_outlines_to_skymaps(
+            footprint_outline, spheremaps, line_width=5, colormap=defaultdict(np.array(["gray"]).item)
+        )
+
+    if footprint is not None:
+        add_footprint_to_skymaps(footprint, spheremaps)
 
     # Transforms for recent, past, future visits
     past_future_js = """
@@ -344,10 +357,25 @@ def create_visit_skymaps(
         observatory = ModelObservatory(nside=nside, init_load_length=1)
         observatory.sky_model.load_length = 1
 
-    footprint = get_footprint(nside)
+    footprint_regions = get_current_footprint(nside)[1]
+    footprint_regions[np.isin(footprint_regions, ["bulgy", "lowdust"])] = "WFD"
+    footprint_regions[
+        np.isin(footprint_regions, ["LMC_SMC", "dusty_plane", "euclid_overlap", "nes", "scp", "virgo"])
+    ] = "other"
+
+    # Get rid of tine little loops
+    footprint_outline = find_healpix_area_polygons(footprint_regions)
+    tiny_loops = footprint_outline.groupby(["region", "loop"]).count().query("RA<10").index
+    footprint_outline = footprint_outline.drop(tiny_loops)
+
     observatory.mjd = end_time.mjd
     conditions = observatory.return_conditions()
-    data = {"visits": visits, "footprint": footprint, "conditions": conditions}
+    data = {
+        "visits": visits,
+        "footprint": None,
+        "footprint_outline": footprint_outline,
+        "conditions": conditions,
+    }
     if planisphere_only:
         vmap = schedview.plot.visitmap.plot_visit_skymaps(map_classes=[Planisphere], **data)
     else:
