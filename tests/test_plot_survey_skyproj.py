@@ -13,7 +13,9 @@ import schedview
 import schedview.collect
 from schedview.plot.survey_skyproj import (
     compute_circle_points,
+    create_hpix_map_grid,
     create_hpix_visit_map_grid,
+    map_healpix,
     map_visits_over_healpix,
 )
 
@@ -74,3 +76,32 @@ def test_create_hpix_visit_map_grid():
     )
 
     create_hpix_visit_map_grid(visits, hpix_maps, model_observatory, night_events)
+
+
+def test_map_healpix():
+    hp_map = np.random.default_rng(RANDOM_SEED).uniform(0, 1, hp.nside2npix(4))
+    mjd = 61040
+    time_datetime = Time(mjd - 0.5, format="mjd").datetime
+    model_observatory = ModelObservatory(init_load_length=1)
+    astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
+    night_events = schedview.compute.astro.night_events(
+        datetime.date(time_datetime.year, time_datetime.month, time_datetime.day)
+    )
+
+    map_healpix(hp_map, model_observatory, night_events)
+
+
+def test_create_hpix_map_grid():
+    hpix_maps = {}
+    for band in "ugrizy":
+        hpix_maps[band] = np.random.default_rng(RANDOM_SEED).uniform(0, 1, hp.nside2npix(4))
+
+    mjd = 61040
+    time_datetime = Time(mjd - 0.5, format="mjd").datetime
+    model_observatory = ModelObservatory(init_load_length=1)
+    astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
+    night_events = schedview.compute.astro.night_events(
+        datetime.date(time_datetime.year, time_datetime.month, time_datetime.day)
+    )
+
+    create_hpix_map_grid(hpix_maps, model_observatory, night_events)
