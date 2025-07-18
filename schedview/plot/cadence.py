@@ -9,7 +9,13 @@ from .colors import make_band_cmap
 
 
 def create_cadence_plot(
-    nightly_totals, start_dayobs_mjd, end_dayobs_mjd, targets=None, cmap=None, user_plot_kwargs={}
+    nightly_totals,
+    start_dayobs_mjd,
+    end_dayobs_mjd,
+    targets=None,
+    cmap=None,
+    target_column="target_name",
+    user_plot_kwargs={},
 ):
     """ "Create a cadence plot for a set of targets.
 
@@ -44,7 +50,7 @@ def create_cadence_plot(
         cmap = make_band_cmap(band_column(nightly_totals))
 
     if targets is None:
-        targets = tuple(nightly_totals.index.get_level_values("target_name").unique())
+        targets = tuple(nightly_totals.index.get_level_values(target_column).unique())
 
     date_factors = [Time(mjd, format="mjd").iso[:10] for mjd in np.arange(start_dayobs_mjd, end_dayobs_mjd)]
     band_factors = cmap.transform.factors
