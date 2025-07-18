@@ -144,6 +144,10 @@ def read_ddf_visits(*args, **kwargs) -> pd.DataFrame:
     ddf_visits = []
     for ddf_name in ddf_field_names:
         this_field_visits = all_visits.query(f"{target_column_name}.str.contains('{ddf_name}')")
+        # Add a column with just the DDF field name and nothing else,
+        # so that if the same DDF appears in different places
+        # in the target_name value they still get identified as the
+        # same DDF field.
         this_field_visits["field_name"] = ddf_name
         ddf_visits.append(this_field_visits)
     ddf_visits = pd.concat(ddf_visits)
