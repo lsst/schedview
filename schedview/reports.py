@@ -81,13 +81,17 @@ def find_reports(
     return reports
 
 
-def make_report_link_table(reports: pd.DataFrame) -> str:
+def make_report_link_table(
+    reports: pd.DataFrame, report_columns=("prenight", "multiprenight", "nightsum", "compareprenight")
+) -> str:
     """Generate an html table of links to reports.
 
     Parameters
     ----------
     reports : `pd.DataFrame`
         A DataFrame of report metadata, as returned by `find_reports`.
+    report_columns : `tuple`
+        A list of names of reports.
 
     Returns
     -------
@@ -100,7 +104,7 @@ def make_report_link_table(reports: pd.DataFrame) -> str:
         .pivot(index=("night", "instrument"), columns="report", values="link")
         .sort_values("night", ascending=False)
         .fillna("")
-        .reindex(columns=["prenight", "multiprenight", "nightsum", "compareprenight"])
+        .reindex(columns=list(report_columns))
     )
 
     report_table_html = report_links.to_html(escape=False)
