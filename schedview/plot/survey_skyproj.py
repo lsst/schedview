@@ -192,7 +192,7 @@ def map_visits_over_healpix(visits, map_hpix, model_observatory, night_events, a
     axes : `matplotlib.axes._axes.Axes`
         A matplotlib set of axes.
     """
-    sky_map = map_healpix(map_hpix, model_observatory, night_events, axes=None, **kwargs)
+    sky_map = map_healpix(map_hpix, model_observatory, night_events, axes=axes, **kwargs)
 
     camera_perimeter = LsstCameraFootprintPerimeter()
     ras, decls = camera_perimeter(visits.fieldRA, visits.fieldDec, visits.rotSkyPos)
@@ -340,8 +340,8 @@ def create_metric_map_grid(metric, visits, observatory, nside=32, **kwargs) -> F
 
     Returns
     -------
-    plot : `bokeh.models.plots.Plot`
-        The plot with the map
+    fig : `matplotlib.figure.Figure`
+        The matplotlib figure with the array of maps.
     """
 
     if len(visits):
