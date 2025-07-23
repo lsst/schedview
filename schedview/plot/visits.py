@@ -20,75 +20,85 @@ from schedview.collect import read_opsim
 
 from .colors import make_band_cmap
 
+TIMELINE_TOOLTIPS = [
+    (
+        "Start time",
+        "@start_timestamp{%F %T} UTC (mjd=@observationStartMJD{00000.00}, LST=@observationStartLST"
+        + "\u00b0"
+        + ")",
+    ),
+    ("flush by mjd", "@flush_by_mjd{00000.00}"),
+    ("Scheduler note", "@scheduler_note"),
+    ("Band", "@band"),
+    (
+        "Field coordinates",
+        "RA=@fieldRA"
+        + "\u00b0"
+        + ", Decl=@fieldDec"
+        + "\u00b0"
+        + ", Az=@azimuth"
+        + "\u00b0"
+        + ", Alt=@altitude"
+        + "\u00b0",
+    ),
+    ("Parallactic angle", "@paraAngle" + "\u00b0"),
+    ("Rotator angle", "@rotTelPos" + "\u00b0"),
+    ("Rotator angle (backup)", "@rotTelPos_backup" + "\u00b0"),
+    ("Cumulative telescope azimuth", "@cummTelAz" + "\u00b0"),
+    ("Airmass", "@airmass"),
+    ("Moon distance", "@moonDistance" + "\u00b0"),
+    (
+        "Moon",
+        "RA=@sunRA"
+        + "\u00b0"
+        + ", Decl=@sunDec"
+        + "\u00b0"
+        + ", Az=@sunAz"
+        + "\u00b0"
+        + ", Alt=@sunAlt"
+        + "\u00b0"
+        + ", phase=@moonPhase"
+        + "\u00b0",
+    ),
+    (
+        "Sun",
+        "RA=@moonRA"
+        + "\u00b0"
+        + ", Decl=@moonDec"
+        + "\u00b0"
+        + ", Az=@moonAz"
+        + "\u00b0"
+        + ", Alt=@moonAlt"
+        + "\u00b0"
+        + ", elong=@solarElong"
+        + "\u00b0",
+    ),
+    ("Sky brightness", "@skyBrightness mag arcsec^-2"),
+    ("Exposure time", "@visitExposureTime seconds (@numExposures exposures)"),
+    ("Visit time", "@visitTime seconds"),
+    ("Slew distance", "@slewDistance" + "\u00b0"),
+    ("Slew time", "@slewTime seconds"),
+    ("Field ID", "@fieldId"),
+    ("Proposal ID", "@proposalId"),
+    ("Block ID", "@block_id"),
+    ("Scripted ID", "@scripted_id"),
+]
+
+WEATHER_TOOLTIPS = [
+    (
+        "Seeing",
+        '@seeingFwhm500" (500nm), @seeingFwhmEff" (Eff), @seeingFwhmGeom" (Geom)',
+    ),
+    ("Cloud", "@cloud"),
+    ("5-sigma depth", "@fiveSigmaDepth"),
+]
+
 
 def visits_tooltips(weather: bool = False) -> list:
-    deg = "\u00b0"
-    tooltips = [
-        (
-            "Start time",
-            "@start_timestamp{%F %T} UTC (mjd=@observationStartMJD{00000.00}, LST=@observationStartLST"
-            + deg
-            + ")",
-        ),
-        ("flush by mjd", "@flush_by_mjd{00000.00}"),
-        ("Scheduler note", "@scheduler_note"),
-        ("Band", "@band"),
-        (
-            "Field coordinates",
-            "RA=@fieldRA" + deg + ", Decl=@fieldDec" + deg + ", Az=@azimuth" + deg + ", Alt=@altitude" + deg,
-        ),
-        ("Parallactic angle", "@paraAngle" + deg),
-        ("Rotator angle", "@rotTelPos" + deg),
-        ("Rotator angle (backup)", "@rotTelPos_backup" + deg),
-        ("Cumulative telescope azimuth", "@cummTelAz" + deg),
-        ("Airmass", "@airmass"),
-        ("Moon distance", "@moonDistance" + deg),
-        (
-            "Moon",
-            "RA=@sunRA"
-            + deg
-            + ", Decl=@sunDec"
-            + deg
-            + ", Az=@sunAz"
-            + deg
-            + ", Alt=@sunAlt"
-            + deg
-            + ", phase=@moonPhase"
-            + deg,
-        ),
-        (
-            "Sun",
-            "RA=@moonRA"
-            + deg
-            + ", Decl=@moonDec"
-            + deg
-            + ", Az=@moonAz"
-            + deg
-            + ", Alt=@moonAlt"
-            + deg
-            + ", elong=@solarElong"
-            + deg,
-        ),
-        ("Sky brightness", "@skyBrightness mag arcsec^-2"),
-        ("Exposure time", "@visitExposureTime seconds (@numExposures exposures)"),
-        ("Visit time", "@visitTime seconds"),
-        ("Slew distance", "@slewDistance" + deg),
-        ("Slew time", "@slewTime seconds"),
-        ("Field ID", "@fieldId"),
-        ("Proposal ID", "@proposalId"),
-        ("Block ID", "@block_id"),
-        ("Scripted ID", "@scripted_id"),
-    ]
+    tooltips = TIMELINE_TOOLTIPS
 
     if weather:
-        tooltips += [
-            (
-                "Seeing",
-                '@seeingFwhm500" (500nm), @seeingFwhmEff" (Eff), @seeingFwhmGeom" (Geom)',
-            ),
-            ("Cloud", "@cloud"),
-            ("5-sigma depth", "@fiveSigmaDepth"),
-        ]
+        tooltips += WEATHER_TOOLTIPS
 
     return tooltips
 
@@ -162,6 +172,7 @@ def plot_visit_param_vs_time(
     hovertool: bool = True,
     color_transform: bokeh.models.mappers.CategoricalColorMapper | None = None,
     marker_transform: bokeh.models.mappers.CategoricalMarkerMapper | None = None,
+    tooltips: str | None = None,
     **kwargs,
 ) -> bokeh.models.ui.ui_element.UIElement:
     """Plot a column in the visit table vs. time.
@@ -212,7 +223,7 @@ def plot_visit_param_vs_time(
     if "sim_alpha" not in source.data:
         source.data["sim_alpha"] = np.full_like(source.data["start_timestamp"], 1.0, dtype=np.float64)
 
-    scatter_kwargs = {"fill_alpha": 0.0, "line_alpha": "sim_alpha"}
+    scatter_kwargs = {"fill_alpha": 0.0, "line_alpha": "sim_alpha", "name": "timeline"}
 
     if color_transform is None:
         scatter_kwargs["color"] = make_band_cmap(band_column(visits))
@@ -299,8 +310,11 @@ def plot_visit_param_vs_time(
         plot.add_layout(legend, "below")
 
     if hovertool:
+        if tooltips is None:
+            tooltips = visits_tooltips()
+
         hover_tool = bokeh.models.HoverTool(
-            renderers=[timeline], tooltips=visits_tooltips(), formatters={"@start_timestamp": "datetime"}
+            renderers=[timeline], tooltips=tooltips, formatters={"@start_timestamp": "datetime"}
         )
         plot.add_tools(hover_tool)
 
