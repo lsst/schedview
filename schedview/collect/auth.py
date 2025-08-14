@@ -23,7 +23,7 @@ except ImportError:
             token_file = ACCESS_TOKEN_FILE
 
         if token_file is not None:
-            with open("token_file", "r") as f:
+            with open(token_file, "r") as f:
                 token = f.read()
         elif "ACCESS_TOKEN" in os.environ:
             token = os.environ.get("ACCESS_TOKEN")
