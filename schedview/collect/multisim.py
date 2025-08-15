@@ -92,7 +92,8 @@ def read_multiple_opsims(
         these_visits["sim_index"] = int(sim_uri.split("/")[-2])
 
         for key in sim_metadata_keys:
-            these_visits[key] = [sim_metadata[key]] * len(these_visits)
+            value = sim_metadata[key] if key in sim_metadata else None
+            these_visits[key] = [value] * len(these_visits)
 
         visits_list.append(these_visits)
 
