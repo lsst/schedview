@@ -67,6 +67,11 @@ def get_prenight_table(
     sim_metadata = munge_sim_archive_metadata(raw_sim_metadata, day_obs, archive_uri)
     prenight_df = pd.DataFrame(sim_metadata).T
     prenight_df.index.name = "resource_url"
+
+    for column_name in SIM_TABLE_COLUMNS:
+        if column_name not in prenight_df.reset_index().columns:
+            prenight_df[column_name] = "Unknown"
+
     prenight_df = prenight_df.reset_index().loc[:, SIM_TABLE_COLUMNS]
 
     # "Plot"
