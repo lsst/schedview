@@ -18,11 +18,20 @@ Because the `schedview` notebooks can be slow to execute, this is sometimes inco
 Pre-generated reports
 =====================
 
-To avoid requiring humans to wait for notebooks to be executed, a `cron` job at the USDF uses `nbconvert` to create a set of `html` pages.
-The index of reports that are completely public can be found at `https://s3df.slac.stanford.edu/data/rubin/sim-data/schedview/reports/ <https://s3df.slac.stanford.edu/data/rubin/sim-data/schedview/reports/>`__.
+To avoid requiring humans to wait for notebooks to be executed, a `cron` job at the USDF uses submits a set of batch jobs that use `nbconvert` to create a set of `html` pages.
+These scripts are found in the `batch` directory of the `schedview_notebooks` repository: `batch/prenight.sh` and `batch/scheduler_nightsum.sh`.
+Each of these scripts builds an environment in which to convert the notebook, executes the conversion, and updates a corresponding index it include the new reports.
+There are currently two indexes of reports.
+One index lists publicly accessible, which are served from `https://s3df.slac.stanford.edu/data/rubin/sim-data/schedview/reports/ <https://s3df.slac.stanford.edu/data/rubin/sim-data/schedview/reports/>`__.
 Currently, the public reports are limited to a brief nigth summary.
 
 Additional reports, currently requiring logging to the the USDF, can be found at `https://usdf-rsp-int.slac.stanford.edu/schedview-static-pages/ <https://usdf-rsp-int.slac.stanford.edu/schedview-static-pages/>`__.
+
+The `cron` job runs the reports with the following entries::
+
+    15 5 * * * /opt/slurm/slurm-curr/bin/sbatch /sdf/data/rubin/shared/scheduler/packages/schedview_notebooks/batch/scheduler_nightsum.sh 2>&1 >> /sdf/data/rubin/shared/scheduler/schedview/scheduler_nightsum/scheduler_nightsum.out
+    30 7 * * * /opt/slurm/slurm-curr/bin/sbatch /sdf/data/rubin/shared/scheduler/packages/schedview_notebooks/batch/prenight.sh 2>&1 >> /sdf/data/rubin/shared/scheduler/schedview/prenight/prenight.out
+
 
 Hand generation of reports
 ==========================
