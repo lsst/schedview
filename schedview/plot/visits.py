@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 import bokeh
 import bokeh.io
@@ -173,6 +173,7 @@ def plot_visit_param_vs_time(
     color_transform: bokeh.models.mappers.CategoricalColorMapper | None = None,
     marker_transform: bokeh.models.mappers.CategoricalMarkerMapper | None = None,
     tooltips: str | None = None,
+    offered_columns: Iterable[str] = tuple(),
     **kwargs,
 ) -> bokeh.models.ui.ui_element.UIElement:
     """Plot a column in the visit table vs. time.
@@ -193,6 +194,8 @@ def plot_visit_param_vs_time(
         The color mapper from band to color.
     marker_transform: `CategoricalMarkerMapper` or None
         The marker mapper from label to marker.
+    offered_columns: `Iterable`
+        A list of columns to be offered in the dropdown selector.
     **kwargs
         Additional keyword arguments to be passed to
         `bokeh.plotting.figure.scatter`.
@@ -319,16 +322,31 @@ def plot_visit_param_vs_time(
         plot.add_tools(hover_tool)
 
     if show_column_selector:
-        ignored_columns = {"level_0", "index", "sim_alpha", "sim_index"}
         # Only offer numeric fields as options
         options = []
+
+        if len(offered_columns) == 0:
+            offered_columns = (
+                "fieldRA",
+                "fieldDec",
+                "altitude",
+                "azimuth",
+                "HA",
+                "seeingFwhmEff",
+                "cloud",
+                "fiveSigmaDepth",
+                "nest_healpix",
+            )
+
         # Use a loop instead of a list comprehension to make it easier
         # to appease mypy
-        for k in sorted(set(source.column_names) - ignored_columns):
-            column_data = source.data[k]
+        for column in offered_columns:
+            if column not in source.column_names:
+                continue
+            column_data = source.data[column]
             assert isinstance(column_data, np.ndarray)
             if np.issubdtype(column_data.dtype, np.number):
-                options.append(k)
+                options.append(column)
 
         column_selector = bokeh.models.Select(value=column_name, options=options, name="visitcolselect")
 
