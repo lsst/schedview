@@ -165,7 +165,7 @@ def create_visit_explorer(visits, night_date, observatory=None, timezone="Chile/
 
 def plot_visit_param_vs_time(
     visits: pd.DataFrame,
-    column_name: str,
+    column_name: str | Iterable[str],
     plot: bokeh.plotting.figure | None = None,
     show_column_selector: bool = False,
     show_sim_selector: bool = False,
@@ -174,6 +174,8 @@ def plot_visit_param_vs_time(
     marker_transform: bokeh.models.mappers.CategoricalMarkerMapper | None = None,
     tooltips: str | None = None,
     offered_columns: Iterable[str] = tuple(),
+    num_plots: int = 1,
+    user_figure_kwargs: dict | None = None,
     **kwargs,
 ) -> bokeh.models.ui.ui_element.UIElement:
     """Plot a column in the visit table vs. time.
@@ -182,10 +184,10 @@ def plot_visit_param_vs_time(
     ----------
     visits: `pandas.DataFrame`
         One row per visit, as created by `schedview.collect.opsim.read_opsim`.
-    column_name: `str`
+    column_name: `str` or `list`
         The name of the column to plot against time.
-    plot: `bokeh.plotting.figure` or None
-        The figure on which to plot the visits. None creates a new
+    plot: `bokeh.plotting.figure`, `list`, or None
+        The figure or figures on which to plot the visits. None creates a new
         figure. Defaults to None.
     show_column_selector: `bool`
         Include a drop-down to select which column to plot?
@@ -196,6 +198,10 @@ def plot_visit_param_vs_time(
         The marker mapper from label to marker.
     offered_columns: `Iterable`
         A list of columns to be offered in the dropdown selector.
+    num_plots: int
+        Number of parallel timelines..
+    user_figure_kwargs: dict on None
+        Arguments passed along to bokeh.plotting.figure
     **kwargs
         Additional keyword arguments to be passed to
         `bokeh.plotting.figure.scatter`.
@@ -205,15 +211,36 @@ def plot_visit_param_vs_time(
     `plot` : `bokeh.models.plots.Plot`
         The figure with the plot.
     """
-    if plot is None:
-        plot = bokeh.plotting.figure(y_axis_label=column_name, x_axis_label="Time (UTC)")
-
+    # If there are no visits, do not make the plot.
     if len(visits) == 0:
+        if plot is None:
+            plot = bokeh.plotting.figure()
         plot.text(x=0.5, y=0.5, text="No visits.")
         return plot
 
-    # Make mypy happy
-    assert isinstance(plot, bokeh.plotting.figure)
+    initial_columns = [column_name] * num_plots if isinstance(column_name, str) else column_name
+    if len(tuple(initial_columns)) != num_plots:
+        raise ValueError("column name must be a string, or have one column name for each plot.")
+
+    # Create the night number of bokeh plots.
+    figure_kwargs = {"x_axis_label": "Time (UTC)"}
+    if user_figure_kwargs is not None:
+        figure_kwargs.update(user_figure_kwargs)
+
+    if plot is None:
+        plots = []
+        for column in initial_columns:
+            plots.append(bokeh.plotting.figure(y_axis_label=column, **figure_kwargs))
+            if "x_range" not in figure_kwargs:
+                figure_kwargs["x_range"] = plots[0].x_range
+
+    elif isinstance(plot, bokeh.models.plots.Plot):
+        plots = [plot]
+    else:
+        plots = plot
+
+    if len(plots) != num_plots:
+        raise ValueError("plot must be None, or have length equal to num_plots")
 
     if isinstance(visits, bokeh.models.ColumnarDataSource):
         source = visits
@@ -240,14 +267,65 @@ def plot_visit_param_vs_time(
 
     scatter_kwargs.update(kwargs)
 
-    timeline = plot.scatter(
-        x="start_timestamp",
-        y=column_name,
-        source=source,
-        **scatter_kwargs,
-    )
+    timelines = []
+    column_selectors = []
+    for plot, initial_column in zip(plots, initial_columns):
 
-    plot.xaxis[0].formatter = bokeh.models.DatetimeTickFormatter(hours="%H:%M")
+        timeline = plot.scatter(
+            x="start_timestamp",
+            y=initial_column,
+            source=source,
+            **scatter_kwargs,
+        )
+        timelines.append(timeline)
+
+        plot.xaxis[0].formatter = bokeh.models.DatetimeTickFormatter(hours="%H:%M")
+
+        if show_column_selector:
+            # Only offer numeric fields as options
+            options = []
+
+            if len(offered_columns) == 0:
+                offered_columns = (
+                    "fieldRA",
+                    "fieldDec",
+                    "altitude",
+                    "azimuth",
+                    "HA",
+                    "seeingFwhmEff",
+                    "cloud",
+                    "fiveSigmaDepth",
+                    "nest_healpix",
+                )
+
+            # Use a loop instead of a list comprehension to make it easier
+            # to appease mypy
+            for column in offered_columns:
+                if column not in source.column_names:
+                    continue
+                column_data = source.data[column]
+                assert isinstance(column_data, np.ndarray)
+                if np.issubdtype(column_data.dtype, np.number):
+                    options.append(column)
+
+            column_selector = bokeh.models.Select(
+                value=initial_column, options=options, name="visitcolselect"
+            )
+            column_selectors.append(column_selector)
+
+            column_selector_callback = bokeh.models.CustomJS(
+                args={"timeline": timeline, "source": source, "yaxis": plot.yaxis[0]},
+                code="""
+                    timeline.glyph.y.field = this.value
+                    yaxis.axis_label = this.value
+                    source.change.emit()
+                """,
+            )
+            column_selector.js_on_change("value", column_selector_callback)
+        else:
+            column_selectors.append(None)
+
+    # Make a legend using the last plot.
 
     # Bokeh's fully automatic legend creation can't make legends for
     # color and marker independently. So, follow
@@ -275,18 +353,6 @@ def plot_visit_param_vs_time(
         color=scatter_kwargs["color"].transform.palette,
     )
     sample_color_renderer.visible = False
-
-    legend = bokeh.models.Legend(
-        items=[
-            bokeh.models.LegendItem(
-                label=scatter_kwargs["color"].transform.factors[i], renderers=[sample_color_renderer], index=i
-            )
-            for i in range(len(scatter_kwargs["color"].transform.factors))
-        ],
-        location="bottom_center",
-        orientation="horizontal",
-    )
-    plot.add_layout(legend, "below")
 
     if isinstance(marker_transform, bokeh.models.CategoricalMarkerMapper):
         # create an invisible renderer to drive shape legend
@@ -317,48 +383,21 @@ def plot_visit_param_vs_time(
             tooltips = visits_tooltips()
 
         hover_tool = bokeh.models.HoverTool(
-            renderers=[timeline], tooltips=tooltips, formatters={"@start_timestamp": "datetime"}
+            renderers=timelines, tooltips=tooltips, formatters={"@start_timestamp": "datetime"}
         )
         plot.add_tools(hover_tool)
 
-    if show_column_selector:
-        # Only offer numeric fields as options
-        options = []
-
-        if len(offered_columns) == 0:
-            offered_columns = (
-                "fieldRA",
-                "fieldDec",
-                "altitude",
-                "azimuth",
-                "HA",
-                "seeingFwhmEff",
-                "cloud",
-                "fiveSigmaDepth",
-                "nest_healpix",
+    legend = bokeh.models.Legend(
+        items=[
+            bokeh.models.LegendItem(
+                label=scatter_kwargs["color"].transform.factors[i], renderers=[sample_color_renderer], index=i
             )
-
-        # Use a loop instead of a list comprehension to make it easier
-        # to appease mypy
-        for column in offered_columns:
-            if column not in source.column_names:
-                continue
-            column_data = source.data[column]
-            assert isinstance(column_data, np.ndarray)
-            if np.issubdtype(column_data.dtype, np.number):
-                options.append(column)
-
-        column_selector = bokeh.models.Select(value=column_name, options=options, name="visitcolselect")
-
-        column_selector_callback = bokeh.models.CustomJS(
-            args={"timeline": timeline, "source": source, "yaxis": plot.yaxis[0]},
-            code="""
-                timeline.glyph.y.field = this.value
-                yaxis.axis_label = this.value
-                source.change.emit()
-            """,
-        )
-        column_selector.js_on_change("value", column_selector_callback)
+            for i in range(len(scatter_kwargs["color"].transform.factors))
+        ],
+        location="bottom_center",
+        orientation="horizontal",
+    )
+    plot.add_layout(legend, "below")
 
     if show_sim_selector:
         if "label" not in source.column_names:
@@ -383,16 +422,18 @@ def plot_visit_param_vs_time(
             """,
         )
         sim_selector.js_on_change("value", sim_selector_callback)
-
-    if show_column_selector or show_sim_selector:
-        selector_row_contents = []
-        if show_column_selector:
-            selector_row_contents.append(column_selector)
-        if show_sim_selector:
-            selector_row_contents.append(sim_selector)
-        ui_element = bokeh.layouts.column([bokeh.layouts.row(selector_row_contents), plot])
     else:
-        ui_element = plot
+        sim_selector = None
+
+    output_rows = []
+    if sim_selector is not None:
+        output_rows.append(sim_selector)
+    for plot, column_selector in zip(plots, column_selectors):
+        if column_selector is not None:
+            output_rows.append(column_selector)
+        output_rows.append(plot)
+
+    ui_element = bokeh.layouts.column(output_rows)
 
     return ui_element
 
