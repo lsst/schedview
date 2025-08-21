@@ -12,6 +12,81 @@ from schedview import band_column
 from .colors import make_band_cmap
 
 
+def create_table(summary_dict, stat_name, stat_str_template, html=True):
+    """Take a dict of values and do some mapping to make pretty HTML
+
+    Paramaters
+    ----------
+    `summary_dict`: `dict`
+        Dictionary with keys of strings and values of usually numbers.
+    `stat_name`: `dict`
+        Mapping of dict key to proper sentence
+    `stat_str_template`: `dict`
+        Convert values to proper sentence and add units
+    """
+    with StringIO() as result_io:
+        if html:
+            summary = ET.Element("dl")
+            for stat_key in summary_dict:
+                name_el = ET.Element("dt")
+                name_el.text = stat_name[stat_key]
+                value_el = ET.Element("dd")
+                value_el.text = stat_str_template[stat_key].format(summary_dict[stat_key])
+                summary.append(name_el)
+                summary.append(value_el)
+            ET.ElementTree(summary).write(result_io, encoding="unicode", method="html")
+        else:
+            for stat_key in summary_dict:
+                print(
+                    stat_name[stat_key],
+                    ": ",
+                    stat_str_template[stat_key].format(summary_dict[stat_key]),
+                    file=result_io,
+                )
+
+        result = result_io.getvalue()
+    return result
+
+
+def create_sv_summary_table(sv_summary, html=True):
+    """Make a formatted table from an sv summary dictionary
+
+    Parameters
+    ----------
+    `sv_summary`: `dict`
+        A dictionary of summary values, as computed by
+        `schedview.compute.visits.compute_sv_summary`
+    `html`: `bool`
+        Format the table with html? Defaults to True
+
+    Returns
+    -------
+    `summary` : `str`
+        Formatted summary.
+    """
+
+    stat_name = {
+        "time_avail": "Time available for SV visits",
+        "n_sv_visits": "Number of sv visits in night",
+        "n_pairs_started": "Number of pairs started",
+        "n_pairs_finished": "Number of pairs finished",
+        "ddfs_observed": "DDFs Observed",
+        "too_observed": "ToOs Observed",
+    }
+    stat_str_template = {
+        "time_avail": "{:5.2f} hours",
+        "n_sv_visits": "{}",
+        "n_pairs_started": "{}",
+        "n_pairs_finished": "{}",
+        "ddfs_observed": "{}",
+        "too_observed": "{}",
+    }
+
+    result = create_table(sv_summary, stat_name, stat_str_template, html=html)
+
+    return result
+
+
 def create_overhead_summary_table(overhead_summary, html=True):
     """Make a formatted table from an overhead summary dictionary
 
@@ -30,7 +105,7 @@ def create_overhead_summary_table(overhead_summary, html=True):
     """
     stat_name = {
         "relative_start_time": "Open shutter of first exposure",
-        "relative_end_time": "Close shutter time of last exposure",
+        "relative_end_time": "Close shutter of last exposure",
         "total_time": "Total wall clock time",
         "num_exposures": "Number of exposures",
         "total_exptime": "Total open shutter time",
@@ -47,27 +122,7 @@ def create_overhead_summary_table(overhead_summary, html=True):
         "median_gap_time": "{:7.2f} seconds",
     }
 
-    with StringIO() as result_io:
-        if html:
-            summary = ET.Element("dl")
-            for stat_key in overhead_summary:
-                name_el = ET.Element("dt")
-                name_el.text = stat_name[stat_key]
-                value_el = ET.Element("dd")
-                value_el.text = stat_str_template[stat_key].format(overhead_summary[stat_key])
-                summary.append(name_el)
-                summary.append(value_el)
-            ET.ElementTree(summary).write(result_io, encoding="unicode", method="html")
-        else:
-            for stat_key in overhead_summary:
-                print(
-                    stat_name[stat_key],
-                    ": ",
-                    stat_str_template[stat_key].format(overhead_summary[stat_key]),
-                    file=result_io,
-                )
-
-        result = result_io.getvalue()
+    result = create_table(overhead_summary, stat_name, stat_str_template, html=html)
 
     return result
 

@@ -41,7 +41,12 @@ from .colors import PLOT_BAND_COLORS, make_band_cmap
 from .multisim import generate_sim_indicators, overplot_kernel_density_estimates
 from .nightbf import plot_infeasible, plot_rewards
 from .nightly import plot_airmass_vs_time, plot_alt_vs_time, plot_polar_alt_az
-from .overhead import create_overhead_histogram, create_overhead_summary_table, plot_overhead_vs_slew_distance
+from .overhead import (
+    create_overhead_histogram,
+    create_overhead_summary_table,
+    create_sv_summary_table,
+    plot_overhead_vs_slew_distance,
+)
 from .rewards import (
     area_timeline_for_tier,
     create_survey_reward_plot,
