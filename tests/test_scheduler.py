@@ -1,3 +1,4 @@
+import math
 import unittest
 
 import astropy.utils.iers
@@ -11,7 +12,7 @@ from schedview.collect import sample_pickle
 from schedview.plot.scheduler import DEFAULT_MJD, SchedulerDisplay
 
 NSIDE = 32
-MJD_SCHED = DEFAULT_MJD
+MJD_SCHED = math.ceil(DEFAULT_MJD) + 0.2
 astropy.utils.iers.conf.iers_degraded_accuracy = "warn"
 
 
@@ -20,10 +21,10 @@ class TestSchedulerDisplay(unittest.TestCase):
         mjd = MJD_SCHED
         nside = NSIDE
 
-        scheduler = example_scheduler(nside=nside, mjd_start=MJD_SCHED)
+        scheduler = example_scheduler(nside=nside, mjd_start=DEFAULT_MJD)
 
         try:
-            observatory = ModelObservatory(mjd_start=mjd - 1, nside=nside)
+            observatory = ModelObservatory(mjd_start=DEFAULT_MJD, nside=nside)
             observatory.mjd = mjd
             conditions = observatory.return_conditions()
         except ValueError:
@@ -32,7 +33,7 @@ class TestSchedulerDisplay(unittest.TestCase):
             # ModelObservatory, but we should be able to run
             # it anyway. Fake up a conditions object as well as
             # we can.
-            conditions = Conditions(mjd_start=mjd - 1, nside=nside)
+            conditions = Conditions(mjd_start=DEFAULT_MJD - 1, nside=nside)
             conditions.mjd = mjd
 
         scheduler.update_conditions(conditions)
@@ -46,15 +47,15 @@ class TestSchedulerDisplay(unittest.TestCase):
 
         self.assertGreater(len(sched_display.map_keys), 0)
 
-        self.assertEqual(sched_display.mjd, MJD_SCHED)
-        self.assertLessEqual(sched_display.conditions.sun_n18_setting, MJD_SCHED)
-        self.assertGreaterEqual(sched_display.conditions.sun_n18_rising, MJD_SCHED)
+        self.assertEqual(sched_display.mjd, mjd)
+        self.assertLessEqual(sched_display.conditions.sunset, mjd)
+        self.assertGreaterEqual(sched_display.conditions.sunrise, mjd)
 
-        new_mjd = MJD_SCHED + 1.1
+        new_mjd = mjd + 1.1
         sched_display.mjd = new_mjd
         self.assertEqual(sched_display.mjd, new_mjd)
-        self.assertLessEqual(sched_display.conditions.sun_n18_setting, new_mjd)
-        self.assertGreaterEqual(sched_display.conditions.sun_n18_rising, new_mjd)
+        self.assertLessEqual(sched_display.conditions.sunset, new_mjd)
+        self.assertGreaterEqual(sched_display.conditions.sunrise, new_mjd)
 
         time = sched_display.time
         prev_mjd = sched_display.mjd
