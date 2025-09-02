@@ -1,4 +1,5 @@
 import warnings
+from collections.abc import Sequence
 from types import MappingProxyType
 from typing import Mapping
 
@@ -51,6 +52,7 @@ def make_categorical_hourglass(
     cmap: mpl.colors.Colormap = mpl.colors.ListedColormap(seaborn.color_palette("colorblind")),
     axes: mpl.axes.Axes | None = None,
     legend_kwargs: Mapping = MappingProxyType({}),
+    legend_order: Sequence[str] = ("u", "g", "r", "i", "z", "y"),
 ) -> mpl.axes.Axes:
     """Generate a categorical hourglass plot.
 
@@ -75,7 +77,9 @@ def make_categorical_hourglass(
         The Axes instance to use for plotting.
         If not provided, a new instance will be created.
     legend_kwargs : `Mapping`, optional
-        Additional keyword arguments to pass to the `mpl.figure.Figure.legend`.
+        Additional keyword arguments to pass to the `mpl.figure.Figure.legend`
+    legend_order : `Sequence[str]`, optional
+        The order in which categories are to appear in the legend.
 
     Returns
     -------
@@ -121,12 +125,26 @@ def make_categorical_hourglass(
 
     # **** Setting the colors of the bars ************************
 
-    if cmap.N < len(np.unique(values)):
+    unassigned_categories = set(np.unique(values))
+    if cmap.N < len(unassigned_categories):
         warnings.warn(
             "More unique values than colors in the supplied color map, "
             + "so the same color will be used for multiple categories."
         )
-    value_colors = {v: cmap(i) for i, v in enumerate(np.unique(values))}
+    value_colors = {}
+    next_color_index = 0
+    # assign the categories we have asked for in order
+    for category in legend_order:
+        if category in unassigned_categories:
+            value_colors[category] = cmap(next_color_index)
+            unassigned_categories.remove(category)
+            next_color_index += 1
+
+    # assign any categories left over
+    for category in unassigned_categories:
+        value_colors[category] = cmap(next_color_index)
+        next_color_index += 1
+
     colors = np.array(np.vectorize(value_colors.get)(values)).T.tolist()
 
     # **** Prepare matplotlib figure and axes *********************
