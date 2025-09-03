@@ -21,7 +21,7 @@ class TestPlotVisits(TestCase):
 
     def test_plot_visit_param_vs_time(self):
         plot = schedview.plot.plot_visit_param_vs_time(self.visits, "seeingFwhmEff")
-        self.assertIsInstance(plot, bokeh.models.plots.Plot)
+        self.assertIsInstance(plot, bokeh.models.ui.ui_element.UIElement)
 
     def test_create_visit_table(self):
         plot = schedview.plot.create_visit_table(self.visits, show=False)
