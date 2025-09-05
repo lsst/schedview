@@ -16,5 +16,6 @@ Contents
    prenight_sim_generation
    tutorials
    architecture
+   reports
    examples
    api
