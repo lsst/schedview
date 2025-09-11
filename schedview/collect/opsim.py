@@ -189,7 +189,7 @@ def read_ddf_visits(
     ddf_field_names = [f"DD:{field_name}" for field_name in ddf_locations().keys()]
     ddf_field_names += [f"dd:{field_name}" for field_name in ddf_locations().keys()]
     try:
-        constraint = " OR ".join([f"target_name LIKE '%{field_name}'" for field_name in ddf_field_names])
+        constraint = " OR ".join([f"target_name LIKE '%{field_name}%'" for field_name in ddf_field_names])
         visits = read_opsim(
             opsim_uri,
             start_time=start_time,
@@ -199,7 +199,7 @@ def read_ddf_visits(
             **kwargs,
         )
     except pd.errors.DatabaseError:
-        constraint = " OR ".join([f"target LIKE '%{field_name}'" for field_name in ddf_field_names])
+        constraint = " OR ".join([f"target LIKE '%{field_name}%'" for field_name in ddf_field_names])
         visits = read_opsim(
             opsim_uri,
             start_time=start_time,
