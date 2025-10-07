@@ -53,6 +53,16 @@ def read_multiple_prenights(
         day_obs.date, day_obs.date, tags=["prenight"], telescope=telescope, max_simulation_age=max_age
     ).set_index(["visitseq_uuid"])
 
+    sim_metadata_keys = [
+        "visitseq_label",
+        "config_url",
+        "scheduler_version",
+        "sim_runner_kwargs",
+        "sim_creation_day_obs",
+        "daily_id",
+        "tags",
+    ]
+
     visits_list = []
     for visitseq_uuid, prenight_metadata in prenights_for_night.iterrows():
         these_visits = vseqarchive.get_visits(
@@ -63,15 +73,6 @@ def read_multiple_prenights(
         these_visits["visitseq_uuid"] = visitseq_uuid
         these_visits = add_coords_tuple(these_visits)
 
-        sim_metadata_keys = [
-            "visitseq_label",
-            "config_url",
-            "schedulre_version",
-            "sim_runner_kwargs",
-            "sim_creation_day_obs",
-            "daily_id",
-            "tags",
-        ]
         for key in sim_metadata_keys:
             value = prenight_metadata[key] if key in prenight_metadata else None
             these_visits[key] = [value] * len(these_visits)
