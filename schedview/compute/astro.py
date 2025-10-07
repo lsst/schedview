@@ -89,15 +89,22 @@ def night_events(night_date=None, site=None, timezone="Chile/Continental"):
             closest_night = next_night if next_dt < proir_dt else prior_night
             mjds[event] = all_nights_events.loc[closest_night, event]
 
-    ap_times = Time(mjds, format="mjd", scale="utc", location=site)
+    # We need to use masked_invalid before passing mjds to Time
+    # because there are occasional nights where the moon either
+    # doesn't rise or doesn't set.
+    ap_times = Time(np.ma.masked_invalid(mjds), format="mjd", scale="utc", location=site)
     time_df = pd.DataFrame(
         {
             "MJD": ap_times.mjd,
             "LST": ap_times.sidereal_time("apparent").deg,
-            "UTC": pd.to_datetime(ap_times.iso).tz_localize("UTC"),
+            "UTC": pd.to_datetime(ap_times.to_datetime()).tz_localize("UTC"),
         },
         index=mjds.index,
     )
+    # If a value is masked, indicate so by a NaN or NaT
+    time_df.loc[ap_times.mask, "MJD"] = np.nan
+    time_df.loc[ap_times.mask, "UTC"] = np.nan
+
     time_df[timezone] = time_df["UTC"].dt.tz_convert(timezone)
     time_df.index.name = "event"
 
