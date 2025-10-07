@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import panel as pn
 import param
+from rubin_sim.sim_archive.vseqmetadata import VisitSequenceArchiveMetadata
 
 import schedview.collect.visits
 from schedview import DayObs
@@ -39,7 +40,7 @@ class CombinedTimelineDashboard(param.Parameterized):
     # Derived parameters
     day_obs = param.Parameter()
     events = param.Parameter()
-    archive_uri = "s3://rubin:rubin-scheduler-prenight/opsim/"
+    vseq_metadata_archive = VisitSequenceArchiveMetadata()
 
     def _run_async_io(self, io_coroutine):
         # Run the async io (needed for the EFD) in a separate thread and
@@ -132,8 +133,8 @@ class CombinedTimelineDashboard(param.Parameterized):
             )
             completed_visits["sim_runner_kwargs"] = {}
 
-        simulated_visits = schedview.collect.multisim.read_multiple_opsims(
-            self.archive_uri,
+        simulated_visits = schedview.collect.multisim.read_multiple_prenights(
+            self.vseq_metadata_archive,
             day_obs.start,
             day_obs.mjd,
             stackers=schedview.collect.visits.NIGHT_STACKERS,
