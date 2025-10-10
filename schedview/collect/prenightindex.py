@@ -17,6 +17,43 @@ def get_prenight_index_from_database(
     user: str | None = None,
     database: str | None = None,
 ) -> pd.DataFrame:
+    """
+    Retrieve the pre‑night observation index for a given night from the
+    LSST SIM Archive.
+
+    Parameters
+    ----------
+    day_obs : `str` or `int` or `date` or `DayObs`
+        The night for which to fetch the index.  Accepts a date string,
+        YYYYMMDD encoded into an integer, a :class:`datetime.date`, or a
+        :class:`~schedview.DayObs` instance.
+    telescope : `str`, optional
+        Telescope name (default ``"simonyi"``).  Passed directly to
+        :class:`~rubin_sim.sim_archive.vseqmetadata.VisitSequenceArchiveMetadata`.
+    schema : `str` | `None`, optional
+        Optional database schema name.
+    host : `str` | `None`, optional
+        Database host address.
+    user : `str` | `None`, optional
+        Database user name.
+    database : `str` | `None`, optional
+        Database name.
+
+    Returns
+    -------
+    prenights: `pandas.DataFrame`
+        A DataFrame indexed by ``visitseq_uuid`` containing all pre‑night
+        entries for the requested night.  Columns mirror those returned
+        by the underlying `sims_on_nights` call.
+
+    Notes
+    -----
+    * The function uses a hard‑coded maximum simulation age of
+      :data:`MAX_AGE` (365 days) to limit the search.
+    * If any of ``host``, ``user`` or ``database`` are supplied, they
+      override the defaults in the ``metadata_dsn`` dictionary passed to
+      :class:`~rubin_sim.sim_archive.vseqmetadata.VisitSequenceArchiveMetadata`.
+    """
 
     day_obs = DayObs.from_date(day_obs)
     assert isinstance(day_obs, DayObs)
@@ -42,7 +79,31 @@ def get_prenight_index_from_bucket(
         str | ResourcePath
     ) = "s3://rubin:rubin-scheduler-prenight/opsim/test/prenight_index/",
 ) -> pd.DataFrame:
+    """
+    Load the pre‑night observation index for a given night from a remote
+    bucket.
 
+    Parameters
+    ----------
+    day_obs : `str` or `int` or `date` or `DayObs`
+        The night for which to fetch the index.  Accepts a date string,
+        YYYYMMDD encoded into an integer, a :class:`datetime.date`, or a
+        :class:`~schedview.DayObs` instance.
+    telescope : `str`, optional
+        Telescope name (default ``"simonyi"``).
+    prenight_index_path : `str` or `ResourcePath`, optional
+        The root path where the pre‑night index
+        JSON files are stored.  It can be a string URL or a
+        :class:`lsst.resources.ResourcePath` instance.  Default:
+        ``"s3://rubin:rubin-scheduler-prenight/opsim/test/prenight_index/"``
+
+    Returns
+    -------
+    prenights : `pandas.DataFrame`
+        A DataFrame indexed by the JSON key (``visitseq_uuid``) containing
+        all pre‑night entries for the requested night.  The columns match
+        those stored in the JSON file.
+    """
     day_obs = DayObs.from_date(day_obs)
     assert isinstance(day_obs, DayObs)
 
