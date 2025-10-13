@@ -30,13 +30,13 @@ def get_prenight_index_from_database(
     telescope : `str`, optional
         Telescope name (default ``"simonyi"``).  Passed directly to
         :class:`~rubin_sim.sim_archive.vseqmetadata.VisitSequenceArchiveMetadata`.
-    schema : `str` | `None`, optional
+    schema : `str` or `None`, optional
         Optional database schema name.
-    host : `str` | `None`, optional
+    host : `str` or `None`, optional
         Database host address.
-    user : `str` | `None`, optional
+    user : `str` or `None`, optional
         Database user name.
-    database : `str` | `None`, optional
+    database : `str` or `None`, optional
         Database name.
 
     Returns
@@ -122,5 +122,57 @@ def get_prenight_index_from_bucket(
     )
     with prenight_index_resource_path.as_local() as local_resource_path:
         prenights = pd.read_json(local_resource_path.ospath, orient="index")
+
+    return prenights
+
+
+def get_prenight_index(
+    day_obs: str | int | date | DayObs,
+    telescope: str = "simonyi",
+    schema: str | None = None,
+    host: str | None = None,
+    user: str | None = None,
+    database: str | None = None,
+    prenight_index_path: str | ResourcePath | None = None,
+) -> pd.DataFrame:
+    """
+    Retrieve the pre‑night observation index for a given night.
+
+    The function first attempts to read the index from the LSST SIM Archive
+    database via :func:`get_prenight_index_from_database`.  If that call
+    fails (e.g., missing credentials or connectivity issues) it falls back
+    to :func:`get_prenight_index_from_bucket` to load the JSON file from
+    the remote bucket.
+
+    Parameters
+    ----------
+    day_obs : `str` or `int` or `date` or `DayObs`
+        Night for which to fetch the index.
+    telescope : `str`
+        Telescope name (default ``simonyi``).
+    schema : `str` or `None`, optional
+        Optional database schema name.
+    host : `str` or `None`, optional
+        Database host address.
+    user : `str` or `None`, optional
+        Database user name.
+    database : `str` or `None`, optional
+        Database name.
+    prenight_index_path :  `str` or `ResourcePath`, optional
+        Root path to the bucket files (used only if the database call fails).
+
+    Returns
+    -------
+    prenights: `pd.DataFrame`
+        Pre‑night index indexed by ``visitseq_uuid``.
+    """
+    try:
+        # Try the database first
+        prenights = get_prenight_index_from_database(day_obs, telescope, schema, host, user, database)
+    except Exception:
+        # Fall back to the bucket
+        if prenight_index_path is None:
+            prenight_index_path = "s3://rubin:rubin-scheduler-prenight/opsim/test/prenight_index/"
+        prenights = get_prenight_index_from_bucket(day_obs, telescope, prenight_index_path)
 
     return prenights
