@@ -2,6 +2,7 @@ import asyncio
 import threading
 from collections import defaultdict
 from datetime import date
+from typing import DefaultDict
 
 import astropy.time
 import astropy.utils.iers
@@ -9,7 +10,6 @@ import numpy as np
 import pandas as pd
 import panel as pn
 import param
-from rubin_sim.sim_archive.vseqmetadata import VisitSequenceArchiveMetadata
 
 import schedview.collect.visits
 from schedview import DayObs
@@ -22,7 +22,7 @@ from schedview.plot import make_timeline_scatterplots
 IO_LOOP = asyncio.new_event_loop()
 IO_THREAD = threading.Thread(target=IO_LOOP.run_forever, name="Timeline IO thread", daemon=True)
 
-ORIGIN_TELESCOPE = defaultdict(np.array(["Simonyi"]).item, {"latiss": "AuxTel"})
+ORIGIN_TELESCOPE: DefaultDict[str, str] = defaultdict(np.array(["Simonyi"]).item, {"latiss": "AuxTel"})
 
 
 class CombinedTimelineDashboard(param.Parameterized):
@@ -40,7 +40,6 @@ class CombinedTimelineDashboard(param.Parameterized):
     # Derived parameters
     day_obs = param.Parameter()
     events = param.Parameter()
-    vseq_metadata_archive = VisitSequenceArchiveMetadata()
 
     def _run_async_io(self, io_coroutine):
         # Run the async io (needed for the EFD) in a separate thread and
@@ -65,6 +64,7 @@ class CombinedTimelineDashboard(param.Parameterized):
         day_obs = self.day_obs
         assert isinstance(day_obs, DayObs)
 
+        assert isinstance(self.visit_origin, str)
         telescope = ORIGIN_TELESCOPE[self.visit_origin]
 
         visit_origin = self.visit_origin
@@ -134,8 +134,7 @@ class CombinedTimelineDashboard(param.Parameterized):
             completed_visits["sim_runner_kwargs"] = {}
 
         simulated_visits = schedview.collect.multisim.read_multiple_prenights(
-            self.vseq_metadata_archive,
-            day_obs.start,
+            day_obs.date,
             day_obs.mjd,
             stackers=schedview.collect.visits.NIGHT_STACKERS,
             telescope=telescope,
