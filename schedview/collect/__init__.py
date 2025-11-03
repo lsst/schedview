@@ -12,7 +12,7 @@ __all__ = [
     "query_efd_topic_for_night",
     "read_consdb",
     "read_ddf_visits",
-    "read_multiple_opsims",
+    "read_multiple_prenights",
     "read_opsim",
     "read_rewards",
     "read_scheduler",
@@ -57,7 +57,7 @@ match CLIENT_SITE:
 from .consdb import read_consdb
 from .footprint import get_footprint
 from .metrics import get_metric_path
-from .multisim import read_multiple_opsims
+from .multisim import read_multiple_prenights
 from .nightreport import get_night_narrative, get_night_report
 from .opsim import read_ddf_visits, read_opsim
 from .resources import find_file_resources

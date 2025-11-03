@@ -9,3 +9,4 @@ boto3
 botocore
 playwright
 pytest-asyncio
+psycopg2

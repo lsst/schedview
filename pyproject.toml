@@ -35,11 +35,12 @@ dependencies = [
     "pandas",
     "panel >= 1.1.0",
     "param",
+    "psycopg2",
     "pytz",
     "skyproj",
     "tabulate",
     "rubin-scheduler >= 3.11.0",
-    "rubin-sim >= 2.2.4",
+    "rubin-sim >= 2.6.0",
     "uranography >= 1.1.0 ",
 ]
 

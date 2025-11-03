@@ -195,7 +195,7 @@ class TestTimelinePlotters(TestCase):
         mjds = self.rng.uniform(61000.2, 61001.4, num_events)
         data = to_list_of_dicts(
             first_logevent_time=Time(mjds, format="mjd").datetime64,
-            striptState=self.rng.choice(np.arange(6), num_events),
+            scriptState=self.rng.choice(np.arange(6), num_events),
         )
         plotter = ScriptQueueLogeventScriptTimelinePlotter(data)
         assert is_plottable_bokeh(plotter.plot)
@@ -206,7 +206,7 @@ class TestTimelinePlotters(TestCase):
         mjds = self.rng.uniform(61000.2, 61001.4, num_events)
         data = to_list_of_dicts(
             first_logevent_time=Time(mjds, format="mjd").datetime64,
-            striptState=self.rng.choice(np.arange(6), num_events),
+            scriptState=self.rng.choice(np.arange(6), num_events),
             start_time=Time(mjds - 0.01, format="mjd").iso,
             end_time=Time(mjds + 0.01, format="mjd").iso,
         )
