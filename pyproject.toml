@@ -35,6 +35,7 @@ dependencies = [
     "pandas",
     "panel >= 1.1.0",
     "param",
+    "psycopg2",
     "pytz",
     "skyproj",
     "tabulate",
