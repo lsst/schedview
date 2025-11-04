@@ -130,7 +130,7 @@ def compute_overhead_summary(visits, sun_n12_setting, sun_n12_rising):
     visit_end = visit_start + visits["visitTime"] / (24 * 60 * 60)
 
     relative_start_time = (visit_start.min() - sun_n12_setting) * 60 * 24
-    relative_end_time = (visit_end.max() - sun_n12_rising) * 60 * 24
+    relative_end_time = (sun_n12_rising - visit_end.max()) * 60 * 24
     total_time = (visit_end.max() - visit_start.min()) * 24
     num_exposures = len(visits)
     total_exptime = visits.visitExposureTime.sum() / (60 * 60)
