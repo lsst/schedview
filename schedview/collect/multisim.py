@@ -45,10 +45,13 @@ def read_multiple_prenights(
     assert telescope in ("simonyi", "auxtel")
 
     all_prenights_for_night = get_prenight_index(day_obs.date, **kwargs)
-    recent_prenight_mask = (all_prenights_for_night.sim_creation_day_obs >= sim_date.date).values
-    prenights_for_night = (
-        all_prenights_for_night.loc[recent_prenight_mask, :].reset_index().set_index(["visitseq_uuid"])
-    )
+    sim_creation_day_obs = pd.to_datetime(all_prenights_for_night.sim_creation_day_obs).dt.date
+    recent_prenight_mask = (sim_creation_day_obs >= sim_date.date).values
+    prenights_for_night = all_prenights_for_night.loc[recent_prenight_mask, :].reset_index()
+    if "visitseq_uuid" in prenights_for_night.columns:
+        # If there are no simulations, the column won't exist, so only tryo to
+        # make it the index if the corresponding column exists.
+        prenights_for_night.set_index(["visitseq_uuid"], inplace=True)
 
     sim_metadata_keys = [
         "visitseq_label",
