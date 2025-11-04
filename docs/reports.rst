@@ -105,14 +105,17 @@ To tag and install a new version to be used, start by deciding on a tag. Get sor
 
 Make and push a new tag (with the base of a checked-out `schedview_notebooks` as the current working directory)::
 
-    git tag v0.1.0.dev2
-    git push origin tag v0.1.0.dev2
+    NEWTAG="v0.1.0.dev2"
+    echo "New tag is ${NEWTAG}"
+    echo ""
+    git tag ${NEWTAG}
+    git push origin tag ${NEWTAG}
 
 Then install it in `/sdf/data/rubin/shared/scheduler/packages`::
 
     git archive \
         --format=tar \
-        --prefix schedview_notebooks-v0.1.0.dev2/ v0.1.0.dev2 \
+        --prefix schedview_notebooks-${NEWTAG}/ ${NEWTAG} \
         | tar -x --directory /sdf/data/rubin/shared/scheduler/packages
 
 Replace the symlink to point to your new one::
@@ -138,6 +141,8 @@ Make and push a new tag (with the base of the repository as the current working 
 
     NEWVERSION="0.1.0.dev2"
     NEWTAG=v${NEWVERSION}
+    echo "New version is ${NEWVERSION} with tag ${NEWTAG}"
+    echo ""
     git tag ${NEWTAG}
     git push origin tag v${NEWTAG}
 
