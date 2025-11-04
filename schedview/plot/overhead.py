@@ -113,7 +113,7 @@ def create_overhead_summary_table(overhead_summary, html=True):
         "median_gap_time": "Median gap time",
     }
     stat_str_template = {
-        "relative_start_time": "{:5.2f} minutes before 12 degree evening twilight",
+        "relative_start_time": "{:5.2f} minutes after 12 degree evening twilight",
         "relative_end_time": "{:5.2f} minutes before 12 degree morning twilight",
         "total_time": "{:4.2f} hours",
         "num_exposures": "{}",
