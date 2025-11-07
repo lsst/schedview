@@ -38,7 +38,7 @@ class ExampleCompoundVisitDashboard(param.Parameterized):
         super().__init__(**params)
         self.nside = 32
         self.footprint = schedview.collect.footprint.get_footprint(self.nside)
-        self.observatory = ModelObservatory(nside=self.nside, init_load_length=1)
+        self.observatory = ModelObservatory(nside=self.nside, no_sky=True)
         self.conditions = self.observatory.return_conditions()
 
     @param.depends("night", watch=True)

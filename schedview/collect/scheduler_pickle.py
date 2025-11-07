@@ -71,7 +71,7 @@ def read_local_scheduler_pickle(file_name, everything=False):
         try:
             conditions = scheduler.conditions
         except AttributeError:
-            conditions = ModelObservatory().return_conditions()
+            conditions = ModelObservatory(no_sky=True).return_conditions()
 
     return [scheduler, conditions]
 

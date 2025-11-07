@@ -70,7 +70,7 @@ def night_events(night_date=None, site=None, timezone="Chile/Continental"):
         night_date = datetime.date.today()
 
     if site is None:
-        site = ModelObservatory().location
+        site = ModelObservatory(no_sky=True).location
 
     all_nights_events = _compute_all_night_events().set_index("night")
     night_of_survey = convert_evening_date_to_night_of_survey(night_date, timezone=timezone)

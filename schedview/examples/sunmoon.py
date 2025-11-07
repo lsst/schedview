@@ -38,7 +38,7 @@ def make_sunmoon(
     night_events: pd.DataFrame = schedview.compute.astro.night_events(day_obs.date)
     mjd = night_events.loc["night_middle", "MJD"]
 
-    observatory: ModelObservatory = ModelObservatory(init_load_length=1, mjd=mjd)
+    observatory: ModelObservatory = ModelObservatory(no_sky=True, mjd=mjd)
     positions: pd.DataFrame = schedview.compute.astro.compute_sun_moon_positions(observatory)
 
     # Plot

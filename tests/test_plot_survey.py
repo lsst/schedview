@@ -34,7 +34,7 @@ class TestMapSurvey(unittest.TestCase):
             get_baseline(), Time(start_mjd + 0.5, format="mjd"), Time(start_mjd + 1.5, format="mjd")
         )
 
-        observatory = ModelObservatory(mjd_start=start_mjd + 1, nside=nside)
+        observatory = ModelObservatory(mjd_start=start_mjd + 1, nside=nside, no_sky=True)
         conditions = observatory.return_conditions()
 
         plot = create_hpix_visit_map_grid(hpix_maps, visits, conditions)
@@ -50,7 +50,7 @@ class TestMapSurvey(unittest.TestCase):
             get_baseline(), Time(start_mjd + 0.5, format="mjd"), Time(start_mjd + 1.5, format="mjd")
         )
 
-        observatory = ModelObservatory(mjd_start=start_mjd + 1, nside=nside)
+        observatory = ModelObservatory(mjd_start=start_mjd + 1, nside=nside, no_sky=True)
         conditions = observatory.return_conditions()
 
         plot = map_visits_over_hpix(visits, conditions, hpix_map, prerender_hpix=False)

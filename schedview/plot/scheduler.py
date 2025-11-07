@@ -152,10 +152,12 @@ class SchedulerDisplay:
         try:
             # If we cannot go to the requested MJD, follback on
             # on we can go to:
-            if value < self.observatory.sky_model.mjd_left.min():
+            if self.observatory.sky_model is not None and value < self.observatory.sky_model.mjd_left.min():
                 LOGGER.info("Cannot go to requested date, going to earliest.")
                 self.observatory.mjd = self.observatory.sky_model.mjd_left.min() + 1.0
-            elif value > self.observatory.sky_model.mjd_right.max():
+            elif (
+                self.observatory.sky_model is not None and value > self.observatory.sky_model.mjd_right.max()
+            ):
                 LOGGER.info("Cannot go to requested date, going to latest.")
                 self.observatory.mjd = self.observatory.sky_model.mjd_right.max() - 1.0
             else:

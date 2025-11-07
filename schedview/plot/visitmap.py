@@ -354,8 +354,7 @@ def create_visit_skymaps(
         visits = visits.query(f"observationStartMJD <= {Time(end_time).mjd}")
 
     if observatory is None:
-        observatory = ModelObservatory(nside=nside, init_load_length=1)
-        observatory.sky_model.load_length = 1
+        observatory = ModelObservatory(nside=nside, no_sky=True)
 
     footprint_regions = get_current_footprint(nside)[1]
     footprint_regions[np.isin(footprint_regions, ["bulgy", "lowdust"])] = "WFD"

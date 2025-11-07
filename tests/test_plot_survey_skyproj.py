@@ -50,7 +50,7 @@ def test_map_visits_over_healpix():
     visits_mjd = visits["observationStartMJD"].median()
     time_datetime = Time(visits_mjd - 0.5, format="mjd").datetime
 
-    model_observatory = ModelObservatory(init_load_length=1)
+    model_observatory = ModelObservatory(no_sky=True)
     astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
     night_events = schedview.compute.astro.night_events(
         datetime.date(time_datetime.year, time_datetime.month, time_datetime.day)
@@ -69,7 +69,7 @@ def test_create_hpix_visit_map_grid():
     visits_mjd = visits["observationStartMJD"].median()
     time_datetime = Time(visits_mjd - 0.5, format="mjd").datetime
 
-    model_observatory = ModelObservatory(init_load_length=1)
+    model_observatory = ModelObservatory(no_sky=True)
     astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
     night_events = schedview.compute.astro.night_events(
         datetime.date(time_datetime.year, time_datetime.month, time_datetime.day)
@@ -82,7 +82,7 @@ def test_map_healpix():
     hp_map = np.random.default_rng(RANDOM_SEED).uniform(0, 1, hp.nside2npix(4))
     mjd = 61040
     time_datetime = Time(mjd - 0.5, format="mjd").datetime
-    model_observatory = ModelObservatory(init_load_length=1)
+    model_observatory = ModelObservatory(no_sky=True)
     astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
     night_events = schedview.compute.astro.night_events(
         datetime.date(time_datetime.year, time_datetime.month, time_datetime.day)
@@ -98,7 +98,7 @@ def test_create_hpix_map_grid():
 
     mjd = 61040
     time_datetime = Time(mjd - 0.5, format="mjd").datetime
-    model_observatory = ModelObservatory(init_load_length=1)
+    model_observatory = ModelObservatory(no_sky=True)
     astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
     night_events = schedview.compute.astro.night_events(
         datetime.date(time_datetime.year, time_datetime.month, time_datetime.day)

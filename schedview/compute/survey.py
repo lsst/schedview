@@ -104,8 +104,9 @@ def compute_maps(survey, conditions, nside=None):
 
     survey_maps = OrderedDict()
 
-    for band in conditions.skybrightness.keys():
-        survey_maps[f"{band}_sky"] = deepcopy(conditions.skybrightness[band])
+    if conditions.skybrightness is not None:
+        for band in conditions.skybrightness.keys():
+            survey_maps[f"{band}_sky"] = deepcopy(conditions.skybrightness[band])
 
     def can_be_healpix_map(values):
         try:

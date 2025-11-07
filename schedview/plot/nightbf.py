@@ -8,7 +8,7 @@ from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 
 def _extract_night(df, mjd_column, night, observatory=None):
     if observatory is None:
-        observatory = ModelObservatory()
+        observatory = ModelObservatory(no_sky=True)
 
     # Add 1, so we use the date of the pm of the night instead of the am
     # as our reference.
