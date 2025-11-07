@@ -348,10 +348,10 @@ def create_visit_skymaps(
         visits = read_opsim(visits)
 
     if start_time is not None:
-        visits.query(f"observationStartMJD >= {Time(start_time).mjd}", inplace=True)
+        visits = visits.query(f"observationStartMJD >= {Time(start_time).mjd}")
 
     if end_time is not None:
-        visits.query(f"observationStartMJD <= {Time(end_time).mjd}", inplace=True)
+        visits = visits.query(f"observationStartMJD <= {Time(end_time).mjd}")
 
     if observatory is None:
         observatory = ModelObservatory(nside=nside, init_load_length=1)

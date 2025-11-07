@@ -105,20 +105,61 @@ To tag and install a new version to be used, start by deciding on a tag. Get sor
 
 Make and push a new tag (with the base of a checked-out `schedview_notebooks` as the current working directory)::
 
-    git tag v0.1.0.dev2
-    git push origin tag v0.1.0.dev2
+    NEWTAG="v0.1.0.dev2"
+    echo "New tag is ${NEWTAG}"
+    echo ""
+    git tag ${NEWTAG}
+    git push origin tag ${NEWTAG}
 
 Then install it in `/sdf/data/rubin/shared/scheduler/packages`::
 
     git archive \
         --format=tar \
-        --prefix schedview_notebooks-v0.1.0.dev2/ v0.1.0.dev2 \
+        --prefix schedview_notebooks-${NEWTAG}/ ${NEWTAG} \
         | tar -x --directory /sdf/data/rubin/shared/scheduler/packages
 
 Replace the symlink to point to your new one::
 
-    if test -L /sdf/data/rubin/shared/scheduler/packages/schedview_notebooks ; then rm /sdf/data/rubin/shared/scheduler/packages/schedview_notebooks ; fi
+    if test -L /sdf/data/rubin/shared/scheduler/packages/schedview_notebooks ; then
+      rm /sdf/data/rubin/shared/scheduler/packages/schedview_notebooks
+    fi
     ln -s /sdf/data/rubin/shared/scheduler/packages/schedview_notebooks-v0.1.0.dev2 /sdf/data/rubin/shared/scheduler/packages/schedview_notebooks
+
+Updating other software used by the jobs
+----------------------------------------
+
+Begin by determining the next available tag.
+
+Get sorted existing tags with::
+
+    curl -s https://api.github.com/repos/lsst/schedview/tags \
+        | jq -r '.[].name' \
+        | egrep '^v[0-9]+.[0-9]+.[0-9]+.*$' \
+        | sort -V
+
+Make and push a new tag (with the base of the repository as the current working directory)::
+
+    NEWVERSION="0.1.0.dev2"
+    NEWTAG=v${NEWVERSION}
+    echo "New version is ${NEWVERSION} with tag ${NEWTAG}"
+    echo ""
+    git tag ${NEWTAG}
+    git push origin tag v${NEWTAG}
+
+Then install it in `/sdf/data/rubin/shared/scheduler/packages`::
+
+    pip install \
+        --no-deps \
+        --target=/sdf/data/rubin/shared/scheduler/packages/schedview-${NEWVERSION} \
+        git+https://github.com/lsst/schedview.git@${NEWTAG}
+
+Replace the symlink to point to your new version::
+
+    if test -L /sdf/data/rubin/shared/scheduler/packages/schedview ; then
+      rm /sdf/data/rubin/shared/scheduler/packages/schedview
+    fi
+    ln -s /sdf/data/rubin/shared/scheduler/packages/schedview-${NEWVERSION} \ /sdf/data/rubin/shared/scheduler/packages/schedview
+
 
 Hand generation of reports
 ==========================
