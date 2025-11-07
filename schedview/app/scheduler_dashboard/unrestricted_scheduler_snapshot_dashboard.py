@@ -4,6 +4,7 @@ import traceback
 
 # Filter the astropy warnings swamping the terminal.
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import bokeh
@@ -35,7 +36,11 @@ from schedview.app.scheduler_dashboard.constants import (
     h2_stylesheet,
     h3_stylesheet,
 )
-from schedview.app.scheduler_dashboard.utils import get_sky_brightness_date_bounds, url_formatter
+from schedview.app.scheduler_dashboard.utils import (
+    get_sky_brightness_date_bounds,
+    localize_scheduler_url,
+    url_formatter,
+)
 
 
 class SchedulerSnapshotDashboard(param.Parameterized):
@@ -533,11 +538,17 @@ class SchedulerSnapshotDashboard(param.Parameterized):
             Record of success or failure of reading scheduler from file/URL.
         """
         try:
-            self._debugging_message = "Starting to load scheduler from " + self.scheduler_fname
+            self._debugging_message = "Requested scheduler path: " + self.scheduler_fname
+            scheduler_path = (
+                self.scheduler_fname
+                if Path(self.scheduler_fname).is_file()
+                else localize_scheduler_url(self.scheduler_fname)
+            )
+            self._debugging_message = "Starting to load scheduler from " + scheduler_path
             pn.state.notifications.info("Scheduler loading...", duration=0)
 
             os.environ["LSST_DISABLE_BUCKET_VALIDATION"] = "1"
-            scheduler_resource_path = ResourcePath(self.scheduler_fname)
+            scheduler_resource_path = ResourcePath(scheduler_path)
             scheduler_resource_path.use_threads = False
             with scheduler_resource_path.as_local() as local_scheduler_resource:
                 (scheduler, conditions) = schedview.collect.scheduler_pickle.read_scheduler(
