@@ -26,7 +26,7 @@ def _load_sample_visits():
 
 
 def _create_almanac(night):
-    site = ModelObservatory().location
+    site = ModelObservatory(no_sky=True).location
     timezone = "Chile/Continental"
     almanac_events = schedview.compute.astro.night_events(night, site, timezone)
     return almanac_events
