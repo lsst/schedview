@@ -57,7 +57,15 @@ match CLIENT_SITE:
 from .consdb import read_consdb
 from .footprint import get_footprint
 from .metrics import get_metric_path
-from .multisim import read_multiple_prenights
+
+try:
+    from .multisim import read_multiple_prenights
+except ModuleNotFoundError as missing_module:
+
+    def read_multiple_prenights(*args, **kwargs):
+        assert False, "read_multiple_prenights cannot run without optional module " + missing_module.msg
+
+
 from .nightreport import get_night_narrative, get_night_report
 from .opsim import read_ddf_visits, read_opsim
 from .resources import find_file_resources

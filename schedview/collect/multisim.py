@@ -4,8 +4,16 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from rubin_scheduler.scheduler.utils import ObservationArray, SchemaConverter
-from rubin_sim.sim_archive import vseqarchive
-from rubin_sim.sim_archive.prenightindex import get_prenight_index
+
+try:
+    from rubin_sim.sim_archive import vseqarchive
+    from rubin_sim.sim_archive.prenightindex import get_prenight_index
+
+    HAVE_SIM_ARCHIVE = True
+    MISSING_MODULE_ERROR = None
+except ModuleNotFoundError as missing_module:
+    HAVE_SIM_ARCHIVE = False
+    MISSING_MODULE_ERROR = missing_module
 
 from schedview import DayObs
 from schedview.collect.visits import NIGHT_STACKERS
@@ -34,6 +42,7 @@ def read_multiple_prenights(
     visits : `pandas.DataFrame`
         Data on the visits.
     """
+    assert HAVE_SIM_ARCHIVE, "Missing optional module " + MISSING_MODULE_ERROR.msg
     sim_date = DayObs.from_date(sim_date)
     assert isinstance(sim_date, DayObs)
 
