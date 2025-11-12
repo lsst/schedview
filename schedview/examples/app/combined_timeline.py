@@ -118,16 +118,22 @@ class CombinedTimelineDashboard(param.Parameterized):
 
             ts_config_ocs_version = schedview.collect.efd.get_version_at_time("ts_config_ocs", obs_start_time)
             sal_indexes = schedview.collect.efd.SAL_INDEX_GUESSES[visit_origin]
-            opsim_config_script = self._run_async_io(
-                schedview.collect.get_scheduler_config(ts_config_ocs_version, telescope, obs_start_time)
-            )
+            try:
+                config_scheduler_ref, scheduler_config_script = schedview.collect.efd.get_scheduler_config(
+                    telescope, obs_start_time
+                )
+            except ValueError:
+                config_scheduler_ref = "unknown"
+                scheduler_config_script = "unknown"
+
             completed_visits["filter"] = completed_visits["band"]
             completed_visits["sim_date"] = None
             completed_visits["sim_index"] = 0
             completed_visits["label"] = "Completed"
+            completed_visits["config_scheduler_ref"] = config_scheduler_ref
+            completed_visits["scheduler_config_script"] = scheduler_config_script
             completed_visits["opsim_config_branch"] = ts_config_ocs_version
             completed_visits["opsim_config_repository"] = None
-            completed_visits["opsim_config_script"] = opsim_config_script
             completed_visits["scheduler_version"] = schedview.collect.efd.get_version_at_time(
                 "rubin_scheduler", obs_start_time
             )

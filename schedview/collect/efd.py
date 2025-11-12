@@ -1,9 +1,11 @@
 import asyncio
+import re
 import threading
 from collections import defaultdict
 from collections.abc import Iterable
 from functools import cache, partial
-from typing import Literal
+from pathlib import Path
+from typing import Literal, Optional
 
 import pandas as pd
 import requests
@@ -15,7 +17,7 @@ import schedview.clientsite
 from schedview.dayobs import DayObs
 
 EfdDatabase = Literal["efd", "lsst.obsenv"]
-ScheduledThing = Literal["maintel", "ocs", "auxtel"]
+ScheduledThing = Literal["simonyi", "lsstcam", "maintel", "latiss", "auxtel"]
 
 SAL_INDEX_GUESSES = defaultdict(
     partial([[]].__getitem__, 0),
@@ -314,7 +316,7 @@ def get_version_at_time(item: str, time_cut: Time | None = None, max_age: TimeDe
     return version
 
 
-async def get_scheduler_config(
+async def old_get_scheduler_config(
     ts_config_ocs_version: str, what_scheduled: ScheduledThing, time_cut: Time | None = None
 ) -> str:
     """Get the relative path of the scheduler configuration script.
@@ -391,3 +393,99 @@ async def get_scheduler_config(
         scheduler_config.find("/ts_config_ocs/Scheduler/feature_scheduler") + 1 :
     ]
     return relative_scheduler_config
+
+
+def get_scheduler_config(what_scheduled, time_cut: Optional[Time] = None) -> tuple[str, str]:
+    """Retrieve the Git reference and path for the scheduler configuration used
+    at a given time.
+
+    Parameters
+    ----------
+    what_scheduled : str
+        Identifier of the scheduled component (e.g. ``"maintel"``,
+        ``"auxtel"``, ``"simonyi"``, ``"latiss"``, ``"lsstcam"``).
+    time_cut : astropy.time.Time, optional
+        Timestamp at which to query the configuration.
+        If ``None`` (default), the current time is used.
+
+    Returns
+    -------
+    git_reference: str
+        The Git reference (commit hash, tag, or branch name) that
+        corresponds to the version recorded in the EFD for the requested
+        component.
+    config_path: str
+        A relative path to the scheduler configuration file within the
+        ``ts_config_scheduler`` repository.
+
+    Raises
+    ------
+    ValueError
+        If the recorded version cannot be matched to a Git reference, or if the
+        configuration record is missing required fields.
+    """
+    if time_cut is None:
+        time_cut = Time.now()
+    assert isinstance(time_cut, Time)
+
+    # Query the EFD for the version recorded
+    raw_version, configurations, url = sync_query_latest_in_efd_topic(
+        topic="lsst.sal.Scheduler.logevent_configurationApplied",
+        num_records=1,
+        db_name="efd",
+        fields="version, configurations, url",
+        time_cut=time_cut,
+        sal_indexes=SAL_INDEX_GUESSES[what_scheduled.lower()],
+    ).iloc[0]
+
+    if not isinstance(raw_version, str):
+        raise ValueError("Unexpected type for version of ts_config_scheduler in EFD")
+
+    assert isinstance(raw_version, str)
+
+    # Initialize git_reference to None to mean we haven't found a ref
+    # for the returned version (yet).
+    git_reference: str | None = None
+
+    # The versions seem to usually be a git describe style string that looks
+    # something like this: heads/temp-0-gb94a182
+    # implying that it's a commit on a branch called "temp"
+    # This branch isn't available on github, but it looks like commits
+    # that match the implied hash (the 7 characters at the end of
+    # the string, after the "g") are sometimes (but not always) there.
+
+    # Begin by testing to see if it is of that form, and if it is, extract
+    # the hash:
+    match = re.search(r"^heads/.*-g([0-9a-fA-F]+)$", raw_version)
+    if match is not None and len(match.group(1)) >= 6:
+        commit_hash = match.group(1)
+
+        # The hash sometimes seems to be available on github, and if it is,
+        # we can use it as our git reference. So, check whether it exists:
+        commit_url = f"https://api.github.com/repos/lsst-ts/ts_config_scheduler/commits/{commit_hash}"
+        commit_exists = requests.get(commit_url).status_code == 200
+        if commit_exists:
+            git_reference = commit_hash
+
+    if git_reference is None:
+        # If the version is a git reference (raw hash, tag, or branch)
+        # available on github, return it "as is":
+        for ref_type in ("commits", "git/ref", "git/ref/tags", "git/ref/heads"):
+            ref_url = f"https://api.github.com/repos/lsst-ts/ts_config_scheduler/{ref_type}/{raw_version}"
+            ref_exists = requests.get(ref_url).status_code == 200
+            if ref_exists:
+                git_reference = raw_version
+                break
+
+    if git_reference is None:
+        raise ValueError(f"Recorded ts_config_scheduler version {raw_version} not available on github")
+
+    assert isinstance(git_reference, str)
+
+    # Now construct the path to the configuration
+    # file within the repository.
+    config_file = configurations.split(",")[-1]
+    config_path_parts = url.split("/") + [config_file]
+    config_path = Path(*config_path_parts[config_path_parts.index("ts_config_scheduler") :]).as_posix()
+
+    return git_reference, config_path
