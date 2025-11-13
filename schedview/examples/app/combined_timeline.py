@@ -3,6 +3,7 @@ import threading
 from collections import defaultdict
 from datetime import date
 from typing import DefaultDict
+from uuid import UUID
 
 import astropy.time
 import astropy.utils.iers
@@ -29,7 +30,7 @@ class CombinedTimelineDashboard(param.Parameterized):
 
     # Parameters set in the UI
     evening_date = param.Date(
-        default=date(2025, 4, 27),
+        default=date(2025, 11, 8),
         label="Date",
         doc="Day obs (local calendar date of sunset for the night)",
     )
@@ -40,6 +41,8 @@ class CombinedTimelineDashboard(param.Parameterized):
     # Derived parameters
     day_obs = param.Parameter()
     events = param.Parameter()
+
+    show_prenights = False
 
     def _run_async_io(self, io_coroutine):
         # Run the async io (needed for the EFD) in a separate thread and
@@ -139,13 +142,26 @@ class CombinedTimelineDashboard(param.Parameterized):
             )
             completed_visits["sim_runner_kwargs"] = {}
 
-        simulated_visits = schedview.collect.multisim.read_multiple_prenights(
-            day_obs.date,
-            day_obs.mjd,
-            stackers=schedview.collect.visits.NIGHT_STACKERS,
-            telescope=telescope,
-        ).query(f'sim_date == "{day_obs}"')
-        visits = pd.concat([completed_visits, simulated_visits])
+        if self.show_prenights:
+            simulated_visits = schedview.collect.multisim.read_multiple_prenights(
+                day_obs.date,
+                day_obs.mjd,
+                stackers=schedview.collect.visits.NIGHT_STACKERS,
+                telescope=telescope.lower(),
+            )
+            # Bokeh gets confused by columns of type UUID, so convert
+            # them to strings on loading.
+            for column_name in simulated_visits.columns:
+                if isinstance(simulated_visits[column_name].iloc[0], UUID):
+                    simulated_visits[column_name] = simulated_visits[column_name].astype(str)
+
+            # If there are no prenights, the stacker does not run, so skip
+            # trying to filter on the right day_obs.
+            if "day_obs_iso8601" in simulated_visits.columns:
+                simulated_visits.query(f'day_obs_iso8601 == "{day_obs}"', inplace=True)
+            visits = pd.concat([completed_visits, simulated_visits])
+        else:
+            visits = completed_visits
         events["visits"] = visits
 
         self.events = events
