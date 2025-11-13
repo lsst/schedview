@@ -9,7 +9,6 @@ from typing import Literal, Optional
 
 import pandas as pd
 import requests
-import yaml
 from astropy.time import Time, TimeDelta
 from lsst_efd_client import EfdClient
 
@@ -314,85 +313,6 @@ def get_version_at_time(item: str, time_cut: Time | None = None, max_age: TimeDe
         )
 
     return version
-
-
-async def old_get_scheduler_config(
-    ts_config_ocs_version: str, what_scheduled: ScheduledThing, time_cut: Time | None = None
-) -> str:
-    """Get the relative path of the scheduler configuration script.
-
-    Parameters
-    ----------
-    ts_config_ocs_version : `str`
-        The version of ts_config_ocs from which to fetch the configuration.
-        Must be a valid string representing the git branch or tag.
-    what_scheduled: `str`
-        What it is being scheduled.
-        Can be `simonyi`, `maintel`, `ocs`, or `auxtel`.
-        (`simonyi` and `maintel` are synonymous.)
-    time_cut : `astropy.time.Time` or `None`
-        The time cut for the query. Default is None, which
-        uses the current time.
-
-    Returns
-    -------
-    config_script_path : `str`
-        The relative path to the scheduler configuration script.
-
-    """
-    if what_scheduled.lower() in ("auxtel", "latiss"):
-        what_scheduled = "auxtel"
-    else:
-        what_scheduled = "maintel"
-
-    latest_config_df = await query_latest_in_efd_topic(
-        topic="lsst.sal.Scheduler.logevent_configurationApplied",
-        fields=["SchedulerId", "configurations", "salIndex", "schemaVersion", "url", "version"],
-        sal_indexes=SAL_INDEX_GUESSES[what_scheduled.lower()],
-        time_cut=time_cut,
-        num_records=1,
-    )
-
-    # Find the name of the yaml configuration file for the FBS
-    # This is typically saved in the last comma-separated values in the
-    # "configurations" field from
-    # lsst.sal.Scheduler.logevent_configurationApplied
-    config_fname = latest_config_df["configurations"].iloc[0].split(",")[-1]
-
-    # schema_version tracks the directory where the above yaml
-    # configuration file should live inside of ts_config_ocs/Scheduler
-    schema_version = latest_config_df["schemaVersion"].iloc[0]
-
-    scheduler_config_ocs_url = "/".join(
-        [
-            "https://raw.githubusercontent.com",
-            "lsst-ts",
-            "ts_config_ocs",
-            ts_config_ocs_version,
-            "Scheduler",
-            schema_version,
-            config_fname,
-        ]
-    )
-
-    response = requests.get(scheduler_config_ocs_url, allow_redirects=True)
-    scheduler_config_ocs = yaml.safe_load(response.content.decode("utf-8"))
-
-    # Find the path to actual python configuration file
-    # for the FBS referenced in the yaml file
-    scheduler_config = scheduler_config_ocs[what_scheduled.lower()]["feature_scheduler_driver_configuration"][
-        "scheduler_config"
-    ]
-
-    # Find the path to the FBS python configuration,
-    # relative to ts_config_ocs/Scheduler/feature_scheduler
-    # The "+1" skips the initial "/", resulting in a relative path,
-    # while still only matching when ts_config_ocs is the full
-    # name of the higest-level named directory.
-    relative_scheduler_config = scheduler_config[
-        scheduler_config.find("/ts_config_ocs/Scheduler/feature_scheduler") + 1 :
-    ]
-    return relative_scheduler_config
 
 
 def get_scheduler_config(what_scheduled, time_cut: Optional[Time] = None) -> tuple[str, str]:
