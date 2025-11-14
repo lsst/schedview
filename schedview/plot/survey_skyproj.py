@@ -152,24 +152,24 @@ def map_healpix(map_hpix, model_observatory, night_events, axes=None, sky_map_fa
     sun_moon_positions = model_observatory.almanac.get_sun_moon_positions(mjd)
     sun_ra = np.degrees(sun_moon_positions["sun_RA"].item())
     sun_decl = np.degrees(sun_moon_positions["sun_dec"].item())
-    sky_map.scatter(sun_ra, sun_decl, color="yellow")
+    sky_map.ax.scatter(sun_ra, sun_decl, color="yellow")
 
     moon_ra = np.degrees(sun_moon_positions["moon_RA"])
     moon_decl = np.degrees(sun_moon_positions["moon_dec"])
-    sky_map.scatter(moon_ra, moon_decl, color="orange")
+    sky_map.ax.scatter(moon_ra, moon_decl, color="orange")
 
     # Night limit horizons
     latitude = model_observatory.site.latitude
     zd = 70
     evening = compute_circle_points(night_events.loc["sun_n12_setting", "LST"], latitude, zd, 180, 360)
-    sky_map.plot(evening.ra, evening.decl, color="red", linestyle="dashed")
+    sky_map.ax.plot(evening.ra, evening.decl, color="red", linestyle="dashed")
     evening = compute_circle_points(night_events.loc["sun_n12_setting", "LST"], latitude, zd, 0, 180)
-    sky_map.plot(evening.ra, evening.decl, color="red", linestyle="dotted")
+    sky_map.ax.plot(evening.ra, evening.decl, color="red", linestyle="dotted")
 
     morning = compute_circle_points(night_events.loc["sun_n12_rising", "LST"], latitude, zd, 0, 180)
-    sky_map.plot(morning.ra, morning.decl, color="red", linestyle="dashed")
+    sky_map.ax.plot(morning.ra, morning.decl, color="red", linestyle="dashed")
     morning = compute_circle_points(night_events.loc["sun_n12_rising", "LST"], latitude, zd, 180, 360)
-    sky_map.plot(morning.ra, morning.decl, color="red", linestyle="dotted")
+    sky_map.ax.plot(morning.ra, morning.decl, color="red", linestyle="dotted")
     return sky_map
 
 
