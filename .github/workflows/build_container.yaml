@@ -61,7 +61,7 @@ jobs:
           echo github.workspace is ${{ github.workspace }}
           find ${{ github.workspace }} -maxdepth 2
 
-      - uses: lsst-sqre/build-and-push-to-ghcr@tickets/DM-41857
+      - uses: lsst-sqre/build-and-push-to-ghcr@v1.5.1
         id: build
         with:
           image: ${{ github.repository }}
