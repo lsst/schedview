@@ -1,4 +1,5 @@
 import datetime
+from functools import partial
 
 import astropy.units as u
 import colorcet
@@ -21,6 +22,13 @@ from schedview.compute.camera import LsstCameraFootprintPerimeter
 from schedview.compute.maf import compute_hpix_metric_in_bands
 
 DEFAULT_MAP_KWARGS = {"cmap": colorcet.cm.blues}
+
+DEFAULT_SKY_MAP_FACTORY = partial(
+    skyproj.LaeaSkyproj,
+    lat_0=-89.9999999999999,
+    lon_0=0,
+    extent=[0.0, 360.0, -90, 89],
+)
 
 
 def compute_circle_points(
@@ -85,7 +93,7 @@ def compute_circle_points(
     return circle
 
 
-def map_healpix(map_hpix, model_observatory, night_events, axes=None, **kwargs):
+def map_healpix(map_hpix, model_observatory, night_events, axes=None, sky_map_factory=None, **kwargs):
     """Plots visits over a healpix map, with astronomical annotations.
 
     Parameters
@@ -99,6 +107,8 @@ def map_healpix(map_hpix, model_observatory, night_events, axes=None, **kwargs):
         `schedview.compute.astro.night_events`.
     axes : `matplotlib.axes._axes.Axes`
         A matplotlib set of axes.
+    sky_map_factory : `skyproj.skyproj.LaeaSkyproj` or `skyproj.McBrydeSkyproj`
+        Factory to make sky_map instances
     **kwargs
         Additional keyword arguments are passed to
         `skyproj.skyproj.LaeaSkyproj.draw_hpxmap`.
@@ -109,6 +119,10 @@ def map_healpix(map_hpix, model_observatory, night_events, axes=None, **kwargs):
         The skyproj projection map.
     """
 
+    if sky_map_factory is None:
+        sky_map_factory = DEFAULT_SKY_MAP_FACTORY
+    assert sky_map_factory is not None
+
     if axes is None:
         fig = plt.figure()
         axes = fig.add_subplot(1, 1, 1)
@@ -117,12 +131,7 @@ def map_healpix(map_hpix, model_observatory, night_events, axes=None, **kwargs):
     # but it is not important for us to get particularly close.
     # It also cannot handle lat_0 of exactly -90, but seems to need it to
     # be very close to run without throwing an exception.
-    sky_map = skyproj.LaeaSkyproj(
-        ax=axes,
-        lat_0=-89.9999999999999,
-        lon_0=0,
-        extent=[0.0, 360.0, -90, 89],
-    )
+    sky_map = sky_map_factory(ax=axes)
 
     hpxmap_kwargs = {"cmap": colorcet.cm.blues}
     hpxmap_kwargs.update(kwargs)
