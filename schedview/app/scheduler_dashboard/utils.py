@@ -3,7 +3,7 @@ from astropy.time import Time
 from lsst.resources import ResourcePath
 from rubin_scheduler.skybrightness_pre.sky_model_pre import SkyModelPre
 
-LOCAL_ROOT_URI = {"usdf": "s3://lfa@", "summit": "https://s3.cp.lsst.org/"}
+LOCAL_ROOT_URI = {"usdf": "s3://", "summit": "https://s3.cp.lsst.org/"}
 
 
 def localize_scheduler_url(scheduler_url, site="usdf"):
