@@ -1,11 +1,8 @@
 import argparse
-import asyncio
 
 from astropy.time import Time
 
-import schedview.collect
-
-GITHUB_API_URL_BASE = "https://api.github.com/repos"
+import schedview.collect.efd
 
 
 def scheduler_config_at_time_cli():
@@ -18,7 +15,8 @@ def scheduler_config_at_time_cli():
     # Prepare argument parsing
     parser = argparse.ArgumentParser(
         prog="scheduler_config_at_time",
-        description="Get the scheduler configuration script path the observatory as of a given time.",
+        description="Get the scheduler configuration git ref and "
+        "script path the observatory as of a given time.",
     )
     parser.add_argument(
         "what_scheduled", type=str, help="Which scheduler config (simonyi, maintel, ocs, or auxtel)."
@@ -35,14 +33,10 @@ def scheduler_config_at_time_cli():
 
     # Do the call
     time_cut = Time(args.datetime)
-    ts_config_ocs_version = schedview.collect.get_version_at_time("ts_config_ocs", time_cut)
 
-    loop = asyncio.get_event_loop()
-    scheduler_config = loop.run_until_complete(
-        schedview.collect.get_scheduler_config(ts_config_ocs_version, args.what_scheduled, time_cut)
-    )
+    config_ref, config_file = schedview.collect.efd.get_scheduler_config(args.what_scheduled, time_cut)
 
-    print(scheduler_config)
+    print(config_ref, config_file)
 
 
 if __name__ == "__main__":

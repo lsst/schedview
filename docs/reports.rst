@@ -123,7 +123,7 @@ Replace the symlink to point to your new one::
     if test -L /sdf/data/rubin/shared/scheduler/packages/schedview_notebooks ; then
       rm /sdf/data/rubin/shared/scheduler/packages/schedview_notebooks
     fi
-    ln -s /sdf/data/rubin/shared/scheduler/packages/schedview_notebooks-v0.1.0.dev2 /sdf/data/rubin/shared/scheduler/packages/schedview_notebooks
+    ln -s /sdf/data/rubin/shared/scheduler/packages/schedview_notebooks-${NEWTAG} /sdf/data/rubin/shared/scheduler/packages/schedview_notebooks
 
 Updating other software used by the jobs
 ----------------------------------------
@@ -132,7 +132,9 @@ Begin by determining the next available tag.
 
 Get sorted existing tags with::
 
-    curl -s https://api.github.com/repos/lsst/schedview/tags \
+    MODULENAME="schedview"
+    MODULEUSER="lsst"
+    curl -s https://api.github.com/repos/${MODULEUSER}/${MODULENAME}/tags \
         | jq -r '.[].name' \
         | egrep '^v[0-9]+.[0-9]+.[0-9]+.*$' \
         | sort -V
@@ -144,21 +146,26 @@ Make and push a new tag (with the base of the repository as the current working 
     echo "New version is ${NEWVERSION} with tag ${NEWTAG}"
     echo ""
     git tag ${NEWTAG}
-    git push origin tag v${NEWTAG}
+    git push origin tag ${NEWTAG}
 
 Then install it in `/sdf/data/rubin/shared/scheduler/packages`::
 
+    PACKAGEDIR="/sdf/data/rubin/shared/scheduler/packages"
+    TARGETDIR="${PACKAGEDIR}/${MODULENAME}-${NEWVERSION}"
+    PIPORIGIN="git+https://github.com/${MODULEUSER}/${MODULENAME}.git@${NEWTAG}"
+    echo "Installing from ${PIPORIGIN} to ${TARGETDIR}"
+    echo ""
     pip install \
         --no-deps \
-        --target=/sdf/data/rubin/shared/scheduler/packages/schedview-${NEWVERSION} \
-        git+https://github.com/lsst/schedview.git@${NEWTAG}
+        --target=${TARGETDIR} \
+        ${PIPORIGIN}
 
 Replace the symlink to point to your new version::
 
-    if test -L /sdf/data/rubin/shared/scheduler/packages/schedview ; then
-      rm /sdf/data/rubin/shared/scheduler/packages/schedview
+    if test -L ${PACKAGEDIR}/${MODULENAME} ; then
+      rm ${PACKAGEDIR}/${MODULENAME}
     fi
-    ln -s /sdf/data/rubin/shared/scheduler/packages/schedview-${NEWVERSION} \ /sdf/data/rubin/shared/scheduler/packages/schedview
+    ln -s ${TARGETDIR} ${PACKAGEDIR}/${MODULENAME}
 
 
 Hand generation of reports
