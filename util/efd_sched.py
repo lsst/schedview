@@ -14,7 +14,7 @@ from rubin_scheduler.utils import Site
 
 from schedview.collect import make_efd_client
 
-LOCAL_ROOT_URI = {"usdf": "s3://lfa@", "summit": "https://s3.cp.lsst.org/"}
+LOCAL_ROOT_URI = {"usdf": "s3://", "summit": "https://s3.cp.lsst.org/"}
 
 
 async def query_schedulers_in_window(desired_time, efd="usdf_efd", time_window=TimeDelta(2 * u.second)):

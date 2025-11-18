@@ -8,6 +8,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import bokeh
+import boto3
 import numpy as np
 import panel as pn
 import param
@@ -564,11 +565,23 @@ class SchedulerSnapshotDashboard(param.Parameterized):
 
             return True
 
-        except Exception:
+        except Exception as exception:
             tb = traceback.format_exc(limit=-1)
             self._debugging_message = f"Cannot load scheduler from {self.scheduler_fname}: \n{tb}"
             pn.state.notifications.clear()
             pn.state.notifications.error(f"Cannot load scheduler from {self.scheduler_fname}", duration=0)
+
+            if (
+                isinstance(exception, FileNotFoundError)
+                and "permission denied" in exception.args[0]
+                and "s3://" in exception.args[0]
+                and "lfa" in list(boto3.session.Session().available_profiles)
+                and "s3://lfa" not in exception.args[0]
+                and "AWS_PROFILE" not in os.environ
+            ):
+                message = "Perhaps you need to set AWS_PROFILE=lfa in your environment?"
+                self._debugging_message = message
+                pn.state.notifications.error(message, duration=0)
 
             self._scheduler = None
             self._conditions = None
