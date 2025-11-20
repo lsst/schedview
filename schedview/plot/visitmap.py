@@ -123,8 +123,21 @@ def plot_visit_skymaps(
     if "mjd" not in spheremaps[0].sliders:
         spheremaps[0].add_mjd_slider()
 
+    # Add date and time sliders to the reference (first) projection
+    if "mjd" not in spheremaps[0].sliders:
+        spheremaps[0].add_mjd_slider()
+
+    spheremaps[0].sliders["mjd"].visible = False
+
     spheremaps[0].sliders["mjd"].start = conditions.sun_n12_setting
     spheremaps[0].sliders["mjd"].end = conditions.sun_n12_rising
+
+    if "hour_minute" not in spheremaps[0].sliders:
+        spheremaps[0].add_date_time_sliders()
+
+    if "night_date" in spheremaps[0].sliders:
+        if spheremaps[0].sliders["night_date"].start == spheremaps[0].sliders["night_date"].end:
+            spheremaps[0].sliders["night_date"].visible = False
 
     for spheremap in spheremaps[1:]:
         spheremap.sliders["mjd"] = spheremaps[0].sliders["mjd"]
