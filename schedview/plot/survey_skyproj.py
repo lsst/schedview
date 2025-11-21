@@ -4,6 +4,7 @@ from functools import partial
 import astropy.units as u
 import colorcet
 import healpy as hp
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -364,3 +365,58 @@ def create_metric_map_grid(metric, visits, observatory, nside=32, **kwargs) -> F
     night_events = schedview.compute.astro.night_events(day_obs_date)
     fig = create_hpix_map_grid(metric_hpix, observatory, night_events, **kwargs)
     return fig
+
+
+def map_count_healpix(
+    *args,
+    num_colors: int = 6,
+    cmap: str | mpl.colors.Colormap = "cividis_r",
+    clip: bool = True,
+    colorbar: bool = True,
+    **kwargs,
+) -> skyproj.skyproj.LaeaSkyproj:
+    """Plot a healpix map appropriate when values are low integers greater
+    than zero.
+
+    Parameters
+    ----------
+    *args
+        Positional arguments forwarded to :func:`map_healpix`.  Usually
+        ``map_hpix``, ``model_observatory``, ``night_events`` and an optional
+        ``axes`` instance.
+    num_colors : `int`, optional
+        Maximum number of integers.
+        Defaults to 6.
+    cmap : 'str' or `matplotlib.colors.Colormap`, optional
+        Colormap name or instance to use for the discrete bins. If a string,
+        the colormap is obtained via ``plt.get_cmap(cmap, num_colors)``.
+    clip : `bool`, optional
+        If ``True`` (default), values above the highest bin are clipped
+        and the colorbar shows a “+” suffix for the final tick label.
+    **kwargs
+        Additional keyword arguments forwarded to :func:`map_healpix`.
+
+    Returns
+    -------
+    sky_map : `skyproj.skyproj.LaeaSkyproj`
+        The sky projection object with the healpix map drawn and a colorbar
+        added.  The map is displayed with discrete colors corresponding to
+        the specified number of bins.
+    """
+    if isinstance(cmap, str):
+        cmap = plt.get_cmap(cmap, num_colors)
+
+    norm = mpl.colors.BoundaryNorm(np.arange(num_colors + 1) + 0.5, ncolors=num_colors, clip=clip)
+
+    sky_map = map_healpix(*args, cmap=cmap, norm=norm, **kwargs)
+
+    if colorbar:
+        ticks = 1 + np.arange(num_colors)
+        cbar = sky_map.draw_colorbar(ticks=ticks, location="bottom", pad=0.1)
+
+        if clip:
+            cbar_ticks_labels = [t.get_text() for t in cbar.ax.get_xticklabels()]
+            cbar_ticks_labels[-1] = cbar_ticks_labels[-1] + "+"
+            cbar.set_ticks(ticks, labels=cbar_ticks_labels)
+
+    return sky_map
