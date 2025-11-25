@@ -1,5 +1,6 @@
 import datetime
 from functools import partial
+from typing import Callable, Literal, Tuple, TypeAlias
 
 import astropy.units as u
 import colorcet
@@ -16,11 +17,12 @@ from matplotlib.figure import Figure
 
 # Import ModelObservatory to make sphinx happy
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory  # noqa F401
+from rubin_sim import maf
 
 import schedview.compute.astro
 from schedview import band_column
 from schedview.compute.camera import LsstCameraFootprintPerimeter
-from schedview.compute.maf import compute_hpix_metric_in_bands
+from schedview.compute.maf import compute_hpix_metric_in_bands, compute_metric
 
 DEFAULT_MAP_KWARGS = {"cmap": colorcet.cm.blues}
 
@@ -30,6 +32,12 @@ DEFAULT_SKY_MAP_FACTORY = partial(
     lon_0=0,
     extent=[0.0, 360.0, -90, 89],
 )
+
+HorizonOptions: TypeAlias = Tuple[
+    Literal["morning west"], Literal["morning east"], Literal["evening west"], Literal["evening east"]
+]
+
+DEFAULT_HORIZONS: HorizonOptions = ("morning west", "morning east", "evening west", "evening east")
 
 
 def compute_circle_points(
@@ -94,7 +102,16 @@ def compute_circle_points(
     return circle
 
 
-def map_healpix(map_hpix, model_observatory, night_events, axes=None, sky_map_factory=None, **kwargs):
+def map_healpix(
+    map_hpix,
+    model_observatory,
+    night_events,
+    axes=None,
+    sky_map_factory=None,
+    horizons: HorizonOptions | None = DEFAULT_HORIZONS,
+    horizon_zd: float = 60.0,
+    **kwargs,
+):
     """Plots visits over a healpix map, with astronomical annotations.
 
     Parameters
@@ -153,24 +170,39 @@ def map_healpix(map_hpix, model_observatory, night_events, axes=None, sky_map_fa
     sun_moon_positions = model_observatory.almanac.get_sun_moon_positions(mjd)
     sun_ra = np.degrees(sun_moon_positions["sun_RA"].item())
     sun_decl = np.degrees(sun_moon_positions["sun_dec"].item())
-    sky_map.ax.scatter(sun_ra, sun_decl, color="yellow")
+    sky_map.ax.scatter(sun_ra, sun_decl, color="brown")
 
     moon_ra = np.degrees(sun_moon_positions["moon_RA"])
     moon_decl = np.degrees(sun_moon_positions["moon_dec"])
     sky_map.ax.scatter(moon_ra, moon_decl, color="orange")
 
     # Night limit horizons
-    latitude = model_observatory.site.latitude
-    zd = 70
-    evening = compute_circle_points(night_events.loc["sun_n12_setting", "LST"], latitude, zd, 180, 360)
-    sky_map.ax.plot(evening.ra, evening.decl, color="red", linestyle="dashed")
-    evening = compute_circle_points(night_events.loc["sun_n12_setting", "LST"], latitude, zd, 0, 180)
-    sky_map.ax.plot(evening.ra, evening.decl, color="red", linestyle="dotted")
+    if horizons is not None and len(horizons) > 0:
+        assert isinstance(horizons, tuple)
 
-    morning = compute_circle_points(night_events.loc["sun_n12_rising", "LST"], latitude, zd, 0, 180)
-    sky_map.ax.plot(morning.ra, morning.decl, color="red", linestyle="dashed")
-    morning = compute_circle_points(night_events.loc["sun_n12_rising", "LST"], latitude, zd, 180, 360)
-    sky_map.ax.plot(morning.ra, morning.decl, color="red", linestyle="dotted")
+        latitude = model_observatory.site.latitude
+        if "morning west" in horizons:
+            evening = compute_circle_points(
+                night_events.loc["sun_n12_setting", "LST"], latitude, horizon_zd, 180, 360
+            )
+            sky_map.ax.plot(evening.ra, evening.decl, color="red", linestyle="dashed")
+        if "morning east" in horizons:
+            evening = compute_circle_points(
+                night_events.loc["sun_n12_setting", "LST"], latitude, horizon_zd, 0, 180
+            )
+            sky_map.ax.plot(evening.ra, evening.decl, color="red", linestyle="dotted")
+
+        if "evening east" in horizons:
+            morning = compute_circle_points(
+                night_events.loc["sun_n12_rising", "LST"], latitude, horizon_zd, 0, 180
+            )
+            sky_map.ax.plot(morning.ra, morning.decl, color="red", linestyle="dashed")
+        if "evening west" in horizons:
+            morning = compute_circle_points(
+                night_events.loc["sun_n12_rising", "LST"], latitude, horizon_zd, 180, 360
+            )
+            sky_map.ax.plot(morning.ra, morning.decl, color="red", linestyle="dotted")
+
     return sky_map
 
 
@@ -420,3 +452,93 @@ def map_count_healpix(
             cbar.set_ticks(ticks, labels=cbar_ticks_labels)
 
     return sky_map
+
+
+def map_hpix_in_laea_and_mcbryde(
+    map_function: Callable, *args, lon_0: float = 0.0, figsize: tuple = (15, 10), **kwargs
+) -> Figure:
+    """Map a healpix array in both LAEA and McBryde projections, side by side.
+
+    Parameters
+    ----------
+    map_function: `Callable`
+        A function that takes sky_map_function and axes arguments, and plots
+        the healpix map on these axes. The ``axes`` agument must take an
+        instance of `matplotlib.axes.Axes`, and ``sky_map_factory`` must be
+        a dictionary with keys ``laea`` and ``mcbryde`` with values that
+        are functions that return instances of `skyproj.LaeaSkyproj` and
+        `skyproj.McBrydeSkyproj`, respectively.
+    lon_0: `float`
+        The central longitude for the McBryde projection.
+    figsize: `tuple`
+        Figure size, passed to ``plt.sublots``
+    *args:
+        Additional positional arguments are passed as positional arguments
+        to ``map_function``.
+    **kwargs:
+        Additional keyword arguments are passed as keyword arguments to
+        ``map_funtion``.
+
+    Returns
+    -------
+    fig : `Figure`
+        A matplotlib figure with the maps on two axes.
+    """
+    map_factories = {
+        "laea": DEFAULT_SKY_MAP_FACTORY,
+        "mcbryde": partial(skyproj.McBrydeSkyproj, lon_0=lon_0),
+    }
+
+    fig, axes = plt.subplots(1, 2, figsize=figsize, gridspec_kw={"width_ratios": [1, 2]})
+    for plot_index, proj in enumerate(map_factories):
+        these_axes = axes[plot_index]
+        map_function(*args, axes=these_axes, sky_map_factory=map_factories[proj], **kwargs)
+    return fig
+
+
+def map_metric_in_laea_and_mcbryde(
+    visits: pd.DataFrame,
+    metric: maf.metrics.base_metric.BaseMetric,
+    map_function: Callable,
+    *args,
+    nside: int = 32,
+    **kwargs,
+) -> Figure:
+    """Map a healpix array in both LAEA and McBryde projections, side by side.
+
+    Parameters
+    ----------
+    visits: `pandas.DataFrame`
+        A table of visits with any columns necessary for computation of the
+        supplied ``metric``
+    metric: `rubin_sim.maf.metrics.base_metric.BaseMetric`
+        The MAF metric to compute.
+    map_function: `Callable`
+        A function that takes sky_map_function and axes arguments, and plots
+        the healpix map on these axes. The ``axes`` agument must take an
+        instance of `matplotlib.axes.Axes`, and ``sky_map_factory`` must be
+        a dictionary with keys ``laea`` and ``mcbryde`` with values that
+        are functions that return instances of `skyproj.LaeaSkyproj` and
+        `skyproj.McBrydeSkyproj`, respectively.
+    *args:
+        Additional positional arguments are passed as positional arguments
+        to ``map_function``.
+    nside: `int`
+        The nside of the healpix array on which to compute the metric.
+    **kwargs:
+        Additional keyword arguments are passed as keyword arguments to
+        ``map_funtion``.
+
+    Returns
+    -------
+    fig : `Figure`
+        A matplotlib figure with the maps on two axes.
+    """
+    metric_bundle = maf.MetricBundle(
+        metric,
+        maf.HealpixSlicer(nside=nside, verbose=False),
+    )
+    compute_metric(visits, metric_bundle)
+
+    fig = map_hpix_in_laea_and_mcbryde(map_function, metric_bundle.metric_values, *args, **kwargs)
+    return fig
