@@ -11,5 +11,5 @@ from ..efd import (
 )
 from ..logdb import get_from_logdb_with_retries
 
-schedview.clientsite.DATASOURCE_BASE_URL = "https://base-lsp.slac.lsst.codes/"
+schedview.clientsite.DATASOURCE_BASE_URL = "https://base-lsp.lsst.codes/"
 schedview.clientsite.EFD_NAME = "base_efd"
