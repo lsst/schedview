@@ -8,10 +8,9 @@ dependencies:
  - numpy
  - pandas
  - astropy >= 5.3
- - uranography >= 1.2.1
  - bokeh >= 3.1.1
  - panel >= 1.1.0
- - uranography
+ - uranography >= 1.4.1
  - param
  - git
  - botocore

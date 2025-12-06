@@ -1,3 +1,4 @@
+setuptools_scm
 astropy-base>=5.3
 bokeh>=3.1.1
 colorcet
@@ -15,7 +16,7 @@ pytz
 scikit-learn
 skyproj
 tabulate
-uranography>=1.1.0
-rubin-scheduler>=3.11.0
+uranography>=1.4.1
+rubin-scheduler>=3.18.0
 rubin-sim>=2.6.0
 pip
