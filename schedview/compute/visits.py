@@ -150,7 +150,7 @@ def compute_overhead_summary(visits, sun_n12_setting, sun_n12_rising):
     return summary
 
 
-def compute_sv_summary(visits, sun_n12_setting, sunrise, time_before_sunrise=2):
+def compute_survey_visit_summary(visits, sun_n12_setting, sun_n12_rising):
     """Create a dictionary of science validation survey summary stats.
 
     Parameters
@@ -159,24 +159,21 @@ def compute_sv_summary(visits, sun_n12_setting, sunrise, time_before_sunrise=2):
         The table of visits. Assumes all SV visits.
     `sun_n12_setting`: `float`
         The MJD of evening twilight.
-    `sunrise`: `float`
-        The MJD of sunrise.
-    `time_before_sunrise`: `float`
-        Time before sunrise that SV survey stops. Default 2 (hours).
+    `sun_n12_rising`: `float`
+        The MJD of morning twilight.
 
     Returns
     -------
     `summary` : `dict`
         A dictionary of summary statistics
     """
-
-    time_available = (sunrise - sun_n12_setting) * 24 - time_before_sunrise
+    n12_night_time = (sun_n12_rising - sun_n12_setting) * 24
 
     initial_pairs = np.sum([("pair" in note) & (", a" in note) for note in visits["scheduler_note"]])
     final_pairs = np.sum([("pair" in note) & (", b" in note) for note in visits["scheduler_note"]])
 
     # Could do a check to make sure all the visits are for the SV
-    n_sv_visits = np.size(visits["scheduler_note"])
+    n_survey_visits = np.size(visits["scheduler_note"])
 
     u_note = np.unique(visits["scheduler_note"])
     ddf_names = np.unique([note.split(":")[1].split(",")[0] for note in u_note if "DD:" in note])
@@ -192,8 +189,8 @@ def compute_sv_summary(visits, sun_n12_setting, sunrise, time_before_sunrise=2):
         too_names = "-"
 
     summary = {
-        "time_avail": time_available,
-        "n_sv_visits": n_sv_visits,
+        "n12_night_time": n12_night_time,
+        "n_survey_visits": n_survey_visits,
         "n_pairs_started": initial_pairs,
         "n_pairs_finished": final_pairs,
         "ddfs_observed": ddf_names,

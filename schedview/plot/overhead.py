@@ -48,14 +48,14 @@ def create_table(summary_dict, stat_name, stat_str_template, html=True):
     return result
 
 
-def create_sv_summary_table(sv_summary, html=True):
+def create_survey_visit_summary_table(sv_summary, html=True):
     """Make a formatted table from an sv summary dictionary
 
     Parameters
     ----------
     `sv_summary`: `dict`
         A dictionary of summary values, as computed by
-        `schedview.compute.visits.compute_sv_summary`
+        `schedview.compute.visits.compute_survey_visit_summary`
     `html`: `bool`
         Format the table with html? Defaults to True
 
@@ -66,16 +66,16 @@ def create_sv_summary_table(sv_summary, html=True):
     """
 
     stat_name = {
-        "time_avail": "Time available for SV visits",
-        "n_sv_visits": "Number of sv visits in night",
+        "n12_night_time": "Time between 12 degree evening and morning twilights",
+        "n_survey_visits": "Number of survey visits in night",
         "n_pairs_started": "Number of pairs started",
         "n_pairs_finished": "Number of pairs finished",
         "ddfs_observed": "DDFs Observed",
         "too_observed": "ToOs Observed",
     }
     stat_str_template = {
-        "time_avail": "{:5.2f} hours",
-        "n_sv_visits": "{}",
+        "n12_night_time": "{:5.2f} hours",
+        "n_survey_visits": "{}",
         "n_pairs_started": "{}",
         "n_pairs_finished": "{}",
         "ddfs_observed": "{}",

@@ -9,7 +9,7 @@ import schedview.compute.visits
 import schedview.plot
 
 
-class TestSvSummary(unittest.TestCase):
+class TestSurveyVisitSummary(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -21,8 +21,8 @@ class TestSvSummary(unittest.TestCase):
         cls.visits = schedview.compute.visits.add_overhead(cls.visits)
 
     def test_sv_summary(self):
-        sv_summary = schedview.compute.visits.compute_sv_summary(
+        sv_summary = schedview.compute.visits.compute_survey_visit_summary(
             self.visits, self.start_time.mjd, self.end_time.mjd
         )
-        summary = schedview.plot.overhead.create_sv_summary_table(sv_summary)
+        summary = schedview.plot.overhead.create_survey_visit_summary_table(sv_summary)
         self.assertIsInstance(summary, str)
