@@ -45,7 +45,7 @@ from .nightly import plot_airmass_vs_time, plot_alt_vs_time, plot_polar_alt_az
 from .overhead import (
     create_overhead_histogram,
     create_overhead_summary_table,
-    create_sv_summary_table,
+    create_survey_visit_summary_table,
     plot_overhead_vs_slew_distance,
 )
 from .rewards import (
