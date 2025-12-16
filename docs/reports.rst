@@ -26,7 +26,7 @@ These scripts are found in the `batch` directory of the `schedview_notebooks` re
 Each of these scripts builds an environment in which to convert the notebook, executes the conversion, and updates a corresponding index it include the new reports.
 There are currently two indexes of reports.
 One index lists publicly accessible, which are served from `https://s3df.slac.stanford.edu/data/rubin/sim-data/schedview/reports/ <https://s3df.slac.stanford.edu/data/rubin/sim-data/schedview/reports/>`__.
-Currently, the public reports are limited to a brief nigth summary.
+Currently, the public reports are limited to a brief night summary.
 
 Additional reports, currently requiring logging to the the USDF, can be found at `https://usdf-rsp-int.slac.stanford.edu/schedview-static-pages/ <https://usdf-rsp-int.slac.stanford.edu/schedview-static-pages/>`__.
 
@@ -37,6 +37,19 @@ The `cron` job runs the reports with the following entries::
 
     15 5 * * * /opt/slurm/slurm-curr/bin/sbatch /sdf/data/rubin/shared/scheduler/packages/schedview_notebooks/batch/scheduler_nightsum.sh 2>&1 >> /sdf/data/rubin/shared/scheduler/schedview/scheduler_nightsum/scheduler_nightsum.out
     30 7 * * * /opt/slurm/slurm-curr/bin/sbatch /sdf/data/rubin/shared/scheduler/packages/schedview_notebooks/batch/prenight.sh 2>&1 >> /sdf/data/rubin/shared/scheduler/schedview/prenight/prenight.out
+
+If necessary, these cron jobs can be stopped from doing anything, even a user that does not own the cron job, if they have write access to ``/sdf/data/rubin/shared/scheduler/cron_gates/${SCRIPT}``.
+This is accomplished using gate files: early in each script, the script checks for the existence of a file with name ``/sdf/data/rubin/shared/scheduler/cron_gates/${SCRIPT_NAME}/${USER}`` and aborts if it does not exist.
+Any user with write access to ``/sdf/data/rubin/shared/scheduler/cron_gates/${SCRIPT_NAME}`` can create or remove files in that directory, so a user can cause these scripts to immediately abort
+when started by a cron job owned by a different user by removing ``/sdf/data/rubin/shared/scheduler/cron_gates/${SCRIPT_NAME}/${CRON_JOB_USER}``.
+
+So, to stop the `scheduler_nightsum.sh`` cron job owned by user ``neilsen``, remove the file ``/sdf/data/rubin/shared/scheduler/cron_gates/scheduler_nightsum/neilsen``,
+and to stop the ``prenight.sh`` cron job owned by user ``neilsen``, remove the file ``/sdf/data/rubin/shared/scheduler/cron_gates/prenight/neilsen``.
+
+The logs of the cron jobs (and any other executions of these scripts submitted using ``sbatch``) can be found in:
+* ``/sdf/data/rubin/shared/scheduler/schedview/sbatch/scheduler_nightsum_%A_%a.out`` and
+* ``/sdf/data/rubin/shared/scheduler/schedview/sbatch/prenight_%A_%a.out``
+where ``%A`` is the slurm "Job array's master job allocation number" and ``%a`` is the slum "Job array ID (index) number".
 
 The environment
 ---------------
@@ -81,7 +94,7 @@ The batch script that generates the prenight briefing reeport requeires a versio
     pip install git+https://github.com/lsst/schedview.git@v0.19.0.dev1
 
 
-Finally, update the bash scripts that need it (batch/prenight.sh and batch/scheduler_nightsum.sh),
+Finally, update the bash scripts that need it (``batch/prenight.sh`` and ``batch/scheduler_nightsum.sh``),
 for example::
 
     source /sdf/group/rubin/sw/w_latest/loadLSST.sh
@@ -128,6 +141,9 @@ Replace the symlink to point to your new one::
 Updating other software used by the jobs
 ----------------------------------------
 
+The jupyter notebooks used to generate the reports import ``schedview`` and related packages from subtirectories of ``/sdf/data/rubin/shared/scheduler/packages``.
+New version should be added there to make them available.
+
 Begin by determining the next available tag.
 
 Get sorted existing tags with::
@@ -148,7 +164,7 @@ Make and push a new tag (with the base of the repository as the current working 
     git tag ${NEWTAG}
     git push origin tag ${NEWTAG}
 
-Then install it in `/sdf/data/rubin/shared/scheduler/packages`::
+Then install it in ``/sdf/data/rubin/shared/scheduler/packages``::
 
     PACKAGEDIR="/sdf/data/rubin/shared/scheduler/packages"
     TARGETDIR="${PACKAGEDIR}/${MODULENAME}-${NEWVERSION}"
@@ -182,10 +198,10 @@ The general pattern followed by these instructions is:
 #. Call `nbconvert` with a command that looks similar to this::
 
     jupyter nbconvert \
-    --to html \
-    --execute \
-    --no-input \
-    --ExecutePreprocessor.kernel_name=python3 \
-    --ExecutePreprocessor.startup_timeout=3600 \
-    --ExecutePreprocessor.timeout=3600 \
-    whatever_notebook.ipynb
+        --to html \
+        --execute \
+        --no-input \
+        --ExecutePreprocessor.kernel_name=python3 \
+        --ExecutePreprocessor.startup_timeout=3600 \
+        --ExecutePreprocessor.timeout=3600 \
+        whatever_notebook.ipynb
