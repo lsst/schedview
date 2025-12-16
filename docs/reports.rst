@@ -104,10 +104,10 @@ Even though we aren't using the environment provided by the source of `loadLSST.
 it's still needed to get `conda` into our path.
 
 
-Updating version of `schedview_notebooks` used by the `cron` job
-----------------------------------------------------------------
+Updating the version of `schedview_notebooks` used by the `cron` job
+--------------------------------------------------------------------
 
-The scripts submitted by the cron job supplied above use the version of schedview in `/sdf/data/rubin/shared/scheduler/packages/schedview_notebooks`, which is itsef a link to a directory for a specific version, e.g. `/sdf/data/rubin/shared/scheduler/packages/schedview_notebooks-v0.1.0`.
+The scripts submitted by the cron job supplied above use the version of schedview in ``/sdf/data/rubin/shared/scheduler/packages/schedview_notebooks``, which is itsef a link to a directory for a specific version, e.g. ``/sdf/data/rubin/shared/scheduler/packages/schedview_notebooks-v0.1.0``.
 
 To tag and install a new version to be used, start by deciding on a tag. Get sorted existing tags with::
 
