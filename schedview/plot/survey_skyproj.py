@@ -110,6 +110,7 @@ def map_healpix(
     sky_map_factory=None,
     horizons: HorizonOptions | None = DEFAULT_HORIZONS,
     horizon_zd: float = 60.0,
+    colorbar: bool = True,
     **kwargs,
 ):
     """Plots visits over a healpix map, with astronomical annotations.
@@ -127,6 +128,8 @@ def map_healpix(
         A matplotlib set of axes.
     sky_map_factory : `skyproj.skyproj.LaeaSkyproj` or `skyproj.McBrydeSkyproj`
         Factory to make sky_map instances
+    colorbar : `bool`
+        Show a colorbar. Defaults to True.
     **kwargs
         Additional keyword arguments are passed to
         `skyproj.skyproj.LaeaSkyproj.draw_hpxmap`.
@@ -202,6 +205,9 @@ def map_healpix(
                 night_events.loc["sun_n12_rising", "LST"], latitude, horizon_zd, 180, 360
             )
             sky_map.ax.plot(morning.ra, morning.decl, color="red", linestyle="dotted")
+
+    if colorbar:
+        sky_map.draw_colorbar(location="bottom", pad=0.14)
 
     return sky_map
 
@@ -440,7 +446,7 @@ def map_count_healpix(
 
     norm = mpl.colors.BoundaryNorm(np.arange(num_colors + 1) + 0.5, ncolors=num_colors, clip=clip)
 
-    sky_map = map_healpix(*args, cmap=cmap, norm=norm, **kwargs)
+    sky_map = map_healpix(*args, cmap=cmap, norm=norm, colorbar=False, **kwargs)
 
     if colorbar:
         ticks = 1 + np.arange(num_colors)
