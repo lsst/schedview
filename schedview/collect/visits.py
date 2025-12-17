@@ -143,9 +143,10 @@ def read_ddf_visits(*args, **kwargs) -> pd.DataFrame:
     ddf_field_names = tuple(ddf_locations().keys())
     ddf_visits = []
     for ddf_name in ddf_field_names:
-        this_field_visits = all_visits.query(
-            f"{target_column_name}.str.contains('{ddf_name}') or scheduler_note.str.contains('DD:{ddf_name}')"
-        )
+        matches_target_column = all_visits[target_column_name].str.contains(ddf_name, case=False)
+        matches_note_column = all_visits["scheduler_note"].str.contains(f"DD:{ddf_name}", case=False)
+        this_field_visits = all_visits.loc[matches_target_column | matches_note_column, :]
+
         # Add a column with just the DDF field name and nothing else,
         # so that if the same DDF appears in different places
         # in the target_name value they still get identified as the
