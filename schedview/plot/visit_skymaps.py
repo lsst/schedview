@@ -17,6 +17,7 @@ import bokeh.layouts
 import bokeh.models
 import bokeh.transform
 import bokeh.palettes
+import bokeh.plotting
 import pandas as pd
 from astropy.coordinates import ICRS, get_body
 from astropy.time import Time
@@ -37,6 +38,8 @@ DEFAULT_VISIT_TOOLTIPS = (
     + "in @band at \u03b1,\u03b4=@fieldRA\u00b0,@fieldDec\u00b0; "
     + "q=@paraAngle\u00b0; a,A=@azimuth\u00b0,@altitude\u00b0"
 )
+
+SPHEREMAP_FIGURE_KWARGS = {"match_aspect": True}
 
 
 class VisitMapBuilder:
@@ -83,6 +86,15 @@ class VisitMapBuilder:
         Function that returns camera‑footprint edge coordinates given arrays of
         ``fieldRA``, ``fieldDec`` and ``rotSkyPos``.  The default is
         :class:`~schedview.compute.camera.LsstCameraFootprintPerimeter`.
+
+    visit_fill_colors : Dict[str, str], optional
+        Colors for each of the bands. The default is None, which causes plots
+        to default to using ``schedview.plot.PLOT_BAND_COLORS``.
+
+    figure_kwargs : Dict[str, Asy], optional
+        Keword arguments with which to instantiate `bokeh.plotting.figure`
+        instances for each spheremap. The default is None, which causes plots
+        to default to using ``SPHEREMAP_FIGURE_KWARGS``.
 
     Notes
     -----
@@ -150,7 +162,6 @@ class VisitMapBuilder:
         "observation_reason",
         "science_program",
     ]
-    visit_fill_colors: Dict[str, str] = PLOT_BAND_COLORS
 
     def __init__(
         self,
@@ -160,7 +171,15 @@ class VisitMapBuilder:
         camera_perimeter: Optional[
             Callable[[pd.Series, pd.Series, pd.Series], Tuple[np.ndarray, np.ndarray]]
         ] = None,
+        visit_fill_colors: Optional[Dict[str, str]] = None,
+        figure_kwargs: Optional[Dict[str, Any]] = None,
     ) -> None:
+        self.figure_kwargs: Dict[str, Any] = (
+            SPHEREMAP_FIGURE_KWARGS if figure_kwargs is None else figure_kwargs
+        )
+        self.visit_fill_colors: Dict[str, str] = (
+            PLOT_BAND_COLORS if visit_fill_colors is None else visit_fill_colors
+        )
         self.visits = visits
 
         # If the mjd is not set by the caller, guess it from the visits
@@ -173,7 +192,7 @@ class VisitMapBuilder:
         else:
             self.mjd = mjd
 
-        self._instantiate_spheremaps(map_classes)
+        self.instantiate_spheremaps(map_classes)
 
         self.camera_perimeter = (
             camera_perimeter if camera_perimeter is not None else LsstCameraFootprintPerimeter()
@@ -188,8 +207,34 @@ class VisitMapBuilder:
         self.healpix_high_ds: Optional[bokeh.models.ColumnDataSource] = None
         self.healpix_low_ds: Optional[bokeh.models.ColumnDataSource] = None
 
-    def _instantiate_spheremaps(self, map_classes: List[SphereMap]) -> None:
-        self.spheremaps = [mc(mjd=self.mjd) for mc in map_classes]
+    def instantiate_spheremaps(self, map_classes: List[SphereMap]) -> None:
+        """Instantiate spheremap objects for each class in map_classes.
+
+        This method creates spheremap instances for each class provided in the
+        `map_classes` list and stores them in `self.spheremaps`. The first
+        spheremap instance is also stored in `self.ref_map` for reference.
+
+        Parameters
+        ----------
+        map_classes : `list` [`uranography.api.SphereMap`]
+            A list of spheremap class constructors (e.g., ``ArmillarySphere``,
+            ``Planisphere``) to instantiate. Each class should accept a ``mjd``
+            keyword argument.
+
+        Notes
+        -----
+        * This method is separated from `__init__` to allow subclasses to
+          override it and customize the spheremap instantiation process.
+        * The `self.spheremaps` list is populated with instances of the
+          provided classes, and `self.ref_map` is set to the first instance.
+        """
+        # Separated into its own method so that it can be easily modified in
+        # subclasses.
+        # For example, a subclass could generate instances of bokeh figure to
+        # pass to each spheremap with customized parameters.
+        self.spheremaps = [
+            mc(mjd=self.mjd, plot=bokeh.plotting.figure(**self.figure_kwargs)) for mc in map_classes
+        ]
         self.ref_map = self.spheremaps[0]
 
     def _add_visit_patches(self) -> None:
@@ -534,6 +579,11 @@ class VisitMapBuilder:
         self : `VisitMapBuilder`
             The builder instance to allow method chaining.
         """
+
+        # TODO: When more than one night's visits are included, create
+        # glyphs for each night, and add a callback to make the visible or
+        # not based on the mjd slider.
+
         ap_time = Time(self.mjd, format="mjd", scale="utc")
         body_coords = get_body(body, ap_time).transform_to(ICRS())
 
