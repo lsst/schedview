@@ -117,10 +117,6 @@ class VisitMapBuilder:
     ...     .add_graticules()
     ...     .add_ecliptic()
     ...     .add_galactic_plane()
-    ...     .add_mjd_slider(
-    ...         start=visits['observationStartMJD'].min(),
-    ...         end=visits['observationStartMJD'].max()
-    ...     )
     ...     .add_datetime_slider()
     ...     .add_eq_sliders()
     ...     .hide_future_visits()
@@ -355,13 +351,7 @@ class VisitMapBuilder:
         Returns
         -------
         self : `VisitMapBuilder`
-            Returns ``self`` to enable method chaining.]
-
-        Notes
-        -----
-        * If the MJD slider has not yet been added to the reference map,
-        this method adds an invisible MJD slider before creating the
-        transform.
+            Returns ``self`` to enable method chaining.
         """
 
         if "mjd" not in self.ref_map.sliders:
@@ -421,6 +411,33 @@ class VisitMapBuilder:
         self._hide_visits_by_mjd(past_future_js)
         return self
 
+    def hide_future_and_other_night_visits(self) -> Self:
+        """Hide visits that occur after the MJD value set by the slider.
+
+        Returns
+        -------
+        self : `VisitMapBuilder`
+            Returns ``self`` to enable method chaining.
+        """
+        # Transforms for recent, past, future visits
+        # The "- 0.5" in the floor causes it to use the same night rollover
+        # as dayobs.
+        past_future_js = """
+            const result = new Array(xs.length)
+            for (let i = 0; i < xs.length; i++) {
+            if ((mjd_slider.value >= xs[i])
+                && (Math.floor(mjd_slider.value - 0.5) == Math.floor(xs[i] - 0.5))) {
+                result[i] = show_value
+            } else {
+                result[i] = hide_value
+            }
+            }
+            return result
+        """
+
+        self._hide_visits_by_mjd(past_future_js)
+        return self
+
     def highlight_recent_visits(self) -> Self:
         """Highlight recent visits based on the MJD slider.
 
@@ -428,12 +445,6 @@ class VisitMapBuilder:
         -------
         self : `VisitMapBuilder`
             Returns ``self`` to enable fluent method chaining.
-
-        Notes
-        -----
-        * If the MJD slider has not yet been added to the reference map, this
-        method adds an invisible MJD slider before constructing the transform.
-
         """
         recent_js = """
             const result = new Array(xs.length)
@@ -483,12 +494,6 @@ class VisitMapBuilder:
         -------
         self : `VisitMapBuilder`
             Returns ``self`` to enable fluent method chaining.
-
-        Notes
-        -----
-        The method simply forwards the call to each ``spheremap`` in the
-        builder's ``self.spheremaps`` list; it does not modify any internal
-        state of the builder itself.
         """
         for spheremap in self.spheremaps:
             spheremap.decorate()
@@ -511,11 +516,6 @@ class VisitMapBuilder:
         -------
         self : `VisitMapBuilder`
             Returns ``self`` to enable fluent method chaining.
-
-        Notes
-        -----
-        No state is modified in the builder itself; the ecliptic line is drawn
-        directly on each ``SphereMap`` instance.
         """
         for spheremap in self.spheremaps:
             spheremap.add_ecliptic(*args, **kwargs)
@@ -538,11 +538,6 @@ class VisitMapBuilder:
         -------
         self : `VisitMapBuilder`
             Returns ``self`` to enable fluent method chaining.
-
-        Notes
-        -----
-        The galactic plane is rendered on each ``SphereMap`` without altering
-        the builder's internal configuration.
         """
         for spheremap in self.spheremaps:
             spheremap.add_galactic_plane(*args, **kwargs)
@@ -565,11 +560,6 @@ class VisitMapBuilder:
         -------
         self : `VisitMapBuilder`
             Returns ``self`` to enable fluent method chaining.
-
-        Notes
-        -----
-        The method does not alter any builder attributes; it only invokes the
-        corresponding method on each ``SphereMap`` instance.
         """
         for spheremap in self.spheremaps:
             spheremap.add_graticules(*args, **kwargs)
@@ -613,8 +603,8 @@ class VisitMapBuilder:
         if time_step > self.mjd_slider.end - self.mjd_slider.start:
             mjds = [(self.mjd_slider.end + self.mjd_slider.start) / 2]
         else:
-            start_mjd: float = self.mjd_slider.start
-            end_mjd: float = self.mjd_slider.end
+            start_mjd: float = self.mjd_slider.start - time_step
+            end_mjd: float = self.mjd_slider.end + time_step
             first_mjd: float = start_mjd + time_step / 2
             last_mjd: float = end_mjd + time_step / 2
             mjds = np.arange(first_mjd, last_mjd, time_step)
@@ -624,6 +614,7 @@ class VisitMapBuilder:
             body_name = body if len(mjds) == 1 else body + ap_time.strftime("%Y%m%d%H%M%S")
             min_mjd = mjd - time_step / 2
             max_mjd = mjd + time_step / 2
+
             body_coords = get_body(body, ap_time).transform_to(ICRS())
 
             hide_js_transform = bokeh.models.CustomJSTransform(
