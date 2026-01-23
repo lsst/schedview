@@ -10,26 +10,25 @@ that can be displayed in a report, dashboard, or other interface.
 
 import warnings
 from types import MethodType
-from typing import Callable, List, Optional, Dict, Any, Tuple, Self
+from typing import Any, Callable, Dict, List, Optional, Self, Tuple
 
 import bokeh
 import bokeh.layouts
 import bokeh.models
-import bokeh.transform
 import bokeh.palettes
 import bokeh.plotting
+import bokeh.transform
+import healpy as hp
+import numpy as np
 import pandas as pd
 from astropy.coordinates import ICRS, get_body
 from astropy.time import Time
-from uranography.api import ArmillarySphere, Planisphere, SphereMap
-import numpy as np
-import healpy as hp
-from uranography.api import split_healpix_by_resolution
+from uranography.api import ArmillarySphere, Planisphere, SphereMap, split_healpix_by_resolution
 
-from schedview.compute.camera import LsstCameraFootprintPerimeter
-from schedview.plot import PLOT_BAND_COLORS
 from schedview.collect import load_bright_stars
+from schedview.compute.camera import LsstCameraFootprintPerimeter
 from schedview.compute.footprint import find_healpix_area_polygons
+from schedview.plot import PLOT_BAND_COLORS
 
 DEFAULT_VISIT_TOOLTIPS = (
     "@observationId: @start_timestamp{%F %T} UTC (mjd=@observationStartMJD{00000.0000}, "
@@ -74,8 +73,8 @@ class VisitMapBuilder:
 
     mjd : float, optional
         Reference MJD for the underlying ``uranography`` maps.  If omitted the
-        maximum ``observationStartMJD`` in *visits* is used; if *visits* is empty
-        the current time is used.
+        maximum ``observationStartMJD`` in *visits* is used; if *visits* is
+        empty the current time is used.
 
     map_classes : list, optional
         List of ``uranography`` map classes to instantiate.  By default an
@@ -143,8 +142,6 @@ class VisitMapBuilder:
     decl_column: str = "fieldDec"
     rot_column: str = "rotSkyPos"
     band_column: str = "band"
-    past_alpha: float = 0.5
-    future_alpha: float = 0.0
     recent_max: float = 1.0
     recent_fade_scale: float = 2.0 / (24 * 60)
     visit_columns: List[str] = [
@@ -200,7 +197,7 @@ class VisitMapBuilder:
 
         self._add_visit_patches()
 
-        self.mjd_slider = None
+        self._add_mjd_slider()
         self.body_ds: Dict[str, bokeh.models.ColumnDataSource] = {}
         self.horizon_ds: Dict[float, bokeh.models.ColumnDataSource] = {}
         self.star_ds: Optional[bokeh.models.ColumnDataSource] = None
@@ -261,10 +258,10 @@ class VisitMapBuilder:
             for spheremap in self.spheremaps[1:]:
                 spheremap.add_patches(data_source=self.visit_ds, patches_kwargs=patches_kwargs)
 
-    def add_mjd_slider(
+    def _add_mjd_slider(
         self, visible: bool = True, start: Optional[float] = None, end: Optional[float] = None
     ) -> Self:
-        """Add a slider to control the Modified Julian Date (MJD) of the visualization.
+        """Add a slider to control the Date (MJD) of the visualization.
 
         This method adds an MJD slider to the visualization that allows users
         to control the time displayed in the sky map. The slider is linked
@@ -323,8 +320,8 @@ class VisitMapBuilder:
         visible : `bool`, optional
             Whether the slider is visible in the visualization, by default True
         *args
-            Additional positional arguments passed to the underlying uranography
-            datetime slider implementation.
+            Additional positional arguments passed to the underlying
+            uranography datetime slider implementation.
         **kwargs
             Additional keyword arguments passed to the underlying uranography
             datetime slider implementation.
@@ -337,15 +334,61 @@ class VisitMapBuilder:
         Notes
         -----
 
-        This method ensures that an MJD slider exists (creating it invisibly if
-        needed) before adding the datetime slider. The datetime slider controls
-        the same MJD value as the underlying MJD slider, but displays it in
-        a more traditional date/time format.
+        The datetime slider controls the same MJD value as the underlying MJD
+        slider, but displays it in a more traditional date/time format.
         """
-        if "mjd" not in self.ref_map.sliders:
-            self.add_mjd_slider(visible=False, *args, **kwargs)
-
         self.ref_map.add_datetime_slider()
+        return self
+
+    def _hide_visits_by_mjd(self, hide_js: str, show_alpha: float = 0.5, hide_alpha: float = 0.0) -> Self:
+        """Hide visits based on MJD.
+
+        Parameters
+        ----------
+        hide_js : `str`
+            Javascript that shows or hides visits based on mjd.
+        show_alpha: `float`
+            The alpha of shown visits.
+        hide_alpha: `float`
+            The alpha of hidden visits.
+
+        Returns
+        -------
+        self : `VisitMapBuilder`
+            Returns ``self`` to enable method chaining.]
+
+        Notes
+        -----
+        * If the MJD slider has not yet been added to the reference map,
+        this method adds an invisible MJD slider before creating the
+        transform.
+        """
+
+        if "mjd" not in self.ref_map.sliders:
+            # The slider must exist for this feature to work, but if we
+            # have not yet explicitly added it, make it invisible.
+            self.ref_map.add_mjd_slider(visible=False)
+
+        past_future_transform = bokeh.models.CustomJSTransform(
+            args=dict(
+                mjd_slider=self.ref_map.sliders["mjd"],
+                show_value=show_alpha,
+                hide_value=hide_alpha,
+            ),
+            v_func=hide_js,
+        )
+
+        # Apply the transform to the visit patches
+        try:
+            for spheremap in self.spheremaps:
+                visit_renderers = spheremap.plot.select(name="visit_patches")
+                if visit_renderers:
+                    for renderer in visit_renderers:
+                        renderer.glyph.fill_alpha = bokeh.transform.transform("mjd", past_future_transform)
+        except Exception as e:
+            warnings.warn(f"Could not apply hide_future_visits transform: {e}")
+            return self
+
         return self
 
     def hide_future_visits(self) -> Self:
@@ -361,48 +404,21 @@ class VisitMapBuilder:
         * If the MJD slider has not yet been added to the reference map,
         this method adds an invisible MJD slider before creating the
         transform.
-        * The opacity values are taken from the class attributes
-        ``past_alpha`` (default ``0.5``) and ``future_alpha``
-        (default ``0.0``).
         """
         # Transforms for recent, past, future visits
         past_future_js = """
             const result = new Array(xs.length)
             for (let i = 0; i < xs.length; i++) {
             if (mjd_slider.value >= xs[i]) {
-                result[i] = past_value
+                result[i] = show_value
             } else {
-                result[i] = future_value
+                result[i] = hide_value
             }
             }
             return result
         """
 
-        if "mjd" not in self.ref_map.sliders:
-            # The slider must exist for this feature to work, but if we
-            # have not yet explicitly added it, make it invisible.
-            self.ref_map.add_mjd_slider(visible=False)
-
-        past_future_transform = bokeh.models.CustomJSTransform(
-            args=dict(
-                mjd_slider=self.ref_map.sliders["mjd"],
-                past_value=self.past_alpha,
-                future_value=self.future_alpha,
-            ),
-            v_func=past_future_js,
-        )
-
-        # Apply the transform to the visit patches
-        try:
-            for spheremap in self.spheremaps:
-                visit_renderers = spheremap.plot.select(name="visit_patches")
-                if visit_renderers:
-                    for renderer in visit_renderers:
-                        renderer.glyph.fill_alpha = bokeh.transform.transform("mjd", past_future_transform)
-        except Exception as e:
-            warnings.warn(f"Could not apply hide_future_visits transform: {e}")
-            return self
-
+        self._hide_visits_by_mjd(past_future_js)
         return self
 
     def highlight_recent_visits(self) -> Self:
@@ -560,7 +576,7 @@ class VisitMapBuilder:
 
         return self
 
-    def add_body(self, body: str, size: float, color: str, alpha: float) -> Self:
+    def add_body(self, body: str, size: float, color: str, alpha: float, time_step: float = 1.0) -> Self:
         """Add a celestial‑body marker to the reference map.
 
         Parameters
@@ -573,6 +589,8 @@ class VisitMapBuilder:
             Color of the marker (any valid Bokeh color string).
         alpha : `float`
             Opacity of the marker (0.0‑1.0).
+        time_step: `float`
+            The time between "updates" to the position with time, in days.
 
         Returns
         -------
@@ -580,27 +598,68 @@ class VisitMapBuilder:
             The builder instance to allow method chaining.
         """
 
-        # TODO: When more than one night's visits are included, create
-        # glyphs for each night, and add a callback to make the visible or
-        # not based on the mjd slider.
+        hide_js = """
+            const result = new Array(xs.length)
+            for (let i = 0; i < xs.length; i++) {
+                if ((mjd_slider.value >= min_mjd) && (mjd_slider.value < max_mjd)) {
+                    result[i] = show_value
+                } else {
+                    result[i] = hide_value
+                }
+            }
+            return result
+        """
 
-        ap_time = Time(self.mjd, format="mjd", scale="utc")
-        body_coords = get_body(body, ap_time).transform_to(ICRS())
+        if time_step > self.mjd_slider.end - self.mjd_slider.start:
+            mjds = [(self.mjd_slider.end + self.mjd_slider.start) / 2]
+        else:
+            start_mjd: float = self.mjd_slider.start
+            end_mjd: float = self.mjd_slider.end
+            first_mjd: float = start_mjd + time_step / 2
+            last_mjd: float = end_mjd + time_step / 2
+            mjds = np.arange(first_mjd, last_mjd, time_step)
 
-        circle_kwargs = {"color": color, "alpha": alpha, "name": body}
+        for mjd in mjds:
+            ap_time = Time(mjd, format="mjd", scale="utc")
+            body_name = body if len(mjds) == 1 else body + ap_time.strftime("%Y%m%d%H%M%S")
+            min_mjd = mjd - time_step / 2
+            max_mjd = mjd + time_step / 2
+            body_coords = get_body(body, ap_time).transform_to(ICRS())
 
-        self.body_ds[body] = self.ref_map.add_marker(
-            ra=body_coords.ra.deg,
-            decl=body_coords.dec.deg,
-            name=body,
-            glyph_size=size,
-            circle_kwargs=circle_kwargs,
-        )
-
-        for spheremap in self.spheremaps[1:]:
-            spheremap.add_marker(
-                data_source=self.body_ds[body], name=body, glyph_size=size, circle_kwargs=circle_kwargs
+            hide_js_transform = bokeh.models.CustomJSTransform(
+                args=dict(
+                    mjd_slider=self.ref_map.sliders["mjd"],
+                    min_mjd=min_mjd,
+                    max_mjd=max_mjd,
+                    show_value=alpha,
+                    hide_value=0,
+                ),
+                v_func=hide_js,
             )
+
+            hide_transform = bokeh.transform.transform("decl", hide_js_transform)
+
+            circle_kwargs = {
+                "color": color,
+                "alpha": hide_transform,
+                "name": body,
+            }
+
+            self.body_ds[body_name] = self.ref_map.add_marker(
+                ra=body_coords.ra.deg,
+                decl=body_coords.dec.deg,
+                name=body_name,
+                glyph_size=size,
+                circle_kwargs=circle_kwargs,
+            )
+
+            for spheremap in self.spheremaps[1:]:
+                spheremap.add_marker(
+                    data_source=self.body_ds[body_name],
+                    name=body_name,
+                    glyph_size=size,
+                    circle_kwargs=circle_kwargs,
+                )
 
         return self
 
@@ -790,7 +849,7 @@ class VisitMapBuilder:
 
         if filled:
             warnings.warn(
-                'The "filled" option does yet work correctly when the polygon crosses a projection discontinuity.'
+                'The "filled" option does work correctly when the polygon crosses a projection discontinuity.'
             )
 
         if "region" not in footprint_polygons.index.names:
@@ -836,7 +895,7 @@ class VisitMapBuilder:
                 continue
 
             for this_loop in footprint_regions[region_name].values():
-                line_kwargs["name"] = f"footprint_outline"
+                line_kwargs["name"] = "footprint_outline"
                 loop_ds = bokeh.models.ColumnDataSource({"coords": this_loop})
                 for spheremap in self.spheremaps:
                     if filled:

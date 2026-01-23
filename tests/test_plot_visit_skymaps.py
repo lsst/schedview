@@ -1,18 +1,15 @@
 """Unit tests for schedview.plot.visit_skymaps module."""
 
-import pandas as pd
-import numpy as np
-import tempfile
 import pathlib
-import re
+import tempfile
 
 import bokeh.io
 import bokeh.models
-import pytest
+import pandas as pd
+from rubin_scheduler.scheduler.utils import get_current_footprint
+from uranography.api import ArmillarySphere, Planisphere
 
 from schedview.plot.visit_skymaps import VisitMapBuilder
-from uranography.api import ArmillarySphere, Planisphere
-from rubin_scheduler.scheduler.utils import get_current_footprint
 
 TEST_VISITS = pd.DataFrame(
     {
@@ -80,7 +77,7 @@ def test_elaborate_build():
         .add_graticules()
         .add_ecliptic()
         .add_galactic_plane()
-        .add_mjd_slider(start=visits["observationStartMJD"].min(), end=visits["observationStartMJD"].max())
+        ._add_mjd_slider(start=visits["observationStartMJD"].min(), end=visits["observationStartMJD"].max())
         .add_datetime_slider()
         .hide_future_visits()
         .highlight_recent_visits()
@@ -150,7 +147,7 @@ def test_add_horizon():
 def test_add_mjd_slider():
     """Test that add_mjd_slider initialises the mjd_slider attribute."""
     builder = VisitMapBuilder(TEST_VISITS)
-    builder.add_mjd_slider()
+    builder._add_mjd_slider()
     viewable = builder.build()
 
     assert isinstance(builder.mjd_slider, bokeh.models.Slider)
@@ -172,7 +169,7 @@ def test_hide_future_visits():
 
 
 def test_highlight_recent_visits():
-    """Test that highlight_recent_visits applies a transform to visit patches."""
+    """Test that highlight_recent_visits applies its transform."""
     builder = VisitMapBuilder(TEST_VISITS)
     builder.highlight_recent_visits()
     viewable = builder.build()
