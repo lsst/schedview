@@ -3,15 +3,22 @@ import sqlite3
 from collections.abc import Mapping
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Callable
 
 import numpy as np
 import pandas as pd
 from rubin_scheduler.scheduler.utils import SchemaConverter
 from rubin_sim import maf
 
+from schedview.dayobs import DayObs
 from schedview.util import band_column
 
-__all__ = ["compute_metric_by_visit", "compute_scalar_metric_at_mjd", "compute_mixed_scalar_metric_at_mjd"]
+__all__ = [
+    "compute_metric_by_visit",
+    "compute_scalar_metric_at_one_mjd",
+    "compute_mixed_scalar_metric",
+    "make_metric_progress_df",
+]
 
 
 def _visits_to_opsim(visits, opsim):
@@ -154,23 +161,19 @@ def compute_hpix_metric_in_bands(visits, metric, constraint="", nside=32):
     return metric_values
 
 
-def compute_scalar_metric_at_mjd(
+def compute_scalar_metric_at_one_mjd(
+    mjd,
     visits,
     slicer,
     metric,
-    mjd,
     summary_metric=None,
     run_name=None,
-    query="",
     mjd_column="observationStartMJD",
-):
+) -> dict:
     visits = visits.loc[visits[mjd_column] < mjd, :]
 
-    if len(query) > 0:
-        visits = visits.query(query)
-
     if len(visits) == 0:
-        return np.nan
+        raise ValueError("No visits")
 
     if run_name is None:
         run_name = "Run" + datetime.datetime.now().isoformat()
@@ -207,14 +210,123 @@ def compute_scalar_metric_at_mjd(
     return {metric_name: metric_values[0]}
 
 
-def compute_mixed_scalar_metric_at_mjd(
-    start_visits, end_visits, transition_mjd, *args, mjd_column="observationStartMJD", **kwargs
+def compute_scalar_metric_at_mjds(mjds, *args, **kwargs):
+    metric_values = []
+    name = None
+    mjds_with_data = []
+    for mjd in mjds:
+        try:
+            metric_value_dict = compute_scalar_metric_at_one_mjd(mjd, *args, **kwargs)
+        except ValueError:
+            continue
+        these_keys = tuple(metric_value_dict.keys())
+        assert len(these_keys) == 1
+        if name is None:
+            name = these_keys[0]
+        else:
+            assert these_keys[0] == name
+        mjds_with_data.append(mjd)
+        metric_values.append(metric_value_dict[name])
+
+    metric_values = pd.Series(metric_values, index=mjds_with_data, name=name)
+    return metric_values
+
+
+def compute_mixed_scalar_metric(
+    start_visits, end_visits, transition_mjds, *args, mjd_column="observationStartMJD", **kwargs
 ):
-    visits = pd.concat(
-        (
-            start_visits.loc[start_visits[mjd_column] <= transition_mjd, :].dropna(axis="columns", how="all"),
-            end_visits.loc[transition_mjd < end_visits[mjd_column], :].dropna(axis="columns", how="all"),
+
+    mjds_with_data = []
+    metric_values = []
+    name = None
+    for transition_mjd in transition_mjds:
+        visits = pd.concat(
+            (
+                start_visits.loc[start_visits[mjd_column] <= transition_mjd, :].dropna(
+                    axis="columns", how="all"
+                ),
+                end_visits.loc[transition_mjd < end_visits[mjd_column], :].dropna(axis="columns", how="all"),
+            )
         )
+        try:
+            metric_value_dict = compute_scalar_metric_at_one_mjd(*args, visits=visits, **kwargs)
+        except ValueError:
+            continue
+
+        these_keys = tuple(metric_value_dict.keys())
+        assert len(these_keys) == 1
+        if name is None:
+            name = these_keys[0]
+        else:
+            assert these_keys[0] == name
+        mjds_with_data.append(transition_mjd)
+        metric_values.append(metric_value_dict[name])
+
+    metric_values = pd.Series(metric_values, index=mjds_with_data, name=name)
+    return metric_values
+
+
+def make_metric_progress_df(
+    completed_visits: pd.DataFrame,
+    baseline_visits: pd.DataFrame,
+    start_dayobs: datetime.date | int | str | DayObs,
+    extrapolation_dayobs: datetime.date | int | str | DayObs,
+    slicer_factory,
+    metric_factory,
+    summary_metric_factory=None,
+    freq: dict | str = "MS",
+    mjd_column: str = "observationStartMJD",
+):
+
+    # Be flexible in how we accept the start and end dates.
+    start_dayobs = DayObs.from_date(start_dayobs)
+    end_dayobs = DayObs.from_date(extrapolation_dayobs)
+    assert isinstance(start_dayobs, DayObs)
+    assert isinstance(end_dayobs, DayObs)
+
+    # If we only get one value for freq, use it for both completed
+    # and future dates.
+    if isinstance(freq, str):
+        freq = {"completed": freq, "future": freq}
+
+    timeframes = set(["completed", "future"])
+    assert isinstance(freq, dict)
+    assert set(freq.keys()) == timeframes, "freq must be a dict with 'completed' and 'future' keys"
+
+    timestamps = {}
+    mjds = {}
+    for timeframe in timeframes:
+        timestamps[timeframe] = pd.date_range(
+            start=start_dayobs.date, end=end_dayobs.date, freq=freq[timeframe]
+        )
+        mjds[timeframe] = (timestamps[timeframe].to_julian_date().values - 2400000.5).astype(int)
+
+    mjds["completed"] = mjds["completed"][mjds["completed"] <= completed_visits[mjd_column].max()]
+    mjds["future"] = mjds["future"][mjds["future"] > mjds["completed"].max()]
+    mjds["all"] = np.concatenate([mjds["completed"], mjds["future"]])
+
+    dates = pd.to_datetime(2400000.5 + mjds["all"], unit="D", origin="julian")
+    metric_values = pd.DataFrame({"date": dates}, index=pd.Index(mjds["all"], name="mjd"))
+
+    # create a helper function to make it easier to avoid trying to call
+    # summary_metric_factory when there isn't one.
+    def maf_args():
+        args = {"slicer": slicer_factory(), "metric": metric_factory()}
+        if summary_metric_factory is not None:
+            assert isinstance(summary_metric_factory, Callable)
+            args["summary_metric"] = summary_metric_factory()
+        return args
+
+    metric_values["snapshot"] = compute_scalar_metric_at_mjds(
+        mjds["completed"], visits=completed_visits, **maf_args()
     )
-    result = compute_scalar_metric_at_mjd(visits, *args, **kwargs)
-    return result
+
+    metric_values["baseline"] = compute_scalar_metric_at_mjds(
+        mjds["all"], visits=baseline_visits, **maf_args()
+    )
+
+    metric_values["extrapolated"] = compute_mixed_scalar_metric(
+        completed_visits, baseline_visits, transition_mjds=mjds["completed"], mjd=end_dayobs.mjd, **maf_args()
+    )
+
+    return metric_values
