@@ -325,7 +325,7 @@ def make_metric_progress_df(
         mjds["all"], visits=baseline_visits, **maf_args()
     )
 
-    metric_values["extrapolated"] = compute_mixed_scalar_metric(
+    metric_values["chimera"] = compute_mixed_scalar_metric(
         completed_visits, baseline_visits, transition_mjds=mjds["completed"], mjd=end_dayobs.mjd, **maf_args()
     )
 

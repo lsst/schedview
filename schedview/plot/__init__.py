@@ -35,6 +35,7 @@ __all__ = [
     "make_timeline_scatterplots",
     "make_html_table_of_sim_archive_metadata",
     "mpl_fig_to_html",
+    "make_metric_line_plots",
 ]
 
 from .cadence import create_cadence_plot
@@ -48,6 +49,7 @@ from .overhead import (
     create_survey_visit_summary_table,
     plot_overhead_vs_slew_distance,
 )
+from .progress import make_metric_line_plots
 from .rewards import (
     area_timeline_for_tier,
     create_survey_reward_plot,
