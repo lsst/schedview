@@ -94,3 +94,72 @@ def make_band_cmap(
 
     cmap = bokeh.transform.factor_cmap(field_name, tuple(assigned_colors), tuple(assigned_bands))
     return cmap
+
+
+LIGHT_PLOT_BAND_COLORS = {
+    "u": "#3eb7ff",
+    "g": "#30c39f",
+    "r": "#ff7e00",
+    "i": "#2af5ff",
+    "z": "#a7f9c1",
+    "y": "#fdc900",
+}
+
+# Use
+# glasbey.extend_palette(
+#    LIGHT_ PLOT_BAND_COLORS.values(),
+#    palette_size=48,
+#    colorblind_safe=True,
+#    grid_size=256
+# )
+# to generate extra colors, attempting to get distinguishable ones.
+LIGHT_EXTRA_COLORS = [
+    "#3eb7ff",
+    "#30c39f",
+    "#ff7e00",
+    "#2af5ff",
+    "#a7f9c1",
+    "#fdc900",
+    "#85b972",
+    "#6ccfcb",
+    "#cdf19a",
+    "#f5862c",
+    "#8ffbe5",
+    "#6fdf4d",
+    "#8acfff",
+    "#1adfad",
+    "#fdaf76",
+    "#18fbff",
+    "#b9fa4d",
+    "#31bed2",
+    "#81f9c0",
+    "#85dd8d",
+    "#9bb600",
+    "#59bea7",
+    "#e7d262",
+    "#beb755",
+    "#05eacd",
+    "#0dc68e",
+    "#17cc50",
+    "#edaa05",
+    "#5fbcf9",
+    "#3dfa7f",
+    "#00e0ea",
+    "#c3d90b",
+    "#de945e",
+    "#83e5e2",
+    "#03c2bd",
+    "#97e2ff",
+    "#87e9c9",
+    "#7dcd97",
+    "#ffa34b",
+    "#00d679",
+    "#ffdb00",
+    "#00efa6",
+    "#6dd1ba",
+    "#c3cd73",
+    "#68fff4",
+    "#a5ca00",
+    "#6cffa5",
+    "#79c7e0",
+]
