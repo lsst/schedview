@@ -59,7 +59,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
     """
 
     # Get available skybrightness_pre date range.
-    (mjd_min, mjd_max) = get_sky_brightness_date_bounds()
+    mjd_min, mjd_max = get_sky_brightness_date_bounds()
     # Convert astropy times to iso format to be
     # used as bounds for datetime parameter.
     date_bounds = (mjd_min.to_datetime(), mjd_max.to_datetime())
@@ -552,7 +552,7 @@ class SchedulerSnapshotDashboard(param.Parameterized):
             scheduler_resource_path = ResourcePath(scheduler_path)
             scheduler_resource_path.use_threads = False
             with scheduler_resource_path.as_local() as local_scheduler_resource:
-                (scheduler, conditions) = schedview.collect.scheduler_pickle.read_scheduler(
+                scheduler, conditions = schedview.collect.scheduler_pickle.read_scheduler(
                     local_scheduler_resource.ospath
                 )
 

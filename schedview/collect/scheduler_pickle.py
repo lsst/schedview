@@ -106,7 +106,7 @@ def read_scheduler(file_name_or_url=None, everything=False):
             contents = read_local_scheduler_pickle(local_scheduler_resource.ospath, everything=True)
             return contents
         else:
-            (scheduler, conditions) = read_local_scheduler_pickle(local_scheduler_resource.ospath)
+            scheduler, conditions = read_local_scheduler_pickle(local_scheduler_resource.ospath)
 
     return scheduler, conditions
 
