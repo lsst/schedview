@@ -189,7 +189,7 @@ def plot_alt_vs_time(
         Bokeh figure object to plot on.  If None, a new figure will be created.
     note_column : `str` or None
         The column to use as the note to map to color.
-        Defaults to None, which defaults `scheduler_note` if it is present
+        Defaults to None, which defaults `observation_reason` if it is present
         in the visit datasource, otherwise `note`.
 
     Returns
@@ -200,10 +200,10 @@ def plot_alt_vs_time(
 
     if note_column is None:
         if isinstance(visits, bokeh.models.ColumnDataSource):
-            scheduler_note_present = "scheduler_note" in visits.data
+            observation_reason_present = "observation_reason" in visits.data
         else:
-            scheduler_note_present = "scheduler_note" in visits
-        note_column = "scheduler_note" if scheduler_note_present else "note"
+            observation_reason_present = "observation_reason" in visits
+        note_column = "observation_reason" if observation_reason_present else "note"
 
     for time_column in "start_timestamp", "observationStartDatetime64":
         if isinstance(visits, bokeh.models.ColumnDataSource):
@@ -412,10 +412,10 @@ def plot_polar_alt_az(visits, band_shapes=BAND_SHAPES, figure=None, legend=True,
     """
     if note_column is None:
         if isinstance(visits, bokeh.models.ColumnDataSource):
-            scheduler_note_present = "scheduler_note" in visits.data
+            observation_reason_present = "observation_reason" in visits.data
         else:
-            scheduler_note_present = "scheduler_note" in visits
-        note_column = "scheduler_note" if scheduler_note_present else "note"
+            observation_reason_present = "observation_reason" in visits
+        note_column = "observation_reason" if observation_reason_present else "note"
 
     if figure is None:
         fig = bokeh.plotting.figure(
