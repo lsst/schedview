@@ -18,5 +18,5 @@ skyproj
 tabulate
 uranography>=1.4.1
 rubin-scheduler>=3.18.0
-rubin-sim>=2.6.0
+rubin-sim>=2.6.1
 pip

@@ -1,5 +1,5 @@
 pytest
-black>=24.0
+black
 ruff
 pytest-cov
 firefox
