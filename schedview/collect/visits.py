@@ -168,6 +168,37 @@ def match_visits_to_pointings(
     name_col: str = "pointing_name",
     match_radius: float = 1.75,
 ) -> pd.DataFrame:
+    """Match visits to pointings based on coordinates.
+
+    Parameters
+    ----------
+    visits : `pd.DataFrame`
+        DataFrame containing visit data with equatorial coordinates.
+    pointings : `dict`
+        Dictionary of pointings where keys are pointing names and values are
+        coordinate tuples (ra, dec) in degrees.
+    ra_col : `str`, optional
+        Name of the column containing right ascension values in the visits DataFrame.
+        Default is "s_ra".
+    decl_col : `str`, optional
+        Name of the column containing declination values in the visits DataFrame.
+        Default is "s_dec".
+    name_col : `str`, optional
+        Name of the column to be added to the output DataFrame to identify
+        which pointing each visit matches to. Default is "pointing_name".
+    match_radius : `float`, optional
+        Matching radius in degrees for associating visits with pointings.
+        Default is 1.75 degrees.
+
+    Returns
+    -------
+    pointing_visits : `pd.DataFrame`
+        DataFrame containing the original visits DataFrame with an additional column
+        (named by ``name_col``) identifying which pointing each visit matches to.
+        The returned DataFrame maintains the original visit data but is filtered
+        to only include visits that match to at least one pointing.
+
+    """
 
     pointings_df = pd.DataFrame(pointings).T
     pointings_df.columns = pd.Index(["ra", "decl"])
