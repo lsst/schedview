@@ -1,4 +1,5 @@
 import calendar
+import datetime
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -6,15 +7,37 @@ import pandas as pd
 from rubin_sim import maf
 
 from .util import mpl_fig_to_html
+from typing import Callable
 
 
 def plot_collapsed_monthly_hourglass_metric(
-    metric_bundle,
-    name,
-    first_date,
-    last_date,
-    plotter_factory=maf.plots.MonthHourglassPlot,
+    metric_bundle: maf.MetricBundle,
+    name: str,
+    first_date: datetime.date | str,
+    last_date: datetime.date | str,
+    plotter_factory: Callable[[int, int], maf.BasePlotter] = maf.plots.MonthHourglassPlot,
 ) -> str:
+    """Generate a collapsible HTML string of hourglass plots.
+
+    Parameters
+    ----------
+    metric_bundle : Any
+        The ``MetricBundle`` to run.
+    name : str
+        Base name used in the plot titles.
+    first_date : `datetime.date` or `str`
+        Starting date for the range.
+    last_date : `datetime.date` or `str`
+        End date for the range, inclusive.
+    plotter_factory : Callable[[int, int], maf.BasePlotter], optional
+        Factory that creates a MAF plotter for a given month and year.  The
+        default creates a ``MonthHourglassPlot``.
+
+    Returns
+    -------
+    html_figures : `str`
+        HTML string containing the collapsed hourglass figures.
+    """
 
     # Use plt.ioff to stop the jupyter notebook from showing the fig
     # natively, so we can use the collapseable html instead of rather
