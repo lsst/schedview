@@ -162,14 +162,43 @@ def compute_hpix_metric_in_bands(visits, metric, constraint="", nside=32):
 
 
 def compute_scalar_metric_at_one_mjd(
-    mjd,
-    visits,
-    slicer,
-    metric,
-    summary_metric=None,
-    run_name=None,
-    mjd_column="observationStartMJD",
-) -> dict:
+    mjd: float,
+    visits: pd.DataFrame,
+    slicer: maf.BaseSlicer,
+    metric: maf.BaseMetric,
+    summary_metric: maf.BaseMetric | None = None,
+    run_name: str | None = None,
+    mjd_column: str = "observationStartMJD",
+) -> dict[str, float]:
+    """Compute a scalar MAF metric at a specific modified Julian date.
+
+    Parameters
+    ----------
+    mjd : `float`
+        The modified Julian date to use as the cutoff for visits.
+    visits : `pandas.DataFrame`
+        The DataFrame of visits.
+    slicer : `rubin_sim.maf.slicers.BaseSlicer`
+        The slicer to use for computing the metric.
+    metric : `rubin_sim.maf.metrics.BaseMetric`
+        The metric to compute.
+    summary_metric : `rubin_sim.maf.metrics.BaseMetric` or `None`, optional
+        The summary metric to compute.
+    run_name : `str` or `None`, optional
+        The name to use for the run.
+    mjd_column : `str`, optional
+        The name of the column containing the MJD values. Default is "observationStartMJD".
+
+    Returns
+    -------
+    metric_values : `dict[str, float]`
+        A dictionary with the metric name as key and the computed scalar value as value.
+
+    Raises
+    ------
+    ValueError
+        If no visits are found before the specified MJD.
+    """
     visits = visits.loc[visits[mjd_column] < mjd, :]
 
     if len(visits) == 0:
