@@ -1,6 +1,7 @@
 import unittest
 
 import numpy as np
+import pandas as pd
 from rubin_scheduler.utils import SURVEY_START_MJD
 from rubin_sim.data import get_baseline
 from rubin_sim import maf
@@ -15,6 +16,8 @@ try:
         compute_hpix_metric_in_bands,
         compute_metric_by_visit,
         compute_scalar_metric_at_one_mjd,
+        compute_scalar_metric_at_mjds,
+        compute_mixed_scalar_metric,
     )
 except ModuleNotFoundError:
     HAVE_MAF = False
@@ -97,3 +100,58 @@ class TestComputeMAF(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             compute_scalar_metric_at_one_mjd(mjd, visits, slicer, metric)
+
+    @unittest.skipUnless(HAVE_MAF, "No maf installation")
+    def test_compute_scalar_metric_at_mjds(self):
+        visits = self.visits
+        # Use dates where some have visits and some don't
+        mjds = SURVEY_START_MJD + np.arange(5) - 1
+        metric = maf.SumMetric(col="t_eff", metric_name="Total Teff")
+        slicer = maf.UniSlicer()
+
+        result = compute_scalar_metric_at_mjds(mjds, visits, slicer, metric)
+
+        self.assertIsInstance(result, pd.Series)
+        self.assertLessEqual(len(result), len(mjds[mjds > 0]))
+        self.assertEqual(result.name, "Total Teff")
+
+        # All values should be numeric and non-negative
+        for value in result.values:
+            self.assertIsInstance(value, (int, float))
+            self.assertGreaterEqual(value, 0.0)
+
+    @unittest.skipUnless(HAVE_MAF, "No maf installation")
+    def test_compute_mixed_scalar_metric(self):
+
+        # Use the first month or so of the baseline as the test end visits
+        end_visits = self.visits[self.visits.observationStartMJD < SURVEY_START_MJD + 30]
+
+        # Modify the end visits to create a sample start visits.
+        start_visits = end_visits.sample(n=100, random_state=42).copy()
+
+        # Shift observationStartDate by random amounts less than 0.0001 days,
+        # which is just under 9 seconds.
+        np.random.seed(42)
+        start_visits["observationStartMJD"] = start_visits["observationStartMJD"] + np.random.uniform(
+            -0.0001, 0.0001, len(start_visits)
+        )
+
+        transition_mjds = SURVEY_START_MJD + np.arange(1, 6) * 2
+
+        metric = maf.SumMetric(col="t_eff", metric_name="Total Teff")
+        slicer = maf.UniSlicer()
+
+        result = compute_mixed_scalar_metric(
+            start_visits, end_visits, transition_mjds, mjd=SURVEY_START_MJD + 30, slicer=slicer, metric=metric
+        )
+
+        self.assertIsInstance(result, pd.Series)
+        self.assertEqual(result.name, "Total Teff")
+
+        # Check that result index is a subset of transition_mjds (some may fail due to no visits)
+        self.assertTrue(set(result.index).issubset(set(transition_mjds)))
+
+        # All values should be numeric and non-negative
+        for value in result.values:
+            self.assertIsInstance(value, (int, float))
+            self.assertGreaterEqual(value, 0.0)
