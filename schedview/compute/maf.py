@@ -3,7 +3,7 @@ import sqlite3
 from collections.abc import Mapping
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Callable
+from typing import Callable, Sequence, Any
 
 import numpy as np
 import pandas as pd
@@ -239,7 +239,32 @@ def compute_scalar_metric_at_one_mjd(
     return {metric_name: metric_values[0]}
 
 
-def compute_scalar_metric_at_mjds(mjds, *args, **kwargs):
+def compute_scalar_metric_at_mjds(
+    mjds: Sequence[float],
+    *args: Any,
+    **kwargs: Any,
+) -> pd.Series:
+    """Compute a scalar MAF metric at multiple modified Julian dates.
+
+    Parameters
+    ----------
+    mjds : `sequence` of `float`
+        The MJDs to use as cutoffs for visits.
+    *args : `Any`
+        Positional arguments to pass to `compute_scalar_metric_at_one_mjd`.
+    **kwargs : `Any`
+        Keyword arguments to pass to `compute_scalar_metric_at_one_mjd`.
+
+    Returns
+    -------
+    metric_values : `pandas.Series`
+        A Series with the computed metric values, indexed by the MJDs used.
+
+    See Also
+    --------
+    compute_scalar_metric_at_one_mjd
+        The function used to compute the metric at each individual MJD.
+    """
     metric_values = []
     name = None
     mjds_with_data = []
@@ -262,9 +287,39 @@ def compute_scalar_metric_at_mjds(mjds, *args, **kwargs):
 
 
 def compute_mixed_scalar_metric(
-    start_visits, end_visits, transition_mjds, *args, mjd_column="observationStartMJD", **kwargs
-):
+    start_visits: pd.DataFrame,
+    end_visits: pd.DataFrame,
+    transition_mjds: Sequence[float],
+    *args,
+    mjd_column: str = "observationStartMJD",
+    **kwargs,
+) -> pd.Series:
+    """Compute a scalar MAF metric at multiple transition MJDs using a
+    visits from `start_visits` up to each transition MJD, and visits
+    from `end_visits` after
 
+    Parameters
+    ----------
+    start_visits : `pandas.DataFrame`
+        DataFrame of visits to use before each transition MJD.
+    end_visits : `pandas.DataFrame`
+        DataFrame of visits to use after each transition MJD.
+    transition_mjds : `sequence` of `float`
+        MJDs that define the transition points for combining visits.
+    mjd_column : `str`, optional
+        The name of the column containing MJD values.
+        Default is "observationStartMJD".
+    *args : `Any`
+        Positional arguments to pass to `compute_scalar_metric_at_one_mjd`.
+    **kwargs : `Any`
+        Keyword arguments to pass to `compute_scalar_metric_at_one_mjd`.
+
+    Returns
+    -------
+    metric_values : `pandas.Series`
+        A Series with the computed metric values, indexed by the transition
+        MJDs used.
+    """
     mjds_with_data = []
     metric_values = []
     name = None
@@ -300,13 +355,54 @@ def make_metric_progress_df(
     baseline_visits: pd.DataFrame,
     start_dayobs: datetime.date | int | str | DayObs,
     extrapolation_dayobs: datetime.date | int | str | DayObs,
-    slicer_factory,
-    metric_factory,
-    summary_metric_factory=None,
+    slicer_factory: Callable[[], maf.BaseSlicer],
+    metric_factory: Callable[[], maf.BaseMetric],
+    summary_metric_factory: Callable[[], maf.BaseMetric] | None = None,
     freq: dict | str = "MS",
     mjd_column: str = "observationStartMJD",
-):
+) -> pd.DataFrame:
+    """Compute metric values over time for completed, baseline, and mixed
+    (chimera) sets of visits.
 
+    Parameters
+    ----------
+    completed_visits : `pandas.DataFrame`
+        Completed visits.
+    baseline_visits : `pandas.DataFrame`
+        Visits from the baseline survey strategy.
+    start_dayobs : `datetime.date`, `int`, `str`, or `DayObs`
+        The start date for the time range to compute metrics.
+    extrapolation_dayobs : `datetime.date`, `int`, `str`, or `DayObs`
+        The end date for the time range to compute metrics.
+    slicer_factory : `callable`
+        A callable that returns a `maf.BaseSlicer` instance to be used for
+        computing metrics.
+    metric_factory : `callable`
+        A callable that returns a `maf.BaseMetric` instance to be used for
+        computing metrics.
+    summary_metric_factory : `callable` or `None`, optional
+        A callable that returns a `maf.BaseMetric` instance to be used as a
+        summary metric.
+        If `None`, no summary metric is computed.
+    freq : `dict` or `str`, optional
+        Frequency for computing metrics, as used in the ``freq`` argument
+        to `pandas.date_range`. If a string, it's used for both
+        completed and future dates. If a dict, it should have 'completed'
+        and 'future' keys. Default is "MS" (month start).
+    mjd_column : `str`, optional
+        The name of the column containing MJD values.
+        Default is "observationStartMJD".
+
+    Returns
+    -------
+    metric_values : `pandas.DataFrame`
+        A DataFrame with columns:
+        - 'date': The date for each time point
+        - 'snapshot': Metric values computed using completed visits
+        - 'baseline': Metric values computed using baseline visits
+        - 'chimera': Metric values computed using a combination
+        The index is the MJD values used for computation.
+    """
     # Be flexible in how we accept the start and end dates.
     start_dayobs = DayObs.from_date(start_dayobs)
     end_dayobs = DayObs.from_date(extrapolation_dayobs)
