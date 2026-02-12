@@ -2,7 +2,10 @@ import datetime
 import warnings
 
 import numpy as np
+import pandas as pd
+from astropy.coordinates import SkyCoord, search_around_sky
 from astropy.time import Time
+import astropy.units as u
 from rubin_scheduler.site_models import SeeingModel
 
 import schedview.compute
@@ -342,3 +345,66 @@ def accum_teff_by_night(visits):
     """
     stats_by_night = accum_stats_by_target_band_night(visits)
     return stats_by_night.loc[:, "t_eff"]
+
+
+def match_visits_to_pointings(
+    visits: pd.DataFrame,
+    pointings: dict,
+    ra_col: str = "s_ra",
+    decl_col: str = "s_dec",
+    name_col: str = "pointing_name",
+    match_radius: float = 1.75,
+) -> pd.DataFrame:
+    """Match visits to pointings based on coordinates.
+
+    Parameters
+    ----------
+    visits : `pd.DataFrame`
+        DataFrame containing visit data with equatorial coordinates.
+    pointings : `dict`
+        Dictionary of pointings where keys are pointing names and values are
+        coordinate tuples (ra, dec) in degrees.
+    ra_col : `str`, optional
+        Name of the column containing right ascension values in the visits DataFrame.
+        Default is "s_ra".
+    decl_col : `str`, optional
+        Name of the column containing declination values in the visits DataFrame.
+        Default is "s_dec".
+    name_col : `str`, optional
+        Name of the column to be added to the output DataFrame to identify
+        which pointing each visit matches to. Default is "pointing_name".
+    match_radius : `float`, optional
+        Matching radius in degrees for associating visits with pointings.
+        Default is 1.75 degrees.
+
+    Returns
+    -------
+    pointing_visits : `pd.DataFrame`
+        DataFrame containing the original visits DataFrame with an additional column
+        (named by ``name_col``) identifying which pointing each visit matches to.
+        The returned DataFrame maintains the original visit data but is filtered
+        to only include visits that match to at least one pointing.
+
+    """
+
+    pointings_df = pd.DataFrame(pointings).T
+    pointings_df.columns = pd.Index(["ra", "decl"])
+    pointing_coords = SkyCoord(
+        ra=pointings_df.ra.values * u.deg, dec=pointings_df.decl.values * u.deg, frame="icrs"
+    )
+
+    visit_centers = SkyCoord(
+        ra=visits[ra_col].values * u.deg, dec=visits[decl_col].values * u.deg, frame="icrs"
+    )
+
+    pointing_matches = search_around_sky(pointing_coords, visit_centers, match_radius * u.deg)
+
+    visit_match_dfs = {}
+    for pointing_idx, pointing_name in enumerate(pointings):
+        visit_idx = pointing_matches[1][pointing_matches[0] == pointing_idx]
+        visit_match_dfs[pointing_name] = visits.iloc[visit_idx, :].copy()
+        visit_match_dfs[pointing_name][name_col] = pointing_name
+
+    pointing_visits = pd.concat([visit_match_dfs[n] for n in visit_match_dfs])
+
+    return pointing_visits

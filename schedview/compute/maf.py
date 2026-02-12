@@ -99,7 +99,7 @@ def compute_metric_by_visit(visits, metric, constraint=""):
         database).
     metric : `rubin_sim.maf.metrics.BaseMetric`
         The metric to compute.
-    constraint : `str`
+    constraint : `str` or `None`
         The SQL query to filter visits to be used.
 
     Returns
@@ -114,7 +114,7 @@ def compute_metric_by_visit(visits, metric, constraint=""):
     metric_bundle = maf.MetricBundle(slicer=slicer, metric=metric, constraint=constraint)
 
     # If the constraint is set, we need to use sqlite
-    use_sqlite = len(constraint) > 0
+    use_sqlite = constraint is None or len(constraint) > 0
 
     compute_metric(visits, metric_bundle, sqlite=use_sqlite)
     result = pd.Series(metric_bundle.metric_values, index=slicer.slice_points["bins"][:-1].astype(int))

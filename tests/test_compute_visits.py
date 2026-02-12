@@ -1,6 +1,7 @@
 import unittest
 
 import numpy as np
+import pandas as pd
 from astropy.time import Time
 from rubin_scheduler.utils import SURVEY_START_MJD
 from rubin_sim.data import get_baseline
@@ -61,3 +62,38 @@ class TestComputeVisits(unittest.TestCase):
         self.assertEqual(night_teff.index.names[1], "day_obs_iso8601")
         for col_name in night_teff.columns:
             self.assertTrue(col_name in "ugrizy")
+
+    def test_match_visits_to_pointings_basic(self):
+        """Test basic matching functionality"""
+        # Create sample visit data
+        # Use RA=0 everywhere so separation is just differenc in declination
+        visits_data = {"s_ra": [0.0, 0.0, 0.0], "s_dec": [0.0, 1.0, 2.0], "filter": ["g", "r", "i"]}
+        visits = pd.DataFrame(visits_data)
+
+        # Create pointings dictionary
+        pointings = {
+            "pointing1": (0.0, 0.0),
+            "pointing2": (0.0, 1.0),
+            "pointing3": (0.0, 3.0),
+            "pointing4": (0.0, 90.0),
+        }
+
+        # Test matching
+        result = schedview.compute.visits.match_visits_to_pointings(visits, pointings, match_radius=1.5)
+
+        # Check that we got results
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertIn("pointing_name", result.columns)
+
+        # Check that we have the right number of matching visits
+        # pointing1 should match visits 0 and 1
+        self.assertEqual(len(result[result["pointing_name"] == "pointing1"]), 2)
+
+        # pointing2 should match visits 0, 1, and 2
+        self.assertEqual(len(result[result["pointing_name"] == "pointing2"]), 3)
+
+        # pointing3 should match only visit 2
+        self.assertEqual(len(result[result["pointing_name"] == "pointing3"]), 1)
+
+        # pointing4 should have no matches
+        self.assertEqual(len(result[result["pointing_name"] == "pointing4"]), 0)
