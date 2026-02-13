@@ -11,7 +11,7 @@ def find_reports(
     report_dir: str = "/sdf/data/rubin/shared/scheduler/reports",
     url_base: str = "https://usdf-rsp-int.slac.stanford.edu/schedview-static-pages",
 ) -> pd.DataFrame:
-    """Find staticic schedview reports by walking the report directory.
+    """Find static schedview reports by walking the report directory.
 
     Parameters
     ----------
@@ -82,7 +82,8 @@ def find_reports(
 
 
 def make_report_link_table(
-    reports: pd.DataFrame, report_columns=("prenight", "multiprenight", "nightsum", "compareprenight")
+    reports: pd.DataFrame,
+    report_columns=("prenight", "multiprenight", "nightsum", "compareprenight", "preprogress"),
 ) -> str:
     """Generate an html table of links to reports.
 

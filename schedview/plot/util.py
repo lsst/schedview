@@ -7,7 +7,9 @@ __all__ = ["mpl_fig_to_html"]
 
 
 def mpl_fig_to_html(
-    fig: mpl.figure.Figure, template: str = '<img src="data:image/png;base64,{png_base64}" />'
+    fig: mpl.figure.Figure,
+    template: str = '<img src="data:image/png;base64,{png_base64}" />',
+    summary: str = "",
 ) -> str:
     """Convert a Matplotlib figure to an HTML ``<img>`` tag.
 
@@ -19,6 +21,9 @@ def mpl_fig_to_html(
         A format string that will receive the base64‑encoded PNG data.
         The default template embeds the image in a data URI inside an ``<img>``
         element.
+    summary: `str`, option
+        Embed the figure in a collapseable html element with this summary,
+        if not the empty string. Defaults to the empty string.
 
     Returns
     -------
@@ -30,4 +35,8 @@ def mpl_fig_to_html(
     byte_buffer.seek(0)
     png_base64 = base64.b64encode(byte_buffer.read()).decode("utf-8")
     fig_html = template.format(png_base64=png_base64)
+
+    if len(summary) > 0:
+        fig_html = f"<details><summary><b>{summary}</b></summary>{fig_html}</details>"
+
     return fig_html

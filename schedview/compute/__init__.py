@@ -13,6 +13,9 @@ __all__ = [
     "compute_maps",
     "compute_metric_by_visit",
     "compute_hpix_metric_in_bands",
+    "compute_scalar_metric_at_one_mjd",
+    "compute_scalar_metric_at_mjds",
+    "compute_mixed_scalar_metric",
     "often_repeated_fields",
     "count_visits_by_sim",
     "match_visits_across_sims",
@@ -40,7 +43,13 @@ from .sim_archive import munge_sim_archive_metadata
 from .survey import compute_maps, make_survey_reward_df
 
 try:
-    from .maf import compute_hpix_metric_in_bands, compute_metric_by_visit
+    from .maf import (
+        compute_hpix_metric_in_bands,
+        compute_metric_by_visit,
+        compute_mixed_scalar_metric,
+        compute_scalar_metric_at_mjds,
+        compute_scalar_metric_at_one_mjd,
+    )
 except ModuleNotFoundError as e:
     if not e.args == ("No module named 'rubin_sim'",):
         raise e
