@@ -1,9 +1,10 @@
-from types import MappingProxyType
 from collections.abc import Mapping
-import pandas as pd
+from types import MappingProxyType
+
 import bokeh.layouts
 import bokeh.models
 import bokeh.plotting
+import pandas as pd
 
 __all__ = [
     "make_metric_line_plots",

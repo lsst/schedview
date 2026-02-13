@@ -1,5 +1,6 @@
 import calendar
 import datetime
+from typing import Callable
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -7,7 +8,6 @@ import pandas as pd
 from rubin_sim import maf
 
 from .util import mpl_fig_to_html
-from typing import Callable
 
 
 def plot_collapsed_monthly_hourglass_metric(

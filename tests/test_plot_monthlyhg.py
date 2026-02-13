@@ -1,8 +1,9 @@
-import unittest
 import datetime
+import unittest
 from unittest.mock import MagicMock
-from matplotlib import pyplot as plt
 from xml.etree import ElementTree as ET
+
+from matplotlib import pyplot as plt
 
 from schedview.plot.monthlyhg import plot_collapsed_monthly_hourglass_metric
 

@@ -3,7 +3,7 @@ import sqlite3
 from collections.abc import Mapping
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Callable, Sequence, Any
+from typing import Any, Callable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -187,12 +187,14 @@ def compute_scalar_metric_at_one_mjd(
     run_name : `str` or `None`, optional
         The name to use for the run.
     mjd_column : `str`, optional
-        The name of the column containing the MJD values. Default is "observationStartMJD".
+        The name of the column containing the MJD values.
+        Default is "observationStartMJD".
 
     Returns
     -------
     metric_values : `dict[str, float]`
-        A dictionary with the metric name as key and the computed scalar value as value.
+        A dictionary with the metric name as key and the computed scalar value
+        as value.
 
     Raises
     ------

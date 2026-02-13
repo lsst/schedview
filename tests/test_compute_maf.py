@@ -1,11 +1,11 @@
-from functools import partial
 import unittest
+from functools import partial
 
 import numpy as np
 import pandas as pd
 from rubin_scheduler.utils import SURVEY_START_MJD
-from rubin_sim.data import get_baseline
 from rubin_sim import maf
+from rubin_sim.data import get_baseline
 
 from schedview import DayObs
 from schedview.collect import read_opsim
@@ -18,9 +18,9 @@ try:
     from schedview.compute import (
         compute_hpix_metric_in_bands,
         compute_metric_by_visit,
-        compute_scalar_metric_at_one_mjd,
-        compute_scalar_metric_at_mjds,
         compute_mixed_scalar_metric,
+        compute_scalar_metric_at_mjds,
+        compute_scalar_metric_at_one_mjd,
     )
 except ModuleNotFoundError:
     HAVE_MAF = False
@@ -151,7 +151,8 @@ class TestComputeMAF(unittest.TestCase):
         self.assertIsInstance(result, pd.Series)
         self.assertEqual(result.name, "Total Teff")
 
-        # Check that result index is a subset of transition_mjds (some may fail due to no visits)
+        # Check that result index is a subset of transition_mjds
+        # (some may fail due to no visits)
         self.assertTrue(set(result.index).issubset(set(transition_mjds)))
 
         # All values should be numeric and non-negative

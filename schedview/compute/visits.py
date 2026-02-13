@@ -1,11 +1,11 @@
 import datetime
 import warnings
 
+import astropy.units as u
 import numpy as np
 import pandas as pd
 from astropy.coordinates import SkyCoord, search_around_sky
 from astropy.time import Time
-import astropy.units as u
 from rubin_scheduler.site_models import SeeingModel
 
 import schedview.compute
@@ -365,11 +365,11 @@ def match_visits_to_pointings(
         Dictionary of pointings where keys are pointing names and values are
         coordinate tuples (ra, dec) in degrees.
     ra_col : `str`, optional
-        Name of the column containing right ascension values in the visits DataFrame.
-        Default is "s_ra".
+        Name of the column containing right ascension values in the visits
+        DataFrame. Default is "s_ra".
     decl_col : `str`, optional
-        Name of the column containing declination values in the visits DataFrame.
-        Default is "s_dec".
+        Name of the column containing declination values in the visits
+        DataFrame. Default is "s_dec".
     name_col : `str`, optional
         Name of the column to be added to the output DataFrame to identify
         which pointing each visit matches to. Default is "pointing_name".
@@ -380,10 +380,11 @@ def match_visits_to_pointings(
     Returns
     -------
     pointing_visits : `pd.DataFrame`
-        DataFrame containing the original visits DataFrame with an additional column
-        (named by ``name_col``) identifying which pointing each visit matches to.
-        The returned DataFrame maintains the original visit data but is filtered
-        to only include visits that match to at least one pointing.
+        DataFrame containing the original visits DataFrame with an additional
+        column (named by ``name_col``) identifying which pointing each visit
+        matches to. The returned DataFrame maintains the original visit data
+        but is filtered to only include visits that match to at least one
+        pointing.
 
     """
 
