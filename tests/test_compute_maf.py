@@ -161,21 +161,17 @@ class TestComputeMAF(unittest.TestCase):
 
     @unittest.skipUnless(HAVE_MAF, "No maf installation")
     def test_make_metric_progress_df(self):
-        # Create sample visits data
-        visits = self.visits
-
         # Create some sample data for completed and baseline visits
         # Using a subset of the baseline visits for both
         current_mjd = int(SURVEY_START_MJD) + 10.5
-        completed_visits = visits[visits.observationStartMJD < current_mjd]
-        baseline_visits = visits[visits.observationStartMJD < current_mjd + 5]
-        start_dayobs = DayObs.from_date(int(SURVEY_START_MJD) + 1, int_format="mjd")
-        extrapolation_dayobs = DayObs.from_date(int(SURVEY_START_MJD) + 12, int_format="mjd")
+        completed_visits = self.visits[self.visits.observationStartMJD < current_mjd]
+        start_dayobs = DayObs.from_time(SURVEY_START_MJD + 1)
+        extrapolation_dayobs = DayObs.from_time(current_mjd + 3)
 
         # Test with default frequency
         result = make_metric_progress_df(
             completed_visits=completed_visits,
-            baseline_visits=baseline_visits,
+            baseline_visits=self.visits,
             start_dayobs=start_dayobs,
             extrapolation_dayobs=extrapolation_dayobs,
             slicer_factory=maf.UniSlicer,
@@ -193,7 +189,7 @@ class TestComputeMAF(unittest.TestCase):
 
         result = make_metric_progress_df(
             completed_visits=completed_visits,
-            baseline_visits=baseline_visits,
+            baseline_visits=self.visits,
             start_dayobs=start_dayobs,
             extrapolation_dayobs=extrapolation_dayobs,
             slicer_factory=partial(maf.HealpixSlicer, nside=8, verbose=False),
