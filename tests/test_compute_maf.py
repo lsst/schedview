@@ -1,3 +1,4 @@
+from functools import partial
 import unittest
 
 import numpy as np
@@ -6,7 +7,9 @@ from rubin_scheduler.utils import SURVEY_START_MJD
 from rubin_sim.data import get_baseline
 from rubin_sim import maf
 
+from schedview import DayObs
 from schedview.collect import read_opsim
+from schedview.compute.maf import make_metric_progress_df
 
 try:
     from rubin_sim import maf
@@ -155,3 +158,62 @@ class TestComputeMAF(unittest.TestCase):
         for value in result.values:
             self.assertIsInstance(value, (int, float))
             self.assertGreaterEqual(value, 0.0)
+
+    @unittest.skipUnless(HAVE_MAF, "No maf installation")
+    def test_make_metric_progress_df(self):
+        # Create sample visits data
+        visits = self.visits
+
+        # Create some sample data for completed and baseline visits
+        # Using a subset of the baseline visits for both
+        current_mjd = int(SURVEY_START_MJD) + 10.5
+        completed_visits = visits[visits.observationStartMJD < current_mjd]
+        baseline_visits = visits[visits.observationStartMJD < current_mjd + 5]
+        start_dayobs = DayObs.from_date(int(SURVEY_START_MJD) + 1, int_format="mjd")
+        extrapolation_dayobs = DayObs.from_date(int(SURVEY_START_MJD) + 12, int_format="mjd")
+
+        # Test with default frequency
+        result = make_metric_progress_df(
+            completed_visits=completed_visits,
+            baseline_visits=baseline_visits,
+            start_dayobs=start_dayobs,
+            extrapolation_dayobs=extrapolation_dayobs,
+            slicer_factory=maf.UniSlicer,
+            metric_factory=partial(maf.CountMetric, col="observationStartMJD", metric_name="count"),
+            freq="D",
+        )
+        assert isinstance(result, pd.DataFrame)
+        assert result.index.name == "mjd"
+        assert len(result) > 0
+        assert "date" in result.columns
+        assert np.all(result.loc[:, "baseline"].values >= 0)
+        for column in ("snapshot", "chimera"):
+            assert np.all(result.loc[:current_mjd, column] >= 0)
+            assert np.all(np.isnan(result.loc[current_mjd:, column]))
+
+        result = make_metric_progress_df(
+            completed_visits=completed_visits,
+            baseline_visits=baseline_visits,
+            start_dayobs=start_dayobs,
+            extrapolation_dayobs=extrapolation_dayobs,
+            slicer_factory=partial(maf.HealpixSlicer, nside=8, verbose=False),
+            metric_factory=partial(maf.CountExplimMetric, metric_name="fO"),
+            summary_metric_factory=partial(
+                maf.FOArea,
+                nside=8,
+                norm=False,
+                metric_name="fOArea",
+                asky=18000,
+                n_visit=5,
+                badval=0,
+            ),
+            freq="D",
+        )
+        assert isinstance(result, pd.DataFrame)
+        assert result.index.name == "mjd"
+        assert len(result) > 0
+        assert "date" in result.columns
+        assert np.all(result.loc[:, "baseline"].values >= 0)
+        for column in ("snapshot", "chimera"):
+            assert np.all(result.loc[:current_mjd, column] >= 0)
+            assert np.all(np.isnan(result.loc[current_mjd:, column]))
