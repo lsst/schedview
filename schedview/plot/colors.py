@@ -1,73 +1,76 @@
 import bokeh.core.property
 import bokeh.transform
+from lsst.utils.plotting import get_multiband_plot_colors
 
 # Follow RTN-045 for mapping filters to plot colors
 
-PLOT_BAND_COLORS = {
-    "u": "#1600ea",
-    "g": "#31de1f",
-    "r": "#b52626",
-    "i": "#370201",
-    "z": "#ba52ff",
-    "y": "#61a2b3",
-}
+PLOT_BAND_COLORS = get_multiband_plot_colors()
+LIGHT_PLOT_BAND_COLORS = get_multiband_plot_colors(dark_background=True)
 
-# Use
-# glasbey.extend_palette(
-#    PLOT_BAND_COLORS.values(),
-#    palette_size=48,
-#    colorblind_safe=True,
-#    grid_size=256
-# )
-# to generate extra colors, attempting to get distinguishable ones.
+# to generate extra colors for no filter, pinhole, etc.,
+# attempting to get distinguishable ones.
+
+# Extended palettes as they were on 2026-02-17
 EXTRA_COLORS = [
-    "#007000",
-    "#ff8c72",
-    "#006169",
-    "#000073",
-    "#9461ff",
-    "#002e00",
-    "#d8a2ff",
-    "#26af00",
-    "#dc1a25",
-    "#36164c",
-    "#10d9aa",
-    "#48936f",
-    "#0113ff",
-    "#84010e",
-    "#9d7cb5",
-    "#01593c",
-    "#7c3ca8",
-    "#e2b200",
-    "#015cff",
-    "#924e47",
-    "#00b2fd",
-    "#81c9d3",
-    "#ff5701",
-    "#2b8683",
-    "#00457c",
-    "#c87168",
-    "#0ed767",
-    "#0080aa",
-    "#7c7f31",
-    "#3702a6",
-    "#364801",
-    "#983e00",
-    "#5dae9d",
-    "#540005",
-    "#79a762",
-    "#c073f8",
-    "#0d7849",
-    "#280162",
-    "#73a9c9",
-    "#013ed6",
-    "#5a3c71",
-    "#9804f1",
+    "#0c71ff",
+    "#49be61",
+    "#c61c00",
+    "#ffc200",
+    "#f341a2",
+    "#5d0000",
+    "#0000b6",
+    "#04e9ff",
+    "#006200",
+    "#750065",
+    "#e74eff",
+    "#ff5f00",
 ]
+LIGHT_EXTRA_COLORS = [
+    "#3eb7ff",
+    "#30c39f",
+    "#ff7e00",
+    "#2af5ff",
+    "#a7f9c1",
+    "#fdc900",
+    "#85b972",
+    "#12c5c8",
+    "#f2e585",
+    "#fba96c",
+    "#23ffdf",
+    "#7ccb2b",
+]
+
+need_new_standard_colors = EXTRA_COLORS[: len(PLOT_BAND_COLORS)] != list(PLOT_BAND_COLORS.values())
+need_new_light_colors = LIGHT_EXTRA_COLORS[: len(LIGHT_PLOT_BAND_COLORS)] != list(
+    LIGHT_PLOT_BAND_COLORS.values()
+)
+
+if need_new_standard_colors or need_new_light_colors:
+    try:
+        # Start by trying to use glasbey to get colors distinguishable from
+        # the latest standards from lsst.utils.plotting
+
+        import glasbey
+
+        if need_new_standard_colors:
+            EXTRA_COLORS = glasbey.extend_palette(
+                PLOT_BAND_COLORS.values(), palette_size=48, colorblind_safe=True, grid_size=256
+            )
+
+        if need_new_light_colors:
+            LIGHT_EXTRA_COLORS = glasbey.extend_palette(
+                LIGHT_PLOT_BAND_COLORS.values(), palette_size=48, colorblind_safe=True, grid_size=256
+            )
+
+    except ModuleNotFoundError:
+        # If glasbey is not available, use lists of extra colors based on the
+        # standadards as they were on 2026-02-17
+        EXTRA_COLORS[: len(PLOT_BAND_COLORS)] = PLOT_BAND_COLORS.values()
+        LIGHT_EXTRA_COLORS[: len(LIGHT_PLOT_BAND_COLORS)] = LIGHT_PLOT_BAND_COLORS.values()
 
 
 def make_band_cmap(
-    field_name="band", bands=("u", "g", "r", "i", "z", "y")
+    field_name="band", bands=("u", "g", "r", "i", "z", "y"), light=False
 ) -> bokeh.core.property.vectorization.Field:
     """Make a bokeh cmap transform for bands
 
@@ -77,89 +80,25 @@ def make_band_cmap(
         Name of field with the band value.
     bands : `list`
         A full list of bands that need colors.
+    light : `bool`
+        Use light palette
 
     Returns
     -------
     cmap : `bokeh.core.property.vectorization.Field`
         The bokeh color map.
     """
+    band_colors = LIGHT_PLOT_BAND_COLORS if light else PLOT_BAND_COLORS
+    extra_colors = LIGHT_EXTRA_COLORS if light else EXTRA_COLORS
+
     # Always assign standard colors to standard bands
-    assigned_colors, assigned_bands = list(PLOT_BAND_COLORS.values()), list(PLOT_BAND_COLORS.keys())
+    assigned_colors, assigned_bands = list(band_colors.values()), list(band_colors.keys())
 
     # Go through any we miss and assign extra colors to extra bands.
     for extra_index, band in enumerate(set(bands)):
         if band not in assigned_bands:
             assigned_bands.append(band)
-            assigned_colors.append(EXTRA_COLORS[extra_index % len(EXTRA_COLORS)])
+            assigned_colors.append(extra_colors[extra_index % len(extra_colors)])
 
     cmap = bokeh.transform.factor_cmap(field_name, tuple(assigned_colors), tuple(assigned_bands))
     return cmap
-
-
-LIGHT_PLOT_BAND_COLORS = {
-    "u": "#3eb7ff",
-    "g": "#30c39f",
-    "r": "#ff7e00",
-    "i": "#2af5ff",
-    "z": "#a7f9c1",
-    "y": "#fdc900",
-}
-
-# Use
-# glasbey.extend_palette(
-#    LIGHT_ PLOT_BAND_COLORS.values(),
-#    palette_size=48,
-#    colorblind_safe=True,
-#    grid_size=256
-# )
-# to generate extra colors, attempting to get distinguishable ones.
-LIGHT_EXTRA_COLORS = [
-    "#3eb7ff",
-    "#30c39f",
-    "#ff7e00",
-    "#2af5ff",
-    "#a7f9c1",
-    "#fdc900",
-    "#85b972",
-    "#6ccfcb",
-    "#cdf19a",
-    "#f5862c",
-    "#8ffbe5",
-    "#6fdf4d",
-    "#8acfff",
-    "#1adfad",
-    "#fdaf76",
-    "#18fbff",
-    "#b9fa4d",
-    "#31bed2",
-    "#81f9c0",
-    "#85dd8d",
-    "#9bb600",
-    "#59bea7",
-    "#e7d262",
-    "#beb755",
-    "#05eacd",
-    "#0dc68e",
-    "#17cc50",
-    "#edaa05",
-    "#5fbcf9",
-    "#3dfa7f",
-    "#00e0ea",
-    "#c3d90b",
-    "#de945e",
-    "#83e5e2",
-    "#03c2bd",
-    "#97e2ff",
-    "#87e9c9",
-    "#7dcd97",
-    "#ffa34b",
-    "#00d679",
-    "#ffdb00",
-    "#00efa6",
-    "#6dd1ba",
-    "#c3cd73",
-    "#68fff4",
-    "#a5ca00",
-    "#6cffa5",
-    "#79c7e0",
-]
