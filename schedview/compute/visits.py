@@ -384,7 +384,11 @@ def match_visits_to_pointings(
         column (named by ``name_col``) identifying which pointing each visit
         matches to. The returned DataFrame maintains the original visit data
         but is filtered to only include visits that match to at least one
-        pointing.
+        pointing. The DataFrame will contain one row for every pointing/visit
+        match, so selecting on a given pointing will result in a DataFrame
+        with all visits within match_radius of that pointing. If a visits
+        covers multiple pointings, it can appear multiple times in the
+        DataFrame.
 
     """
 
