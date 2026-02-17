@@ -356,12 +356,12 @@ def make_metric_progress_df(
     completed_visits: pd.DataFrame,
     baseline_visits: pd.DataFrame,
     start_dayobs: datetime.date | int | str | DayObs,
+    last_completed_dayobs: datetime.date | int | str | DayObs,
     extrapolation_dayobs: datetime.date | int | str | DayObs,
     slicer_factory: Callable[[], maf.BaseSlicer],
     metric_factory: Callable[[], maf.BaseMetric],
     summary_metric_factory: Callable[[], maf.BaseMetric] | None = None,
     freq: dict | str = "MS",
-    mjd_column: str = "observationStartMJD",
 ) -> pd.DataFrame:
     """Compute metric values over time for completed, baseline, and mixed
     (chimera) sets of visits.
@@ -374,6 +374,8 @@ def make_metric_progress_df(
         Visits from the baseline survey strategy.
     start_dayobs : `datetime.date`, `int`, `str`, or `DayObs`
         The start date for the time range to compute metrics.
+    last_completed_dayobs : `datetime.date`, `int`, `str`, or `DayObs`
+        The last dayobs completed.
     extrapolation_dayobs : `datetime.date`, `int`, `str`, or `DayObs`
         The end date for the time range to compute metrics.
     slicer_factory : `callable`
@@ -391,9 +393,6 @@ def make_metric_progress_df(
         to `pandas.date_range`. If a string, it's used for both
         completed and future dates. If a dict, it should have 'completed'
         and 'future' keys. Default is "MS" (month start).
-    mjd_column : `str`, optional
-        The name of the column containing MJD values.
-        Default is "observationStartMJD".
 
     Returns
     -------
@@ -407,8 +406,11 @@ def make_metric_progress_df(
     """
     # Be flexible in how we accept the start and end dates.
     start_dayobs = DayObs.from_date(start_dayobs)
+    last_completed_dayobs = DayObs.from_date(last_completed_dayobs)
     end_dayobs = DayObs.from_date(extrapolation_dayobs)
+    # The asserts make type checkers happy.
     assert isinstance(start_dayobs, DayObs)
+    assert isinstance(last_completed_dayobs, DayObs)
     assert isinstance(end_dayobs, DayObs)
 
     # If we only get one value for freq, use it for both completed
@@ -421,19 +423,31 @@ def make_metric_progress_df(
     assert set(freq.keys()) == timeframes, "freq must be a dict with 'completed' and 'future' keys"
 
     timestamps = {}
-    mjds = {}
+    dayobs_end_mjds = {}
+    dayobs_start_mjds = {}
     for timeframe in timeframes:
         timestamps[timeframe] = pd.date_range(
             start=start_dayobs.date, end=end_dayobs.date, freq=freq[timeframe]
         )
-        mjds[timeframe] = (timestamps[timeframe].to_julian_date().values - 2400000.5).astype(int)
+        dayobs_end_mjds[timeframe] = np.array(
+            [DayObs.from_date(d).end.mjd for d in timestamps[timeframe].date]
+        )
+        dayobs_start_mjds[timeframe] = np.array(
+            [DayObs.from_date(d).start.mjd for d in timestamps[timeframe].date]
+        )
 
-    mjds["completed"] = mjds["completed"][mjds["completed"] <= completed_visits[mjd_column].max()]
-    mjds["future"] = mjds["future"][mjds["future"] > mjds["completed"].max()]
-    mjds["all"] = np.concatenate([mjds["completed"], mjds["future"]])
+    max_completed_mjd = last_completed_dayobs.end.mjd
+    dayobs_end_mjds["completed"] = dayobs_end_mjds["completed"][
+        dayobs_start_mjds["completed"] < max_completed_mjd
+    ]
+    dayobs_end_mjds["future"] = dayobs_end_mjds["future"][dayobs_start_mjds["future"] > max_completed_mjd]
+    dayobs_end_mjds["all"] = np.concatenate([dayobs_end_mjds["completed"], dayobs_end_mjds["future"]])
 
-    dates = pd.to_datetime(2400000.5 + mjds["all"], unit="D", origin="julian")
-    metric_values = pd.DataFrame({"date": dates}, index=pd.Index(mjds["all"], name="mjd"))
+    dates = pd.to_datetime([DayObs.from_time(end_mjd - 0.1).date for end_mjd in dayobs_end_mjds["all"]])
+    jds = np.array([DayObs(d).jd for d in dates])
+    metric_values = pd.DataFrame(
+        {"date": dates, "jd": jds}, index=pd.Index(dayobs_end_mjds["all"], name="mjd")
+    )
 
     # create a helper function to make it easier to avoid trying to call
     # summary_metric_factory when there isn't one.
@@ -445,15 +459,21 @@ def make_metric_progress_df(
         return args
 
     metric_values["snapshot"] = compute_scalar_metric_at_mjds(
-        mjds["completed"], visits=completed_visits, **maf_args()
+        dayobs_end_mjds["completed"], visits=completed_visits, **maf_args()
     )
 
     metric_values["baseline"] = compute_scalar_metric_at_mjds(
-        mjds["all"], visits=baseline_visits, **maf_args()
+        dayobs_end_mjds["all"], visits=baseline_visits, **maf_args()
     )
 
     metric_values["chimera"] = compute_mixed_scalar_metric(
-        completed_visits, baseline_visits, transition_mjds=mjds["completed"], mjd=end_dayobs.mjd, **maf_args()
+        completed_visits,
+        baseline_visits,
+        transition_mjds=dayobs_end_mjds["completed"],
+        mjd=end_dayobs.mjd,
+        **maf_args(),
     )
+
+    metric_values.set_index("jd", inplace=True)
 
     return metric_values

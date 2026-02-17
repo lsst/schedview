@@ -199,6 +199,12 @@ class DayObs:
                     dayobs_datetime: datetime.datetime = maybe_datetime
                 else:
                     raise ValueError(f"{cls.__name__} currently only accepts scalars.")
+            case np.datetime64():
+                maybe_datetime = Time(arg).datetime
+                if isinstance(maybe_datetime, datetime.datetime):
+                    dayobs_datetime: datetime.datetime = maybe_datetime
+                else:
+                    raise ValueError(f"{cls.__name__} currently only accepts scalars.")
             case Time():
                 maybe_datetime = arg.datetime
                 if isinstance(maybe_datetime, datetime.datetime):

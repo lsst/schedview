@@ -3,7 +3,6 @@ from functools import partial
 
 import numpy as np
 import pandas as pd
-from rubin_scheduler.utils import SURVEY_START_MJD
 from rubin_sim import maf
 from rubin_sim.data import get_baseline
 
@@ -34,14 +33,15 @@ class TestComputeMAF(unittest.TestCase):
         # do not bother reading cls.visits.
         if HAVE_MAF:
             cls.visits = read_opsim(get_baseline())
+            cls.start_dayobs = DayObs.from_time(cls.visits.observationStartMJD.min())
+            cls.start_mjd = cls.start_dayobs.start.mjd
         else:
             cls.visits = None
 
     @unittest.skipUnless(HAVE_MAF, "No maf installation")
     def test_compute_metric_by_visit(self):
         visits = self.visits
-        mjd_start = SURVEY_START_MJD
-        constraint = f"observationStartMjd BETWEEN {mjd_start + 0.5} AND {mjd_start+1.5}"
+        constraint = f"observationStartMjd BETWEEN {self.start_mjd} AND {self.start_mjd+1}"
         metric = maf.SumMetric(col="t_eff", metric_name="Total Teff")
         values = compute_metric_by_visit(visits, metric, constraint=constraint)
         self.assertGreater(len(values), 10)
@@ -50,7 +50,7 @@ class TestComputeMAF(unittest.TestCase):
 
     @unittest.skipUnless(HAVE_MAF, "No maf installation")
     def test_compute_hpix_metric_in_bands(self):
-        visits = self.visits.query(f"observationStartMJD < {SURVEY_START_MJD + 1.5}")
+        visits = self.visits.query(f"observationStartMJD < {self.start_mjd + 1}")
         metric = maf.SumMetric(col="t_eff", metric_name="Total Teff")
         values = compute_hpix_metric_in_bands(visits, metric)
         self.assertGreater(len(values.keys()), 1)
@@ -63,9 +63,8 @@ class TestComputeMAF(unittest.TestCase):
     @unittest.skipUnless(HAVE_MAF, "No maf installation")
     def test_compute_scalar_metric_at_one_mjd(self):
         visits = self.visits
-        mjd_start = SURVEY_START_MJD
         # Use a date that should have visits
-        mjd = mjd_start + 5.0
+        mjd = self.start_mjd + 5.0
         metric = maf.SumMetric(col="t_eff", metric_name="Total Teff")
         slicer = maf.UniSlicer()
 
@@ -79,9 +78,8 @@ class TestComputeMAF(unittest.TestCase):
     @unittest.skipUnless(HAVE_MAF, "No maf installation")
     def test_compute_scalar_metric_at_one_mjd_with_summary_metric(self):
         visits = self.visits
-        mjd_start = SURVEY_START_MJD
         # Use a date that should have visits
-        mjd = mjd_start + 5.0
+        mjd = self.start_mjd + 5.0
         metric = maf.CountMetric(col="t_eff", metric_name="Count Teff")
         slicer = maf.UniSlicer()
         summary_metric = maf.SumMetric(col="t_eff", metric_name="Sum Teff")
@@ -97,7 +95,7 @@ class TestComputeMAF(unittest.TestCase):
     def test_compute_scalar_metric_at_one_mjd_no_visits(self):
         visits = self.visits
         # Use a date that should have no visits
-        mjd = SURVEY_START_MJD - 10.0
+        mjd = self.start_mjd - 10.0
         metric = maf.SumMetric(col="t_eff", metric_name="Total Teff")
         slicer = maf.UniSlicer()
 
@@ -108,7 +106,7 @@ class TestComputeMAF(unittest.TestCase):
     def test_compute_scalar_metric_at_mjds(self):
         visits = self.visits
         # Use dates where some have visits and some don't
-        mjds = SURVEY_START_MJD + np.arange(5) - 1
+        mjds = self.start_mjd + np.arange(5)
         metric = maf.SumMetric(col="t_eff", metric_name="Total Teff")
         slicer = maf.UniSlicer()
 
@@ -127,7 +125,7 @@ class TestComputeMAF(unittest.TestCase):
     def test_compute_mixed_scalar_metric(self):
 
         # Use the first month or so of the baseline as the test end visits
-        end_visits = self.visits[self.visits.observationStartMJD < SURVEY_START_MJD + 30]
+        end_visits = self.visits[self.visits.observationStartMJD < self.start_mjd + 30]
 
         # Modify the end visits to create a sample start visits.
         start_visits = end_visits.sample(n=100, random_state=42).copy()
@@ -139,13 +137,13 @@ class TestComputeMAF(unittest.TestCase):
             -0.0001, 0.0001, len(start_visits)
         )
 
-        transition_mjds = SURVEY_START_MJD + np.arange(1, 6) * 2
+        transition_mjds = self.start_mjd + np.arange(1, 6) * 2
 
         metric = maf.SumMetric(col="t_eff", metric_name="Total Teff")
         slicer = maf.UniSlicer()
 
         result = compute_mixed_scalar_metric(
-            start_visits, end_visits, transition_mjds, mjd=SURVEY_START_MJD + 30, slicer=slicer, metric=metric
+            start_visits, end_visits, transition_mjds, mjd=self.start_mjd + 30, slicer=slicer, metric=metric
         )
 
         self.assertIsInstance(result, pd.Series)
@@ -164,34 +162,38 @@ class TestComputeMAF(unittest.TestCase):
     def test_make_metric_progress_df(self):
         # Create some sample data for completed and baseline visits
         # Using a subset of the baseline visits for both
-        current_mjd = int(SURVEY_START_MJD) + 10.5
+        current_mjd = self.start_mjd + 5.0
+        current_dayobs = DayObs.from_time(current_mjd)
         completed_visits = self.visits[self.visits.observationStartMJD < current_mjd]
-        start_dayobs = DayObs.from_time(SURVEY_START_MJD + 1)
-        extrapolation_dayobs = DayObs.from_time(current_mjd + 3)
+        extrapolation_dayobs = DayObs.from_time(current_mjd + 8)
 
         # Test with default frequency
         result = make_metric_progress_df(
             completed_visits=completed_visits,
             baseline_visits=self.visits,
-            start_dayobs=start_dayobs,
+            start_dayobs=self.start_dayobs,
+            last_completed_dayobs=current_dayobs,
             extrapolation_dayobs=extrapolation_dayobs,
             slicer_factory=maf.UniSlicer,
             metric_factory=partial(maf.CountMetric, col="observationStartMJD", metric_name="count"),
             freq="D",
         )
         assert isinstance(result, pd.DataFrame)
-        assert result.index.name == "mjd"
+        assert result.index.name == "jd"
         assert len(result) > 0
         assert "date" in result.columns
+
         assert np.all(result.loc[:, "baseline"].values >= 0)
-        for column in ("snapshot", "chimera"):
-            assert np.all(result.loc[:current_mjd, column] >= 0)
-            assert np.all(np.isnan(result.loc[current_mjd:, column]))
+        assert np.all(result.loc[: current_dayobs.end.jd, "snapshot"] >= 0)
+        assert np.all(np.isnan(result.loc[current_dayobs.end.jd :, "snapshot"]))
+        assert np.all(result.loc[: current_dayobs.end.jd, "chimera"] >= 0)
+        assert np.all(np.isnan(result.loc[current_dayobs.end.jd :, "chimera"]))
 
         result = make_metric_progress_df(
             completed_visits=completed_visits,
             baseline_visits=self.visits,
-            start_dayobs=start_dayobs,
+            start_dayobs=self.start_dayobs,
+            last_completed_dayobs=current_dayobs,
             extrapolation_dayobs=extrapolation_dayobs,
             slicer_factory=partial(maf.HealpixSlicer, nside=8, verbose=False),
             metric_factory=partial(maf.CountExplimMetric, metric_name="fO"),
@@ -207,10 +209,11 @@ class TestComputeMAF(unittest.TestCase):
             freq="D",
         )
         assert isinstance(result, pd.DataFrame)
-        assert result.index.name == "mjd"
+        assert result.index.name == "jd"
         assert len(result) > 0
         assert "date" in result.columns
         assert np.all(result.loc[:, "baseline"].values >= 0)
-        for column in ("snapshot", "chimera"):
-            assert np.all(result.loc[:current_mjd, column] >= 0)
-            assert np.all(np.isnan(result.loc[current_mjd:, column]))
+        assert np.all(result.loc[: current_dayobs.end.jd, "snapshot"] >= 0)
+        assert np.all(np.isnan(result.loc[current_dayobs.end.jd :, "snapshot"]))
+        assert np.all(result.loc[: current_dayobs.end.jd, "chimera"] >= 0)
+        assert np.all(np.isnan(result.loc[current_dayobs.end.jd :, "chimera"]))
