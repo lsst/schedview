@@ -1,17 +1,36 @@
+from typing import Any, Callable, Dict
+
 import bokeh.core.property
 import bokeh.transform
-from lsst.utils.plotting import get_multiband_plot_colors
 
-# Follow RTN-045 for mapping filters to plot colors
+try:
+    from glasbey import extend_palette
+except ModuleNotFoundError:
 
-PLOT_BAND_COLORS = get_multiband_plot_colors()
-LIGHT_PLOT_BAND_COLORS = get_multiband_plot_colors(dark_background=True)
+    def extend_palette(*args, **kwargs) -> Any:
+        raise NotImplementedError
 
-# to generate extra colors for no filter, pinhole, etc.,
-# attempting to get distinguishable ones.
 
-# Extended palettes as they were on 2026-02-17
-EXTRA_COLORS = [
+extend_palette: Callable[..., Any]
+
+try:
+    from lsst.utils.plotting import get_multiband_plot_colors
+except ModuleNotFoundError:
+
+    def get_multiband_plot_colors(*arg, **kwargs) -> Dict[str, str]:
+        raise NotImplementedError
+
+
+get_multiband_plot_colors: Callable[..., Any]
+
+BANDS: tuple[str] = ("u", "g", "r", "i", "z", "y")
+
+# Palettes from RTN-045 as of 2026-02-17, supplemented so we
+# have extra colors for non-standard "bands" (e.g. pinhole) using
+# glasbey.extend_palette with kwargs:
+#   palette_size=12, colorblind_safe=True, grid_size=256
+#
+DEFAULT_DARK_COLORS: list[str] = [
     "#0c71ff",
     "#49be61",
     "#c61c00",
@@ -25,7 +44,9 @@ EXTRA_COLORS = [
     "#e74eff",
     "#ff5f00",
 ]
-LIGHT_EXTRA_COLORS = [
+DEFAULT_BAND_COLORS: Dict[str, str] = {b: DEFAULT_DARK_COLORS[i] for i, b in enumerate(BANDS)}
+
+DEFAULT_LIGHT_COLORS: list[str] = [
     "#3eb7ff",
     "#30c39f",
     "#ff7e00",
@@ -39,34 +60,43 @@ LIGHT_EXTRA_COLORS = [
     "#23ffdf",
     "#7ccb2b",
 ]
+DEFAULT_LIGHT_BAND_COLORS: Dict[str, str] = {b: DEFAULT_LIGHT_COLORS[i] for i, b in enumerate(BANDS)}
 
-need_new_standard_colors = EXTRA_COLORS[: len(PLOT_BAND_COLORS)] != list(PLOT_BAND_COLORS.values())
-need_new_light_colors = LIGHT_EXTRA_COLORS[: len(LIGHT_PLOT_BAND_COLORS)] != list(
-    LIGHT_PLOT_BAND_COLORS.values()
-)
+PLOT_BAND_COLORS: Dict[str, str]
+try:
+    PLOT_BAND_COLORS = get_multiband_plot_colors()
+except NotImplementedError:
+    PLOT_BAND_COLORS = DEFAULT_BAND_COLORS
 
-if need_new_standard_colors or need_new_light_colors:
+LIGHT_PLOT_BAND_COLORS: Dict[str, str]
+try:
+    LIGHT_PLOT_BAND_COLORS = get_multiband_plot_colors(dark_background=True)
+except NotImplementedError:
+    LIGHT_PLOT_BAND_COLORS = DEFAULT_LIGHT_BAND_COLORS
+
+EXTRA_COLORS: list[str]
+if DEFAULT_DARK_COLORS[: len(PLOT_BAND_COLORS)] == list(PLOT_BAND_COLORS.values()):
+    EXTRA_COLORS = DEFAULT_DARK_COLORS
+else:
     try:
-        # Start by trying to use glasbey to get colors distinguishable from
-        # the latest standards from lsst.utils.plotting
+        EXTRA_COLORS = extend_palette(
+            PLOT_BAND_COLORS.values(), palette_size=12, colorblind_safe=True, grid_size=256
+        )
+    except NotImplementedError:
+        EXTRA_COLORS = list(PLOT_BAND_COLORS.values()) + DEFAULT_DARK_COLORS[len(PLOT_BAND_COLORS) :]
 
-        import glasbey
-
-        if need_new_standard_colors:
-            EXTRA_COLORS = glasbey.extend_palette(
-                PLOT_BAND_COLORS.values(), palette_size=48, colorblind_safe=True, grid_size=256
-            )
-
-        if need_new_light_colors:
-            LIGHT_EXTRA_COLORS = glasbey.extend_palette(
-                LIGHT_PLOT_BAND_COLORS.values(), palette_size=48, colorblind_safe=True, grid_size=256
-            )
-
-    except ModuleNotFoundError:
-        # If glasbey is not available, use lists of extra colors based on the
-        # standadards as they were on 2026-02-17
-        EXTRA_COLORS[: len(PLOT_BAND_COLORS)] = PLOT_BAND_COLORS.values()
-        LIGHT_EXTRA_COLORS[: len(LIGHT_PLOT_BAND_COLORS)] = LIGHT_PLOT_BAND_COLORS.values()
+LIGHT_EXTRA_COLORS: list[str]
+if DEFAULT_LIGHT_COLORS[: len(LIGHT_PLOT_BAND_COLORS)] == list(LIGHT_PLOT_BAND_COLORS.values()):
+    LIGHT_EXTRA_COLORS = DEFAULT_LIGHT_COLORS
+else:
+    try:
+        LIGHT_EXTRA_COLORS = extend_palette(
+            LIGHT_PLOT_BAND_COLORS.values(), palette_size=12, colorblind_safe=True, grid_size=256
+        )
+    except NotImplementedError:
+        LIGHT_EXTRA_COLORS = (
+            list(LIGHT_PLOT_BAND_COLORS.values()) + DEFAULT_LIGHT_COLORS[len(LIGHT_PLOT_BAND_COLORS) :]
+        )
 
 
 def make_band_cmap(
