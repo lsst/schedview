@@ -114,6 +114,7 @@ class VisitMapBuilder:
     ...         mjd=visits['observationStartMJD'].max(),
     ...         map_classes=[ArmillarySphere, Planisphere]
     ...     )
+    ...     .add_visit_patches()
     ...     .add_graticules()
     ...     .add_ecliptic()
     ...     .add_galactic_plane()
@@ -158,7 +159,7 @@ class VisitMapBuilder:
 
     def __init__(
         self,
-        visits: pd.DataFrame,
+        visits: pd.DataFrame | None = None,
         mjd: Optional[float] = None,
         map_classes: List[SphereMap] = [ArmillarySphere, Planisphere],
         camera_perimeter: Optional[
@@ -191,8 +192,8 @@ class VisitMapBuilder:
             camera_perimeter if camera_perimeter is not None else LsstCameraFootprintPerimeter()
         )
 
-        self._add_visit_patches()
-
+        self.visits_ds = None
+        self.visit_patches_added = False
         self._add_mjd_slider()
         self.body_ds: Dict[str, bokeh.models.ColumnDataSource] = {}
         self.horizon_ds: Dict[float, bokeh.models.ColumnDataSource] = {}
@@ -230,7 +231,46 @@ class VisitMapBuilder:
         ]
         self.ref_map = self.spheremaps[0]
 
-    def _add_visit_patches(self) -> None:
+    def add_visit_patches(self, visits: pd.DataFrame | None = None) -> Self:
+        """Add visit patches to the map.
+
+        Parameters
+        ----------
+        visits : `pandas.DataFrame` or `None`
+            Table of visits.  At minimum the DataFrame must contain the columns
+            listed below.  Columns can be renamed by overriding the
+            corresponding class attributes
+            (e.g. ``VisitMapBuilder.ra_column``).
+
+            Required columns
+            ^^^^^^^^^^^^^^^^
+            ``fieldRA`` : ``float``
+                Right‑ascension of the field pointing (degrees).
+            ``fieldDec`` : ``float``
+                Declination of the field pointing (degrees).
+            ``observationStartMJD`` : ``float``
+                Start time of the exposure as a Modified Julian Date.
+            ``band`` : ``str``
+                Photometric band (e.g. ``u``, ``g``, ``r``, ``i``, ``z``
+                or ``y``).
+            ``rotSkyPos`` : ``float``
+                Camera rotation angle (degrees).
+
+        Returns
+        -------
+        self: `VisitMapBuilder`
+            Returns self to support method chaining.
+        """
+
+        if visits is not None:
+            if self.visits is not None:
+                raise ValueError("visits already supplied.")
+            self.visits = visits
+
+        if self.visits is None:
+            warnings.warn("No visits to show.")
+            return self
+
         present_visit_columns = [c for c in self.visit_columns if c in self.visits.columns]
         for band in "ugrizy":
             in_band_mask = self.visits[self.band_column].values == band
@@ -253,6 +293,10 @@ class VisitMapBuilder:
 
             for spheremap in self.spheremaps[1:]:
                 spheremap.add_patches(data_source=self.visit_ds, patches_kwargs=patches_kwargs)
+
+        self.visit_patches_added = True
+
+        return self
 
     def _add_mjd_slider(
         self, visible: bool = True, start: Optional[float] = None, end: Optional[float] = None
@@ -285,8 +329,19 @@ class VisitMapBuilder:
         self.mjd_slider = self.ref_map.sliders["mjd"]
 
         self.mjd_slider.visible = visible
-        self.mjd_slider.start = self.visits[self.mjd_column].min() if start is None else start
-        self.mjd_slider.end = self.visits[self.mjd_column].max() if end is None else end
+        if start is not None:
+            self.mjd_slider.start = start
+        elif self.visits is not None:
+            self.mjd_slider.start = self.visits[self.mjd_column].min()
+        else:
+            self.mjd_slider.start = Time.now().mjd - 1
+
+        if end is not None:
+            self.mjd_slider.end = end
+        elif self.visits is not None:
+            self.mjd_slider.end = self.visits[self.mjd_column].max()
+        else:
+            self.mjd_slider.end = Time.now().mjd
 
         for spheremap in self.spheremaps[1:]:
             spheremap.sliders["mjd"] = self.mjd_slider
@@ -395,6 +450,9 @@ class VisitMapBuilder:
         this method adds an invisible MJD slider before creating the
         transform.
         """
+        if not self.visit_patches_added:
+            raise ValueError("add_visit_patches must be called before hide_future_visits")
+
         # Transforms for recent, past, future visits
         past_future_js = """
             const result = new Array(xs.length)
@@ -457,6 +515,9 @@ class VisitMapBuilder:
             }
             return result
         """
+
+        if not self.visit_patches_added:
+            raise ValueError("add_visit_patches must be called before highlight_recent_visits")
 
         if "mjd" not in self.ref_map.sliders:
             # The slider must exist for this feature to work, but if we
@@ -990,8 +1051,9 @@ class VisitMapBuilder:
         self, layout: Callable[[List[bokeh.models.UIElement]], bokeh.models.UIElement] = bokeh.layouts.row
     ) -> bokeh.models.UIElement:
 
-        for spheremap in self.spheremaps:
-            spheremap.connect_controls(self.visit_ds)
+        if self.visits_ds is not None:
+            for spheremap in self.spheremaps:
+                spheremap.connect_controls(self.visit_ds)
 
         map_figures = list(s.figure for s in self.spheremaps)
         combined_figure = layout(map_figures)
