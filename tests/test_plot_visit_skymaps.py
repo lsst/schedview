@@ -56,6 +56,7 @@ def _save_and_check_viewable_html(
 def test_basic_build():
     """Test that the most basic builder builds."""
     builder = VisitMapBuilder(TEST_VISITS)
+    builder.add_visit_patches()
     viewable = builder.build()
 
     assert isinstance(viewable, bokeh.models.UIElement)
@@ -74,6 +75,7 @@ def test_elaborate_build():
         VisitMapBuilder(
             visits, mjd=visits["observationStartMJD"].max(), map_classes=[ArmillarySphere, Planisphere]
         )
+        .add_visit_patches()
         .add_graticules()
         .add_ecliptic()
         .add_galactic_plane()
@@ -99,6 +101,7 @@ def test_elaborate_build():
 def test_add_graticules():
     """Test that add_graticules adds graticule renderers."""
     builder = VisitMapBuilder(TEST_VISITS)
+    builder.add_visit_patches()
     builder.add_graticules()
     viewable = builder.build()
 
@@ -158,6 +161,7 @@ def test_add_mjd_slider():
 def test_hide_future_visits():
     """Test that hide_future_visits applies a transform to visit patches."""
     builder = VisitMapBuilder(TEST_VISITS)
+    builder.add_visit_patches()
     builder.hide_future_visits()
     viewable = builder.build()
 
@@ -171,6 +175,7 @@ def test_hide_future_visits():
 def test_highlight_recent_visits():
     """Test that highlight_recent_visits applies its transform."""
     builder = VisitMapBuilder(TEST_VISITS)
+    builder.add_visit_patches()
     builder.highlight_recent_visits()
     viewable = builder.build()
 
