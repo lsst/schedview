@@ -21,9 +21,15 @@ import bokeh.transform
 import healpy as hp
 import numpy as np
 import pandas as pd
-from astropy.coordinates import ICRS, get_body
+from astropy.coordinates import get_body
 from astropy.time import Time
-from uranography.api import ArmillarySphere, Planisphere, SphereMap, split_healpix_by_resolution
+from uranography.api import (
+    ArmillarySphere,
+    Planisphere,
+    SphereMap,
+    split_healpix_by_resolution,
+)
+from uranography.spheremap import MovingSphereMap
 
 from schedview.collect import load_bright_stars
 from schedview.compute.camera import LsstCameraFootprintPerimeter
@@ -89,6 +95,13 @@ class VisitMapBuilder:
     visit_fill_colors : Dict[str, str], optional
         Colors for each of the bands. The default is None, which causes plots
         to default to using ``schedview.plot.PLOT_BAND_COLORS``.
+
+    start_mjd : `float`, optional
+        The start value for the slider range. If None, uses the minimum
+        MJD value from the visits DataFrame, by default None
+    end_mjd : `float`, optional
+        The end value for the slider range. If None, uses the maximum
+        MJD value from the visits DataFrame, by default None
 
     figure_kwargs : Dict[str, Asy], optional
         Keword arguments with which to instantiate `bokeh.plotting.figure`
@@ -166,6 +179,8 @@ class VisitMapBuilder:
             Callable[[pd.Series, pd.Series, pd.Series], Tuple[np.ndarray, np.ndarray]]
         ] = None,
         visit_fill_colors: Optional[Dict[str, str]] = None,
+        start_mjd: Optional[float] = None,
+        end_mjd: Optional[float] = None,
         figure_kwargs: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.figure_kwargs: Dict[str, Any] = (
@@ -192,9 +207,9 @@ class VisitMapBuilder:
             camera_perimeter if camera_perimeter is not None else LsstCameraFootprintPerimeter()
         )
 
-        self.visits_ds = None
+        self.visits_ds = {}
         self.visit_patches_added = False
-        self._add_mjd_slider()
+        self._add_mjd_slider(start=start_mjd, end=end_mjd)
         self.body_ds: Dict[str, bokeh.models.ColumnDataSource] = {}
         self.horizon_ds: Dict[float, bokeh.models.ColumnDataSource] = {}
         self.star_ds: Optional[bokeh.models.ColumnDataSource] = None
@@ -286,13 +301,13 @@ class VisitMapBuilder:
 
             patches_kwargs = {"name": "visit_patches", "fill_color": self.visit_fill_colors[band]}
 
-            self.visit_ds = self.ref_map.add_patches(
+            self.visits_ds[band] = self.ref_map.add_patches(
                 band_visits,
                 patches_kwargs=patches_kwargs,
             )
 
             for spheremap in self.spheremaps[1:]:
-                spheremap.add_patches(data_source=self.visit_ds, patches_kwargs=patches_kwargs)
+                spheremap.add_patches(data_source=self.visits_ds[band], patches_kwargs=patches_kwargs)
 
         self.visit_patches_added = True
 
@@ -676,7 +691,7 @@ class VisitMapBuilder:
             min_mjd = mjd - time_step / 2
             max_mjd = mjd + time_step / 2
 
-            body_coords = get_body(body, ap_time).transform_to(ICRS())
+            body_coords = get_body(body, ap_time)
 
             hide_js_transform = bokeh.models.CustomJSTransform(
                 args=dict(
@@ -735,6 +750,7 @@ class VisitMapBuilder:
         data_source = self.ref_map.add_horizon(zd=zd, line_kwargs=line_kwargs)
         for spheremap in self.spheremaps[1:]:
             spheremap.add_horizon(data_source=data_source, line_kwargs=line_kwargs)
+            spheremap.connect_controls(data_source)
 
         self.horizon_ds[zd] = data_source
 
@@ -1051,9 +1067,15 @@ class VisitMapBuilder:
         self, layout: Callable[[List[bokeh.models.UIElement]], bokeh.models.UIElement] = bokeh.layouts.row
     ) -> bokeh.models.UIElement:
 
-        if self.visits_ds is not None:
-            for spheremap in self.spheremaps:
-                spheremap.connect_controls(self.visit_ds)
+        # Data sources that might change with silders on all plots, not just
+        # those that change with orientation.
+        dynamic_data_sources = list(self.visits_ds.values()) + list(self.body_ds.values())
+        for spheremap in self.spheremaps:
+            for data_source in dynamic_data_sources:
+                if isinstance(spheremap, MovingSphereMap):
+                    spheremap.connect_controls(data_source)
+                else:
+                    spheremap.set_emit_update_func(data_source)
 
         map_figures = list(s.figure for s in self.spheremaps)
         combined_figure = layout(map_figures)
