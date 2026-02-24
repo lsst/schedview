@@ -29,7 +29,6 @@ from uranography.api import (
     SphereMap,
     split_healpix_by_resolution,
 )
-from uranography.spheremap import MovingSphereMap
 
 from schedview.collect import load_bright_stars
 from schedview.compute.camera import LsstCameraFootprintPerimeter
@@ -98,12 +97,8 @@ class VisitMapBuilder:
         Colors for each of the bands. The default is None, which causes plots
         to default to using ``schedview.plot.PLOT_BAND_COLORS``.
 
-    start_mjd : `float`, optional
-        The start value for the slider range. If None, uses the minimum
-        MJD value from the visits DataFrame, by default None
-    end_mjd : `float`, optional
-        The end value for the slider range. If None, uses the maximum
-        MJD value from the visits DataFrame, by default None
+    mjd_slider_kwargs : Dict[str, Any], optional
+        Keyword arguments passed to `bokeh.models.Slider` for the MJD Slider.
 
     figure_kwargs : Dict[str, Asy], optional
         Keword arguments with which to instantiate `bokeh.plotting.figure`
@@ -181,10 +176,12 @@ class VisitMapBuilder:
             Callable[[pd.Series, pd.Series, pd.Series], Tuple[np.ndarray, np.ndarray]]
         ] = None,
         visit_fill_colors: Optional[Dict[str, str]] = None,
-        start_mjd: Optional[float] = None,
-        end_mjd: Optional[float] = None,
+        mjd_slider_kwargs: Optional[Dict[str, Any]] = None,
         figure_kwargs: Optional[Dict[str, Any]] = None,
     ) -> None:
+        if mjd_slider_kwargs is None:
+            mjd_slider_kwargs = {}
+
         self.figure_kwargs: Dict[str, Any] = (
             SPHEREMAP_FIGURE_KWARGS if figure_kwargs is None else figure_kwargs
         )
@@ -211,7 +208,7 @@ class VisitMapBuilder:
 
         self.visits_ds = {}
         self.visit_patches_added = False
-        self._add_mjd_slider(start=start_mjd, end=end_mjd)
+        self._add_mjd_slider(**mjd_slider_kwargs)
         self.body_ds: Dict[str, bokeh.models.ColumnDataSource] = {}
         self.horizon_ds: Dict[float, bokeh.models.ColumnDataSource] = {}
         self.star_ds: Optional[bokeh.models.ColumnDataSource] = None
@@ -248,7 +245,7 @@ class VisitMapBuilder:
         ]
         self.ref_map = self.spheremaps[0]
 
-    def add_visit_patches(self, visits: pd.DataFrame | None = None, **kwargs) -> Self:
+    def add_visit_patches(self, visits: pd.DataFrame | None = None, **kwargs: Any) -> Self:
         """Add visit patches to the map.
 
         Parameters
@@ -320,9 +317,7 @@ class VisitMapBuilder:
 
         return self
 
-    def _add_mjd_slider(
-        self, visible: bool = True, start: Optional[float] = None, end: Optional[float] = None
-    ) -> Self:
+    def _add_mjd_slider(self, *args, **kwargs) -> Self:
         """Add a slider to control the Date (MJD) of the visualization.
 
         This method adds an MJD slider to the visualization that allows users
@@ -331,39 +326,28 @@ class VisitMapBuilder:
 
         Parameters
         ----------
-        visible : `bool`, optional
-            Whether the slider is visible in the visualization, by default True
-        start : `float`, optional
-            The start value for the slider range. If None, uses the minimum
-            MJD value from the visits DataFrame, by default None
-        end : `float`, optional
-            The end value for the slider range. If None, uses the maximum
-            MJD value from the visits DataFrame, by default None
+        *args : Any, optional
+            Positional arguments passed to `bokeh.models.Slider`
+            for the MJD Slider.
+        **kwargs : Dict[str, Any], optional
+            Keyword arguments passed to `bokeh.models.Slider`
+            for the MJD Slider.
 
         Returns
         -------
         self: `VisitMapBuilder`
             Returns self to support method chaining.
         """
+        slider_kwargs = {
+            "start": self.visits[self.mjd_column].min() if self.visits is not None else Time.now().mjd - 1,
+            "end": self.visits[self.mjd_column].max() if self.visits is not None else Time.now().mjd + 1,
+        }
+        slider_kwargs.update(kwargs)
+
         if "mjd" not in self.ref_map.sliders:
-            self.ref_map.add_mjd_slider()
+            self.ref_map.add_mjd_slider(*args, **slider_kwargs)
 
         self.mjd_slider = self.ref_map.sliders["mjd"]
-
-        self.mjd_slider.visible = visible
-        if start is not None:
-            self.mjd_slider.start = start
-        elif self.visits is not None:
-            self.mjd_slider.start = self.visits[self.mjd_column].min()
-        else:
-            self.mjd_slider.start = Time.now().mjd - 1
-
-        if end is not None:
-            self.mjd_slider.end = end
-        elif self.visits is not None:
-            self.mjd_slider.end = self.visits[self.mjd_column].max()
-        else:
-            self.mjd_slider.end = Time.now().mjd
 
         for spheremap in self.spheremaps[1:]:
             spheremap.sliders["mjd"] = self.mjd_slider
@@ -385,13 +369,11 @@ class VisitMapBuilder:
 
         return self
 
-    def add_datetime_slider(self, visible: bool = True, *args: Any, **kwargs: Any) -> Self:
+    def add_datetime_slider(self, *args: Any, **kwargs: Any) -> Self:
         """Add a datetime slider linked to the (maybe invisible) MJD slider.
 
         Parameters
         ----------
-        visible : `bool`, optional
-            Whether the slider is visible in the visualization, by default True
         *args
             Additional positional arguments passed to the underlying
             uranography datetime slider implementation.
@@ -410,7 +392,7 @@ class VisitMapBuilder:
         The datetime slider controls the same MJD value as the underlying MJD
         slider, but displays it in a more traditional date/time format.
         """
-        self.ref_map.add_datetime_slider()
+        self.ref_map.add_datetime_slider(*args, **kwargs)
         return self
 
     def _hide_visits_by_mjd(self, hide_js: str, show_alpha: float = 0.5, hide_alpha: float = 0.0) -> Self:
@@ -1079,10 +1061,7 @@ class VisitMapBuilder:
         dynamic_data_sources = list(self.visits_ds.values()) + list(self.body_ds.values())
         for spheremap in self.spheremaps:
             for data_source in dynamic_data_sources:
-                if isinstance(spheremap, MovingSphereMap):
-                    spheremap.connect_controls(data_source)
-                else:
-                    spheremap.set_emit_update_func(data_source)
+                spheremap.connect_controls(data_source)
 
         map_figures = list(s.figure for s in self.spheremaps)
         combined_figure = layout(map_figures)
