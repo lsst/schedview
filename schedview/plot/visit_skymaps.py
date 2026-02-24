@@ -111,6 +111,9 @@ class VisitMapBuilder:
       ``add_`` method returns ``self`` to enable fluent chaining.
     * Configuration methods such as `add_graticules` and `add_horizon`
       are thin wrappers around the corresponding ``uranography`` API calls.
+    * Figure elements are rendered in the order in which the method calls
+      that add them are called, so that elements added later in the call
+      chain appear on top of elements that appear earlier.
 
     Examples
     --------
