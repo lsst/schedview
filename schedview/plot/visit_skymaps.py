@@ -453,6 +453,10 @@ class VisitMapBuilder:
 
         Notes
         -----
+        * This method causes the map to show all visits prior to the MJD
+        set by the slider, regardless of what night they were observed in.
+        In contrast, the `VisitMapBuilder.hide_future_and_other_night_visits`,
+        hides both visits after MJD and also visits on other nights.
         * If the MJD slider has not yet been added to the reference map,
         this method adds an invisible MJD slider before creating the
         transform.
@@ -483,6 +487,15 @@ class VisitMapBuilder:
         -------
         self : `VisitMapBuilder`
             Returns ``self`` to enable method chaining.
+
+        Notes
+        -----
+        This method hides both visits that occurred on nights other than
+        that of MJD (including previous nights), and also visits that occur
+        later than MJD (even if in the same night).
+        In contrast, the `VisitMapBuilder.hide_future_visits`,
+        hides only visits that occur after MJD, and shows those that happened
+        on previous nights.
         """
         # Transforms for recent, past, future visits
         # The "- 0.5" in the floor causes it to use the same night rollover
@@ -510,6 +523,13 @@ class VisitMapBuilder:
         -------
         self : `VisitMapBuilder`
             Returns ``self`` to enable fluent method chaining.
+
+        Notes
+        -----
+        While the `VisitMapBuilder.hide_future_visits` and
+        `VisitMapBuilder.hide_future_and_other_night_visits` hide and show
+        visits entirely, this method highlights visits that occurred just
+        before MJD by giving them an extra outline.
         """
         recent_js = """
             const result = new Array(xs.length)
