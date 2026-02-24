@@ -44,6 +44,8 @@ DEFAULT_VISIT_TOOLTIPS = (
     + "q=@paraAngle\u00b0; a,A=@azimuth\u00b0,@altitude\u00b0"
 )
 
+DEFAULT_VISIT_PATCHES_KWARGS = {"name": "visit_patches", "line_alpha": 0.0}
+
 SPHEREMAP_FIGURE_KWARGS = {"match_aspect": True}
 
 
@@ -246,7 +248,7 @@ class VisitMapBuilder:
         ]
         self.ref_map = self.spheremaps[0]
 
-    def add_visit_patches(self, visits: pd.DataFrame | None = None) -> Self:
+    def add_visit_patches(self, visits: pd.DataFrame | None = None, **kwargs) -> Self:
         """Add visit patches to the map.
 
         Parameters
@@ -270,6 +272,9 @@ class VisitMapBuilder:
                 or ``y``).
             ``rotSkyPos`` : ``float``
                 Camera rotation angle (degrees).
+        **kwargs
+            Additional keyword arguments passed to the underlying
+            `bokeh.plotting.figure.patches` call.
 
         Returns
         -------
@@ -299,7 +304,9 @@ class VisitMapBuilder:
             )
             band_visits = band_visits.assign(ra=ras, decl=decls, mjd=band_visits[self.mjd_column].values)
 
-            patches_kwargs = {"name": "visit_patches", "fill_color": self.visit_fill_colors[band]}
+            patches_kwargs = {"fill_color": self.visit_fill_colors[band]}
+            patches_kwargs.update(DEFAULT_VISIT_PATCHES_KWARGS)
+            patches_kwargs.update(kwargs)
 
             self.visits_ds[band] = self.ref_map.add_patches(
                 band_visits,
