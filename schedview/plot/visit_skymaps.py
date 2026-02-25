@@ -1075,9 +1075,8 @@ class VisitMapBuilder:
 
         return self
 
-    def build(
-        self, layout: Callable[[List[bokeh.models.UIElement]], bokeh.models.UIElement] = bokeh.layouts.row
-    ) -> bokeh.models.UIElement:
+    def _connect_controls(self):
+        # Must be called after all data sources and contros have been added.
 
         # Data sources that might change with silders on all plots, not just
         # those that change with orientation.
@@ -1085,6 +1084,12 @@ class VisitMapBuilder:
         for spheremap in self.spheremaps:
             for data_source in dynamic_data_sources:
                 spheremap.connect_controls(data_source)
+
+    def build(
+        self, layout: Callable[[List[bokeh.models.UIElement]], bokeh.models.UIElement] = bokeh.layouts.row
+    ) -> bokeh.models.UIElement:
+
+        self._connect_controls()
 
         map_figures = list(s.figure for s in self.spheremaps)
         combined_figure = layout(map_figures)
