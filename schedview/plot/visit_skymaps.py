@@ -372,7 +372,8 @@ class VisitMapBuilder:
         self.mjd_slider = self.ref_map.sliders["mjd"]
 
         for spheremap in self.spheremaps[1:]:
-            spheremap.sliders["mjd"] = self.mjd_slider
+            spheremap.controls["mjd"] = self.mjd_slider
+            spheremap.suppressed_controls.append("mjd")
 
         # Support method chaining
         return self
