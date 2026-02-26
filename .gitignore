@@ -148,6 +148,8 @@ notebooks/de421.bsp
 notebooks/MPCORB.DAT.gz
 
 # Other temporary files
+local/
+.clinerules/
 tmp/*
 util/tmp/*
 .vscode/settings.json

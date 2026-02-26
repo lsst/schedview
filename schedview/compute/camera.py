@@ -1,3 +1,5 @@
+from numpy.typing import NDArray
+
 import astropy.units as u
 import numpy as np
 import pandas as pd
@@ -33,7 +35,7 @@ class LsstCameraFootprintPerimeter(object):
         self.vertices["angle"] = np.degrees(np.arctan2(self.vertices.y, self.vertices.x))
         self.vertices["r"] = np.hypot(self.vertices.y, self.vertices.x)
 
-    def single_eq_vertices(self, ra, decl, rotation=0):
+    def single_eq_vertices(self, ra: float, decl: float, rotation: float = 0.0):
         """Compute vertices for a single pair of equatorial coordinates
 
         Parameters
@@ -66,7 +68,12 @@ class LsstCameraFootprintPerimeter(object):
         decl = eq_vertices.dec.deg
         return ra, decl
 
-    def __call__(self, ra, decl, rotation=0):
+    def __call__(
+        self,
+        ra: float | NDArray[np.floating],
+        decl: float | NDArray[np.floating],
+        rotation: float | NDArray[np.floating] = 0.0,
+    ):
         """Compute vertices for a single pair of equatorial coordinates
 
         Parameters
@@ -88,13 +95,22 @@ class LsstCameraFootprintPerimeter(object):
             surrounding the camera footprints (degrees).
         """
         if np.isscalar(ra):
+            assert isinstance(ra, float)
+            assert isinstance(decl, float)
+            assert isinstance(rotation, float)
             return self.single_eq_vertices(ra, decl, rotation)
 
-        if np.isscalar(rotation):
-            rotation = np.full_like(ra, rotation)
+        assert isinstance(ra, np.ndarray)
+        assert isinstance(decl, np.ndarray)
+        assert decl.shape == ra.shape
+
+        rotation_array: NDArray[np.floating] = (
+            rotation if isinstance(rotation, np.ndarray) else np.full_like(ra, rotation)
+        )
+        assert rotation_array.shape == ra.shape
 
         vertex_ras, vertex_decls = [], []
-        for this_ra, this_decl, this_rotation in zip(ra, decl, rotation):
+        for this_ra, this_decl, this_rotation in zip(ra, decl, rotation_array):
             this_vertex_ra, this_vertex_decl = self.single_eq_vertices(this_ra, this_decl, this_rotation)
             vertex_ras.append(this_vertex_ra)
             vertex_decls.append(this_vertex_decl)

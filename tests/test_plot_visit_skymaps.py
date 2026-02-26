@@ -226,11 +226,12 @@ def test_add_footprint_outlines():
 
     # Bokeh does not support pattern matching in selection by name,
     # so iterate over all renderers and check their names explicitly.
-    outline_renderers = [
-        m
-        for m in viewable.select({"type": bokeh.models.GlyphRenderer})
-        if m.name.startswith("footprint_outline")
-    ]
+    outline_renderers = []
+    for renderer in viewable.select({"type": bokeh.models.GlyphRenderer}):
+        assert isinstance(renderer.name, str)
+        if renderer.name.startswith("footprint_outline"):
+            outline_renderers.append(renderer)
+
     assert len(outline_renderers) > 0
 
     _save_and_check_viewable_html(viewable)

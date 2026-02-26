@@ -10,7 +10,7 @@ that can be displayed in a report, dashboard, or other interface.
 
 import warnings
 from types import MethodType
-from typing import Any, Callable, Dict, List, Optional, Self, Tuple
+from typing import Any, Callable, Dict, List, Optional, Self, Tuple, SupportsFloat
 
 import bokeh
 import bokeh.layouts
@@ -21,7 +21,7 @@ import bokeh.transform
 import healpy as hp
 import numpy as np
 import pandas as pd
-from astropy.coordinates import get_body
+from astropy.coordinates import get_body, SkyCoord
 from astropy.time import Time
 from uranography.api import (
     ArmillarySphere,
@@ -176,7 +176,7 @@ class VisitMapBuilder:
         mjd: Optional[float] = None,
         map_classes: List[SphereMap] = [ArmillarySphere, Planisphere],
         camera_perimeter: Optional[
-            Callable[[pd.Series, pd.Series, pd.Series], Tuple[np.ndarray, np.ndarray]]
+            Callable[[np.ndarray, np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray]]
         ] = None,
         visit_fill_colors: Optional[Dict[str, str]] = None,
         mjd_slider_kwargs: Optional[Dict[str, Any]] = None,
@@ -196,10 +196,14 @@ class VisitMapBuilder:
         # If the mjd is not set by the caller, guess it from the visits
         # if there are any, and if there are not, assume "now".
         if mjd is None:
-            if len(self.visits) > 0:
-                self.mjd = visits[self.mjd_column].max() if mjd is None else mjd
+            if self.visits is not None and len(self.visits) > 0:
+                self.mjd = self.visits[self.mjd_column].max() if mjd is None else mjd
             else:
-                self.mjd = Time.now().mjd.item()
+                mjd_value = Time.now().mjd
+                # Tell the type checker that no, really, I know
+                # Time.now().mjd returns a scalar.
+                assert isinstance(mjd_value, SupportsFloat)
+                self.mjd = float(mjd_value)
         else:
             self.mjd = mjd
 
@@ -293,16 +297,26 @@ class VisitMapBuilder:
 
         present_visit_columns = [c for c in self.visit_columns if c in self.visits.columns]
         for band in "ugrizy":
-            in_band_mask = self.visits[self.band_column].values == band
-            band_visits = self.visits.reset_index().loc[in_band_mask, present_visit_columns].copy()
+            in_band_mask = self.visits[self.band_column] == band
+            band_visits = self.visits.loc[in_band_mask, present_visit_columns].copy()
 
             if len(band_visits) < 1:
                 continue
 
-            ras, decls = self.camera_perimeter(
-                band_visits[self.ra_column], band_visits[self.decl_column], band_visits[self.rot_column]
+            assert pd.api.types.is_float_dtype(band_visits[self.ra_column])
+            assert pd.api.types.is_float_dtype(band_visits[self.decl_column])
+            assert pd.api.types.is_float_dtype(band_visits[self.rot_column])
+            # np.asarray makes type checking happier than .values
+            visits_ra = np.asarray(band_visits[self.ra_column])
+            visits_decl = np.asarray(band_visits[self.decl_column])
+            visits_rot = np.asarray(band_visits[self.rot_column])
+
+            ras, decls = self.camera_perimeter(visits_ra, visits_decl, visits_rot)
+            band_visits = band_visits.assign(
+                ra=ras,
+                decl=decls,
+                mjd=band_visits[self.mjd_column].values,
             )
-            band_visits = band_visits.assign(ra=ras, decl=decls, mjd=band_visits[self.mjd_column].values)
 
             patches_kwargs = {"fill_color": self.visit_fill_colors[band]}
             patches_kwargs.update(DEFAULT_VISIT_PATCHES_KWARGS)
@@ -341,9 +355,14 @@ class VisitMapBuilder:
         self: `VisitMapBuilder`
             Returns self to support method chaining.
         """
+        mjd_now = Time.now().mjd
+
+        # Appease type checker
+        assert isinstance(mjd_now, SupportsFloat)
+
         slider_kwargs = {
-            "start": self.visits[self.mjd_column].min() if self.visits is not None else Time.now().mjd - 1,
-            "end": self.visits[self.mjd_column].max() if self.visits is not None else Time.now().mjd + 1,
+            "start": self.visits[self.mjd_column].min() if self.visits is not None else float(mjd_now) - 1,
+            "end": self.visits[self.mjd_column].max() if self.visits is not None else float(mjd_now) + 1,
         }
         slider_kwargs.update(kwargs)
 
@@ -697,13 +716,17 @@ class VisitMapBuilder:
             last_mjd: float = end_mjd + time_step / 2
             mjds = np.arange(first_mjd, last_mjd, time_step)
 
-        for mjd in mjds:
-            ap_time = Time(mjd, format="mjd", scale="utc")
+        ap_times = Time(mjds, format="mjd", scale="utc")
+        body_coords_all_times = get_body(body, ap_times)
+        assert isinstance(body_coords_all_times, SkyCoord)
+
+        for mjd, ap_time, body_coords in zip(mjds, ap_times, body_coords_all_times):
+            assert isinstance(body_coords, SkyCoord)
+            assert isinstance(ap_time, Time)
+
             body_name = body if len(mjds) == 1 else body + ap_time.strftime("%Y%m%d%H%M%S")
             min_mjd = mjd - time_step / 2
             max_mjd = mjd + time_step / 2
-
-            body_coords = get_body(body, ap_time)
 
             hide_js_transform = bokeh.models.CustomJSTransform(
                 args=dict(
@@ -961,7 +984,9 @@ class VisitMapBuilder:
             colormap = {r: c for r, c in zip(regions, palette)}
 
         footprint_regions = {}
-        for region_name, loop_id in set(footprint_polygons.index.values.tolist()):
+        for region_index in set(footprint_polygons.index.values.tolist()):
+            assert isinstance(region_index, tuple)
+            region_name, loop_id = region_index
             if region_name not in footprint_regions:
                 footprint_regions[region_name] = {}
             footprint_regions[region_name][loop_id] = (
