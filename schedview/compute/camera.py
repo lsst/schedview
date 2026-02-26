@@ -100,12 +100,12 @@ class LsstCameraFootprintPerimeter(object):
             assert isinstance(rotation, float)
             return self.single_eq_vertices(ra, decl, rotation)
 
-        assert isinstance(ra, np.ndarray)
-        assert isinstance(decl, np.ndarray)
+        assert isinstance(ra, np.ndarray) or isinstance(ra, pd.Series)
+        assert isinstance(decl, np.ndarray) or isinstance(decl, pd.Series)
         assert decl.shape == ra.shape
 
-        rotation_array: NDArray[np.floating] = (
-            rotation if isinstance(rotation, np.ndarray) else np.full_like(ra, rotation)
+        rotation_array: NDArray[np.floating] | pd.Series = (
+            np.full_like(ra, rotation) if np.isscalar(rotation) else rotation
         )
         assert rotation_array.shape == ra.shape
 
