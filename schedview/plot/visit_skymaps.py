@@ -10,7 +10,7 @@ that can be displayed in a report, dashboard, or other interface.
 
 import warnings
 from types import MethodType
-from typing import Any, Callable, Dict, List, Optional, Self, Tuple, SupportsFloat
+from typing import Any, Callable, Dict, List, Optional, Self, SupportsFloat, Tuple
 
 import bokeh
 import bokeh.layouts
@@ -21,7 +21,7 @@ import bokeh.transform
 import healpy as hp
 import numpy as np
 import pandas as pd
-from astropy.coordinates import get_body, SkyCoord
+from astropy.coordinates import SkyCoord, get_body
 from astropy.time import Time
 from uranography.api import (
     ArmillarySphere,

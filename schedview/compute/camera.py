@@ -1,9 +1,8 @@
-from numpy.typing import NDArray
-
 import astropy.units as u
 import numpy as np
 import pandas as pd
 from astropy.coordinates import SkyCoord
+from numpy.typing import NDArray
 
 
 class LsstCameraFootprintPerimeter(object):
