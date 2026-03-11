@@ -251,7 +251,8 @@ def plot_visit_param_vs_time(
         source.data["label"] = np.full_like(source.data["start_timestamp"], "")
 
     if "sim_alpha" not in source.data:
-        source.data["sim_alpha"] = np.full_like(source.data["start_timestamp"], 1.0, dtype=np.float64)
+        source.data["sim_alpha"] = np.full_like(source.data["start_timestamp"], 0.2, dtype=np.float64)
+        source.data["sim_alpha"][source.data["label"] == "Completed"] = 1.0
 
     scatter_kwargs = {"fill_alpha": 0.0, "line_alpha": "sim_alpha", "name": "timeline"}
 
@@ -413,7 +414,7 @@ def plot_visit_param_vs_time(
                     if (source.data['label'][i] === 'Completed') {
                         source.data['sim_alpha'][i] = 1.0;
                     } else if (['All', source.data['label'][i]].includes(this.value)) {
-                        source.data['sim_alpha'][i] = 0.8;
+                        source.data['sim_alpha'][i] = 0.2;
                     } else {
                         source.data['sim_alpha'][i] = 0.0;
                     }
