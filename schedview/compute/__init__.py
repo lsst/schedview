@@ -16,7 +16,11 @@ __all__ = [
     "compute_scalar_metric_at_one_mjd",
     "compute_scalar_metric_at_mjds",
     "compute_mixed_scalar_metric",
+    "compute_obs_sim_offsets",
+    "compute_offset_stats",
+    "offsets_of_coord_band",
     "often_repeated_fields",
+    "assign_field_hpids",
     "count_visits_by_sim",
     "match_visits_across_sims",
     "compute_matched_visit_delta_statistics",
@@ -25,6 +29,12 @@ __all__ = [
 
 from .astro import compute_sun_moon_positions, convert_evening_date_to_night_of_survey, night_events
 from .camera import LsstCameraFootprintPerimeter
+from .comparesim import (
+    assign_field_hpids,
+    compute_obs_sim_offsets,
+    compute_offset_stats,
+    offsets_of_coord_band,
+)
 from .multisim import (
     compute_matched_visit_delta_statistics,
     count_visits_by_sim,
