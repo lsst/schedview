@@ -10,6 +10,7 @@ __all__ = [
     "make_unique_survey_name",
     "make_scheduler_summary_df",
     "make_survey_reward_df",
+    "compute_common_fractions",
     "compute_maps",
     "compute_metric_by_visit",
     "compute_hpix_metric_in_bands",
@@ -31,6 +32,7 @@ from .astro import compute_sun_moon_positions, convert_evening_date_to_night_of_
 from .camera import LsstCameraFootprintPerimeter
 from .comparesim import (
     assign_field_hpids,
+    compute_common_fractions,
     compute_obs_sim_offsets,
     compute_offset_stats,
     offsets_of_coord_band,
