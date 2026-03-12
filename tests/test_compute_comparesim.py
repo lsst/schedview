@@ -6,9 +6,9 @@ import pandas as pd
 
 from schedview.compute.comparesim import (
     assign_field_hpids,
+    compute_common_fractions,
     compute_obs_sim_offsets,
     compute_offset_stats,
-    compute_common_fractions,
     offsets_of_coord_band,
 )
 
