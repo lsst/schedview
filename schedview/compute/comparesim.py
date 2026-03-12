@@ -131,6 +131,11 @@ def offsets_of_coord_band(sim_index: int, visits: pd.DataFrame, obs_index: int =
         A DataFrame with columns ``obs_time``, ``sim_time`` and ``delta`` and
         an index level ``sim_index``.
     """
+    # This function is intended to be run on a DataFrame on a single
+    # field/band combination, not on the whole set of visits, e.g. for a night.
+    for col in ("band", "fieldHpid"):
+        if col in visits.columns:
+            assert len(visits[col].unique()) == 1
 
     offsets = match_visits_across_sims(visits.set_index("sim_index").start_timestamp, (obs_index, sim_index))
 
