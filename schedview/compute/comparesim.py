@@ -119,15 +119,15 @@ def offsets_of_coord_band(sim_index: int, visits: pd.DataFrame, obs_index: int =
 
     Parameters
     ----------
-    sim_index : int
+    sim_index : `int`
         The simulation index to compare against the observation (index 0).
-    visits : pd.DataFrame
-        Table of visits that contains at least the columns *sim_index* and
-        *start_timestamp*.
+    visits : `pd.DataFrame`
+        Table of visits that contains at least the columns ``sim_index`` and
+        ``start_timestamp``.
 
     Returns
     -------
-    pd.DataFrame
+    offsets: `pd.DataFrame`
         A DataFrame with columns ``obs_time``, ``sim_time`` and ``delta`` and
         an index level ``sim_index``.
     """

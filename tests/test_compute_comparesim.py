@@ -4,7 +4,7 @@ import healpy as hp
 import numpy as np
 import pandas as pd
 
-from schedview.compute.comparesim import assign_field_hpids
+from schedview.compute.comparesim import assign_field_hpids, offsets_of_coord_band
 
 
 class TestAssignFieldHpids(unittest.TestCase):
@@ -100,6 +100,73 @@ class TestAssignFieldHpids(unittest.TestCase):
         # Completed DataFrame should remain empty but still have the column.
         self.assertTrue(comp_out.empty)
         self.assertIn("fieldHpid", comp_out.columns)
+
+
+class TestOffsetOfCoordBand(unittest.TestCase):
+
+    def setUp(self):
+        self.num_test_visits = 10
+
+        # generate a set of self.num_test_visits times separated by 500 to 600
+        # seconds, and generate a dataframe self.sim_visits with those times.
+        start_time = pd.Timestamp("2020-01-01 00:00:00", tz="UTC")
+        time_diffs = np.random.uniform(500, 600, self.num_test_visits)
+        times = [
+            start_time + pd.Timedelta(seconds=np.sum(time_diffs[:i])) for i in range(self.num_test_visits)
+        ]
+        self.sim_visits = pd.DataFrame(
+            {
+                "sim_index": [1] * self.num_test_visits,
+                "start_timestamp": times,
+                "fieldRA": [10.0] * self.num_test_visits,
+                "fieldDec": [0.0] * self.num_test_visits,
+                "band": ["r"] * self.num_test_visits,
+            }
+        )
+
+        # randomly but repeatably generate a set of self.num_test_visits
+        # offsets between -60 and 60 seconds, self.offsets, and apply these to
+        # self.sim_visits to get self.obs_visits
+        rng = np.random.default_rng(6563)
+        self.offsets = rng.uniform(-60, 60, self.num_test_visits)
+        self.obs_visits = self.sim_visits.copy()
+        self.obs_visits["start_timestamp"] = self.obs_visits["start_timestamp"] + pd.to_timedelta(
+            self.offsets, unit="s"
+        )
+        self.obs_visits["sim_index"] = [0] * self.num_test_visits
+
+    def test_equal_numbers(self):
+        visits = pd.concat(
+            [self.sim_visits.assign(sim_index=0), self.obs_visits.assign(sim_index=1)], ignore_index=True
+        )
+
+        # Verify that we can recover the time offsets
+        result = offsets_of_coord_band(0, visits, 1)
+        np.testing.assert_array_almost_equal(result["delta"].values, self.offsets, decimal=4)
+
+        # Verify that we can reverse the sign
+        result = offsets_of_coord_band(1, visits, 0)
+        np.testing.assert_array_almost_equal(result["delta"].values, -1 * self.offsets, decimal=4)
+
+    def test_missing_some(self):
+        rng = np.random.default_rng(6564)
+        dropped_indexes = rng.choice(len(self.sim_visits), 3, replace=False)
+        kept_indexes = np.setdiff1d(np.arange(len(self.sim_visits)), dropped_indexes)
+        remaining_offsets = self.offsets[kept_indexes]
+
+        reduced_sim_visits = self.sim_visits.drop(dropped_indexes).reset_index(drop=True)
+
+        visits = pd.concat(
+            [reduced_sim_visits.assign(sim_index=0), self.obs_visits.assign(sim_index=1)], ignore_index=True
+        )
+
+        # Visits that weren't dropped should be recoverable
+        result = offsets_of_coord_band(0, visits, 1)
+        np.testing.assert_array_almost_equal(result["delta"].values, remaining_offsets, decimal=4)
+
+        # Reverse sim and obs, and see if it still works
+        result = offsets_of_coord_band(1, visits, 0)
+        np.testing.assert_array_almost_equal(result["delta"].values, -1 * remaining_offsets, decimal=4)
 
 
 if __name__ == "__main__":
