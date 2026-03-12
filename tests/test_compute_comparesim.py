@@ -6,6 +6,8 @@ import pandas as pd
 
 from schedview.compute.comparesim import assign_field_hpids, offsets_of_coord_band
 
+RANDOM_NUMBER_GENERATOR = np.random.default_rng(6563)
+
 
 class TestAssignFieldHpids(unittest.TestCase):
 
@@ -13,8 +15,7 @@ class TestAssignFieldHpids(unittest.TestCase):
         self.nside = 2**10
 
         # Pick a few random but reproducible healpix indices.
-        rng = np.random.default_rng(42)
-        self.sim_hpids = rng.integers(0, hp.nside2npix(self.nside), size=5)
+        self.sim_hpids = RANDOM_NUMBER_GENERATOR.integers(0, hp.nside2npix(self.nside), size=5)
         ra, dec = hp.pix2ang(self.nside, self.sim_hpids, lonlat=True)
         self.simulated_visits = pd.DataFrame({"fieldRA": ra, "fieldDec": dec})
 
@@ -127,8 +128,7 @@ class TestOffsetOfCoordBand(unittest.TestCase):
         # randomly but repeatably generate a set of self.num_test_visits
         # offsets between -60 and 60 seconds, self.offsets, and apply these to
         # self.sim_visits to get self.obs_visits
-        rng = np.random.default_rng(6563)
-        self.offsets = rng.uniform(-60, 60, self.num_test_visits)
+        self.offsets = RANDOM_NUMBER_GENERATOR.uniform(-60, 60, self.num_test_visits)
         self.obs_visits = self.sim_visits.copy()
         self.obs_visits["start_timestamp"] = self.obs_visits["start_timestamp"] + pd.to_timedelta(
             self.offsets, unit="s"
@@ -149,8 +149,7 @@ class TestOffsetOfCoordBand(unittest.TestCase):
         np.testing.assert_array_almost_equal(result["delta"].values, -1 * self.offsets, decimal=4)
 
     def test_missing_some(self):
-        rng = np.random.default_rng(6564)
-        dropped_indexes = rng.choice(len(self.sim_visits), 3, replace=False)
+        dropped_indexes = RANDOM_NUMBER_GENERATOR.choice(len(self.sim_visits), 3, replace=False)
         kept_indexes = np.setdiff1d(np.arange(len(self.sim_visits)), dropped_indexes)
         remaining_offsets = self.offsets[kept_indexes]
 
