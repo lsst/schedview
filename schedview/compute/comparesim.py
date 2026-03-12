@@ -257,7 +257,7 @@ def compute_common_fractions(visit_counts: pd.DataFrame, sim_labels: pd.Series, 
         The values are integers representing the number of visits to each field
         in each simulation. (Such a ``pd.DataFrame`` is returned by
         ``schedview.compute.multisim.count_visits_by_sim``.)
-    sim_labels : `pd.Series`
+    sim_labels : `pd.Series` or `pd.DataFrame`
         A Series with simulation indices as the index and labels as values.
         This is used to label the returned DataFrame.
     obs_index : `int`, optional
@@ -291,6 +291,9 @@ def compute_common_fractions(visit_counts: pd.DataFrame, sim_labels: pd.Series, 
     by other simulation indices). The fractions are computed using the
     ``fraction_common`` function from ``schedview.compute.multisim``.
     """
+    if isinstance(sim_labels, pd.Series):
+        sim_labels = sim_labels.to_frame()
+
     fraction_obs_simulated = partial(fraction_common, visit_counts, sim2=obs_index, match_count=False)
     fraction_sim_observed = partial(fraction_common, visit_counts, obs_index, match_count=False)
     fraction_obs_simulated_num = partial(fraction_common, visit_counts, sim2=obs_index, match_count=True)
