@@ -8,6 +8,7 @@ from schedview.compute.comparesim import (
     assign_field_hpids,
     compute_obs_sim_offsets,
     compute_offset_stats,
+    compute_common_fractions,
     offsets_of_coord_band,
 )
 
@@ -281,6 +282,54 @@ class TestComputeOffsetStats(unittest.TestCase):
         offset_dt_stats = pd.Series(self.offset_dt).describe()
         for col in offset_dt_stats.index[1:]:
             self.assertAlmostEqual(offset_dt_stats[col], offset_stats.loc[1, col], 5)
+
+
+class TestComputeCommonFractions(unittest.TestCase):
+
+    def setUp(self):
+        # Create a simple test visit counts DataFrame
+        # This simulates what would come from count_visits_by_sim
+
+        self.visit_counts = pd.DataFrame(
+            {
+                "fieldHpid": [100, 101, 102, 103, 100, 101, 102, 102],
+                "band": ["u", "u", "u", "u", "g", "g", "g", "g"],
+                0: [1, 1, 1, 1, 2, 2, 0, 0],
+                1: [1, 1, 1, 1, 2, 2, 0, 0],
+                2: [2, 2, 1, 1, 2, 2, 0, 0],
+                3: [1, 1, 1, 1, 1, 1, 1, 1],
+            }
+        ).set_index(["fieldHpid", "band"])
+
+        self.num_sims = len(self.visit_counts.columns) - 1
+
+        # Create sim_labels Series
+        self.sim_labels = pd.Series(
+            ["Completed", "Sim 1", "Sim 2", "Sim 3"], index=[0, 1, 2, 3], name="label"
+        )
+
+    def test_compute_common_fractions(self):
+        """Test basic functionality of compute_common_fractions."""
+        result = compute_common_fractions(self.visit_counts, self.sim_labels, obs_index=0)
+
+        # Should return a DataFrame
+        self.assertIsInstance(result, pd.DataFrame)
+
+        # Should have the expected columns
+        expected_columns = ["label", "frac_obs_sim_num", "frac_sim_obs_num", "frac_obs_sim", "frac_sim_obs"]
+        self.assertListEqual(list(result.columns), expected_columns)
+
+        # Make sure we have one row per sim
+        self.assertListEqual(list(result.index), (1 + np.arange(self.num_sims)).tolist())
+
+        # Check that all values are between 0 and 1
+        fraction_columns = ["frac_obs_sim_num", "frac_sim_obs_num", "frac_obs_sim", "frac_sim_obs"]
+        for col in fraction_columns:
+            assert (np.all(result[col]) <= 1) and (np.all(result[col] >= 0))
+
+        np.testing.assert_array_equal(result.loc[1, fraction_columns], [1.0, 1.0, 1.0, 1.0])
+        np.testing.assert_array_equal(result.loc[2, fraction_columns], [1.0, 0.8, 1.0, 1.0])
+        np.testing.assert_array_equal(result.loc[3, fraction_columns], [0.75, 0.75, 1.0, 0.75])
 
 
 if __name__ == "__main__":
