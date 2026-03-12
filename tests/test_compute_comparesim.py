@@ -4,7 +4,7 @@ import healpy as hp
 import numpy as np
 import pandas as pd
 
-from schedview.compute.comparesim import assign_field_hpids, offsets_of_coord_band
+from schedview.compute.comparesim import assign_field_hpids, compute_obs_sim_offsets, offsets_of_coord_band
 
 RANDOM_NUMBER_GENERATOR = np.random.default_rng(6563)
 
@@ -110,14 +110,13 @@ class TestOffsetOfCoordBand(unittest.TestCase):
 
         # generate a set of self.num_test_visits times separated by 500 to 600
         # seconds, and generate a dataframe self.sim_visits with those times.
-        start_time = pd.Timestamp("2020-01-01 00:00:00", tz="UTC")
+        start_time = pd.Timestamp("2027-01-01 00:00:00", tz="UTC")
         time_diffs = np.random.uniform(500, 600, self.num_test_visits)
         times = [
             start_time + pd.Timedelta(seconds=np.sum(time_diffs[:i])) for i in range(self.num_test_visits)
         ]
         self.sim_visits = pd.DataFrame(
             {
-                "sim_index": [1] * self.num_test_visits,
                 "start_timestamp": times,
                 "fieldRA": [10.0] * self.num_test_visits,
                 "fieldDec": [0.0] * self.num_test_visits,
@@ -166,6 +165,89 @@ class TestOffsetOfCoordBand(unittest.TestCase):
         # Reverse sim and obs, and see if it still works
         result = offsets_of_coord_band(1, visits, 0)
         np.testing.assert_array_almost_equal(result["delta"].values, -1 * remaining_offsets, decimal=4)
+
+
+class TestComputeObsSimOffsets(unittest.TestCase):
+
+    def setUp(self):
+        self.num_visits_per_hpid_band = 5
+        self.num_hpid_band = 3
+        self.num_sims = 3
+
+        # Generate a pandas.DataFrame, hpid_band_df, of length
+        # self.num_hpid_band,
+        # with fieldRA, fieldDec, band, and fieldHpid corresponding to
+        # fieldRA and fieldDec with healpy nside 32
+        # fieldRA and fieldDec should be randomly but repeatably generate.
+        # band should be randomly but repeatably selected from u, g, r, i, z, y
+        nside = 32
+        hpid_band_df = pd.DataFrame()
+        hpid_band_df["fieldHpid"] = RANDOM_NUMBER_GENERATOR.integers(
+            0, hp.nside2npix(nside), size=self.num_hpid_band
+        )
+        hpid_band_df["fieldRA"], hpid_band_df["fieldDec"] = hp.pix2ang(
+            nside, hpid_band_df["fieldHpid"], lonlat=True
+        )
+
+        # Generate random bands from u, g, r, i, z, y
+        bands = ["u", "g", "r", "i", "z", "y"]
+        hpid_band_df["band"] = RANDOM_NUMBER_GENERATOR.choice(bands, size=self.num_hpid_band)
+
+        self.hpid_band_df = hpid_band_df
+
+        # Generate a set of simulations
+        sim_dfs = []
+        start_time = pd.Timestamp("2027-01-01 00:00:00", tz="UTC")
+        for sim_index in range(1, self.num_sims + 1):
+            sim_df = pd.DataFrame()
+            visit_data = []
+            start_timestamp = start_time
+
+            # in this simulation, observe each hpid_band
+            for _, hpid_band in self.hpid_band_df.iterrows():
+                for time_diff in RANDOM_NUMBER_GENERATOR.uniform(500, 600, self.num_visits_per_hpid_band):
+                    start_timestamp = start_timestamp + pd.Timedelta(seconds=time_diff)
+                    visit_data.append(
+                        {
+                            "sim_index": sim_index,
+                            "start_timestamp": start_timestamp,
+                            "fieldRA": hpid_band["fieldRA"],
+                            "fieldDec": hpid_band["fieldDec"],
+                            "band": hpid_band["band"],
+                            "fieldHpid": hpid_band["fieldHpid"],
+                        }
+                    )
+
+            sim_df = pd.DataFrame(visit_data)
+            sim_dfs.append(sim_df)
+
+        # Generate an obs_df with is similar to the first sim, but with offsets
+        obs_df = sim_dfs[0].copy()
+        self.offsets = RANDOM_NUMBER_GENERATOR.uniform(-6, 6, len(obs_df))
+        obs_df["start_timestamp"] = obs_df["start_timestamp"] + pd.to_timedelta(self.offsets, unit="s")
+        obs_df["sim_index"] = 0
+
+        self.visits = pd.concat([obs_df] + sim_dfs, ignore_index=True)
+
+    def test_compute_obs_sim_offsets_basic(self):
+        # Test basic functionality of compute_obs_sim_offsets
+        result = compute_obs_sim_offsets(self.visits, obs_index=0)
+
+        self.assertIsNotNone(result)
+        self.assertIn("delta", result.columns)
+
+        # Test that we recover offsets
+        np.testing.assert_array_almost_equal(
+            result.sort_values("sim_time").loc[1, "delta"].values, self.offsets, decimal=4
+        )
+
+        # Should have a multiindex with sim_index, fieldHpid, and band
+        self.assertTrue(isinstance(result.index, pd.MultiIndex))
+        self.assertEqual(result.index.names, ["sim_index", "fieldHpid", "band"])
+
+        # Should have at least one entry for each simulation
+        sim_indexes = result.index.get_level_values("sim_index").unique()
+        assert set(sim_indexes) == set(range(self.num_sims + 1)) - set([0])
 
 
 if __name__ == "__main__":
