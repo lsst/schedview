@@ -75,32 +75,38 @@ def assign_field_hpids(
         lonlat=True,
     )
 
-    # Values assigned here will be replaced by closest matches
-    # in simulated_visit[hpid_col] if there are any within
-    # field_coord_tolerance_deg
-    completed_visits[hpid_col] = hp.ang2pix(
-        nside=nside,
-        theta=completed_visits[ra_col],
-        phi=completed_visits[decl_col],
-        lonlat=True,
-    )
+    if completed_visits.empty:
+        # If completed_visits is empty, all we have to do is create the column
+        # in the empty DataFrame and we are done.
+        completed_visits[hpid_col] = []
+        completed_visits[hpid_col] = completed_visits[hpid_col].astype(int)
+    else:
+        # Values assigned here will be replaced by closest matches
+        # in simulated_visit[hpid_col] if there are any within
+        # field_coord_tolerance_deg
+        completed_visits[hpid_col] = hp.ang2pix(
+            nside=nside,
+            theta=completed_visits[ra_col],
+            phi=completed_visits[decl_col],
+            lonlat=True,
+        )
 
-    # Find all hpids actually used in the simulation.
-    sim_hpids = simulated_visits[hpid_col].unique()
-    sim_hp_ra, sim_hp_dec = hp.pix2ang(nside=nside, ipix=sim_hpids, lonlat=True)
-    sim_hp_coords = SkyCoord(ra=sim_hp_ra * u.deg, dec=sim_hp_dec * u.deg, frame="icrs")
+        # Find all hpids actually used in the simulation.
+        sim_hpids = simulated_visits[hpid_col].unique()
+        sim_hp_ra, sim_hp_dec = hp.pix2ang(nside=nside, ipix=sim_hpids, lonlat=True)
+        sim_hp_coords = SkyCoord(ra=sim_hp_ra * u.deg, dec=sim_hp_dec * u.deg, frame="icrs")
 
-    # Match completed visits to the nearest hpid actually used in simulations.
-    completed_coords = SkyCoord(
-        ra=completed_visits[ra_col].values * u.deg,
-        dec=completed_visits[decl_col].values * u.deg,
-        frame="icrs",
-    )
-    sim_hp_match_idx, sim_hp_sep, _ = completed_coords.match_to_catalog_sky(sim_hp_coords)
+        # Match completed visits to the nearest hpid used in simulations.
+        completed_coords = SkyCoord(
+            ra=completed_visits[ra_col].values * u.deg,
+            dec=completed_visits[decl_col].values * u.deg,
+            frame="icrs",
+        )
+        sim_hp_match_idx, sim_hp_sep, _ = completed_coords.match_to_catalog_sky(sim_hp_coords)
 
-    # Apply tolerance mask and replace the healpix id where appropriate.
-    within_tol = sim_hp_sep.deg < coord_match_tolerance_deg
-    completed_visits.loc[within_tol, hpid_col] = sim_hpids[sim_hp_match_idx[within_tol]]
+        # Apply tolerance mask and replace the healpix id where appropriate.
+        within_tol = sim_hp_sep.deg < coord_match_tolerance_deg
+        completed_visits.loc[within_tol, hpid_col] = sim_hpids[sim_hp_match_idx[within_tol]]
 
     return simulated_visits, completed_visits
 
