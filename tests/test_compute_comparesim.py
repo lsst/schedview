@@ -249,7 +249,9 @@ class TestComputeObsSimOffsets(unittest.TestCase):
 
         # Test that we recover offsets
         np.testing.assert_array_almost_equal(
-            result.sort_values("sim_time").loc[1, "delta"].values, self.offsets, decimal=4
+            result.loc[1, :].sort_values("sim_time").loc[:, "delta"].values,
+            self.offsets,
+            decimal=4,
         )
 
         # Should have a multiindex with sim_index, fieldHpid, and band
