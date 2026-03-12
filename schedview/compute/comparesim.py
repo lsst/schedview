@@ -181,7 +181,8 @@ def compute_obs_sim_offsets(
     sim_indexes = sim_indexes[sim_indexes != obs_index]
 
     offsets = pd.concat(
-        visits.groupby(["fieldHpid", "band"]).apply(partial(offsets_of_coord_band, i)) for i in sim_indexes
+        visits.groupby(["fieldHpid", "band"]).apply(partial(offsets_of_coord_band, i), include_groups=False)
+        for i in sim_indexes
     )
     offsets.index = offsets.index.reorder_levels(["sim_index", "fieldHpid", "band"])
     return offsets
