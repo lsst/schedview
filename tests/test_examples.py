@@ -38,7 +38,7 @@ class TestExamples(unittest.TestCase):
 
     def test_nightevents(self):
         with TemporaryDirectory() as dir:
-            report = Path(dir).joinpath("nightevents.txt").name
+            report = str(Path(dir).joinpath("nightevents.txt"))
             make_night_events(TEST_ISO_DATE, report)
             with open(report) as report_io:
                 content = report_io.read()
@@ -46,7 +46,7 @@ class TestExamples(unittest.TestCase):
 
     def test_gaps(self):
         with TemporaryDirectory() as dir:
-            report = Path(dir).joinpath("gaps.html").name
+            report = str(Path(dir).joinpath("gaps.html"))
             make_gaps(TEST_ISO_DATE, "baseline", report)
             with open(report) as report_io:
                 content = report_io.read()
@@ -55,31 +55,31 @@ class TestExamples(unittest.TestCase):
 
     def test_visitmap(self):
         with TemporaryDirectory() as dir:
-            report = Path(dir).joinpath("visitmaps.html").name
+            report = str(Path(dir).joinpath("visitmaps.html"))
             make_visit_map(TEST_ISO_DATE, "baseline", 16, report=report)
             assert os.path.exists(report)
 
     def test_altplot(self):
         with TemporaryDirectory() as dir:
-            report = Path(dir).joinpath("altplot.html").name
+            report = str(Path(dir).joinpath("altplot.html"))
             make_alt_vs_time_plot(TEST_ISO_DATE, "baseline", report=report)
             assert os.path.exists(report)
 
     def test_horizonplot(self):
         with TemporaryDirectory() as dir:
-            report = Path(dir).joinpath("horizonplot.html").name
+            report = str(Path(dir).joinpath("horizonplot.html"))
             make_horizon_plot(TEST_ISO_DATE, "baseline", report=report)
             assert os.path.exists(report)
 
     def test_visitparam(self):
         with TemporaryDirectory() as dir:
-            report = Path(dir).joinpath("visitparam.html").name
+            report = str(Path(dir).joinpath("visitparam.html"))
             make_visit_param_vs_time_plot(TEST_ISO_DATE, "baseline", report=report)
             assert os.path.exists(report)
 
     def test_surveyrewards(self):
         with TemporaryDirectory() as dir:
-            report = Path(dir).joinpath("surveyrewards.html").name
+            report = str(Path(dir).joinpath("surveyrewards.html"))
             rewards_uri: str = str(
                 importlib.resources.files("schedview").joinpath("data").joinpath("sample_rewards.h5")
             )
@@ -88,7 +88,7 @@ class TestExamples(unittest.TestCase):
 
     def test_bfrewards(self):
         with TemporaryDirectory() as dir:
-            report = Path(dir).joinpath("surveyrewards.html").name
+            report = str(Path(dir).joinpath("surveyrewards.html"))
             rewards_uri: str = str(
                 importlib.resources.files("schedview").joinpath("data").joinpath("sample_rewards.h5")
             )
@@ -97,62 +97,62 @@ class TestExamples(unittest.TestCase):
 
     def test_accumdepth(self):
         with TemporaryDirectory() as dir:
-            report = Path(dir).joinpath("accumdepth.png").name
+            report = str(Path(dir).joinpath("accumdepth.png"))
             make_accum_depth(TEST_ISO_DATE, "baseline", report=report)
             assert os.path.exists(report)
 
     def test_agemap(self):
         with TemporaryDirectory() as dir:
-            report = Path(dir).joinpath("agemap.png").name
+            report = str(Path(dir).joinpath("agemap.png"))
             make_agemap(TEST_ISO_DATE, "baseline", report=report)
             assert os.path.exists(report)
 
     def test_ddf_cadence_plot(self):
         with TemporaryDirectory() as dir:
-            report = Path(dir).joinpath("ddfcadence.html").name
+            report = str(Path(dir).joinpath("ddfcadence.html"))
             make_ddf_cadence_plot(TEST_ISO_DATE, "baseline", report=report)
             assert os.path.exists(report)
 
     @unittest.skipUnless(USE_CONSDB, "Skipping test requiring consdb access.")
     def test_narrative_log(self):
         with TemporaryDirectory() as dir:
-            report = Path(dir).joinpath("narrlog.txt").name
+            report = str(Path(dir).joinpath("narrlog.txt"))
             make_narrative_log(TEST_ISO_DATE, "Simonyi", report=report)
             assert os.path.exists(report)
 
     @unittest.skipUnless(USE_CONSDB, "Skipping test requiring consdb access.")
     def test_nightreport(self):
         with TemporaryDirectory() as dir:
-            report = Path(dir).joinpath("nightreport.txt").name
+            report = str(Path(dir).joinpath("nightreport.txt"))
             make_nightreport(TEST_ISO_DATE, "Simonyi", report=report)
             assert os.path.exists(report)
 
     def test_overhead_hist(self):
         with TemporaryDirectory() as dir:
-            report = Path(dir).joinpath("overhead_hist.html").name
+            report = str(Path(dir).joinpath("overhead_hist.html"))
             make_overhead_hist(TEST_ISO_DATE, "baseline", report=report)
             assert os.path.exists(report)
 
     def test_overhead_vs_slew_dist(self):
         with TemporaryDirectory() as dir:
-            report = Path(dir).joinpath("overhead_vs_slew_dist.html").name
+            report = str(Path(dir).joinpath("overhead_vs_slew_dist.html"))
             make_overhead_vs_slew_dist(TEST_ISO_DATE, "baseline", report=report)
             assert os.path.exists(report)
 
     def test_overhead_table(self):
         with TemporaryDirectory() as dir:
-            report = Path(dir).joinpath("overhead_table.html").name
+            report = str(Path(dir).joinpath("overhead_table.html"))
             make_overhead_table(TEST_ISO_DATE, "baseline", report=report)
             assert os.path.exists(report)
 
     def test_sunmoon(self):
         with TemporaryDirectory() as dir:
-            report = Path(dir).joinpath("sunmoon.txt").name
+            report = str(Path(dir).joinpath("sunmoon.txt"))
             make_sunmoon(TEST_ISO_DATE, report=report)
             assert os.path.exists(report)
 
     def test_visit_table(self):
         with TemporaryDirectory() as dir:
-            report = Path(dir).joinpath("visit_table.html").name
+            report = str(Path(dir).joinpath("visit_table.html"))
             make_visit_table(TEST_ISO_DATE, "baseline", report=report)
             assert os.path.exists(report)
