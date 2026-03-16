@@ -26,7 +26,7 @@ class TestLogExamples(unittest.TestCase):
     @unittest.skipUnless(USE_EFD, "Skipping test that requires EFD access")
     def test_nightevents(self):
         with TemporaryDirectory() as dir:
-            report = str(Path(dir).joinpath("nightevents.txt").name)
+            report = str(Path(dir).joinpath("nightevents.txt"))
             make_night_events(TEST_ISO_DATE, report)
             with open(report) as report_io:
                 content = report_io.read()
@@ -35,20 +35,20 @@ class TestLogExamples(unittest.TestCase):
     @unittest.skipUnless(USE_CONSDB, "Skipping test that requires consdb access")
     def test_narrative_log(self):
         with TemporaryDirectory() as dir:
-            report = str(Path(dir).joinpath("narrlog.txt").name)
+            report = str(Path(dir).joinpath("narrlog.txt"))
             make_narrative_log(TEST_ISO_DATE, TEST_TELESCOPE, report=report)
             assert os.path.exists(report)
 
     @unittest.skipUnless(USE_CONSDB, "Skipping test that requires consdb access")
     def test_nightreport(self):
         with TemporaryDirectory() as dir:
-            report = str(Path(dir).joinpath("nightreport.txt").name)
+            report = str(Path(dir).joinpath("nightreport.txt"))
             make_nightreport(TEST_ISO_DATE, TEST_TELESCOPE, report=report)
             assert os.path.exists(report)
 
     @unittest.skipUnless(USE_EFD, "Skipping test that requires EFD access")
     def test_timeline(self):
         with TemporaryDirectory() as dir:
-            report = str(Path(dir).joinpath("timeline.html").name)
+            report = str(Path(dir).joinpath("timeline.html"))
             make_timeline(TEST_ISO_DATE, TEST_VISIT_SOURCE, TEST_TELESCOPE, report=report)
             assert os.path.exists(report)
