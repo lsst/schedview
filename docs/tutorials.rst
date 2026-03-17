@@ -1,4 +1,4 @@
 Tutorials
 =========
 
-For tutorial documentation, follow the tutorials in `schedview/notebooks/scheduler.ipynb` and `schedview/notebooks/prenight.ipynb`` in jupyter.
+`Overview of the visit sky map builder <visit_skymaps.html>`__.

@@ -347,6 +347,12 @@ def create_visit_skymaps(
         The arguments used to produce the figure using
         `plot_visit_skymaps`.
     """
+    warn(
+        "create_visit_skymaps is deprecated and will be removed; use VisitMapBuilder instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     site = None if observatory is None else observatory.location
     night_events = schedview.compute.astro.night_events(night_date=night_date, site=site, timezone=timezone)
     start_time = Time(night_events.loc["sunset", "UTC"])

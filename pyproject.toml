@@ -41,7 +41,7 @@ dependencies = [
     "tabulate",
     "rubin-scheduler >= 3.22.0",
     "rubin-sim >= 2.6.1",
-    "uranography >= 1.4.1 ",
+    "uranography >= 1.5.0 ",
 ]
 
 [project.optional-dependencies]
