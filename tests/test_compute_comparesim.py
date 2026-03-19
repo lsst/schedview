@@ -6,7 +6,6 @@ import pandas as pd
 
 from schedview.compute.comparesim import (
     assign_field_hpids,
-    compute_common_fractions,
     compute_obs_sim_offsets,
     compute_offset_stats,
     offsets_of_coord_band,
@@ -307,29 +306,6 @@ class TestComputeCommonFractions(unittest.TestCase):
         self.sim_labels = pd.Series(
             ["Completed", "Sim 1", "Sim 2", "Sim 3"], index=[0, 1, 2, 3], name="label"
         )
-
-    def test_compute_common_fractions(self):
-        """Test basic functionality of compute_common_fractions."""
-        result = compute_common_fractions(self.visit_counts, self.sim_labels, obs_index=0)
-
-        # Should return a DataFrame
-        self.assertIsInstance(result, pd.DataFrame)
-
-        # Should have the expected columns
-        expected_columns = ["label", "frac_obs_sim_num", "frac_sim_obs_num", "frac_obs_sim", "frac_sim_obs"]
-        self.assertListEqual(list(result.columns), expected_columns)
-
-        # Make sure we have one row per sim
-        self.assertListEqual(list(result.index), (1 + np.arange(self.num_sims)).tolist())
-
-        # Check that all values are between 0 and 1
-        fraction_columns = ["frac_obs_sim_num", "frac_sim_obs_num", "frac_obs_sim", "frac_sim_obs"]
-        for col in fraction_columns:
-            assert (np.all(result[col]) <= 1) and (np.all(result[col] >= 0))
-
-        np.testing.assert_array_equal(result.loc[1, fraction_columns], [1.0, 1.0, 1.0, 1.0])
-        np.testing.assert_array_equal(result.loc[2, fraction_columns], [1.0, 0.8, 1.0, 1.0])
-        np.testing.assert_array_equal(result.loc[3, fraction_columns], [0.75, 0.75, 1.0, 0.75])
 
 
 if __name__ == "__main__":

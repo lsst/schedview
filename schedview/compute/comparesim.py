@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from astropy.coordinates import Angle, SkyCoord
 
-from .multisim import fraction_common, match_visits_across_sims
+from .multisim import match_visits_across_sims
 
 
 def assign_field_hpids(
@@ -243,66 +243,3 @@ def compute_offset_stats(
         offset_stats.insert(0, "label", visits.groupby("sim_index")["label"].first().to_frame())
 
     return offset_stats
-
-
-def compute_common_fractions(visit_counts: pd.DataFrame, sim_labels: pd.Series, obs_index: int = 0):
-    """
-    Compute fractions of visits in common between observed & simulated visits.
-
-    Parameters
-    ----------
-    visit_counts : `pd.DataFrame`
-        A table of visit counts by field and simulation, where each row
-        corresponds to a field and each column corresponds to a simulation.
-        The values are integers representing the number of visits to each field
-        in each simulation. (Such a ``pd.DataFrame`` is returned by
-        ``schedview.compute.multisim.count_visits_by_sim``.)
-    sim_labels : `pd.Series` or `pd.DataFrame`
-        A Series with simulation indices as the index and labels as values.
-        This is used to label the returned DataFrame.
-    obs_index : `int`, optional
-        The index of the observation (completed visits) "simulation." This
-        is used as the reference simulation for computing fractions.
-        Default is 0.
-
-    Returns
-    -------
-    fraction_completed : `pd.DataFrame`
-        A DataFrame with the following columns:
-
-        ``frac_obs_sim_num``: The fraction of occurrences of coordinate/band
-            combinations observed that were also observed in the simulation
-            (count-based).
-        ``frac_sim_obs_num``: The fraction of occurrences of coordinate/band
-            combinations simulated that were observed (count-based).
-        ``frac_obs_sim``: The fraction of coordinate/band combinations
-            observed at least once that were also observed at least once in
-            the simulation (occurrence-based).
-        ``frac_sim_obs``: The fraction of coordinate/band combinations
-            simulated at least once that were observed at least once
-            (occurrence-based).
-
-        The index is the simulation indices (excluding ``obs_index``).
-
-    Notes
-    -----
-    This function calculates several fractions comparing observations (from
-    the simulation identified by ``obs_index``) with simulations (identified
-    by other simulation indices). The fractions are computed using the
-    ``fraction_common`` function from ``schedview.compute.multisim``.
-    """
-    if isinstance(sim_labels, pd.Series):
-        sim_labels = sim_labels.to_frame()
-
-    fraction_obs_simulated = partial(fraction_common, visit_counts, sim2=obs_index, match_count=False)
-    fraction_sim_observed = partial(fraction_common, visit_counts, obs_index, match_count=False)
-    fraction_obs_simulated_num = partial(fraction_common, visit_counts, sim2=obs_index, match_count=True)
-    fraction_sim_observed_num = partial(fraction_common, visit_counts, obs_index, match_count=True)
-
-    sim_indexes = pd.Series(sim_labels.index.values[sim_labels.index.values != obs_index])
-    fraction_completed = sim_labels.loc[sim_indexes, :].copy()
-    fraction_completed["frac_obs_sim_num"] = sim_indexes.apply(fraction_obs_simulated_num).round(2).values
-    fraction_completed["frac_sim_obs_num"] = sim_indexes.apply(fraction_sim_observed_num).round(2).values
-    fraction_completed["frac_obs_sim"] = sim_indexes.apply(fraction_obs_simulated).round(2).values
-    fraction_completed["frac_sim_obs"] = sim_indexes.apply(fraction_sim_observed).round(2).values
-    return fraction_completed
