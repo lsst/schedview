@@ -3,6 +3,7 @@ __all__ = [
     "plot_infeasible",
     "plot_airmass_vs_time",
     "plot_alt_vs_time",
+    "plot_obs_vs_sim_time",
     "plot_polar_alt_az",
     "plot_survey_rewards",
     "create_survey_reward_plot",
@@ -42,6 +43,7 @@ __all__ = [
 
 from .cadence import create_cadence_plot
 from .colors import LIGHT_EXTRA_COLORS, LIGHT_PLOT_BAND_COLORS, PLOT_BAND_COLORS, make_band_cmap
+from .comparesim import plot_obs_vs_sim_time
 from .multisim import generate_sim_indicators, overplot_kernel_density_estimates
 from .nightbf import plot_infeasible, plot_rewards
 from .nightly import plot_airmass_vs_time, plot_alt_vs_time, plot_polar_alt_az
