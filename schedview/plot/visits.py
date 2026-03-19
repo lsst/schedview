@@ -176,6 +176,7 @@ def plot_visit_param_vs_time(
     offered_columns: Iterable[str] = tuple(),
     num_plots: int = 1,
     user_figure_kwargs: dict | None = None,
+    default_sim: str = "All",
     **kwargs,
 ) -> bokeh.models.ui.ui_element.UIElement:
     """Plot a column in the visit table vs. time.
@@ -200,8 +201,10 @@ def plot_visit_param_vs_time(
         A list of columns to be offered in the dropdown selector.
     num_plots: int
         Number of parallel timelines..
-    user_figure_kwargs: dict on None
+    user_figure_kwargs: dict or None
         Arguments passed along to bokeh.plotting.figure
+    default_sim: str
+        Label of default sim to show (defaults to ``All``)
     **kwargs
         Additional keyword arguments to be passed to
         `bokeh.plotting.figure.scatter`.
@@ -251,7 +254,12 @@ def plot_visit_param_vs_time(
         source.data["label"] = np.full_like(source.data["start_timestamp"], "")
 
     if "sim_alpha" not in source.data:
-        source.data["sim_alpha"] = np.full_like(source.data["start_timestamp"], 0.2, dtype=np.float64)
+        if default_sim == "All":
+            source.data["sim_alpha"] = np.full_like(source.data["start_timestamp"], 0.2, dtype=np.float64)
+        else:
+            source.data["sim_alpha"] = np.full_like(source.data["start_timestamp"], 0.0, dtype=np.float64)
+            source.data["sim_alpha"][source.data["label"] == default_sim] = 0.2
+
         source.data["sim_alpha"][source.data["label"] == "Completed"] = 1.0
 
     scatter_kwargs = {"fill_alpha": 0.0, "line_alpha": "sim_alpha", "name": "timeline"}
@@ -404,7 +412,8 @@ def plot_visit_param_vs_time(
         if "label" not in source.column_names:
             raise ValueError("A sim selector needs the label column")
         options = ["All"] + list(o for o in np.unique(source.data["label"]) if o != "Completed")
-        default_sim = "All"
+        if default_sim not in options:
+            raise ValueError(f"Default sim must be one of {options}")
         sim_selector = bokeh.models.Select(value=default_sim, options=options, name="simselect")
 
         sim_selector_callback = bokeh.models.CustomJS(
