@@ -30,6 +30,7 @@ from uranography.api import (
     split_healpix_by_resolution,
 )
 
+from schedview import DayObs
 from schedview.collect import load_bright_stars
 from schedview.compute.camera import LsstCameraFootprintPerimeter
 from schedview.compute.footprint import find_healpix_area_polygons
@@ -355,19 +356,22 @@ class VisitMapBuilder:
         self: `VisitMapBuilder`
             Returns self to support method chaining.
         """
-        mjd_now = Time.now().mjd
 
-        # Appease type checker
-        assert isinstance(mjd_now, SupportsFloat)
+        if "start" not in kwargs:
+            kwargs["start"] = DayObs.from_time(
+                self.mjd if self.visits is None else self.visits[self.mjd_column].min()
+            ).sunset.mjd
 
-        slider_kwargs = {
-            "start": self.visits[self.mjd_column].min() if self.visits is not None else float(mjd_now) - 1,
-            "end": self.visits[self.mjd_column].max() if self.visits is not None else float(mjd_now) + 1,
-        }
-        slider_kwargs.update(kwargs)
+        if "end" not in kwargs:
+            kwargs["end"] = DayObs.from_time(
+                self.mjd if self.visits is None else self.visits[self.mjd_column].max()
+            ).sunrise.mjd
 
-        if "mjd" not in self.ref_map.sliders:
-            self.ref_map.add_mjd_slider(*args, **slider_kwargs)
+        if "mjd" in self.ref_map.sliders:
+            self.ref_map.sliders["mjd"].start = kwargs["start"]
+            self.ref_map.sliders["mjd"].end = kwargs["end"]
+        else:
+            self.ref_map.add_mjd_slider(*args, **kwargs)
 
         self.mjd_slider = self.ref_map.sliders["mjd"]
 
