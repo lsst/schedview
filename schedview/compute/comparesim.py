@@ -13,8 +13,8 @@ from .multisim import match_visits_across_sims
 def assign_field_hpids(
     simulated_visits: pd.DataFrame,
     completed_visits: pd.DataFrame,
-    nside: int,
-    coord_match_tolerance_deg: float,
+    nside: int = 262144,
+    coord_match_tolerance_deg: float = 0.002277777778,
     *,
     ra_col: str = "fieldRA",
     decl_col: str = "fieldDec",
@@ -29,20 +29,29 @@ def assign_field_hpids(
     Parameters
     ----------
     simulated_visits : `pd.DataFrame`
-        Simulated visit table; must contain columns identified by ``ra_col``
+        Simulated visit table containing visits from all simulations to be
+        compared. It must contain columns identified by ``ra_col``
         and ``dec_col`` (both in degrees).  An integer column named
-        ``hpid_col`` will be added or overwritten.
+        ``hpid_col`` will be added or overwritten. Pointings in this
+        ``DataFrame`` are the reference pointings to which pointings from
+        completed visits will be matched.
 
     completed_visits : `pd.DataFrame`
         Completed visit table; same column requirements as
-        ``simulated_visits``.
+        ``simulated_visits``. If ``inplace`` is ``True`` and the column
+        designated by ``hpid_col`` already exists, values in that column
+        will be replaced.
 
     field_hpix_nside : `int`
-        HEALPix nside that defines the pixel resolution.
+        HEALPix nside that defines the pixel resolution. Defaults to
+        nside=2**18 (about 0.8 arcseconds), so pointings with significantly
+        different ditherings are considered distinct.
 
     field_coord_tolerance_deg : `float`
         Maximum angular separation (deg) for a completed visit to be considered
-        a match to a simulated healpix center.
+        a match to a simulated healpix center. Defaults to 0.002277777778,
+        or about 10 arcsecords, which is large enough to match across observed
+        pointing offsets, but not usually across different dithers.
 
     ra_col : str, optional, default ``"fieldRA"``
         Column name for right‑ascension values (degrees).
