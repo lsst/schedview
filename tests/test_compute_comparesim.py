@@ -5,107 +5,13 @@ import numpy as np
 import pandas as pd
 
 from schedview.compute.comparesim import (
-    assign_field_hpids,
     compute_obs_sim_offsets,
     compute_offset_stats,
     offsets_of_coord_band,
 )
+from schedview import DECL_COL, POINTING_COL, RA_COL
 
 RANDOM_NUMBER_GENERATOR = np.random.default_rng(6563)
-
-
-class TestAssignFieldHpids(unittest.TestCase):
-
-    def setUp(self):
-        self.nside = 2**10
-
-        # Pick a few random but reproducible healpix indices.
-        self.sim_hpids = RANDOM_NUMBER_GENERATOR.integers(0, hp.nside2npix(self.nside), size=5)
-        ra, dec = hp.pix2ang(self.nside, self.sim_hpids, lonlat=True)
-        self.simulated_visits = pd.DataFrame({"fieldRA": ra, "fieldDec": dec})
-
-        # Build completed visits based on the simulated ones.
-        completed = self.simulated_visits.copy()
-        # First two rows: small offset (< tolerance), so should be reassigned.
-        completed.loc[0:1, "fieldRA"] += 0.001
-        completed.loc[0:1, "fieldDec"] += 0.001
-        # Next two rows: large offset (> tolerance), so should keep own hpid.
-        completed.loc[2:3, "fieldRA"] += 1.0
-        completed.loc[2:3, "fieldDec"] += 1.0
-        # Add a few completely unrelated visits.
-        extra_ra = np.array([10.0, 150.0, 250.0])
-        extra_dec = np.array([-30.0, 0.0, 45.0])
-        extra = pd.DataFrame({"fieldRA": extra_ra, "fieldDec": extra_dec})
-        self.completed_visits = pd.concat([completed, extra], ignore_index=True)
-
-        self.tolerance_deg = 0.01
-
-    def test_assign_field_hpids_basic(self):
-        sim_out, comp_out = assign_field_hpids(
-            self.simulated_visits,
-            self.completed_visits,
-            nside=self.nside,
-            coord_match_tolerance_deg=self.tolerance_deg,
-            inplace=False,
-        )
-
-        # Simulated IDs should equal the original healpix indices.
-        np.testing.assert_array_equal(sim_out["fieldHpid"].values, self.sim_hpids)
-
-        # Within‑tolerance rows (0 and 1) should have the same hpid as the
-        # corresponding simulated rows.
-        self.assertEqual(comp_out.loc[0, "fieldHpid"], self.sim_hpids[0])
-        self.assertEqual(comp_out.loc[1, "fieldHpid"], self.sim_hpids[1])
-
-        # Rows with a large offset should retain the hpid computed from their
-        # own coordinates
-        self.assertNotEqual(comp_out.loc[2, "fieldHpid"], self.sim_hpids[2])
-        self.assertNotEqual(comp_out.loc[3, "fieldHpid"], self.sim_hpids[3])
-
-        # Ensure the original DataFrames are unchanged.
-        self.assertNotIn("fieldHpid", self.simulated_visits.columns)
-        self.assertNotIn("fieldHpid", self.completed_visits.columns)
-
-    def test_assign_field_hpids_inplace(self):
-
-        sim_original = self.simulated_visits.copy()
-        comp_original = self.completed_visits.copy()
-
-        sim_out, comp_out = assign_field_hpids(
-            sim_original,
-            comp_original,
-            nside=self.nside,
-            coord_match_tolerance_deg=self.tolerance_deg,
-            inplace=True,
-        )
-
-        # Identity checks – the returned objects are the same as the inputs.
-        self.assertIs(sim_out, sim_original)
-        self.assertIs(comp_out, comp_original)
-
-        # Verify that the hpid column now exists on the original objects.
-        self.assertIn("fieldHpid", sim_original.columns)
-        self.assertIn("fieldHpid", comp_original.columns)
-        # Re‑use the basic assertions for correctness.
-        np.testing.assert_array_equal(sim_original["fieldHpid"].values, self.sim_hpids)
-        self.assertEqual(comp_original.loc[0, "fieldHpid"], self.sim_hpids[0])
-        self.assertEqual(comp_original.loc[1, "fieldHpid"], self.sim_hpids[1])
-
-    def test_assign_field_hpids_empty_completed(self):
-
-        empty_completed = pd.DataFrame(columns=["fieldRA", "fieldDec"])
-        sim_out, comp_out = assign_field_hpids(
-            self.simulated_visits,
-            empty_completed,
-            nside=self.nside,
-            coord_match_tolerance_deg=self.tolerance_deg,
-            inplace=False,
-        )
-        # Simulated IDs must be correct.
-        np.testing.assert_array_equal(sim_out["fieldHpid"].values, self.sim_hpids)
-        # Completed DataFrame should remain empty but still have the column.
-        self.assertTrue(comp_out.empty)
-        self.assertIn("fieldHpid", comp_out.columns)
 
 
 class TestOffsetOfCoordBand(unittest.TestCase):
@@ -123,8 +29,8 @@ class TestOffsetOfCoordBand(unittest.TestCase):
         self.sim_visits = pd.DataFrame(
             {
                 "start_timestamp": times,
-                "fieldRA": [10.0] * self.num_test_visits,
-                "fieldDec": [0.0] * self.num_test_visits,
+                RA_COL: [10.0] * self.num_test_visits,
+                DECL_COL: [0.0] * self.num_test_visits,
                 "band": ["r"] * self.num_test_visits,
             }
         )
@@ -183,10 +89,8 @@ def _generate_test_visits(num_visits_per_hpid_band, num_hpid_band, num_sims):
     # band should be randomly but repeatably selected from u, g, r, i, z, y
     nside = 32
     hpid_band_df = pd.DataFrame()
-    hpid_band_df["fieldHpid"] = RANDOM_NUMBER_GENERATOR.integers(0, hp.nside2npix(nside), size=num_hpid_band)
-    hpid_band_df["fieldRA"], hpid_band_df["fieldDec"] = hp.pix2ang(
-        nside, hpid_band_df["fieldHpid"], lonlat=True
-    )
+    hpid_band_df[POINTING_COL] = RANDOM_NUMBER_GENERATOR.integers(0, hp.nside2npix(nside), size=num_hpid_band)
+    hpid_band_df[RA_COL], hpid_band_df[DECL_COL] = hp.pix2ang(nside, hpid_band_df[POINTING_COL], lonlat=True)
 
     # Generate random bands from u, g, r, i, z, y
     bands = ["u", "g", "r", "i", "z", "y"]
@@ -208,10 +112,10 @@ def _generate_test_visits(num_visits_per_hpid_band, num_hpid_band, num_sims):
                     {
                         "sim_index": sim_index,
                         "start_timestamp": start_timestamp,
-                        "fieldRA": hpid_band["fieldRA"],
-                        "fieldDec": hpid_band["fieldDec"],
+                        RA_COL: hpid_band[RA_COL],
+                        DECL_COL: hpid_band[DECL_COL],
                         "band": hpid_band["band"],
-                        "fieldHpid": hpid_band["fieldHpid"],
+                        POINTING_COL: hpid_band[POINTING_COL],
                         "label": f"Sim {sim_index}",
                     }
                 )
@@ -256,7 +160,7 @@ class TestComputeObsSimOffsets(unittest.TestCase):
 
         # Should have a multiindex with sim_index, fieldHpid, and band
         self.assertTrue(isinstance(result.index, pd.MultiIndex))
-        self.assertEqual(result.index.names, ["sim_index", "fieldHpid", "band"])
+        self.assertEqual(result.index.names, ["sim_index", POINTING_COL, "band"])
 
         # Should have at least one entry for each simulation
         sim_indexes = result.index.get_level_values("sim_index").unique()
@@ -291,14 +195,14 @@ class TestComputeCommonFractions(unittest.TestCase):
 
         self.visit_counts = pd.DataFrame(
             {
-                "fieldHpid": [100, 101, 102, 103, 100, 101, 102, 102],
+                POINTING_COL: [100, 101, 102, 103, 100, 101, 102, 102],
                 "band": ["u", "u", "u", "u", "g", "g", "g", "g"],
                 0: [1, 1, 1, 1, 2, 2, 0, 0],
                 1: [1, 1, 1, 1, 2, 2, 0, 0],
                 2: [2, 2, 1, 1, 2, 2, 0, 0],
                 3: [1, 1, 1, 1, 1, 1, 1, 1],
             }
-        ).set_index(["fieldHpid", "band"])
+        ).set_index([POINTING_COL, "band"])
 
         self.num_sims = len(self.visit_counts.columns) - 1
 
