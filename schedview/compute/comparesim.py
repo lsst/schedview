@@ -273,11 +273,12 @@ def compute_offset_stats(
 
     if hhmmss:
         for column in ["MAD", "mean", "std", "min", "25%", "50%", "75%", "max"]:
-            offset_stats.loc[:, column] = Angle(
-                (offset_stats.loc[:, column].astype(int).values / 3600) * u.hour
-            ).to_string(unit=u.hour, sep=":")
+            raw_values = offset_stats.loc[:, column].to_numpy()
+            offset_stats.loc[:, column] = Angle((raw_values.astype(np.int64) / 3600) * u.hour).to_string(
+                unit=u.hour, sep=":"
+            )
 
     if visits is not None and "label" in visits.columns:
-        offset_stats.insert(0, "label", visits.groupby("sim_index")["label"].first().to_frame())
+        offset_stats.insert(0, "label", visits.groupby("sim_index")["label"].first().to_frame()["label"])
 
     return offset_stats
