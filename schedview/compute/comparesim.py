@@ -52,7 +52,9 @@ def find_nearest_pointing_ids(
     reference_coords = SkyCoord(pointing_ras, pointing_decls, unit="deg", frame="icrs")
     match_index, match_sep, _ = input_coordinates.match_to_catalog_sky(reference_coords)
     matched_ids = pointing_ids[match_index]
-    return matched_ids, match_sep.deg
+
+    match_sep_deg = match_sep.to(DEG).value
+    return matched_ids, match_sep_deg
 
 
 def combine_completed_with_sims(
@@ -145,7 +147,7 @@ def combine_completed_with_sims(
 def offsets_of_coord_band(sim_index: int, visits: pd.DataFrame, obs_index: int = 0) -> pd.DataFrame:
     """
     Compute the time offset between a set of observations and a
-    single simulated visit ``sim_index`` for a given (fieldHpid, band)
+    single simulated visit ``sim_index`` for a given pointing id, band
     coordinate pair.
 
     Parameters
@@ -198,7 +200,7 @@ def compute_obs_sim_offsets(
     ----------
     visits : `pd.DataFrame`
         Table of visits with at least the columns ``sim_index``,
-        ``fieldHpid`` and ``band``.
+        the value of `schedview.POINTING_COL` and ``band``.
     obs_index : `int`, optional
         ``sim_index`` value for completed (observed) visits (default = 0).
 
@@ -206,17 +208,22 @@ def compute_obs_sim_offsets(
     -------
     sim_offsets : `pd.DataFrame`
         Offsets for every simulated visit, indexed by ``sim_index``,
-        ``fieldHpid`` and ``band``.
+        the value of `schedview.POINTING_COL` and ``band``.
     """
     sim_indexes = visits.sim_index.unique()
     sim_indexes = sim_indexes[sim_indexes != obs_index]
 
-    offsets = pd.concat(
-        visits.groupby([POINTING_COL, "band"]).apply(partial(offsets_of_coord_band, i), include_groups=False)
-        for i in sim_indexes
-    )
-    assert isinstance(offsets.index, pd.MultiIndex)
-    offsets.index = offsets.index.reorder_levels(["sim_index", POINTING_COL, "band"])
+    sim_offsets = []
+    for i in sim_indexes:
+        sim_offsets.append(
+            visits.set_index([POINTING_COL, "band"])
+            .groupby([POINTING_COL, "band"])
+            .apply(partial(offsets_of_coord_band, i))
+            .reset_index()
+        )
+
+    offsets = pd.concat(sim_offsets, ignore_index=True).set_index(["sim_index", POINTING_COL, "band"])
+
     return offsets
 
 
@@ -247,7 +254,7 @@ def compute_offset_stats(
         A table where each row corresponds to a ``sim_index`` and columns
         include match counts, MAD, and the usual descriptive statistics.
     """
-    abs_delta = np.abs(offsets["delta"])
+    abs_delta = offsets["delta"].abs()
     abs_delta.name = "abs_delta"
 
     offset_stats = offsets.groupby("sim_index")["delta"].describe()
@@ -255,11 +262,15 @@ def compute_offset_stats(
     offset_stats.insert(1, "MAD", abs_delta.to_frame().groupby("sim_index")["abs_delta"].median())
 
     if visits is not None:
-        visit_counts = visits.groupby("sim_index").agg({"label": "count"})
+        visit_counts = visits.groupby("sim_index").agg({"label": "count"}).rename(columns={"label": "counts"})
         offset_stats.insert(
-            0, "obs count", np.full_like(offset_stats["count"], visit_counts.loc[0]).astype(int)
+            0,
+            "obs count",
+            pd.Series(
+                np.full_like(offset_stats["count"], visit_counts.loc[0]).astype(int), index=offset_stats.index
+            ),
         )
-        offset_stats.insert(1, "sim count", visit_counts)
+        offset_stats.insert(1, "sim count", visit_counts["counts"])
         offset_stats.insert(3, "#match/#obs", (offset_stats["count"] / offset_stats["obs count"]).round(2))
         offset_stats.insert(4, "#match/#sim", (offset_stats["count"] / offset_stats["sim count"]).round(2))
 
@@ -267,11 +278,12 @@ def compute_offset_stats(
 
     if hhmmss:
         for column in ["MAD", "mean", "std", "min", "25%", "50%", "75%", "max"]:
-            offset_stats.loc[:, column] = Angle(
-                (offset_stats.loc[:, column].astype(int).values / 3600) * u.hour
-            ).to_string(unit=u.hour, sep=":")
+            raw_values = offset_stats.loc[:, column].to_numpy()
+            offset_stats.loc[:, column] = Angle((raw_values.astype(np.int64) / 3600) * u.hour).to_string(
+                unit=u.hour, sep=":"
+            )
 
     if visits is not None and "label" in visits.columns:
-        offset_stats.insert(0, "label", visits.groupby("sim_index")["label"].first().to_frame())
+        offset_stats.insert(0, "label", visits.groupby("sim_index")["label"].first().to_frame()["label"])
 
     return offset_stats
