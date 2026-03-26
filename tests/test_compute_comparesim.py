@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from schedview.compute.comparesim import (
+    combine_completed_with_sims,
     compute_obs_sim_offsets,
     compute_offset_stats,
     find_nearest_pointing_ids,
@@ -237,5 +238,74 @@ class TestComputeCommonFractions(unittest.TestCase):
         )
 
 
-if __name__ == "__main__":
-    unittest.main()
+class TestCombineCompletedWithSims(unittest.TestCase):
+
+    def setUp(self):
+        self.simulated_visits = pd.DataFrame(
+            {
+                "start_timestamp": [
+                    pd.Timestamp("2027-01-01 00:00:00", tz="UTC"),
+                    pd.Timestamp("2027-01-01 01:00:00", tz="UTC"),
+                ],
+                RA_COL: [10.0, 20.0],
+                DECL_COL: [0.0, 5.0],
+                "band": ["r", "g"],
+                "sim_index": [1, 2],
+            }
+        )
+
+        self.completed_visits = pd.DataFrame(
+            {
+                "start_date": ["2027-01-01 00:30:00", "2027-01-01 02:00:00"],
+                "band": ["r", "g"],
+                RA_COL: [10.1, 20.1],
+                DECL_COL: [0.1, 5.1],
+            }
+        )
+
+    def test_combine_completed_with_sims_basic(self):
+
+        result = combine_completed_with_sims(
+            simulated_visits=self.simulated_visits,
+            completed_visits=self.completed_visits,
+            scheduler_version="test_version",
+        )
+
+        # Check that we have the right number of rows
+        self.assertEqual(len(result), 4)  # 2 simulated + 2 completed
+
+        # Check that completed visits have correct values
+        completed_rows = result.loc[result["sim_index"] == 0, :]
+        self.assertEqual(len(completed_rows), 2)
+        self.assertTrue(np.all(completed_rows["label"] == "Completed"))
+        self.assertTrue(np.all(completed_rows["scheduler_version"] == "test_version"))
+        self.assertTrue(np.all(completed_rows["config_url"] == ""))
+
+        # Check that simulated visits are preserved
+        simulated_rows = result.loc[result["sim_index"] > 0, :]
+        self.assertEqual(len(simulated_rows), 2)
+        self.assertTrue(np.all(simulated_rows["sim_index"].isin([1, 2])))
+
+    def test_combine_completed_with_sims_no_completed(self):
+
+        result = combine_completed_with_sims(
+            simulated_visits=self.simulated_visits,
+            completed_visits=pd.DataFrame(),
+            scheduler_version="test_version",
+        )
+
+        # Should just return simulated visits
+        self.assertEqual(len(result), len(self.simulated_visits))
+
+    def test_combine_completed_with_sims_sim_index_zero_error(self):
+        # Create test simulated visits with sim_index = 0 (should raise error)
+        bad_simulated_visits = self.simulated_visits.copy()
+        bad_simulated_visits["sim_index"][0] = 0
+
+        # Test that it raises ValueError when sim_index = 0
+        with self.assertRaises(ValueError):
+            combine_completed_with_sims(
+                simulated_visits=bad_simulated_visits,
+                completed_visits=self.completed_visits,
+                scheduler_version="test_version",
+            )

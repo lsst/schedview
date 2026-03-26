@@ -104,7 +104,7 @@ def combine_completed_with_sims(
         (Otherwise, they are left unchanged.)
     """
 
-    if 0 in simulated_visits.sim_index:
+    if 0 in simulated_visits.sim_index.values:
         raise ValueError(
             "Simulated visits must not include a sim_index of 0, "
             "because completed visits will be assign sim_index=0"
