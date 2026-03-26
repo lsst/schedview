@@ -20,19 +20,21 @@ __all__ = [
     "compute_offset_stats",
     "offsets_of_coord_band",
     "often_repeated_fields",
-    "assign_field_hpids",
     "count_visits_by_sim",
     "match_visits_across_sims",
     "compute_matched_visit_delta_statistics",
     "munge_sim_archive_metadata",
+    "find_nearest_pointing_ids",
+    "combine_completed_with_sims",
 ]
 
 from .astro import compute_sun_moon_positions, convert_evening_date_to_night_of_survey, night_events
 from .camera import LsstCameraFootprintPerimeter
 from .comparesim import (
-    assign_field_hpids,
+    combine_completed_with_sims,
     compute_obs_sim_offsets,
     compute_offset_stats,
+    find_nearest_pointing_ids,
     offsets_of_coord_band,
 )
 from .multisim import (

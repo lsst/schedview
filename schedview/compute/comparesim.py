@@ -2,122 +2,70 @@ from functools import partial
 from typing import Optional, Tuple
 
 import astropy.units as u
-import healpy as hp
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from astropy.coordinates import Angle, SkyCoord
 
+from .. import DECL_COL, POINTING_COL, RA_COL
 from .multisim import match_visits_across_sims
 
+# Static type checks can get confused by astropy units following
+# the u.myunit idiom. Using u.Unit helps them.
+DEG: u.Unit = u.Unit("deg")
 
-def assign_field_hpids(
+
+def find_nearest_pointing_ids(
+    ra: npt.NDArray[np.floating],
+    decl: npt.NDArray[np.floating],
+    pointing_ids: npt.NDArray[np.integer],
+    pointing_ras: npt.NDArray[np.floating],
+    pointing_decls: npt.NDArray[np.floating],
+) -> Tuple[npt.NDArray[np.integer], npt.NDArray[np.floating]]:
+
+    input_coordinates = SkyCoord(ra, decl, unit="deg", frame="icrs")
+    reference_coords = SkyCoord(pointing_ras, pointing_decls, unit="deg", frame="icrs")
+    match_index, match_sep, _ = input_coordinates.match_to_catalog_sky(reference_coords)
+    matched_ids = pointing_ids[match_index]
+    return matched_ids, match_sep.deg
+
+
+def combine_completed_with_sims(
     simulated_visits: pd.DataFrame,
     completed_visits: pd.DataFrame,
-    nside: int = 262144,
-    coord_match_tolerance_deg: float = 0.002277777778,
-    *,
-    ra_col: str = "fieldRA",
-    decl_col: str = "fieldDec",
-    hpid_col: str = "fieldHpid",
-    inplace: bool = False,
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Populate an id column for simulated and completed visits and
-    propagate the id from the nearest simulated healpix to completed
-    visits that lie within a specified angular tolerance.
+    scheduler_version: str,
+    reference_pointings: pd.DataFrame | None = None,
+    pointing_tolerance: float = 0.002,
+):
+    if len(completed_visits) > 0:
+        completed_visits["start_date"] = pd.to_datetime(
+            completed_visits["start_date"], format="ISO8601"
+        ).dt.tz_localize("UTC")
+        completed_visits["filter"] = completed_visits["band"]
+        completed_visits["sim_creation_day_obs"] = None
+        completed_visits["sim_index"] = 0
+        completed_visits["label"] = "Completed"
+        completed_visits["config_url"] = ""
+        completed_visits["scheduler_version"] = scheduler_version
+        completed_visits["sim_runner_kwargs"] = {}
+        completed_visits.loc[:, "tags"] = len(completed_visits) * [["completed"]]
 
-    Parameters
-    ----------
-    simulated_visits : `pd.DataFrame`
-        Simulated visit table containing visits from all simulations to be
-        compared. It must contain columns identified by ``ra_col``
-        and ``dec_col`` (both in degrees).  An integer column named
-        ``hpid_col`` will be added or overwritten. Pointings in this
-        ``DataFrame`` are the reference pointings to which pointings from
-        completed visits will be matched.
+        if reference_pointings is not None:
+            nearest_pointing_id, match_separation = find_nearest_pointing_ids(
+                completed_visits.loc[:, RA_COL].to_numpy(),
+                completed_visits.loc[:, DECL_COL].to_numpy(),
+                reference_pointings.index.to_numpy(),
+                reference_pointings.loc[:, RA_COL].to_numpy(),
+                reference_pointings.loc[:, DECL_COL].to_numpy(),
+            )
+            match_mask = match_separation < pointing_tolerance
+            completed_visits.loc[match_mask, POINTING_COL] = nearest_pointing_id[match_mask]
 
-    completed_visits : `pd.DataFrame`
-        Completed visit table; same column requirements as
-        ``simulated_visits``. If ``inplace`` is ``True`` and the column
-        designated by ``hpid_col`` already exists, values in that column
-        will be replaced.
-
-    field_hpix_nside : `int`
-        HEALPix nside that defines the pixel resolution. Defaults to
-        nside=2**18 (about 0.8 arcseconds), so pointings with significantly
-        different ditherings are considered distinct.
-
-    field_coord_tolerance_deg : `float`
-        Maximum angular separation (deg) for a completed visit to be considered
-        a match to a simulated healpix center. Defaults to 0.002277777778,
-        or about 10 arcsecords, which is large enough to match across observed
-        pointing offsets, but not usually across different dithers.
-
-    ra_col : str, optional, default ``"fieldRA"``
-        Column name for right‑ascension values (degrees).
-
-    dec_col : str, optional, default ``"fieldDec"``
-        Column name for declination values (degrees).
-
-    hpid_col : str, optional, default ``"fieldHpid"``
-        Column name that will store the healpix index.
-
-    inplace : bool, optional, default ``False``
-        If ``True`` the input DataFrames are modified in place.  If ``False``
-        (default) shallow copies are made so the originals stay untouched.
-
-    Returns
-    -------
-    result : Tuple[pd.DataFrame, pd.DataFrame]
-        ``(simulated_visits_out, completed_visits_out)`` the (possibly copied)
-        DataFrames with the ``hpid_col`` column populated.
-    """
-
-    if not inplace:
-        simulated_visits = simulated_visits.copy()
-        completed_visits = completed_visits.copy()
-
-    simulated_visits[hpid_col] = hp.ang2pix(
-        nside=nside,
-        theta=simulated_visits[ra_col],
-        phi=simulated_visits[decl_col],
-        lonlat=True,
-    )
-
-    if completed_visits.empty:
-        # If completed_visits is empty, all we have to do is create the column
-        # in the empty DataFrame and we are done.
-        completed_visits[hpid_col] = []
-        completed_visits[hpid_col] = completed_visits[hpid_col].astype(int)
+        visits = pd.concat([completed_visits, simulated_visits])
     else:
-        # Values assigned here will be replaced by closest matches
-        # in simulated_visit[hpid_col] if there are any within
-        # field_coord_tolerance_deg
-        completed_visits[hpid_col] = hp.ang2pix(
-            nside=nside,
-            theta=completed_visits[ra_col],
-            phi=completed_visits[decl_col],
-            lonlat=True,
-        )
+        visits = simulated_visits.copy()
 
-        # Find all hpids actually used in the simulation.
-        sim_hpids = simulated_visits[hpid_col].unique()
-        sim_hp_ra, sim_hp_dec = hp.pix2ang(nside=nside, ipix=sim_hpids, lonlat=True)
-        sim_hp_coords = SkyCoord(ra=sim_hp_ra * u.deg, dec=sim_hp_dec * u.deg, frame="icrs")
-
-        # Match completed visits to the nearest hpid used in simulations.
-        completed_coords = SkyCoord(
-            ra=completed_visits[ra_col].values * u.deg,
-            dec=completed_visits[decl_col].values * u.deg,
-            frame="icrs",
-        )
-        sim_hp_match_idx, sim_hp_sep, _ = completed_coords.match_to_catalog_sky(sim_hp_coords)
-
-        # Apply tolerance mask and replace the healpix id where appropriate.
-        within_tol = sim_hp_sep.deg < coord_match_tolerance_deg
-        completed_visits.loc[within_tol, hpid_col] = sim_hpids[sim_hp_match_idx[within_tol]]
-
-    return simulated_visits, completed_visits
+    return visits
 
 
 def offsets_of_coord_band(sim_index: int, visits: pd.DataFrame, obs_index: int = 0) -> pd.DataFrame:
@@ -142,7 +90,7 @@ def offsets_of_coord_band(sim_index: int, visits: pd.DataFrame, obs_index: int =
     """
     # This function is intended to be run on a DataFrame on a single
     # field/band combination, not on the whole set of visits, e.g. for a night.
-    for col in ("band", "fieldHpid"):
+    for col in ("band", POINTING_COL):
         if col in visits.columns:
             assert len(visits[col].unique()) == 1
 
@@ -158,7 +106,7 @@ def offsets_of_coord_band(sim_index: int, visits: pd.DataFrame, obs_index: int =
     assert offsets.columns[1] == sim_index
     assert offsets.columns[2] == "delta"
     assert len(offsets.columns) == 3
-    offsets.columns = ["obs_time", "sim_time", "delta"]
+    offsets.columns = pd.Index(data=["obs_time", "sim_time", "delta"])
     offsets["sim_index"] = sim_index
     offsets = offsets.set_index("sim_index")
 
@@ -190,10 +138,11 @@ def compute_obs_sim_offsets(
     sim_indexes = sim_indexes[sim_indexes != obs_index]
 
     offsets = pd.concat(
-        visits.groupby(["fieldHpid", "band"]).apply(partial(offsets_of_coord_band, i), include_groups=False)
+        visits.groupby([POINTING_COL, "band"]).apply(partial(offsets_of_coord_band, i), include_groups=False)
         for i in sim_indexes
     )
-    offsets.index = offsets.index.reorder_levels(["sim_index", "fieldHpid", "band"])
+    assert isinstance(offsets.index, pd.MultiIndex)
+    offsets.index = offsets.index.reorder_levels(["sim_index", POINTING_COL, "band"])
     return offsets
 
 

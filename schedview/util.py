@@ -1,10 +1,14 @@
 import logging
 import os
 
+RA_COL = "fieldRA"
+DECL_COL = "fieldDec"
+POINTING_COL = "pointing_id"
+
 BAND_COLUMN_NAME_CANDIDATES = ("band", "filter")
 
 
-def band_column(visits):
+def band_column(visits=None):
     """Guess the name of the column with band inforamition.
 
     Parameters
@@ -17,9 +21,10 @@ def band_column(visits):
     column_name : `str`
         The name of the column that contains the band information.
     """
-    for band in BAND_COLUMN_NAME_CANDIDATES:
-        if band in visits.columns:
-            return band
+    if visits is not None:
+        for band in BAND_COLUMN_NAME_CANDIDATES:
+            if band in visits.columns:
+                return band
 
     return BAND_COLUMN_NAME_CANDIDATES[0]
 
