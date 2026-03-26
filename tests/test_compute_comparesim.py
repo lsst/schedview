@@ -7,6 +7,7 @@ import pandas as pd
 from schedview.compute.comparesim import (
     compute_obs_sim_offsets,
     compute_offset_stats,
+    find_nearest_pointing_ids,
     offsets_of_coord_band,
 )
 from schedview import DECL_COL, POINTING_COL, RA_COL
@@ -185,6 +186,30 @@ class TestComputeOffsetStats(unittest.TestCase):
         offset_dt_stats = pd.Series(self.offset_dt).describe()
         for col in offset_dt_stats.index[1:]:
             self.assertAlmostEqual(offset_dt_stats[col], offset_stats.loc[1, col], 5)
+
+
+class TestFindNearestPointingIds(unittest.TestCase):
+
+    def test_find_nearest_pointing_ids(self):
+        pointing_ids = np.arange(3)
+        pointing_ras = np.array([0.0, 10.0, 20.0])
+        pointing_decls = np.array([0.0, 5.0, 10.0])
+
+        # Reference pointing coordinates (ids, ra, dec) - with some offset
+        ra = pointing_ras.copy()
+        decl = pointing_decls + 0.1
+
+        # Call the function
+        matched_ids, match_separation = find_nearest_pointing_ids(
+            ra, decl, pointing_ids, pointing_ras, pointing_decls
+        )
+
+        # Verify results - should match to nearest point
+        expected_ids = np.arange(3)
+        expected_separation = np.array([0.1, 0.1, 0.1])
+
+        np.testing.assert_array_equal(matched_ids, expected_ids)
+        np.testing.assert_array_almost_equal(match_separation, expected_separation, decimal=10)
 
 
 class TestComputeCommonFractions(unittest.TestCase):
