@@ -22,6 +22,31 @@ def find_nearest_pointing_ids(
     pointing_ras: npt.NDArray[np.floating],
     pointing_decls: npt.NDArray[np.floating],
 ) -> Tuple[npt.NDArray[np.integer], npt.NDArray[np.floating]]:
+    """Given arrays of input coordinates and associations of reference
+    coordinates with ids, return the nearest ids to each input coordinate and
+    their distances.
+
+    Parameters
+    ----------
+    ra : `numpy.ndarray` of `float`
+        Right ascension values of input coordinates in degrees.
+    decl : `numpy.ndarray` of `float`
+        Declination values of input coordinates in degrees.
+    pointing_ids : `numpy.ndarray` of `int`
+        Array of pointing IDs corresponding to the reference pointings.
+    pointing_ras : `numpy.ndarray` of `float`
+        Right ascension values of reference pointings in degrees.
+    pointing_decls : `numpy.ndarray` of `float`
+        Declination values of reference pointings in degrees.
+
+    Returns
+    -------
+    matched_ids : `numpy.ndarray` of `int`
+        Array of pointing IDs corresponding to the nearest pointings.
+    match_separation : `numpy.ndarray` of `float`
+        Array of angular separations in degrees between input coordinates
+        and their nearest reference pointings.
+    """
 
     input_coordinates = SkyCoord(ra, decl, unit="deg", frame="icrs")
     reference_coords = SkyCoord(pointing_ras, pointing_decls, unit="deg", frame="icrs")
@@ -36,8 +61,57 @@ def combine_completed_with_sims(
     scheduler_version: str,
     reference_pointings: pd.DataFrame | None = None,
     pointing_tolerance: float = 0.002,
-):
+) -> pd.DataFrame:
+    """Combine a DataFrame of simulated visits with one of completed visits.
+
+    Parameters
+    ----------
+    simulated_visits : `pd.DataFrame`
+        DataFrame containing simulated visits, using the schema returned by
+        `schedview.collect.multisim.read_multiple_prenights`. This schema
+        includes columns mapped from the ``opsim`` outputs database, plus
+        several additional columns including ``sim_index``, which identifies
+        from which simulations each visit came.
+    completed_visits : `pd.DataFrame`
+        DataFrame containing completed (observed) visits, using the schema
+        returned by `schedview.collect.visits.read_visits`. If reference
+        pointings are used, columns must include columns designating R.A. and
+        declination in decimal degrees, and named by `schedview.RA_COL` and
+        `schedview.DECL_COL`.
+    scheduler_version : `str`
+        Version string of the scheduler used to generate the visits.
+    reference_pointings : `pd.DataFrame` or `None`, optional
+        DataFrame containing reference pointing coordinates for matching.
+        If provided, completed visits will be matched to the nearest reference
+        pointing. Default is None.
+    pointing_tolerance : `float`, optional
+        Tolerance in degrees for matching completed visits to reference
+        pointings. Default is 0.002 degrees.
+
+    Returns
+    -------
+    visits : `pd.DataFrame`
+        Combined DataFrame of simulated and completed visits with most columns
+        copied directly from their respective `pd.DataFrame` s of origin.
+        The rows for the completed visits will be assigned (possibly dummy)
+        values for ``sim_creation_day_obs``, ``config_url``, and
+        ``sim_runner_kwargs``. ``label`` will be set to ``Completed`` for
+        completed visits, and ``sim_index`` to 0. If reference pointings are
+        provided, the column with the coordinate ID (specified by
+        `schedview.POINTING_ID`) will be set to the closest available in
+        the provided ``reference_pointings`` ``pd.DataFrame`` if there are
+        any within ``pointing_tolerance``.
+        (Otherwise, they are left unchanged.)
+    """
+
+    if 0 in simulated_visits.sim_index:
+        raise ValueError(
+            "Simulated visits must not include a sim_index of 0, "
+            "because completed visits will be assign sim_index=0"
+        )
+
     if len(completed_visits) > 0:
+        completed_visits = completed_visits.copy()
         completed_visits["start_date"] = pd.to_datetime(
             completed_visits["start_date"], format="ISO8601"
         ).dt.tz_localize("UTC")
