@@ -300,7 +300,7 @@ class TestCombineCompletedWithSims(unittest.TestCase):
     def test_combine_completed_with_sims_sim_index_zero_error(self):
         # Create test simulated visits with sim_index = 0 (should raise error)
         bad_simulated_visits = self.simulated_visits.copy()
-        bad_simulated_visits["sim_index"][0] = 0
+        bad_simulated_visits["sim_index"].values[0] = 0
 
         # Test that it raises ValueError when sim_index = 0
         with self.assertRaises(ValueError):

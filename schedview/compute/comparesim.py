@@ -52,7 +52,9 @@ def find_nearest_pointing_ids(
     reference_coords = SkyCoord(pointing_ras, pointing_decls, unit="deg", frame="icrs")
     match_index, match_sep, _ = input_coordinates.match_to_catalog_sky(reference_coords)
     matched_ids = pointing_ids[match_index]
-    return matched_ids, match_sep.deg
+
+    match_sep_deg = match_sep.to(DEG).value
+    return matched_ids, match_sep_deg
 
 
 def combine_completed_with_sims(
@@ -247,7 +249,7 @@ def compute_offset_stats(
         A table where each row corresponds to a ``sim_index`` and columns
         include match counts, MAD, and the usual descriptive statistics.
     """
-    abs_delta = np.abs(offsets["delta"])
+    abs_delta = offsets["delta"].abs()
     abs_delta.name = "abs_delta"
 
     offset_stats = offsets.groupby("sim_index")["delta"].describe()
@@ -255,11 +257,15 @@ def compute_offset_stats(
     offset_stats.insert(1, "MAD", abs_delta.to_frame().groupby("sim_index")["abs_delta"].median())
 
     if visits is not None:
-        visit_counts = visits.groupby("sim_index").agg({"label": "count"})
+        visit_counts = visits.groupby("sim_index").agg({"label": "count"}).rename(columns={"label": "counts"})
         offset_stats.insert(
-            0, "obs count", np.full_like(offset_stats["count"], visit_counts.loc[0]).astype(int)
+            0,
+            "obs count",
+            pd.Series(
+                np.full_like(offset_stats["count"], visit_counts.loc[0]).astype(int), index=offset_stats.index
+            ),
         )
-        offset_stats.insert(1, "sim count", visit_counts)
+        offset_stats.insert(1, "sim count", visit_counts["counts"])
         offset_stats.insert(3, "#match/#obs", (offset_stats["count"] / offset_stats["obs count"]).round(2))
         offset_stats.insert(4, "#match/#sim", (offset_stats["count"] / offset_stats["sim count"]).round(2))
 
