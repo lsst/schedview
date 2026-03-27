@@ -30,6 +30,7 @@ from uranography.api import (
     split_healpix_by_resolution,
 )
 
+from schedview import DayObs
 from schedview.collect import load_bright_stars
 from schedview.compute.camera import LsstCameraFootprintPerimeter
 from schedview.compute.footprint import find_healpix_area_polygons
@@ -355,19 +356,22 @@ class VisitMapBuilder:
         self: `VisitMapBuilder`
             Returns self to support method chaining.
         """
-        mjd_now = Time.now().mjd
 
-        # Appease type checker
-        assert isinstance(mjd_now, SupportsFloat)
+        if "start" not in kwargs:
+            kwargs["start"] = DayObs.from_time(
+                self.mjd if self.visits is None else self.visits[self.mjd_column].min()
+            ).sunset.mjd
 
-        slider_kwargs = {
-            "start": self.visits[self.mjd_column].min() if self.visits is not None else float(mjd_now) - 1,
-            "end": self.visits[self.mjd_column].max() if self.visits is not None else float(mjd_now) + 1,
-        }
-        slider_kwargs.update(kwargs)
+        if "end" not in kwargs:
+            kwargs["end"] = DayObs.from_time(
+                self.mjd if self.visits is None else self.visits[self.mjd_column].max()
+            ).sunrise.mjd
 
-        if "mjd" not in self.ref_map.sliders:
-            self.ref_map.add_mjd_slider(*args, **slider_kwargs)
+        if "mjd" in self.ref_map.sliders:
+            self.ref_map.sliders["mjd"].start = kwargs["start"]
+            self.ref_map.sliders["mjd"].end = kwargs["end"]
+        else:
+            self.ref_map.add_mjd_slider(*args, **kwargs)
 
         self.mjd_slider = self.ref_map.sliders["mjd"]
 
@@ -1098,6 +1102,153 @@ class VisitMapBuilder:
         for spheremap in self.spheremaps:
             if "up" in spheremap.sliders:
                 spheremap.sliders["up"].visible = False
+
+        return self
+
+    def add_alt_visit_patches(self, visits: pd.DataFrame, **kwargs: Any) -> Self:
+        """Add visit patches for alternate sets of visits to the map.
+        Similar to completed visit patches, but visits are outlined instead
+        of filled.
+
+        Parameters
+        ----------
+        visits : `pandas.DataFrame` or `None`
+            Table of visits, with the same columns required by the
+            add_visit_patches method, plus ``sim_index``.
+        **kwargs
+            Additional keyword arguments passed to the underlying
+            `bokeh.plotting.figure.patches` call.
+
+        Returns
+        -------
+        self: `VisitMapBuilder`
+            Returns self to support method chaining.
+        """
+        self.alt_visits_ds = {}
+        self.alt_visits = visits
+        alt_visit_columns = ["sim_index"] + self.visit_columns
+        present_visit_columns = [c for c in alt_visit_columns if c in self.alt_visits.columns]
+        for band in "ugrizy":
+            in_band_mask = self.alt_visits[self.band_column] == band
+            band_visits = self.alt_visits.loc[in_band_mask, present_visit_columns].copy()
+
+            if len(band_visits) < 1:
+                continue
+
+            assert pd.api.types.is_float_dtype(band_visits[self.ra_column])
+            assert pd.api.types.is_float_dtype(band_visits[self.decl_column])
+            assert pd.api.types.is_float_dtype(band_visits[self.rot_column])
+            # np.asarray makes type checking happier than .values
+            visits_ra = np.asarray(band_visits[self.ra_column])
+            visits_decl = np.asarray(band_visits[self.decl_column])
+            visits_rot = np.asarray(band_visits[self.rot_column])
+
+            ras, decls = self.camera_perimeter(visits_ra, visits_decl, visits_rot)
+            band_visits = band_visits.assign(
+                ra=ras,
+                decl=decls,
+                mjd=band_visits[self.mjd_column].values,
+            )
+
+            patches_kwargs = {
+                "line_color": self.visit_fill_colors[band],
+                "fill_alpha": 0.0,
+                "name": "alt_visit_patches",
+                "line_alpha": 1.0,
+            }
+            patches_kwargs.update(kwargs)
+
+            self.alt_visits_ds[band] = self.ref_map.add_patches(
+                band_visits,
+                patches_kwargs=patches_kwargs,
+            )
+
+            for spheremap in self.spheremaps[1:]:
+                spheremap.add_patches(data_source=self.alt_visits_ds[band], patches_kwargs=patches_kwargs)
+
+        return self
+
+    def add_alt_visits_selector(
+        self, show_alpha: float = 1.0, future_alpha: float = 0.1, other_sim_alpha: float = 0.0
+    ) -> Self:
+        """Hide visits from alternate sets of visits based on which alternate
+        set is selected, or whether the visits start after the mjd slider.
+
+        Parameters
+        ----------
+        show_alpha: `float`
+            The alpha of shown visits.
+        future_alpha: `float`
+            The alpha of visits in the future.
+        other_sim_alpha: `float`
+            The alpha of visits from unselected sims.
+
+        Returns
+        -------
+        self : `VisitMapBuilder`
+            Returns ``self`` to enable method chaining.
+        """
+
+        # Derive the list of sim indexes and their labels from
+        # the sim_visits.
+        visit_set_labels = (
+            self.alt_visits.loc[:, ["sim_index", "label"]].groupby("sim_index").first().to_dict()["label"]
+        )
+        # This specific type hint is needed to get type checkers to accept
+        # it as an options value in the Select instantiation below.
+        alt_options: list[str | tuple[Any, str]] = [
+            (str(i), str(label)) for i, label in visit_set_labels.items()
+        ]
+        default_value = alt_options[0][0]
+        alt_visits_selector = bokeh.models.Select(
+            value=default_value, options=alt_options, name="alt_visits_selector"
+        )
+        self.ref_map.controls["alt_visits_selector"] = alt_visits_selector
+
+        transform_args = {
+            "show_value": show_alpha,
+            "future_value": future_alpha,
+            "other_visits_value": other_sim_alpha,
+            "alt_visits_selector": self.ref_map.controls["alt_visits_selector"],
+        }
+
+        if "mjd" not in self.ref_map.sliders:
+            # The slider must exist for this feature to work, but if we
+            # have not yet explicitly added it, make it invisible.
+            self.ref_map.add_mjd_slider(visible=False)
+
+        transform_args["mjd_slider"] = self.ref_map.sliders["mjd"]
+        hide_js = """
+            const result = new Array(xs.length)
+            const selected_sim = parseInt(alt_visits_selector.value)
+            for (let i = 0; i < xs.length; i++) {
+                if (selected_sim === sim_index[i]) {
+                    if (mjd_slider.value >= xs[i]) {
+                        result[i] = show_value
+                    } else {
+                        result[i] = future_value
+                    }
+                } else {
+                    result[i] = other_visits_value
+                }
+            }
+            return result
+        """
+
+        for spheremap in self.spheremaps:
+            visit_renderers = spheremap.plot.select(name="alt_visit_patches")
+            if visit_renderers:
+                for renderer in visit_renderers:
+                    transform_args["sim_index"] = renderer.data_source.data["sim_index"]
+                    transform = bokeh.models.CustomJSTransform(args=transform_args, v_func=hide_js)
+                    renderer.glyph.line_alpha = bokeh.transform.transform("mjd", transform)
+
+                    # When a new selection is made, make sure the transform
+                    # is rerun.
+                    alt_visits_selector_callback = bokeh.models.CustomJS(
+                        args={"data_source": renderer.data_source}, code="data_source.change.emit()"
+                    )
+                    alt_visits_selector.js_on_change("value", alt_visits_selector_callback)
 
         return self
 
