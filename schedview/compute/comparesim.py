@@ -213,12 +213,17 @@ def compute_obs_sim_offsets(
     sim_indexes = visits.sim_index.unique()
     sim_indexes = sim_indexes[sim_indexes != obs_index]
 
-    offsets = pd.concat(
-        visits.groupby([POINTING_COL, "band"]).apply(partial(offsets_of_coord_band, i), include_groups=False)
-        for i in sim_indexes
-    )
-    assert isinstance(offsets.index, pd.MultiIndex)
-    offsets.index = offsets.index.reorder_levels(["sim_index", POINTING_COL, "band"])
+    sim_offsets = []
+    for i in sim_indexes:
+        sim_offsets.append(
+            visits.set_index([POINTING_COL, "band"])
+            .groupby([POINTING_COL, "band"])
+            .apply(partial(offsets_of_coord_band, i))
+            .reset_index()
+        )
+
+    offsets = pd.concat(sim_offsets, ignore_index=True).set_index(["sim_index", POINTING_COL, "band"])
+
     return offsets
 
 

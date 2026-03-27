@@ -1,9 +1,12 @@
 import unittest
+from typing import Tuple
 
 import healpy as hp
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
+from schedview import DECL_COL, POINTING_COL, RA_COL
 from schedview.compute.comparesim import (
     combine_completed_with_sims,
     compute_obs_sim_offsets,
@@ -11,7 +14,6 @@ from schedview.compute.comparesim import (
     find_nearest_pointing_ids,
     offsets_of_coord_band,
 )
-from schedview import DECL_COL, POINTING_COL, RA_COL
 
 RANDOM_NUMBER_GENERATOR = np.random.default_rng(6563)
 
@@ -54,11 +56,11 @@ class TestOffsetOfCoordBand(unittest.TestCase):
 
         # Verify that we can recover the time offsets
         result = offsets_of_coord_band(0, visits, 1)
-        np.testing.assert_array_almost_equal(result["delta"].values, self.offsets, decimal=4)
+        np.testing.assert_array_almost_equal(result["delta"].to_numpy(), self.offsets, decimal=4)
 
         # Verify that we can reverse the sign
         result = offsets_of_coord_band(1, visits, 0)
-        np.testing.assert_array_almost_equal(result["delta"].values, -1 * self.offsets, decimal=4)
+        np.testing.assert_array_almost_equal(result["delta"].to_numpy(), -1 * self.offsets, decimal=4)
 
     def test_missing_some(self):
         dropped_indexes = RANDOM_NUMBER_GENERATOR.choice(len(self.sim_visits), 3, replace=False)
@@ -73,14 +75,16 @@ class TestOffsetOfCoordBand(unittest.TestCase):
 
         # Visits that weren't dropped should be recoverable
         result = offsets_of_coord_band(0, visits, 1)
-        np.testing.assert_array_almost_equal(result["delta"].values, remaining_offsets, decimal=4)
+        np.testing.assert_array_almost_equal(result["delta"].to_numpy(), remaining_offsets, decimal=4)
 
         # Reverse sim and obs, and see if it still works
         result = offsets_of_coord_band(1, visits, 0)
-        np.testing.assert_array_almost_equal(result["delta"].values, -1 * remaining_offsets, decimal=4)
+        np.testing.assert_array_almost_equal(result["delta"].to_numpy(), -1 * remaining_offsets, decimal=4)
 
 
-def _generate_test_visits(num_visits_per_hpid_band, num_hpid_band, num_sims):
+def _generate_test_visits(
+    num_visits_per_hpid_band, num_hpid_band, num_sims
+) -> Tuple[pd.DataFrame, npt.NDArray, pd.DataFrame]:
     """Generate visits DataFrame for testing."""
 
     # Generate a pandas.DataFrame, hpid_band_df, of length
@@ -130,7 +134,7 @@ def _generate_test_visits(num_visits_per_hpid_band, num_hpid_band, num_sims):
     offsets = RANDOM_NUMBER_GENERATOR.uniform(-6, 6, len(obs_df))
     obs_df["start_timestamp"] = obs_df["start_timestamp"] + pd.to_timedelta(offsets, unit="s")
     obs_df["sim_index"] = 0
-    obs_df["lable"] = "Completed"
+    obs_df["label"] = "Completed"
 
     visits = pd.concat([obs_df] + sim_dfs, ignore_index=True)
     return visits, offsets, hpid_band_df
@@ -154,15 +158,22 @@ class TestComputeObsSimOffsets(unittest.TestCase):
         self.assertIn("delta", result.columns)
 
         # Test that we recover offsets
+        sim_1_result = result.loc[1, :]
+        assert isinstance(sim_1_result, pd.DataFrame)
+        self.assertEqual(len(self.visits.query("sim_index == 1")), len(sim_1_result))
         np.testing.assert_array_almost_equal(
-            result.loc[1, :].sort_values("sim_time").loc[:, "delta"].values,
+            sim_1_result.sort_values(by=["sim_time"]).loc[:, "delta"].to_numpy(),
             self.offsets,
             decimal=4,
         )
 
-        # Should have a multiindex with sim_index, fieldHpid, and band
         self.assertTrue(isinstance(result.index, pd.MultiIndex))
         self.assertEqual(result.index.names, ["sim_index", POINTING_COL, "band"])
+
+        self.assertEqual(tuple(result.columns), ("obs_time", "sim_time", "delta"))
+        self.assertEqual(str(result.obs_time.dtype), "datetime64[ns, UTC]")
+        self.assertEqual(str(result.sim_time.dtype), "datetime64[ns, UTC]")
+        self.assertEqual(str(result.delta.dtype), "float64")
 
         # Should have at least one entry for each simulation
         sim_indexes = result.index.get_level_values("sim_index").unique()
