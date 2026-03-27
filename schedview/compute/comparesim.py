@@ -147,7 +147,7 @@ def combine_completed_with_sims(
 def offsets_of_coord_band(sim_index: int, visits: pd.DataFrame, obs_index: int = 0) -> pd.DataFrame:
     """
     Compute the time offset between a set of observations and a
-    single simulated visit ``sim_index`` for a given (fieldHpid, band)
+    single simulated visit ``sim_index`` for a given pointing id, band
     coordinate pair.
 
     Parameters
@@ -200,7 +200,7 @@ def compute_obs_sim_offsets(
     ----------
     visits : `pd.DataFrame`
         Table of visits with at least the columns ``sim_index``,
-        ``fieldHpid`` and ``band``.
+        the value of `schedview.POINTING_COL` and ``band``.
     obs_index : `int`, optional
         ``sim_index`` value for completed (observed) visits (default = 0).
 
@@ -208,7 +208,7 @@ def compute_obs_sim_offsets(
     -------
     sim_offsets : `pd.DataFrame`
         Offsets for every simulated visit, indexed by ``sim_index``,
-        ``fieldHpid`` and ``band``.
+        the value of `schedview.POINTING_COL` and ``band``.
     """
     sim_indexes = visits.sim_index.unique()
     sim_indexes = sim_indexes[sim_indexes != obs_index]
