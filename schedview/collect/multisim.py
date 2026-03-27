@@ -40,7 +40,31 @@ def read_multiple_prenights(
     Returns
     -------
     visits : `pandas.DataFrame`
-        Data on the visits.
+        Data on the visits, with columns generated according to the opsim
+        schema (see `rubin_scheduler.scheduler.utils.SchemaConverter`), plus
+        several additional ones providing data on each simulation:
+
+        visitseq_label :
+            The text label assigned to the simulation when it was added to the
+            visit sequence archive.
+        config_url :
+            The URL of the configuration file used to run the simulation.
+        scheduler_version :
+            The version of the scheduler used to run the simulation.
+        sim_creation_day_obs :
+            The date (in dayobs timezone) on which the simulation was added
+            to the simulation archive.
+        tags :
+            The list of tags assigned to the simulation in the archive
+            metadata.
+        sim_index :
+            An integer index identifying which simulation the visit destribed
+            in the row came from.
+
+        All visits associated with all returned simulations are included in
+        the same ``visits`` ``pd.DataFrame``. To get the visits from only
+        one simulation of interest, the user needs to filter by the desired
+        ``sim_index`` value.
     """
     assert HAVE_SIM_ARCHIVE, "Missing optional module " + MISSING_MODULE_ERROR.msg
     sim_date = DayObs.from_date(sim_date)

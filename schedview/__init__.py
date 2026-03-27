@@ -8,4 +8,4 @@ except PackageNotFoundError:
 
 from .dayobs import DayObs
 from .sphere import *
-from .util import band_column
+from .util import DECL_COL, POINTING_COL, RA_COL, band_column
