@@ -1194,7 +1194,11 @@ class VisitMapBuilder:
         visit_set_labels = (
             self.alt_visits.loc[:, ["sim_index", "label"]].groupby("sim_index").first().to_dict()["label"]
         )
-        alt_options = [(str(i), label) for i, label in visit_set_labels.items()]
+        # This specific type hint is needed to get type checkers to accept
+        # it as an options value in the Select instantiation below.
+        alt_options: list[str | tuple[Any, str]] = [
+            (str(i), str(label)) for i, label in visit_set_labels.items()
+        ]
         default_value = alt_options[0][0]
         alt_visits_selector = bokeh.models.Select(
             value=default_value, options=alt_options, name="alt_visits_selector"

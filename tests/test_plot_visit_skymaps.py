@@ -13,21 +13,42 @@ from schedview.plot.visit_skymaps import VisitMapBuilder
 
 TEST_VISITS = pd.DataFrame(
     {
-        "fieldRA": [10.0, 20.0],
-        "fieldDec": [-5.0, 15.0],
-        "observationStartMJD": [59000.0, 59001.0],
-        "band": ["g", "r"],
-        "rotSkyPos": [0.0, 45.0],
-        "observationId": [1, 2],
-        "start_timestamp": pd.to_datetime(["2020-01-01", "2020-01-02"]),
-        "observationStartLST": [150.0, 160.0],
-        "paraAngle": [0.0, 0.0],
-        "azimuth": [180.0, 190.0],
-        "altitude": [45.0, 50.0],
-        "observation_reason": ["science", "science"],
-        "science_program": ["prog1", "prog2"],
+        "fieldRA": [59.780536346361515, 62.84973607079297],
+        "fieldDec": [-49.19329541107385, -47.84742038715563],
+        "observationStartMJD": [61105.09302481122, 61105.09346446205],
+        "band": ["i", "i"],
+        "rotSkyPos": [46.55499643418069, 41.58312568172861],
+        "observationId": [2026030500054, 2026030500055],
+        "start_timestamp": pd.to_datetime(["2026-03-06T02:13:57Z", "2026-03-06T02:14:35Z"]),
+        "observationStartLST": [126.57549341396043, 126.73420103825885],
+        "paraAngle": [95.01157303654843, 94.0006966560346],
+        "azimuth": [228.99332822379625, 230.8847273192659],
+        "altitude": [37.30089164250424, 39.122240613722006],
+        "observation_reason": ["ddf_edfs_a", "ddf_edfs_b"],
+        "science_program": ["BLOCK-407", "BLOCK-407"],
     }
 )
+
+TEST_ALT_VISITS = pd.DataFrame(
+    {
+        "fieldRA": [29.155717698495256, 28.196457586307357],
+        "fieldDec": [-21.68100073471875, -18.68709611868367],
+        "observationStartMJD": [61105.0041463103, 61105.00439657373],
+        "band": ["z", "z"],
+        "rotSkyPos": [78.04543083088815, 79.83485071859705],
+        "observationId": [0, 1],
+        "start_timestamp": pd.to_datetime(["2026-03-06T00:05:58Z", "2026-03-06T00:06:19Z"]),
+        "observationStartLST": [94.4899896086903, 94.58033111527438],
+        "paraAngle": [113.09872516602272, 114.84576306113031],
+        "azimuth": [261.99025952876906, 264.70873478710547],
+        "altitude": [31.76771615131967, 29.65491863783054],
+        "observation_reason": ["twilight_near_sun", "twilight_near_sun"],
+        "science_program": ["BLOCK-421", "BLOCK-421"],
+        "sim_index": [1, 1],
+        "label": ["Sim 1 Label", "Sim 1 Label"],
+    }
+)
+
 FOOTPRINT_NSIDE = 16
 
 
@@ -233,5 +254,51 @@ def test_add_footprint_outlines():
             outline_renderers.append(renderer)
 
     assert len(outline_renderers) > 0
+
+    _save_and_check_viewable_html(viewable)
+
+
+def test_add_alt_visit_patches():
+    """Test that add_alt_visit_patches adds alternate visit patches."""
+
+    builder = VisitMapBuilder(TEST_VISITS)
+    builder.add_alt_visit_patches(TEST_ALT_VISITS)
+    viewable = builder.build()
+
+    # Check that alt_visit_patches were added
+    alt_visit_patches = list(viewable.select({"name": "alt_visit_patches"}))
+    assert len(alt_visit_patches) > 0
+
+    # Verify that the patches have the correct class and styling
+    for renderer in alt_visit_patches:
+        assert isinstance(renderer, bokeh.models.renderers.glyph_renderer.GlyphRenderer)
+        assert renderer.glyph.fill_alpha == 0.0
+        assert renderer.glyph.line_alpha == 1.0
+        assert renderer.glyph.line_color is not None
+
+    _save_and_check_viewable_html(viewable)
+
+
+def test_add_alt_visits_selector():
+    """Test that add_alt_visits_selector adds a Bokeh Select widget
+    with correct options."""
+
+    builder = VisitMapBuilder(TEST_VISITS)
+    builder.add_alt_visit_patches(TEST_ALT_VISITS)
+    builder.add_alt_visits_selector()
+    viewable = builder.build()
+
+    # Check that the selector was added
+    selector_renderers = list(viewable.select({"name": "alt_visits_selector"}))
+    assert len(selector_renderers) > 0
+
+    # Verify it's a bokeh Select widget
+    selector = selector_renderers[0]
+    assert isinstance(selector, bokeh.models.Select)
+
+    # Verify the options are correctly set
+    # The selector should have options based on sim_index values in the data
+    expected_options = [("1", "Sim 1 Label")]  # Based on the sim_index=1 and label provided
+    assert selector.options == expected_options
 
     _save_and_check_viewable_html(viewable)
