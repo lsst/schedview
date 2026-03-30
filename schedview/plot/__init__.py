@@ -6,7 +6,6 @@ __all__ = [
     "plot_obs_vs_sim_time",
     "plot_polar_alt_az",
     "plot_survey_rewards",
-    "create_survey_reward_plot",
     "reward_timeline_for_tier",
     "area_timeline_for_tier",
     "reward_timeline_for_surveys",
@@ -23,7 +22,6 @@ __all__ = [
     "create_hpix_visit_map_grid",
     "plot_visits",
     "plot_visit_param_vs_time",
-    "create_visit_explorer",
     "create_overhead_summary_table",
     "create_overhead_histogram",
     "plot_overhead_vs_slew_distance",
@@ -56,21 +54,13 @@ from .overhead import (
 from .progress import make_metric_line_plots
 from .rewards import (
     area_timeline_for_tier,
-    create_survey_reward_plot,
     plot_survey_rewards,
     reward_timeline_for_surveys,
     reward_timeline_for_tier,
-)
-from .scheduler import (
-    BadConditionsError,
-    BadSchedulerError,
-    SchedulerDisplay,
-    SchedulerNotebookDisplay,
-    make_logger,
 )
 from .sim_archive import make_html_table_of_sim_archive_metadata
 from .survey import create_hpix_visit_map_grid, map_survey_healpix, map_visits_over_hpix
 from .timeline import make_timeline_scatterplots
 from .util import mpl_fig_to_html
 from .visitmap import create_visit_skymaps, plot_visit_planisphere, plot_visit_skymaps
-from .visits import create_visit_explorer, create_visit_table, plot_visit_param_vs_time, plot_visits
+from .visits import create_visit_table, plot_visit_param_vs_time, plot_visits
