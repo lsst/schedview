@@ -10,7 +10,7 @@ that can be displayed in a report, dashboard, or other interface.
 
 import warnings
 from types import MethodType
-from typing import Any, Callable, Dict, List, Optional, Self, SupportsFloat, Tuple
+from typing import Any, Callable, Dict, List, Optional, Self, SupportsFloat, Tuple, cast
 
 import bokeh
 import bokeh.layouts
@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 from astropy.coordinates import SkyCoord, get_body
 from astropy.time import Time
+from bokeh.models import UIElement
 from uranography.api import (
     ArmillarySphere,
     Planisphere,
@@ -1252,6 +1253,120 @@ class VisitMapBuilder:
 
         return self
 
+    def add_play_controls(self, speed=250):
+
+        play_toggle = bokeh.models.Toggle(label="Play", button_type="primary", active=True)
+
+        play_callback_code = """
+            const key = 'bokeh_play_timer_' + play.id;
+            function tick() {
+              const step = (mjd.step != null) ? mjd.step : 0.00035;
+              let next = mjd.value + step;
+              if (next > mjd.end) next = mjd.start;
+              mjd.value = next;
+            }
+
+            // If toggled on, start or reset the interval at current speed
+            if (play.active) {
+
+              // Disable the RA and decl sliders when playing because the
+              // callbacks stomp on each other causing problems.
+              if (ra_slider != null) { ra_slider.disabled = true }
+              if (decl_slider != null) { decl_slider.disabled = true }
+
+              play.label = "Stop";
+              if (window[key]) {
+                clearInterval(window[key]);  // reset if already running
+              }
+              window[key] = setInterval(tick, speed);
+            } else {
+              if (ra_slider != null) { ra_slider.disabled = false }
+              if (decl_slider != null) { decl_slider.disabled = false }
+
+              play.label = "Play";
+              if (window[key]) {
+                // actually stops the updates
+                clearInterval(window[key]);
+                window[key] = null;
+              }
+            }
+        """
+        play_toggle_args = {
+            "speed": speed,
+            "play": play_toggle,
+            "mjd": self.mjd_slider,
+            "ra_slider": self.ref_map.controls.get("ra", None),
+            "decl_slider": self.ref_map.controls.get("decl", None),
+        }
+        play_toggle.js_on_change(
+            "active", bokeh.models.CustomJS(args=play_toggle_args, code=play_callback_code)
+        )
+        self.ref_map.controls["play"] = play_toggle
+
+        return self
+
+    def add_zenith_button(self):
+        button = bokeh.models.Button(label="Center zenith")
+
+        code = """
+            if (alt != null) {
+                alt.value = 89.99999
+            }
+            if (az != null) {
+                az.value = 180.0
+            }
+        """
+
+        args = {"alt": self.ref_map.controls.get("alt", None), "az": self.ref_map.controls.get("az", None)}
+        button.js_on_click(bokeh.models.CustomJS(args=args, code=code))
+        self.ref_map.controls["zenith"] = button
+        return self
+
+    def add_coord_sys_selector(self):
+        needed_controls = ["ra", "decl", "alt", "az", "up"]
+        for control_name in needed_controls:
+            if control_name not in self.ref_map.controls:
+                raise ValueError(f"{control_name} control must be added before coord sys selector")
+
+        self.ref_map.controls["ra"].visible = True
+        self.ref_map.controls["decl"].visible = True
+        self.ref_map.controls["up"].visible = False
+        self.ref_map.controls["up"].value = "north is up"
+        self.ref_map.controls["alt"].visible = False
+        self.ref_map.controls["az"].visible = False
+
+        labels = [
+            "sliders in R.A., decl; north is up",
+            "sliders in alt, az; zenith is up",
+        ]
+        args = {
+            "alt": self.ref_map.controls["alt"],
+            "az": self.ref_map.controls["az"],
+            "up": self.ref_map.controls["up"],
+            "ra": self.ref_map.controls["ra"],
+            "decl": self.ref_map.controls["decl"],
+            "labels": labels,
+        }
+        code = """
+            if (labels[this.active].toLowerCase().includes("alt")) {
+                alt.visible = true
+                az.visible = true
+                up.value = "zenith is up"
+                ra.visible = false
+                decl.visible = false
+            } else {
+                alt.visible = false
+                az.visible = false
+                up.value = "north is up"
+                ra.visible = true
+                decl.visible = true
+            }
+        """
+        coordsys = bokeh.models.RadioButtonGroup(name="Coordinate system", labels=labels, active=0)
+        coordsys.js_on_change("active", bokeh.models.CustomJS(args=args, code=code))
+        self.ref_map.controls["coordsys"] = coordsys
+        return self
+
     def _connect_controls(self):
         # Must be called after all data sources and contros have been added.
 
@@ -1262,12 +1377,58 @@ class VisitMapBuilder:
             for data_source in dynamic_data_sources:
                 spheremap.connect_controls(data_source)
 
+    def nightsum_layout(self) -> UIElement:
+        map_row_contents = []
+        for sphere_map in self.spheremaps:
+            map_row_contents.append(sphere_map.force_update_time)
+            map_row_contents.append(sphere_map.plot)
+
+        map_row = bokeh.layouts.row(*map_row_contents)
+
+        self.ref_map.controls["datetime"].sizing_mode = "stretch_width"
+
+        time_row = bokeh.layouts.row(
+            self.ref_map.controls["play"],
+            self.ref_map.controls["datetime"],
+            sizing_mode="stretch_width",
+        )
+
+        button_row = bokeh.layouts.row(
+            bokeh.models.Spacer(sizing_mode="stretch_width"),
+            self.ref_map.controls["zenith"],
+            bokeh.models.Spacer(sizing_mode="stretch_width"),
+            self.ref_map.controls["coordsys"],
+            bokeh.models.Spacer(sizing_mode="stretch_width"),
+            sizing_mode="stretch_width",
+        )
+
+        column_contents = [map_row, time_row, button_row]
+
+        for control_key in ["ra", "decl", "alt", "az"]:
+            column_contents.append(self.ref_map.controls[control_key])
+
+        figure = bokeh.layouts.column(*column_contents)
+
+        return figure
+
     def build(
-        self, layout: Callable[[List[bokeh.models.UIElement]], bokeh.models.UIElement] = bokeh.layouts.row
-    ) -> bokeh.models.UIElement:
+        self,
+        layout: Callable[[List[UIElement]], UIElement] | str = bokeh.layouts.row,
+    ) -> UIElement:
 
         self._connect_controls()
 
-        map_figures = list(s.figure for s in self.spheremaps)
-        combined_figure = layout(map_figures)
+        combined_figure: UIElement | None = None
+        match layout:
+            case "nightsum":
+                combined_figure = self.nightsum_layout()
+            case f if callable(f):
+                map_figures = list(s.figure for s in self.spheremaps)
+                layout = cast(Callable, layout)
+                combined_figure = layout(map_figures)
+            case _:
+                raise ValueError("Invalid layout supplied")
+
+        assert isinstance(combined_figure, UIElement)
+
         return combined_figure
