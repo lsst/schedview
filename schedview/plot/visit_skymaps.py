@@ -1253,8 +1253,29 @@ class VisitMapBuilder:
 
         return self
 
-    def add_play_controls(self, speed=100):
+    def add_play_controls(self, speed: int = 100) -> Self:
+        """Add Play/Stop control.
 
+        Parameters
+        ----------
+        speed : `int`, optional
+            The speed of the playback in milliseconds between updates.
+            Default is 100.
+
+        Returns
+        -------
+        self : `VisitMapBuilder`
+            Returns self to enable method chaining.
+
+        Notes
+        -----
+        * The toggle button switches between "Play" and "Stop" states.
+          When in the "Play" (active) state, the MJD (or datetime) slider(s)
+          advance automatically at a rate set by ``speed``, and the button
+          reads "Stop."
+        * While playing, the RA and decl sliders are disabled to prevent
+          conflicts with the automatic MJD updates.
+        """
         play_toggle = bokeh.models.Toggle(label="\u23f5 Play", button_type="primary", active=True)
 
         play_callback_code = r"""
@@ -1305,7 +1326,14 @@ class VisitMapBuilder:
 
         return self
 
-    def add_zenith_button(self):
+    def add_zenith_button(self) -> Self:
+        """Add a button to center the map on the zenith.
+
+        Returns
+        -------
+        self : `VisitMapBuilder`
+            Returns self to enable method chaining.
+        """
         button = bokeh.models.Button(label="Center zenith")
 
         code = """
@@ -1322,7 +1350,28 @@ class VisitMapBuilder:
         self.ref_map.controls["zenith"] = button
         return self
 
-    def add_coord_sys_selector(self):
+    def add_coord_sys_selector(self) -> Self:
+        """Add a coordinate system selector to toggle between equatorial
+        (R.A, decl) and horizon (alt, az) coordinates.
+
+        Returns
+        -------
+        self : `VisitMapBuilder`
+            Returns self to enable method chaining.
+
+        Notes
+        -----
+        * The coordinate system selector toggles visibility of the appropriate
+          sliders:
+          - Equatorial mode: Shows R.A. and declination sliders, hides alt/az
+            sliders
+          - Horizontal mode: Shows alt and az sliders, hides R.A./decl sliders
+        * The orientation is adjusted according to the coordinate system, such
+          that the north equatorial pole is at x=0, y>0 in equatorial
+          coordinates, and the zenith is at x=0, y>0 in horizon coordinates.
+        * This method requires that the "ra", "decl", "alt", "az", and "up"
+          controls have already been added to the reference map.
+        """
         needed_controls = ["ra", "decl", "alt", "az", "up"]
         for control_name in needed_controls:
             if control_name not in self.ref_map.controls:
@@ -1377,7 +1426,26 @@ class VisitMapBuilder:
             for data_source in dynamic_data_sources:
                 spheremap.connect_controls(data_source)
 
-    def nightsum_layout(self) -> UIElement:
+    def _nightsum_layout(self) -> UIElement:
+        """Create a night summary layout for the visit map.
+
+        Returns
+        -------
+        figure : `bokeh.models.UIElement`
+            A Bokeh UIElement containing the complete night summary layout
+            with maps, time controls, and coordinate system controls.
+
+        Notes
+        -----
+        The layout is designed for night summary and related schedview
+        reports.
+
+        The layout includes:
+        - Map visualization rows with time update indicators
+        - Time control row with play button and datetime slider
+        - Button row with zenith centering and coordinate system selector
+        - Control rows for RA, decl, alt, and az sliders
+        """
         map_row_contents = []
         for sphere_map in self.spheremaps:
             map_row_contents.append(sphere_map.force_update_time)
@@ -1415,13 +1483,47 @@ class VisitMapBuilder:
         self,
         layout: Callable[[List[UIElement]], UIElement] | str = bokeh.layouts.row,
     ) -> UIElement:
+        """Build the visit sky-map visualization.
+
+        Parameters
+        ----------
+        layout : `callable` or `str`, optional
+            Layout function for combining the spheremap figures. If a callable
+            is provided, it will be used to arrange the individual map figures.
+            If the string "nightsum" is provided, a night summary layout is
+            used. Default is `bokeh.layouts.row`.
+
+        Returns
+        -------
+        figure : `bokeh.models.UIElement`
+            A Bokeh UIElement containing the complete visualization that can be
+            embedded in reports, dashboards, or saved as HTML.
+
+        Raises
+        ------
+        `ValueError`
+            If an invalid layout is provided.
+
+        Notes
+        -----
+        * This method finalizes the visualization by connecting all controls
+          and assembling the figure according to the specified layout. It
+          should be called after all configuration methods have been chained.
+        * This method should be called after all configuration methods have
+          been chained.
+        * The returned UIElement can be saved as an HTML file using
+          `bokeh.io.save(viewable, filename="visit_skymap.html")`.
+        * The visualization includes all configured elements such as visit
+          patches, graticules, horizon, celestial bodies, and time controls.
+
+        """
 
         self._connect_controls()
 
         combined_figure: UIElement | None = None
         match layout:
             case "nightsum":
-                combined_figure = self.nightsum_layout()
+                combined_figure = self._nightsum_layout()
             case f if callable(f):
                 map_figures = list(s.figure for s in self.spheremaps)
                 layout = cast(Callable, layout)
