@@ -1253,14 +1253,14 @@ class VisitMapBuilder:
 
         return self
 
-    def add_play_controls(self, speed=250):
+    def add_play_controls(self, speed=100):
 
-        play_toggle = bokeh.models.Toggle(label="Play", button_type="primary", active=True)
+        play_toggle = bokeh.models.Toggle(label="\u23f5 Play", button_type="primary", active=True)
 
-        play_callback_code = """
+        play_callback_code = r"""
             const key = 'bokeh_play_timer_' + play.id;
             function tick() {
-              const step = (mjd.step != null) ? mjd.step : 0.00035;
+              const step = (mjd.step != null) ? mjd.step : 0.0004;
               let next = mjd.value + step;
               if (next > mjd.end) next = mjd.start;
               mjd.value = next;
@@ -1274,7 +1274,7 @@ class VisitMapBuilder:
               if (ra_slider != null) { ra_slider.disabled = true }
               if (decl_slider != null) { decl_slider.disabled = true }
 
-              play.label = "Stop";
+              play.label = "\u23F8 Stop";
               if (window[key]) {
                 clearInterval(window[key]);  // reset if already running
               }
@@ -1283,7 +1283,7 @@ class VisitMapBuilder:
               if (ra_slider != null) { ra_slider.disabled = false }
               if (decl_slider != null) { decl_slider.disabled = false }
 
-              play.label = "Play";
+              play.label = "\u23F5 Play";
               if (window[key]) {
                 // actually stops the updates
                 clearInterval(window[key]);
@@ -1336,8 +1336,8 @@ class VisitMapBuilder:
         self.ref_map.controls["az"].visible = False
 
         labels = [
-            "sliders in R.A., decl; north is up",
-            "sliders in alt, az; zenith is up",
+            "sliders in R.A., decl; north equatorial pole directly above center",
+            "sliders in alt, az; zenith directly above center",
         ]
         args = {
             "alt": self.ref_map.controls["alt"],
