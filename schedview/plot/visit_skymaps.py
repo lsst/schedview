@@ -10,7 +10,7 @@ that can be displayed in a report, dashboard, or other interface.
 
 import warnings
 from types import MethodType
-from typing import Any, Callable, Dict, List, Optional, Self, SupportsFloat, Tuple, cast
+from typing import Any, Callable, Dict, List, Optional, Self, Sequence, SupportsFloat, Tuple, cast
 
 import bokeh
 import bokeh.layouts
@@ -23,7 +23,11 @@ import numpy as np
 import pandas as pd
 from astropy.coordinates import SkyCoord, get_body
 from astropy.time import Time
-from bokeh.models import UIElement
+from bokeh.models.sources import DataSource
+from bokeh.models.ui.ui_element import UIElement
+from bokeh.models.widgets.buttons import Button, Toggle
+from bokeh.models.widgets.groups import RadioButtonGroup
+from bokeh.models.widgets.inputs import Select
 from uranography.api import (
     ArmillarySphere,
     Planisphere,
@@ -215,7 +219,7 @@ class VisitMapBuilder:
             camera_perimeter if camera_perimeter is not None else LsstCameraFootprintPerimeter()
         )
 
-        self.visits_ds = {}
+        self.visits_ds: dict[str, DataSource] = {}
         self.visit_patches_added = False
         self._add_mjd_slider(**mjd_slider_kwargs)
         self.body_ds: Dict[str, bokeh.models.ColumnDataSource] = {}
@@ -320,7 +324,7 @@ class VisitMapBuilder:
                 mjd=band_visits[self.mjd_column].values,
             )
 
-            patches_kwargs = {"fill_color": self.visit_fill_colors[band]}
+            patches_kwargs: dict = {"fill_color": self.visit_fill_colors[band]}
             patches_kwargs.update(DEFAULT_VISIT_PATCHES_KWARGS)
             patches_kwargs.update(kwargs)
 
@@ -713,6 +717,7 @@ class VisitMapBuilder:
             return result
         """
 
+        mjds: Sequence
         if time_step > self.mjd_slider.end - self.mjd_slider.start:
             mjds = [(self.mjd_slider.end + self.mjd_slider.start) / 2]
         else:
@@ -720,7 +725,7 @@ class VisitMapBuilder:
             end_mjd: float = self.mjd_slider.end + time_step
             first_mjd: float = start_mjd + time_step / 2
             last_mjd: float = end_mjd + time_step / 2
-            mjds = np.arange(first_mjd, last_mjd, time_step)
+            mjds = np.arange(first_mjd, last_mjd, time_step).tolist()
 
         ap_times = Time(mjds, format="mjd", scale="utc")
         body_coords_all_times = get_body(body, ap_times)
@@ -972,14 +977,15 @@ class VisitMapBuilder:
         footprint_polygons = footprint_polygons.reorder_levels(["region", "loop"]).copy()
 
         outside = ""
+        palette: tuple[str, ...]
         if colormap is None:
             regions = [
                 r for r in footprint_polygons.index.get_level_values("region").unique() if r != outside
             ]
             if len(regions) == 1:
-                palette = ["black"]
+                palette = ("black",)
             elif len(regions) == 2:
-                palette = ["black", "darkgray"]
+                palette = ("black", "darkgray")
             else:
                 # Try palettes from the "colorblind" section in the bokeh docs
                 try:
@@ -989,7 +995,7 @@ class VisitMapBuilder:
 
             colormap = {r: c for r, c in zip(regions, palette)}
 
-        footprint_regions = {}
+        footprint_regions: dict[str, dict] = {}
         for region_index in set(footprint_polygons.index.values.tolist()):
             assert isinstance(region_index, tuple)
             region_name, loop_id = region_index
@@ -1201,9 +1207,7 @@ class VisitMapBuilder:
             (str(i), str(label)) for i, label in visit_set_labels.items()
         ]
         default_value = alt_options[0][0]
-        alt_visits_selector = bokeh.models.Select(
-            value=default_value, options=alt_options, name="alt_visits_selector"
-        )
+        alt_visits_selector = Select(value=default_value, options=alt_options, name="alt_visits_selector")
         self.ref_map.controls["alt_visits_selector"] = alt_visits_selector
 
         transform_args = {
@@ -1263,7 +1267,7 @@ class VisitMapBuilder:
             Default is 100.
         **kwargs
             Additional keyword arguments passed to the underlying
-            `bokeh.models.Toggle` constructor.
+            `Toggle` constructor.
 
         Returns
         -------
@@ -1279,7 +1283,7 @@ class VisitMapBuilder:
         * While playing, the RA and decl sliders are disabled to prevent
           conflicts with the automatic MJD updates.
         """
-        play_toggle = bokeh.models.Toggle(label="\u23f5 Play", button_type="primary", active=True, **kwargs)
+        play_toggle = Toggle(label="\u23f5 Play", button_type="primary", active=True, **kwargs)
 
         play_callback_code = r"""
             const key = 'bokeh_play_timer_' + play.id;
@@ -1343,7 +1347,7 @@ class VisitMapBuilder:
         self : `VisitMapBuilder`
             Returns self to enable method chaining.
         """
-        button = bokeh.models.Button(label="Center zenith", **kwargs)
+        button = Button(label="Center zenith", **kwargs)
 
         code = """
             if (alt != null) {
@@ -1426,9 +1430,9 @@ class VisitMapBuilder:
                 decl.visible = true
             }
         """
-        rb_kwargs = {"name": "Coordinate system", "labels": labels, "active": 0}
+        rb_kwargs: dict[str, Any] = {"name": "Coordinate system", "labels": labels, "active": 0}
         rb_kwargs.update(kwargs)
-        coordsys = bokeh.models.RadioButtonGroup(**rb_kwargs)
+        coordsys = RadioButtonGroup(**rb_kwargs)
         coordsys.js_on_change("active", bokeh.models.CustomJS(args=args, code=code))
         self.ref_map.controls["coordsys"] = coordsys
         return self
