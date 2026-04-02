@@ -1253,7 +1253,7 @@ class VisitMapBuilder:
 
         return self
 
-    def add_play_controls(self, speed: int = 100) -> Self:
+    def add_play_controls(self, speed: int = 100, **kwargs) -> Self:
         """Add Play/Stop control.
 
         Parameters
@@ -1261,6 +1261,9 @@ class VisitMapBuilder:
         speed : `int`, optional
             The speed of the playback in milliseconds between updates.
             Default is 100.
+        **kwargs
+            Additional keyword arguments passed to the underlying
+            `bokeh.models.Toggle` constructor.
 
         Returns
         -------
@@ -1276,7 +1279,7 @@ class VisitMapBuilder:
         * While playing, the RA and decl sliders are disabled to prevent
           conflicts with the automatic MJD updates.
         """
-        play_toggle = bokeh.models.Toggle(label="\u23f5 Play", button_type="primary", active=True)
+        play_toggle = bokeh.models.Toggle(label="\u23f5 Play", button_type="primary", active=True, **kwargs)
 
         play_callback_code = r"""
             const key = 'bokeh_play_timer_' + play.id;
@@ -1326,15 +1329,21 @@ class VisitMapBuilder:
 
         return self
 
-    def add_zenith_button(self) -> Self:
+    def add_zenith_button(self, **kwargs: Any) -> Self:
         """Add a button to center the map on the zenith.
+
+        Parameters
+        ----------
+        **kwargs
+            Additional keyword arguments passed to the underlying
+            `bokeh.models.Button` constructor.
 
         Returns
         -------
         self : `VisitMapBuilder`
             Returns self to enable method chaining.
         """
-        button = bokeh.models.Button(label="Center zenith")
+        button = bokeh.models.Button(label="Center zenith", **kwargs)
 
         code = """
             if (alt != null) {
@@ -1350,9 +1359,15 @@ class VisitMapBuilder:
         self.ref_map.controls["zenith"] = button
         return self
 
-    def add_coord_sys_selector(self) -> Self:
+    def add_coord_sys_selector(self, **kwargs: Any) -> Self:
         """Add a coordinate system selector to toggle between equatorial
         (R.A, decl) and horizon (alt, az) coordinates.
+
+        Parameters
+        ----------
+        **kwargs
+            Additional keyword arguments passed to the underlying
+            `bokeh.models.RadioButtonGroup` constructor.
 
         Returns
         -------
@@ -1411,7 +1426,9 @@ class VisitMapBuilder:
                 decl.visible = true
             }
         """
-        coordsys = bokeh.models.RadioButtonGroup(name="Coordinate system", labels=labels, active=0)
+        rb_kwargs = {"name": "Coordinate system", "labels": labels, "active": 0}
+        rb_kwargs.update(kwargs)
+        coordsys = bokeh.models.RadioButtonGroup(**rb_kwargs)
         coordsys.js_on_change("active", bokeh.models.CustomJS(args=args, code=code))
         self.ref_map.controls["coordsys"] = coordsys
         return self

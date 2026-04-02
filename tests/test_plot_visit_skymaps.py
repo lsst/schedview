@@ -302,3 +302,98 @@ def test_add_alt_visits_selector():
     assert selector.options == expected_options
 
     _save_and_check_viewable_html(viewable)
+
+
+def test_add_play_controls():
+    """Test that add_play_controls adds a play/stop toggle button."""
+    builder = VisitMapBuilder(TEST_VISITS)
+    builder.add_visit_patches()
+    builder.add_play_controls(name="playbutton")
+    viewable = builder.build()
+
+    # Check that the play control was added to the reference map controls
+    assert "play" in builder.ref_map.controls
+    play_control = builder.ref_map.controls["play"]
+    assert isinstance(play_control, bokeh.models.Toggle)
+
+    # Check that it appears in the viewable
+    playbuttons = list(viewable.select({"name": "playbutton"}))
+    assert len(playbuttons) > 0
+
+    # Check that the label contains the play symbol
+    assert "\u23f5 Play" in play_control.label
+
+    # Verify the viewable can be saved to HTML
+    _save_and_check_viewable_html(viewable)
+
+
+def test_add_zenith_button():
+    """Test that add_zenith_button adds the center zenith button."""
+    builder = VisitMapBuilder(TEST_VISITS)
+    builder.add_visit_patches()
+    builder.add_zenith_button(name="zenithbutton")
+    viewable = builder.build()
+
+    # Check that the play control was added to the reference map controls
+    assert "zenith" in builder.ref_map.controls
+    play_control = builder.ref_map.controls["zenith"]
+    assert isinstance(play_control, bokeh.models.Button)
+
+    # Check that it appears in the viewable
+    zenith_buttons = list(viewable.select({"name": "zenithbutton"}))
+    assert len(zenith_buttons) > 0
+
+    # Verify the viewable can be saved to HTML
+    _save_and_check_viewable_html(viewable)
+
+
+def test_add_coord_sys_selector():
+    """Test that add_coord_sys_selector adds a coordinate system selector."""
+    # Prepare a builder with the controls that add_coord_sys_selector expects
+    builder = VisitMapBuilder(TEST_VISITS).add_visit_patches().add_eq_sliders()
+
+    # Add the coordinate system selector
+    builder.add_coord_sys_selector()
+    viewable = builder.build()
+
+    # Check that the selector was added to the reference map controls
+    assert "coordsys" in builder.ref_map.controls
+    coordsys_selector = builder.ref_map.controls["coordsys"]
+    assert isinstance(coordsys_selector, bokeh.models.RadioButtonGroup)
+    assert coordsys_selector.name == "Coordinate system"
+
+    # Check that the selector appears in the viewable
+    coordsys_selectors = list(viewable.select({"name": "Coordinate system"}))
+    assert len(coordsys_selectors) > 0
+
+    # Verify the viewable can be saved to HTML
+    _save_and_check_viewable_html(viewable)
+
+
+def test_build_with_nightsum_layout():
+    """Test a build with layout='nightsum'."""
+
+    builder = (
+        VisitMapBuilder(TEST_VISITS)
+        .add_visit_patches()
+        .add_datetime_slider(name="datetime")
+        .add_eq_sliders()
+        .add_play_controls(name="play")
+        .add_zenith_button(name="zenith")
+        .add_coord_sys_selector()
+    )
+    viewable = builder.build(layout="nightsum")
+
+    play_controls = list(viewable.select({"name": "play"}))
+    assert len(play_controls) > 0
+
+    datetime_sliders = list(viewable.select({"name": "datetime"}))
+    assert len(datetime_sliders) > 0
+
+    zenith_button = list(viewable.select({"name": "zenith"}))
+    assert len(zenith_button) > 0
+
+    coordsys_selectors = list(viewable.select({"name": "Coordinate system"}))
+    assert len(coordsys_selectors) > 0
+
+    _save_and_check_viewable_html(viewable)
