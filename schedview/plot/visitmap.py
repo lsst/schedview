@@ -13,7 +13,6 @@ from uranography.api import ArmillarySphere, Planisphere
 
 import schedview.compute.astro
 from schedview import band_column
-from schedview.collect import load_bright_stars, read_opsim
 from schedview.compute.camera import LsstCameraFootprintPerimeter
 from schedview.compute.footprint import find_healpix_area_polygons
 from schedview.plot import PLOT_BAND_COLORS
@@ -254,6 +253,9 @@ def plot_visit_skymaps(
     )
 
     if show_stars:
+        # Import here to avoid schedview.collect dependency unless necessary.
+        from schedview.collect.stars import load_bright_stars
+
         star_data = load_bright_stars().loc[:, ["name", "ra", "decl", "Vmag"]]
         star_data["glyph_size"] = 15 - (15.0 / 3.5) * star_data["Vmag"]
         star_data.query("glyph_size>0", inplace=True)
@@ -359,6 +361,9 @@ def create_visit_skymaps(
     end_time = Time(night_events.loc["sunrise", "UTC"])
 
     if isinstance(visits, str):
+        # Import here to avoid collect dependency unless necessary
+        from schedview.collect.opsim import read_opsim
+
         visits = read_opsim(visits)
 
     if start_time is not None:
