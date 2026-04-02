@@ -1254,7 +1254,7 @@ class VisitMapBuilder:
         return self
 
     def add_play_controls(self, speed: int = 100, **kwargs) -> Self:
-        """Add Play/Stop control.
+        """Add Play/Pause control.
 
         Parameters
         ----------
@@ -1272,10 +1272,10 @@ class VisitMapBuilder:
 
         Notes
         -----
-        * The toggle button switches between "Play" and "Stop" states.
+        * The toggle button switches between "Play" and "Pause" states.
           When in the "Play" (active) state, the MJD (or datetime) slider(s)
           advance automatically at a rate set by ``speed``, and the button
-          reads "Stop."
+          reads "Pause."
         * While playing, the RA and decl sliders are disabled to prevent
           conflicts with the automatic MJD updates.
         """
@@ -1298,7 +1298,7 @@ class VisitMapBuilder:
               if (ra_slider != null) { ra_slider.disabled = true }
               if (decl_slider != null) { decl_slider.disabled = true }
 
-              play.label = "\u23F8 Stop";
+              play.label = "\u23F8 Pause";
               if (window[key]) {
                 clearInterval(window[key]);  // reset if already running
               }

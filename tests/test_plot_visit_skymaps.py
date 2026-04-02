@@ -305,7 +305,7 @@ def test_add_alt_visits_selector():
 
 
 def test_add_play_controls():
-    """Test that add_play_controls adds a play/stop toggle button."""
+    """Test that add_play_controls adds a play/pause toggle button."""
     builder = VisitMapBuilder(TEST_VISITS)
     builder.add_visit_patches()
     builder.add_play_controls(name="playbutton")
