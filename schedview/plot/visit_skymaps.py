@@ -1404,8 +1404,8 @@ class VisitMapBuilder:
         self.ref_map.controls["az"].visible = False
 
         labels = [
-            "sliders in R.A., decl; north equatorial pole directly above center",
-            "sliders in alt, az; zenith directly above center",
+            "sliders in R.A., decl",
+            "sliders in alt, az",
         ]
         args = {
             "alt": self.ref_map.controls["alt"],
