@@ -10,7 +10,7 @@ that can be displayed in a report, dashboard, or other interface.
 
 import warnings
 from types import MethodType
-from typing import Any, Callable, Dict, List, Optional, Self, SupportsFloat, Tuple
+from typing import Any, Callable, Dict, List, Optional, Self, Sequence, SupportsFloat, Tuple, cast
 
 import bokeh
 import bokeh.layouts
@@ -23,6 +23,11 @@ import numpy as np
 import pandas as pd
 from astropy.coordinates import SkyCoord, get_body
 from astropy.time import Time
+from bokeh.models.sources import DataSource
+from bokeh.models.ui.ui_element import UIElement
+from bokeh.models.widgets.buttons import Button, Toggle
+from bokeh.models.widgets.groups import RadioButtonGroup
+from bokeh.models.widgets.inputs import Select
 from uranography.api import (
     ArmillarySphere,
     Planisphere,
@@ -214,7 +219,7 @@ class VisitMapBuilder:
             camera_perimeter if camera_perimeter is not None else LsstCameraFootprintPerimeter()
         )
 
-        self.visits_ds = {}
+        self.visits_ds: dict[str, DataSource] = {}
         self.visit_patches_added = False
         self._add_mjd_slider(**mjd_slider_kwargs)
         self.body_ds: Dict[str, bokeh.models.ColumnDataSource] = {}
@@ -319,7 +324,7 @@ class VisitMapBuilder:
                 mjd=band_visits[self.mjd_column].values,
             )
 
-            patches_kwargs = {"fill_color": self.visit_fill_colors[band]}
+            patches_kwargs: dict = {"fill_color": self.visit_fill_colors[band]}
             patches_kwargs.update(DEFAULT_VISIT_PATCHES_KWARGS)
             patches_kwargs.update(kwargs)
 
@@ -712,6 +717,7 @@ class VisitMapBuilder:
             return result
         """
 
+        mjds: Sequence
         if time_step > self.mjd_slider.end - self.mjd_slider.start:
             mjds = [(self.mjd_slider.end + self.mjd_slider.start) / 2]
         else:
@@ -719,7 +725,7 @@ class VisitMapBuilder:
             end_mjd: float = self.mjd_slider.end + time_step
             first_mjd: float = start_mjd + time_step / 2
             last_mjd: float = end_mjd + time_step / 2
-            mjds = np.arange(first_mjd, last_mjd, time_step)
+            mjds = np.arange(first_mjd, last_mjd, time_step).tolist()
 
         ap_times = Time(mjds, format="mjd", scale="utc")
         body_coords_all_times = get_body(body, ap_times)
@@ -971,14 +977,15 @@ class VisitMapBuilder:
         footprint_polygons = footprint_polygons.reorder_levels(["region", "loop"]).copy()
 
         outside = ""
+        palette: tuple[str, ...]
         if colormap is None:
             regions = [
                 r for r in footprint_polygons.index.get_level_values("region").unique() if r != outside
             ]
             if len(regions) == 1:
-                palette = ["black"]
+                palette = ("black",)
             elif len(regions) == 2:
-                palette = ["black", "darkgray"]
+                palette = ("black", "darkgray")
             else:
                 # Try palettes from the "colorblind" section in the bokeh docs
                 try:
@@ -988,7 +995,7 @@ class VisitMapBuilder:
 
             colormap = {r: c for r, c in zip(regions, palette)}
 
-        footprint_regions = {}
+        footprint_regions: dict[str, dict] = {}
         for region_index in set(footprint_polygons.index.values.tolist()):
             assert isinstance(region_index, tuple)
             region_name, loop_id = region_index
@@ -1200,9 +1207,7 @@ class VisitMapBuilder:
             (str(i), str(label)) for i, label in visit_set_labels.items()
         ]
         default_value = alt_options[0][0]
-        alt_visits_selector = bokeh.models.Select(
-            value=default_value, options=alt_options, name="alt_visits_selector"
-        )
+        alt_visits_selector = Select(value=default_value, options=alt_options, name="alt_visits_selector")
         self.ref_map.controls["alt_visits_selector"] = alt_visits_selector
 
         transform_args = {
@@ -1252,6 +1257,186 @@ class VisitMapBuilder:
 
         return self
 
+    def add_play_controls(self, speed: int = 100, **kwargs) -> Self:
+        """Add Play/Pause control.
+
+        Parameters
+        ----------
+        speed : `int`, optional
+            The speed of the playback in milliseconds between updates.
+            Default is 100.
+        **kwargs
+            Additional keyword arguments passed to the underlying
+            `Toggle` constructor.
+
+        Returns
+        -------
+        self : `VisitMapBuilder`
+            Returns self to enable method chaining.
+
+        Notes
+        -----
+        * The toggle button switches between "Play" and "Pause" states.
+          When in the "Play" (active) state, the MJD (or datetime) slider(s)
+          advance automatically at a rate set by ``speed``, and the button
+          reads "Pause."
+        * While playing, the RA and decl sliders are disabled to prevent
+          conflicts with the automatic MJD updates.
+        """
+        play_toggle = Toggle(label="\u23f5 Play", button_type="primary", active=True, **kwargs)
+
+        play_callback_code = r"""
+            const key = 'bokeh_play_timer_' + play.id;
+            function tick() {
+              const step = (mjd.step != null) ? mjd.step : 0.0004;
+              let next = mjd.value + step;
+              if (next > mjd.end) next = mjd.start;
+              mjd.value = next;
+            }
+
+            // If toggled on, start or reset the interval at current speed
+            if (play.active) {
+
+              // Disable the RA and decl sliders when playing because the
+              // callbacks stomp on each other causing problems.
+              if (ra_slider != null) { ra_slider.disabled = true }
+              if (decl_slider != null) { decl_slider.disabled = true }
+
+              play.label = "\u23F8 Pause";
+              if (window[key]) {
+                clearInterval(window[key]);  // reset if already running
+              }
+              window[key] = setInterval(tick, speed);
+            } else {
+              if (ra_slider != null) { ra_slider.disabled = false }
+              if (decl_slider != null) { decl_slider.disabled = false }
+
+              play.label = "\u23F5 Play";
+              if (window[key]) {
+                // actually stops the updates
+                clearInterval(window[key]);
+                window[key] = null;
+              }
+            }
+        """
+        play_toggle_args = {
+            "speed": speed,
+            "play": play_toggle,
+            "mjd": self.mjd_slider,
+            "ra_slider": self.ref_map.controls.get("ra", None),
+            "decl_slider": self.ref_map.controls.get("decl", None),
+        }
+        play_toggle.js_on_change(
+            "active", bokeh.models.CustomJS(args=play_toggle_args, code=play_callback_code)
+        )
+        self.ref_map.controls["play"] = play_toggle
+
+        return self
+
+    def add_zenith_button(self, **kwargs: Any) -> Self:
+        """Add a button to center the map on the zenith.
+
+        Parameters
+        ----------
+        **kwargs
+            Additional keyword arguments passed to the underlying
+            `bokeh.models.Button` constructor.
+
+        Returns
+        -------
+        self : `VisitMapBuilder`
+            Returns self to enable method chaining.
+        """
+        button = Button(label="Center zenith", **kwargs)
+
+        code = """
+            if (alt != null) {
+                alt.value = 89.99999
+            }
+            if (az != null) {
+                az.value = 180.0
+            }
+        """
+
+        args = {"alt": self.ref_map.controls.get("alt", None), "az": self.ref_map.controls.get("az", None)}
+        button.js_on_click(bokeh.models.CustomJS(args=args, code=code))
+        self.ref_map.controls["zenith"] = button
+        return self
+
+    def add_coord_sys_selector(self, **kwargs: Any) -> Self:
+        """Add a coordinate system selector to toggle between equatorial
+        (R.A, decl) and horizon (alt, az) coordinates.
+
+        Parameters
+        ----------
+        **kwargs
+            Additional keyword arguments passed to the underlying
+            `bokeh.models.RadioButtonGroup` constructor.
+
+        Returns
+        -------
+        self : `VisitMapBuilder`
+            Returns self to enable method chaining.
+
+        Notes
+        -----
+        * The coordinate system selector toggles visibility of the appropriate
+          sliders:
+          - Equatorial mode: Shows R.A. and declination sliders, hides alt/az
+            sliders
+          - Horizontal mode: Shows alt and az sliders, hides R.A./decl sliders
+        * The orientation is adjusted according to the coordinate system, such
+          that the north equatorial pole is at x=0, y>0 in equatorial
+          coordinates, and the zenith is at x=0, y>0 in horizon coordinates.
+        * This method requires that the "ra", "decl", "alt", "az", and "up"
+          controls have already been added to the reference map.
+        """
+        needed_controls = ["ra", "decl", "alt", "az", "up"]
+        for control_name in needed_controls:
+            if control_name not in self.ref_map.controls:
+                raise ValueError(f"{control_name} control must be added before coord sys selector")
+
+        self.ref_map.controls["ra"].visible = True
+        self.ref_map.controls["decl"].visible = True
+        self.ref_map.controls["up"].visible = False
+        self.ref_map.controls["up"].value = "north is up"
+        self.ref_map.controls["alt"].visible = False
+        self.ref_map.controls["az"].visible = False
+
+        labels = [
+            "sliders in R.A., decl",
+            "sliders in alt, az",
+        ]
+        args = {
+            "alt": self.ref_map.controls["alt"],
+            "az": self.ref_map.controls["az"],
+            "up": self.ref_map.controls["up"],
+            "ra": self.ref_map.controls["ra"],
+            "decl": self.ref_map.controls["decl"],
+            "labels": labels,
+        }
+        code = """
+            if (labels[this.active].toLowerCase().includes("alt")) {
+                alt.visible = true
+                az.visible = true
+                up.value = "zenith is up"
+                ra.visible = false
+                decl.visible = false
+            } else {
+                alt.visible = false
+                az.visible = false
+                up.value = "north is up"
+                ra.visible = true
+                decl.visible = true
+            }
+        """
+        rb_kwargs: dict[str, Any] = {"name": "Coordinate system", "labels": labels, "active": 0}
+        rb_kwargs.update(kwargs)
+        coordsys = RadioButtonGroup(**rb_kwargs)
+        coordsys.js_on_change("active", bokeh.models.CustomJS(args=args, code=code))
+        self.ref_map.controls["coordsys"] = coordsys
+        return self
+
     def _connect_controls(self):
         # Must be called after all data sources and contros have been added.
 
@@ -1262,12 +1447,111 @@ class VisitMapBuilder:
             for data_source in dynamic_data_sources:
                 spheremap.connect_controls(data_source)
 
+    def _nightsum_layout(self) -> UIElement:
+        """Create a night summary layout for the visit map.
+
+        Returns
+        -------
+        figure : `bokeh.models.UIElement`
+            A Bokeh UIElement containing the complete night summary layout
+            with maps, time controls, and coordinate system controls.
+
+        Notes
+        -----
+        The layout is designed for night summary and related schedview
+        reports.
+
+        The layout includes:
+        - Map visualization rows with time update indicators
+        - Time control row with play button and datetime slider
+        - Button row with zenith centering and coordinate system selector
+        - Control rows for RA, decl, alt, and az sliders
+        """
+        map_row_contents = []
+        for sphere_map in self.spheremaps:
+            map_row_contents.append(sphere_map.force_update_time)
+            map_row_contents.append(sphere_map.plot)
+
+        map_row = bokeh.layouts.row(*map_row_contents)
+
+        self.ref_map.controls["datetime"].sizing_mode = "stretch_width"
+
+        time_row = bokeh.layouts.row(
+            self.ref_map.controls["play"],
+            self.ref_map.controls["datetime"],
+            sizing_mode="stretch_width",
+        )
+
+        button_row = bokeh.layouts.row(
+            bokeh.models.Spacer(sizing_mode="stretch_width"),
+            self.ref_map.controls["zenith"],
+            bokeh.models.Spacer(sizing_mode="stretch_width"),
+            self.ref_map.controls["coordsys"],
+            bokeh.models.Spacer(sizing_mode="stretch_width"),
+            sizing_mode="stretch_width",
+        )
+
+        column_contents = [map_row, time_row, button_row]
+
+        for control_key in ["ra", "decl", "alt", "az"]:
+            column_contents.append(self.ref_map.controls[control_key])
+
+        figure = bokeh.layouts.column(*column_contents)
+
+        return figure
+
     def build(
-        self, layout: Callable[[List[bokeh.models.UIElement]], bokeh.models.UIElement] = bokeh.layouts.row
-    ) -> bokeh.models.UIElement:
+        self,
+        layout: Callable[[List[UIElement]], UIElement] | str = bokeh.layouts.row,
+    ) -> UIElement:
+        """Build the visit sky-map visualization.
+
+        Parameters
+        ----------
+        layout : `callable` or `str`, optional
+            Layout function for combining the spheremap figures. If a callable
+            is provided, it will be used to arrange the individual map figures.
+            If the string "nightsum" is provided, a night summary layout is
+            used. Default is `bokeh.layouts.row`.
+
+        Returns
+        -------
+        figure : `bokeh.models.UIElement`
+            A Bokeh UIElement containing the complete visualization that can be
+            embedded in reports, dashboards, or saved as HTML.
+
+        Raises
+        ------
+        `ValueError`
+            If an invalid layout is provided.
+
+        Notes
+        -----
+        * This method finalizes the visualization by connecting all controls
+          and assembling the figure according to the specified layout. It
+          should be called after all configuration methods have been chained.
+        * This method should be called after all configuration methods have
+          been chained.
+        * The returned UIElement can be saved as an HTML file using
+          `bokeh.io.save(viewable, filename="visit_skymap.html")`.
+        * The visualization includes all configured elements such as visit
+          patches, graticules, horizon, celestial bodies, and time controls.
+
+        """
 
         self._connect_controls()
 
-        map_figures = list(s.figure for s in self.spheremaps)
-        combined_figure = layout(map_figures)
+        combined_figure: UIElement | None = None
+        match layout:
+            case "nightsum":
+                combined_figure = self._nightsum_layout()
+            case f if callable(f):
+                map_figures = list(s.figure for s in self.spheremaps)
+                layout = cast(Callable, layout)
+                combined_figure = layout(map_figures)
+            case _:
+                raise ValueError("Invalid layout supplied")
+
+        assert isinstance(combined_figure, UIElement)
+
         return combined_figure
