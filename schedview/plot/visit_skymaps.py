@@ -1492,6 +1492,8 @@ class VisitMapBuilder:
         )
 
         column_contents = [map_row, time_row, button_row]
+        if "alt_visits_selector" in self.ref_map.controls:
+            column_contents.insert(0, self.ref_map.controls["alt_visits_selector"])
 
         for control_key in ["ra", "decl", "alt", "az"]:
             column_contents.append(self.ref_map.controls[control_key])
