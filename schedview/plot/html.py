@@ -1,4 +1,5 @@
-from typing import Sequence
+from collections.abc import Mapping
+from typing import Any, List, Sequence
 
 import matplotlib as mpl
 import numpy as np
@@ -155,6 +156,24 @@ def markup_sun_moon_positions(sun_moon_positions, collapsed=True):
     return html_representation
 
 
+def markup_mapping_with_format(
+    data: Mapping[str, Any],
+    stat_name: Mapping[str, str],
+    stat_str_template: Mapping[str, str],
+    summary_fields: List[str],
+    title: str,
+    collapsed: bool = True,
+):
+    index_values = [stat_name[k] for k in data]
+    value_str = [stat_str_template[k].format(data[k]) for k in data]
+    content = pd.DataFrame({"value": value_str}, index=index_values)
+    if collapsed:
+        title = ", ".join([f"{f}: {content.loc[f, 'value']}" for f in summary_fields])
+
+    html_representation = convert_to_html(content.to_html(header=False), title, collapsed=collapsed)
+    return html_representation
+
+
 def markup_overhead_summary(overhead_summary, collapsed=True):
     stat_name = {
         "relative_start_time": "Open shutter of first exposure",
@@ -174,14 +193,34 @@ def markup_overhead_summary(overhead_summary, collapsed=True):
         "mean_gap_time": "{:7.2f} seconds",
         "median_gap_time": "{:7.2f} seconds",
     }
-    index_values = [stat_name[k] for k in overhead_summary]
-    value_str = [stat_str_template[k].format(overhead_summary[k]) for k in overhead_summary]
-    content = pd.DataFrame({"value": value_str}, index=index_values)
-    if collapsed:
-        summary_fields = ["Number of exposures", "Mean gap time", "Median gap time"]
-        title = ", ".join([f"{f}: {content.loc[f, 'value']}" for f in summary_fields])
-    else:
-        title = "Time on sky"
+    title = "Time on sky"
+    summary_fields = ["Number of exposures", "Mean gap time", "Median gap time"]
+    html_representation = markup_mapping_with_format(
+        overhead_summary, stat_name, stat_str_template, summary_fields, title, collapsed=collapsed
+    )
+    return html_representation
 
-    html_representation = convert_to_html(content.to_html(header=False), title, collapsed=collapsed)
+
+def markup_survey_visit_summary(survey_visit_summary, collapsed=True):
+    stat_name = {
+        "n12_night_time": "Time between 12 degree evening and morning twilights",
+        "n_survey_visits": "Number of survey visits in night",
+        "n_pairs_started": "Number of pairs started",
+        "n_pairs_finished": "Number of pairs finished",
+        "ddfs_observed": "DDFs Observed",
+        "too_observed": "ToOs Observed",
+    }
+    stat_str_template = {
+        "n12_night_time": "{:5.2f} hours",
+        "n_survey_visits": "{}",
+        "n_pairs_started": "{}",
+        "n_pairs_finished": "{}",
+        "ddfs_observed": "{}",
+        "too_observed": "{}",
+    }
+    title = "Survey visit counts"
+    summary_fields = ["Number of survey visits in night", "DDFs Observed", "ToOs Observed"]
+    html_representation = markup_mapping_with_format(
+        survey_visit_summary, stat_name, stat_str_template, summary_fields, title, collapsed=collapsed
+    )
     return html_representation
