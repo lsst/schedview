@@ -259,8 +259,8 @@ def markup_sim_comments(
     strings.
     """
     comment_content = ""
-    for comment_time, comment_content in sim_info.comments.items():
-        comment_content = comment_content + f"<h4>{comment_time}</h4><p>{comment_content}</p> "
+    for comment_time, this_comment_content in sim_info.comments.items():
+        comment_content = comment_content + f"<h4>{comment_time}</h4><p>{this_comment_content}</p> "
 
     html_representation = convert_to_html(
         comment_content, "Comments recorded in the simulation metadata database", collapsed=collapsed
@@ -306,7 +306,9 @@ def markup_night_events(
     return html_representation
 
 
-def markup_sun_moon_positions(sun_moon_positions: Mapping[str, float], collapsed: bool = True) -> str:
+def markup_sun_moon_positions(
+    sun_moon_positions: Mapping[str, float | np.ndarray], collapsed: bool = True
+) -> str:
     """Convert sun and moon position data to an HTML representation.
 
     Parameters
@@ -341,7 +343,11 @@ def markup_sun_moon_positions(sun_moon_positions: Mapping[str, float], collapsed
     schedview.compute.astro.compute_sun_moon_positions
         A similar function that returns a DataFrame of sun and moon positions.
     """
-    body_positions_wide = pd.DataFrame(sun_moon_positions)
+    # We might get a mapping of single value numpy arrays.
+    # If we do, convert them to scalars.
+    sun_moon_positions = {k: float(v if np.isscalar(v) else v.item()) for k, v in sun_moon_positions.items()}
+
+    body_positions_wide = pd.Series(sun_moon_positions).to_frame().T
     body_positions_wide.index.name = "r"
     body_positions_wide.reset_index(inplace=True)
 
