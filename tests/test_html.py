@@ -243,5 +243,177 @@ class TestMarkupMappingWithFormat(unittest.TestCase):
         self.assertNotIn("<summary>", result)
 
 
+class TestMarkupSimIndexInfo(unittest.TestCase):
+    """Tests for markup_sim_index_info function."""
+
+    def setUp(self):
+        """Create test data matching real usage patterns."""
+        self.sim_index_info = pd.Series(
+            {
+                "visitseq_uuid": "abc-123-def",
+                "sim_creation_day_obs": "2024-08-15",
+                "daily_id": 1001,
+                "visitseq_label": "baseline_v2.0_10yrs",
+                "creation_time": "2024-08-15T12:00:00",
+                "telescope": "LSST",
+                "visitseq_url": "https://example.com/visitseq",
+                "config_url": "https://example.com/config",
+                "tags": "baseline,10yrs",
+            }
+        )
+        self.sim_index_info.files = {
+            "rewards": "https://example.com/rewards.h5",
+            "scheduler_pickle": "https://example.com/scheduler.pickle",
+        }
+
+    def test_collapsed_with_title(self):
+        """Test markup_sim_index_info with collapsed=True."""
+        result = schedview.plot.html.markup_sim_index_info(self.sim_index_info, collapsed=True)
+        self.assertIn("<details>", result)
+        self.assertIn("<summary>", result)
+        self.assertIn("baseline_v2.0_10yrs", result)
+        self.assertIn("LSST", result)
+        self.assertIn("abc-123-def", result)
+        self.assertIn("2024-08-15", result)
+
+
+class TestMarkupAdditionalSimFiles(unittest.TestCase):
+    """Tests for markup_additional_sim_files function."""
+
+    def setUp(self):
+        """Create test data matching real usage patterns."""
+        self.sim_index_info = pd.Series(
+            {
+                "visitseq_uuid": "abc-123-def",
+                "sim_creation_day_obs": "2024-08-15",
+            }
+        )
+        self.sim_index_info.files = {
+            "rewards": "https://example.com/rewards.h5",
+            "scheduler_pickle": "https://example.com/scheduler.pickle",
+        }
+
+    def test_collapsed_with_files(self):
+        """Test markup_additional_sim_files with collapsed=True."""
+        result = schedview.plot.html.markup_additional_sim_files(self.sim_index_info, collapsed=True)
+        self.assertIn("<details>", result)
+        self.assertIn("<summary>", result)
+        self.assertIn("Additional files available", result)
+        self.assertIn("rewards", result)
+        self.assertIn("scheduler_pickle", result)
+        self.assertIn("https://example.com/rewards.h5", result)
+
+
+class TestMarkupSimComments(unittest.TestCase):
+    """Tests for markup_sim_comments function."""
+
+    def setUp(self):
+        """Create test data matching real usage patterns."""
+        self.sim_info = pd.Series(
+            {
+                "visitseq_uuid": "abc-123-def",
+                "sim_creation_day_obs": "2024-08-15",
+            }
+        )
+        self.sim_info.comments = {
+            "2024-08-15T12:00:00": "First comment",
+            "2024-08-15T13:00:00": "Second comment",
+        }
+
+    def test_collapsed_with_comments(self):
+        """Test markup_sim_comments with collapsed=True."""
+        result = schedview.plot.html.markup_sim_comments(self.sim_info, collapsed=True)
+        # Should contain details/summary wrapper
+        self.assertIn("<details>", result)
+        self.assertIn("<summary>", result)
+        self.assertIn("Comments recorded in the simulation metadata database", result)
+        self.assertIn("First comment", result)
+        self.assertIn("Second comment", result)
+
+
+class TestMarkupNightEvents(unittest.TestCase):
+    """Tests for markup_night_events function."""
+
+    def setUp(self):
+        """Create test data matching real usage patterns."""
+        self.night_events = pd.DataFrame(
+            {
+                "UTC": [
+                    "2024-08-15T05:30:00",
+                    "2024-08-15T18:30:00",
+                    "2024-08-15T06:30:00",
+                    "2024-08-15T17:30:00",
+                    "2024-08-15T12:00:00",
+                ]
+            },
+            index=["sunset", "sunrise", "sun_n12_setting", "sun_n12_rising", "night_middle"],
+        )
+        # Convert strings to datetime objects
+        self.night_events["UTC"] = pd.to_datetime(self.night_events["UTC"])
+
+    def test_collapsed_with_title(self):
+        """Test markup_night_events with collapsed=True."""
+        result = schedview.plot.html.markup_night_events(self.night_events, collapsed=True)
+        self.assertIn("<details>", result)
+        self.assertIn("<summary>", result)
+        self.assertIn("Sunset:", result)
+        self.assertIn("Sunrise:", result)
+
+
+class TestMarkupSunMoonPositions(unittest.TestCase):
+    """Tests for markup_sun_moon_positions function."""
+
+    def setUp(self):
+        """Create test data matching real usage patterns."""
+        import numpy as np
+
+        # Position data in radians
+        self.sun_moon_positions = {
+            "sun_RA": np.radians(100.0),
+            "sun_dec": np.radians(20.0),
+            "sun_alt": np.radians(30.0),
+            "sun_az": np.radians(180.0),
+            "moon_RA": np.radians(150.0),
+            "moon_dec": np.radians(-10.0),
+            "moon_alt": np.radians(45.0),
+            "moon_az": np.radians(270.0),
+            "moon_phase": 50.0,
+        }
+
+    def test_collapsed_with_title(self):
+        """Test markup_sun_moon_positions with collapsed=True."""
+        result = schedview.plot.html.markup_sun_moon_positions(self.sun_moon_positions, collapsed=True)
+        self.assertIn("<details>", result)
+        self.assertIn("<summary>", result)
+        self.assertIn("Sun", result)
+        self.assertIn("Moon", result)
+
+
+class TestMarkupSurveyVisitSummary(unittest.TestCase):
+    """Tests for markup_survey_visit_summary function."""
+
+    def setUp(self):
+        """Create test data matching real usage patterns."""
+        self.survey_visit_summary = {
+            "n12_night_time": 10.5,
+            "n_survey_visits": 42,
+            "n_pairs_started": 15,
+            "n_pairs_finished": 12,
+            "ddfs_observed": 5,
+            "too_observed": 3,
+        }
+
+    def test_collapsed_with_title(self):
+        """Test markup_survey_visit_summary with collapsed=True."""
+        result = schedview.plot.html.markup_survey_visit_summary(self.survey_visit_summary, collapsed=True)
+        self.assertIn("<details>", result)
+        self.assertIn("<summary>", result)
+        self.assertIn("Number of survey visits", result)
+        self.assertIn("DDFs Observed", result)
+        self.assertIn("ToOs Observed", result)
+        self.assertIn("Time between 12 degree evening and morning twilights", result)
+        self.assertIn("Number of survey visits in night", result)
+
+
 if __name__ == "__main__":
     unittest.main()
