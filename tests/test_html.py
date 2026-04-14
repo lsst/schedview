@@ -1,14 +1,10 @@
-import datetime
+import re
 import unittest
-from collections import namedtuple
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
-from astropy.time import Time
 
 import schedview
-import schedview.compute.astro
 import schedview.plot.html
 
 
@@ -129,6 +125,122 @@ class TestConvertToHtml(unittest.TestCase):
             df, pd_context_options=("display.width", 200), collapsed=False
         )
         self.assertIn("col1", result)
+
+
+class TestMarkupMappingWithFormat(unittest.TestCase):
+    """Tests for markup_mapping_with_format function."""
+
+    def setUp(self):
+        """Create test data matching real usage patterns."""
+        # Overhead summary data matching compute_overhead_summary output
+        self.overhead_summary = {
+            "relative_start_time": 15.5,
+            "relative_end_time": 25.3,
+            "total_time": 8.5,
+            "num_exposures": 42,
+            "total_exptime": 5.25,
+            "mean_gap_time": 45.7,
+            "median_gap_time": 42.3,
+        }
+
+        # Stat name mapping (keys -> display names)
+        self.overhead_stat_name = {
+            "relative_start_time": "Open shutter of first exposure",
+            "relative_end_time": "Close shutter of last exposure",
+            "total_time": "Total wall clock time",
+            "num_exposures": "Number of exposures",
+            "total_exptime": "Total open shutter time",
+            "mean_gap_time": "Mean gap time",
+            "median_gap_time": "Median gap time",
+        }
+
+        # Stat string templates (format strings)
+        self.overhead_stat_str_template = {
+            "relative_start_time": "{:5.2f} minutes after 12 degree evening twilight",
+            "relative_end_time": "{:5.2f} minutes before 12 degree morning twilight",
+            "total_time": "{:4.2f} hours",
+            "num_exposures": "{}",
+            "total_exptime": "{:4.2f} hours",
+            "mean_gap_time": "{:7.2f} seconds",
+            "median_gap_time": "{:7.2f} seconds",
+        }
+
+    def test_collapsed_false_basic(self):
+        """Test basic functionality with collapsed=False."""
+        result = schedview.plot.html.markup_mapping_with_format(
+            self.overhead_summary,
+            self.overhead_stat_name,
+            self.overhead_stat_str_template,
+            ["Number of exposures"],
+            "Time on sky",
+            collapsed=False,
+        )
+        # Should contain formatted values
+        self.assertIn("15.50", result)
+        self.assertIn("42", result)
+        # Should not contain details/summary wrapper
+        self.assertNotIn("<details>", result)
+        self.assertNotIn("<summary>", result)
+
+    def test_summary_fields_appear_in_collapsed_summary(self):
+        """Test that summary fields appear in the collapsed summary text."""
+        summary_fields = ["Number of exposures", "Mean gap time", "Median gap time"]
+        result = schedview.plot.html.markup_mapping_with_format(
+            self.overhead_summary,
+            self.overhead_stat_name,
+            self.overhead_stat_str_template,
+            summary_fields,
+            "Time on sky",
+            collapsed=True,
+        )
+        # Summary fields should be formatted and appear in the summary.
+        self.assertTrue(re.search(r"Number of exposures:\s*42", result))
+        self.assertTrue(re.search(r"Mean gap time:\s*45\.70 seconds", result))
+        self.assertTrue(re.search(r"Median gap time:\s*42\.30 seconds", result))
+
+    def test_format_templates_applied_correctly(self):
+        """Test that format templates are applied correctly."""
+        result = schedview.plot.html.markup_mapping_with_format(
+            self.overhead_summary,
+            self.overhead_stat_name,
+            self.overhead_stat_str_template,
+            ["total_exptime"],
+            "Test",
+            collapsed=False,
+        )
+        # Float formatting with {:4.2f} should produce 2 decimal places
+        self.assertIn("5.25", result)
+        # Integer formatting with {} should work
+        self.assertIn("42", result)
+
+    def test_overhead_summary_data(self):
+        """Test with realistic overhead summary data."""
+        result = schedview.plot.html.markup_overhead_summary(self.overhead_summary, collapsed=False)
+        # All overhead statistics should be present
+        self.assertIn("Open shutter of first exposure", result)
+        self.assertIn("Close shutter of last exposure", result)
+        self.assertIn("Total wall clock time", result)
+        self.assertIn("Number of exposures", result)
+        self.assertIn("Total open shutter time", result)
+        self.assertIn("Mean gap time", result)
+        self.assertIn("Median gap time", result)
+
+    def test_collapsed_false_no_title(self):
+        """Test collapsed=False with empty title."""
+        result = schedview.plot.html.markup_mapping_with_format(
+            self.overhead_summary,
+            self.overhead_stat_name,
+            self.overhead_stat_str_template,
+            ["Number of exposures"],
+            "",
+            collapsed=False,
+        )
+        # Should contain formatted values
+        self.assertIn("15.50", result)
+        self.assertIn("42", result)
+        # Should not contain details/summary wrapper
+        self.assertNotIn("<details>", result)
+        self.assertNotIn("<summary>", result)
 
 
 if __name__ == "__main__":
