@@ -192,7 +192,7 @@ def markup_additional_sim_files(
     sim_index_info: pd.Series,
     collapsed: bool = True,
 ) -> str:
-    """Convert simulation additional files information to an HTML representation.
+    """Show simulation additional files information to as HTML.
 
     Parameters
     ----------
@@ -318,7 +318,8 @@ def markup_sun_moon_positions(
         ``ModelObservatory.almanac.get_sun_moon_positions(mjd)``.
         Must contain the following keys for the sun: ``sun_RA``, ``sun_dec``,
         ``sun_alt``, ``sun_az``.
-        Must contain the following keys for the moon: ``moon_RA``, ``moon_dec``,
+        Must contain the following keys for the moon: ``moon_RA``,
+        ``moon_dec``,
         ``moon_alt``, ``moon_az``, ``moon_phase``.
         Values are angles in radians (except phase which is in percent).
     collapsed : `bool`, optional
