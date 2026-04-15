@@ -1624,7 +1624,46 @@ class VisitMapBuilder:
         return combined_figure
 
     @classmethod
-    def nightsum(cls, visits=None, footprint_regions=None, alt_visits=None, mjd=None):
+    def nightsum(
+        cls,
+        visits: Optional[pd.DataFrame] = None,
+        footprint_regions: Optional[np.ndarray] = None,
+        alt_visits: Optional[pd.DataFrame] = None,
+        mjd: Optional[float] = None,
+    ) -> Tuple["VisitMapBuilder", str]:
+        """Create a night summary visit sky-map visualization.
+
+        This class method creates a pre-configured `VisitMapBuilder` instance
+        optimized for the night summary reportr.
+
+        Parameters
+        ----------
+        visits : `pandas.DataFrame`, optional
+            Table of completed visits for the night. Must contain the required
+            columns: ``fieldRA``, ``fieldDec``, ``observationStartMJD``,
+            ``band``, ``rotSkyPos``. If None, only ``alt_visits`` can be used.
+        footprint_regions : `numpy.ndarray`, optional
+            Definitions of footprint regions.
+        alt_visits : `pandas.DataFrame`, optional
+            Table of alternative visit sets (e.g., from simulated schedulers)
+            to compare against completed visits. Must contain the same columns
+            as ``visits`` plus a ``sim_index`` column identifying the source
+            simulation. If provided with multiple simulations, a selector
+            widget will be added to switch between them.
+        mjd : `float`, optional
+            Reference Modified Julian Date for the visualization. If None,
+            the maximum ``observationStartMJD`` from ``visits`` or
+            ``alt_visits`` is used.
+
+        Returns
+        -------
+        builder : `VisitMapBuilder`
+            A fully configured `VisitMapBuilder` instance with visit patches,
+            decorations, and controls added.
+        caption : `str`
+            HTML-formatted caption describing the visualization elements,
+            including the meanings of colors and annotations.
+        """
         if mjd is None:
             if visits is not None:
                 mjd = visits["observationStartMJD"].max()
