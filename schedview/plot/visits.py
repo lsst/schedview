@@ -28,21 +28,23 @@ def _get_observation_reason_mapping(
     Parameters
     ----------
     source : ColumnarDataSource
-        The data source for the plot (already contains observation_reason column).
+        Data source for the plot (already contains observation_reason column).
     observation_reason_threshold : int
         Maximum number of distinct observation_reason values to assign
         individual colors. If there are more distinct values than this
-        threshold, the most common ones will get individual colors and
-        the remainder will be grouped into an "other" category.
+        threshold, the most common ones get individual colors and the
+        remainder are grouped into an "other" category.
 
     Returns
     -------
     color_palette : tuple of str or None
-        The color palette for the factors, or None if no observation_reason data.
+        Color palette for the factors, or None if no observation_reason data.
     color_column_name : str or None
-        The column name to use for the color mapping, or None if no observation_reason data.
+        Column name to use for the color mapping, or None if no
+        observation_reason data.
     color_factors : list of str or None
-        The list of observation_reason values to map, or None if no observation_reason data.
+        List of observation_reason values to map, or None if
+        no observation_reason data.
     """
     # Get observation_reason values from source data
     observation_reasons = source.data.get("observation_reason", np.array([]))
@@ -236,10 +238,10 @@ def plot_visit_param_vs_time(
         Defaults to False.
     observation_reason_threshold: `int`
         Maximum number of distinct observation_reason values to assign
-        individual colors. If there are more distinct values than this
-        threshold, the most common ones will get individual colors and
-        the remainder will be grouped into an "other" category.
-        Defaults to 10.
+        individual colors. If there are more distinct values than
+        this threshold, the most common ones will get individual
+        colors and the remainder will be grouped into an "other"
+        category. Defaults to 10.
     **kwargs
         Additional keyword arguments to be passed to
         `bokeh.plotting.figure.scatter`.
