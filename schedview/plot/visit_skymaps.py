@@ -53,6 +53,71 @@ DEFAULT_VISIT_PATCHES_KWARGS = {"name": "visit_patches", "line_alpha": 0.0}
 
 SPHEREMAP_FIGURE_KWARGS = {"match_aspect": True}
 
+NIGHTSUM_CAPTION = """<p>The above plots show the visits collected during the
+night in two different representations, modeled after physical
+observing tools.</p>
+<ul>
+<li>The map on the left shows the sphere in orthographic projection, with the
+   center point of the projection controlled by the "center alt" and
+   "center az" sliders beneath the plot. A static orthogrophic projection
+   is not an equal-area projection, but playing with the sliders is a helpful
+   way to inform a human's spatial
+   reasoning in three dimensions. Use of this map resembles use of an
+   <a href="https://en.wikipedia.org/wiki/Armillary_sphere">armillare
+   sphere</a>.</li>
+<li>The map on the right shows the sky in
+<a href="https://en.wikipedia.org/wiki/Lambert_azimuthal_equal-area_projection">Lambert Azimuthal Equal Area
+   Projection</a>,
+   centered at the south celestial pole, with R.A. increasing counterclockwise
+   (because Rubin Observatory is in the southern hemisphere). The projection
+   used is equal area, but highly distorted near the north celestial pole
+   (outside the LSST footprint). This is a
+   particularly helpful representation for planning observing, because changes
+   in time in relevant features
+   are simple rotations, without alterations in distortion, and there are no
+   discontinuities anywhere in the
+   footprint at any time of year. Use of this map resembles use of a
+   <a href="https://en.wikipedia.org/wiki/Planisphere">planisphere</a>.</li>
+</ul>
+<p>Both plots show the footprints of camera pointing taken up to the time set
+by the MJD slider, with the most
+recent three pointings outlined in cyan. The fill colors are:</p>
+<ul>
+<li><span style='background-color:{u}'>&nbsp;&nbsp;&nbsp;</span>
+    <span style='color:{u}'> aqua</span>: u band</li>
+<li><span style='background-color:{g}'>&nbsp;&nbsp;&nbsp;</span>
+    <span style='color:{g}'> green</span>: g band</li>
+<li><span style='background-color:{r}'>&nbsp;&nbsp;&nbsp;</span>
+    <span style='color:{r}'> red</span>: r band</li>
+<li><span style='background-color:{i}'>&nbsp;&nbsp;&nbsp;</span>
+    <span style='color:{i}'> blue</span>:
+   i band</li>
+<li><span style='background-color:{z}'>&nbsp;&nbsp;&nbsp;</span>
+    <span style='color:{z}'> purple</span>: z band</li>
+<li><span style='background-color:{y}'>&nbsp;&nbsp;&nbsp;</span>
+    <span style='color:{y}'> black</span>: y band</li>
+</ul>
+<p>Both plots have the following additional annotations:</p>
+<ul>
+<li>The gray background shows the planned final depth of the LSST survey.</li>
+<li>The orange disk shows the coordinates of the moon.</li>
+<li>The yellow disk shows the coordinates of the sun.</li>
+<li>The green line (oval) shows the ecliptic.</li>
+<li>The sun moves along the ecliptic in the direction of increasing R.A.
+    (counter-clockwise in the planisphere figure) such that it makes a full
+    revolution in one year.</li>
+<li>The moon moves roughly (within 5.14%deg;) along the ecliptic in the
+direction of increasing R.A. (counter-clockwise in the planisphere figure),
+completing a full revolution in one
+<a href="https://en.wikipedia.org/wiki/Lunar_month#Sidereal_month">sidereal
+month</a> (a bit over 27 days), about 14%deg; per day.</li>
+<li>The blue line (oval) shows the plane of the Milky Way.</li>
+<li>The black line shows the horizon at the time set by the MJD slider.</li>
+<li>The red line shows a zenith distince of 70%deg; (airmass=2.9) at the time
+set by the MJD slider.</li>
+</ul>
+"""
+
 
 class VisitMapBuilder:
     """Builder for interactive visit sky‑maps.
@@ -1492,6 +1557,8 @@ class VisitMapBuilder:
         )
 
         column_contents = [map_row, time_row, button_row]
+        if "alt_visits_selector" in self.ref_map.controls:
+            column_contents.insert(0, self.ref_map.controls["alt_visits_selector"])
 
         for control_key in ["ra", "decl", "alt", "az"]:
             column_contents.append(self.ref_map.controls[control_key])
@@ -1555,3 +1622,105 @@ class VisitMapBuilder:
         assert isinstance(combined_figure, UIElement)
 
         return combined_figure
+
+    @classmethod
+    def nightsum(
+        cls,
+        visits: Optional[pd.DataFrame] = None,
+        footprint_regions: Optional[np.ndarray] = None,
+        alt_visits: Optional[pd.DataFrame] = None,
+        mjd: Optional[float] = None,
+    ) -> Tuple["VisitMapBuilder", str]:
+        """Create a night summary visit sky-map visualization.
+
+        This class method creates a pre-configured `VisitMapBuilder` instance
+        optimized for the night summary reportr.
+
+        Parameters
+        ----------
+        visits : `pandas.DataFrame`, optional
+            Table of completed visits for the night. Must contain the required
+            columns: ``fieldRA``, ``fieldDec``, ``observationStartMJD``,
+            ``band``, ``rotSkyPos``. If None, only ``alt_visits`` can be used.
+        footprint_regions : `numpy.ndarray`, optional
+            Definitions of footprint regions.
+        alt_visits : `pandas.DataFrame`, optional
+            Table of alternative visit sets (e.g., from simulated schedulers)
+            to compare against completed visits. Must contain the same columns
+            as ``visits`` plus a ``sim_index`` column identifying the source
+            simulation. If provided with multiple simulations, a selector
+            widget will be added to switch between them.
+        mjd : `float`, optional
+            Reference Modified Julian Date for the visualization. If None,
+            the maximum ``observationStartMJD`` from ``visits`` or
+            ``alt_visits`` is used.
+
+        Returns
+        -------
+        builder : `VisitMapBuilder`
+            A fully configured `VisitMapBuilder` instance with visit patches,
+            decorations, and controls added.
+        caption : `str`
+            HTML-formatted caption describing the visualization elements,
+            including the meanings of colors and annotations.
+        """
+        if mjd is None:
+            if visits is not None:
+                mjd = visits["observationStartMJD"].max()
+            elif alt_visits is not None:
+                mjd = alt_visits["observationStartMJD"].max()
+            else:
+                raise ValueError("If no visits are provided, mjd must not be None")
+
+        mjd_kwargs = {}
+        if visits is not None:
+            mjd_start = visits["observationStartMJD"].min()
+            mjd_end = visits["observationStartMJD"].max()
+            if alt_visits is not None:
+                mjd_start = min(mjd_start, alt_visits["observationStartMJD"].min())
+                mjd_end = min(mjd_end, alt_visits["observationStartMJD"].max())
+            mjd_kwargs = {"start": mjd_start, "end": mjd_end}
+        elif alt_visits is not None:
+            mjd_start = alt_visits["observationStartMJD"].min()
+            mjd_end = alt_visits["observationStartMJD"].max()
+            mjd_kwargs = {"start": mjd_start, "end": mjd_end}
+
+        builder = cls(
+            visits, mjd=mjd, map_classes=[ArmillarySphere, Planisphere], mjd_slider_kwargs=mjd_kwargs
+        )
+        builder.add_visit_patches()
+
+        if alt_visits is not None:
+            builder.add_alt_visit_patches(alt_visits)
+            visit_set_labels = (
+                alt_visits.loc[:, ["sim_index", "label"]].groupby("sim_index").first().to_dict()["label"]
+            )
+            if len(visit_set_labels) > 1:
+                builder.add_alt_visits_selector()
+
+        if footprint_regions is not None:
+            builder.add_footprint_outlines(footprint_regions)
+
+        builder = (
+            builder.add_eq_sliders()
+            .add_ecliptic()
+            .add_galactic_plane()
+            .add_datetime_slider()
+            .hide_mjd_slider()
+            .add_graticules()
+            .highlight_recent_visits()
+            .add_body("sun", size=15, color="yellow", alpha=1.0)
+            .add_body("moon", size=15, color="orange", alpha=0.8)
+            .add_horizon()
+            .add_horizon(zd=70, color="red")
+            .add_hovertext()
+            .add_play_controls()
+            .add_zenith_button()
+            .add_coord_sys_selector()
+        )
+
+        if visits is not None:
+            builder.hide_future_visits()
+
+        caption = NIGHTSUM_CAPTION.format(**builder.visit_fill_colors)
+        return builder, caption

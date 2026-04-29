@@ -1,6 +1,7 @@
 # Allow import of ElementTree as ET following the recommendation in the
 # official python docs.
 
+import warnings
 from io import StringIO
 from xml.etree import ElementTree as ET
 
@@ -65,6 +66,13 @@ def create_survey_visit_summary_table(sv_summary, html=True):
         Formatted summary.
     """
 
+    warnings.warn(
+        "create_survey_visit_summary_table() is deprecated, "
+        "use schedview.plot.html.markup_survey_visit_summary instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     stat_name = {
         "n12_night_time": "Time between 12 degree evening and morning twilights",
         "n_survey_visits": "Number of survey visits in night",
@@ -103,6 +111,13 @@ def create_overhead_summary_table(overhead_summary, html=True):
     `summary` : `str`
         Formatted summary.
     """
+    warnings.warn(
+        "create_overhead_summary_table() is deprecated, "
+        "use schedview.plot.html.markup_overhead_summary instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     stat_name = {
         "relative_start_time": "Open shutter of first exposure",
         "relative_end_time": "Close shutter of last exposure",

@@ -133,6 +133,7 @@ def plot_visit_param_vs_time(
     num_plots: int = 1,
     user_figure_kwargs: dict | None = None,
     default_sim: str = "All",
+    sim_alpha: float = 0.2,
     **kwargs,
 ) -> bokeh.models.ui.ui_element.UIElement:
     """Plot a column in the visit table vs. time.
@@ -161,6 +162,8 @@ def plot_visit_param_vs_time(
         Arguments passed along to bokeh.plotting.figure
     default_sim: str
         Label of default sim to show (defaults to ``All``)
+    sim_alpha: float
+        The alpha of points for visible simulations.
     **kwargs
         Additional keyword arguments to be passed to
         `bokeh.plotting.figure.scatter`.
@@ -170,6 +173,8 @@ def plot_visit_param_vs_time(
     `plot` : `bokeh.models.plots.Plot`
         The figure with the plot.
     """
+    assert 0.0 <= sim_alpha <= 1.0, "sim_alpha must be between 0 and 1"
+
     # If there are no visits, do not make the plot.
     if len(visits) == 0:
         if plot is None:
@@ -211,10 +216,12 @@ def plot_visit_param_vs_time(
 
     if "sim_alpha" not in source.data:
         if default_sim == "All":
-            source.data["sim_alpha"] = np.full_like(source.data["start_timestamp"], 0.2, dtype=np.float64)
+            source.data["sim_alpha"] = np.full_like(
+                source.data["start_timestamp"], sim_alpha, dtype=np.float64
+            )
         else:
             source.data["sim_alpha"] = np.full_like(source.data["start_timestamp"], 0.0, dtype=np.float64)
-            source.data["sim_alpha"][source.data["label"] == default_sim] = 0.2
+            source.data["sim_alpha"][source.data["label"] == default_sim] = sim_alpha
 
         source.data["sim_alpha"][source.data["label"] == "Completed"] = 1.0
 
@@ -379,7 +386,9 @@ def plot_visit_param_vs_time(
                     if (source.data['label'][i] === 'Completed') {
                         source.data['sim_alpha'][i] = 1.0;
                     } else if (['All', source.data['label'][i]].includes(this.value)) {
-                        source.data['sim_alpha'][i] = 0.2;
+                        source.data['sim_alpha'][i] = """
+            + str(float(sim_alpha))
+            + """;
                     } else {
                         source.data['sim_alpha'][i] = 0.0;
                     }
