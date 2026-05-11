@@ -62,6 +62,9 @@ def _get_observation_reason_mapping(
     color_column_name: str = "observation_reason"
     color_factors = sorted_reasons
 
+    # If there are too many reasons for a reasonable number of categories,
+    # collapse reasons with common prefixes into common categories
+    # until the number of categories becomes manageable.
     match_prefixes = [p.split("_")[0] for p in color_factors]
     for match_prefix in match_prefixes:
         if len(color_factors) > observation_reason_threshold:
@@ -75,6 +78,8 @@ def _get_observation_reason_mapping(
             color_column_name = "obs_reason_col"
             color_factors = unmatched_reasons + [match_prefix]
 
+    # If there are still too many categories, collapse the least common
+    # into an "other" category
     if len(color_factors) > observation_reason_threshold:
         common_reasons = color_factors[:observation_reason_threshold]
         # Create a new column with "other" for rare values
