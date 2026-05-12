@@ -5,7 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from schedview.testing.sample_data import SAMPLE_DATA_DIR_ENV_VAR, SAMPLE_PICKLE_ENV_VAR, ensure_cached_sample_data
+from schedview.testing.sample_data import (
+    SAMPLE_DATA_DIR_ENV_VAR,
+    SAMPLE_PICKLE_ENV_VAR,
+    ensure_cached_sample_data,
+)
 
 SAMPLE_SCHEDULER_PICKLE = "sample_scheduler.pickle.xz"
 
@@ -30,10 +34,8 @@ def _resolve_sample_data_dir(root_path: Path) -> Path:
     return sample_data_dir
 
 
-
 def pytest_configure(config: pytest.Config) -> None:
     _resolve_sample_data_dir(Path(config.rootpath))
-
 
 
 @pytest.fixture(scope="session")
@@ -41,17 +43,14 @@ def sample_data_dir(pytestconfig: pytest.Config) -> Path:
     return _resolve_sample_data_dir(Path(pytestconfig.rootpath))
 
 
-
 @pytest.fixture(scope="session")
 def sample_opsim_path(sample_data_dir: Path) -> Path:
     return sample_data_dir.joinpath("sample_opsim.db")
 
 
-
 @pytest.fixture(scope="session")
 def sample_rewards_path(sample_data_dir: Path) -> Path:
     return sample_data_dir.joinpath("sample_rewards.h5")
-
 
 
 @pytest.fixture(scope="session")

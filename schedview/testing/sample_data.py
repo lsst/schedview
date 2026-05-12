@@ -46,11 +46,9 @@ def _get_sample_data_dir() -> Path:
     return Path(str(importlib.resources.files(root_package).joinpath("data")))
 
 
-
 def get_sample_data_path(file_name: str) -> Path:
     """Return the path to a sample test data artifact"""
     return _get_sample_data_dir().joinpath(file_name)
-
 
 
 def _default_sample_date() -> str:
@@ -58,7 +56,6 @@ def _default_sample_date() -> str:
     from rubin_scheduler.utils import SURVEY_START_MJD
 
     return Time(SURVEY_START_MJD, format="mjd").iso[:10]
-
 
 
 def _configure_generation_warnings() -> None:
@@ -94,7 +91,6 @@ def _configure_generation_warnings() -> None:
     )
 
 
-
 def _manifest(date: str | None = None, duration: int | None = None) -> dict[str, object]:
     resolved_date = _default_sample_date() if date is None else date
     source_hash = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
@@ -113,7 +109,6 @@ def _manifest(date: str | None = None, duration: int | None = None) -> dict[str,
         "generator_source_hash": source_hash,
         "file_names": list(_SAMPLE_DATA_FILE_NAMES),
     }
-
 
 
 def write_sample_data(
@@ -143,7 +138,9 @@ def write_sample_data(
 
     observatory = ModelObservatory()
     evening_mjd = Time(resolved_date).mjd
-    this_night = np.floor(observatory.almanac.sunsets["sunset"] + observatory.site.longitude / 360) == evening_mjd
+    this_night = (
+        np.floor(observatory.almanac.sunsets["sunset"] + observatory.site.longitude / 360) == evening_mjd
+    )
     sim_start_mjd = observatory.almanac.sunsets[this_night]["sun_n12_setting"][0]
     sim_end_mjd = observatory.almanac.sunsets[this_night]["sunrise"][0]
     sim_duration = duration / 24.0 if duration is not None else sim_end_mjd - sim_start_mjd
@@ -175,7 +172,6 @@ def write_sample_data(
     }
 
 
-
 def _generate_sample_data_dir(
     output_dir: str | Path,
     *,
@@ -193,7 +189,6 @@ def _generate_sample_data_dir(
         duration=duration,
     )
     return output_dir
-
 
 
 def ensure_cached_sample_data(
