@@ -104,16 +104,10 @@ def _manifest(date: str | None = None, duration: int | None = None) -> dict[str,
     except PackageNotFoundError:
         rubin_scheduler_version = "unknown"
 
-    try:
-        rubin_sim_version = version("rubin-sim")
-    except PackageNotFoundError:
-        rubin_sim_version = "unknown"
-
     return {
         "cache_schema_version": _CACHE_SCHEMA_VERSION,
         "python": ".".join(str(part) for part in sys.version_info[:2]),
         "rubin_scheduler": rubin_scheduler_version,
-        "rubin_sim": rubin_sim_version,
         "date": resolved_date,
         "duration_hours": duration,
         "generator_source_hash": source_hash,
