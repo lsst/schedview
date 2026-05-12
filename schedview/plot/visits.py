@@ -59,20 +59,37 @@ def _get_observation_reason_mapping(
     # Get sorted list of observation_reasons by frequency
     sorted_reasons = list(value_counts.index)
 
-    # Determine which observation_reasons get individual colors
-    if len(sorted_reasons) > observation_reason_threshold:
-        common_reasons = sorted_reasons[:observation_reason_threshold]
+    color_column_name: str = "observation_reason"
+    color_factors = sorted_reasons
+
+    # If there are too many reasons for a reasonable number of categories,
+    # collapse reasons with common prefixes into common categories
+    # until the number of categories becomes manageable.
+    match_prefixes = [p.split("_")[0] for p in color_factors]
+    for match_prefix in match_prefixes:
+        if len(color_factors) > observation_reason_threshold:
+            unmatched_reasons = [r for r in color_factors if not r.startswith(match_prefix + "_")]
+
+            source.data["obs_reason_col"] = np.where(
+                np.isin(source.data.get(color_column_name, np.array([])), unmatched_reasons),
+                source.data.get(color_column_name, np.array([])),
+                match_prefix,
+            )
+            color_column_name = "obs_reason_col"
+            color_factors = unmatched_reasons + [match_prefix]
+
+    # If there are still too many categories, collapse the least common
+    # into an "other" category
+    if len(color_factors) > observation_reason_threshold:
+        common_reasons = color_factors[:observation_reason_threshold]
         # Create a new column with "other" for rare values
-        source.data["obs_reason_col"] = np.where(
-            np.isin(source.data.get("observation_reason", np.array([])), common_reasons),
-            source.data.get("observation_reason", np.array([])),
+        source.data[color_column_name] = np.where(
+            np.isin(source.data.get(color_column_name, np.array([])), common_reasons),
+            source.data.get(color_column_name, np.array([])),
             "other",
         )
         color_column_name = "obs_reason_col"
         color_factors = common_reasons + ["other"]
-    else:
-        color_column_name = "observation_reason"
-        color_factors = sorted_reasons
 
     # Create the color palette
     num_colors_needed = len(color_factors)
