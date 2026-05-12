@@ -311,7 +311,14 @@ def ensure_cached_sample_data(
         cached_manifest = json.loads(manifest_path.read_text())
         if cached_manifest == manifest:
             return cache_dir
+        regeneration_reason = "cache inputs changed"
+    else:
+        regeneration_reason = "cache entry missing or incomplete"
 
+    print(
+        f"Regenerating sample test data in {cache_dir} ({regeneration_reason}).",
+        flush=True,
+    )
     if cache_dir.exists():
         shutil.rmtree(cache_dir)
 
