@@ -8,6 +8,7 @@ from lsst.resources import ResourcePath
 from rubin_sim.data import get_baseline
 
 from schedview.collect import find_file_resources, read_ddf_visits, read_opsim, read_rewards
+from schedview.testing.sample_data import get_sample_data_dir
 
 
 class TestResources(unittest.TestCase):
@@ -32,8 +33,7 @@ class TestResources(unittest.TestCase):
 
 class TestCollectOpsim(unittest.TestCase):
     def test_read_opsim(self):
-        resource_path = ResourcePath("resource://schedview/data/")
-        visits = read_opsim(resource_path)
+        visits = read_opsim(str(get_sample_data_dir()))
         self.assertTrue("airmass" in visits.columns)
         self.assertGreater(len(visits), 0)
 
@@ -48,8 +48,7 @@ class TestCollectOpsim(unittest.TestCase):
 
 class TestCollectRewards(unittest.TestCase):
     def test_read_opsim(self):
-        resource_path = ResourcePath("resource://schedview/data/")
-        rewards_df, obs_rewards = read_rewards(resource_path)
+        rewards_df, obs_rewards = read_rewards(str(get_sample_data_dir()))
         self.assertGreater(len(rewards_df), 0)
         self.assertGreater(len(obs_rewards), 0)
         self.assertTrue("survey_reward" in rewards_df.columns)

@@ -1,4 +1,3 @@
-import importlib.resources
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -11,10 +10,11 @@ from rubin_scheduler.scheduler.utils import SchemaConverter
 
 import schedview
 import schedview.plot.nightly
+from schedview.testing.sample_data import get_sample_data_path
 
 
 def _load_sample_visits():
-    visits_path = importlib.resources.files(schedview).joinpath("data").joinpath("sample_opsim.db")
+    visits_path = str(get_sample_data_path("sample_opsim.db"))
     visits = pd.DataFrame(SchemaConverter().opsim2obs(visits_path))
     if "observationStartMJD" not in visits.columns and "mjd" in visits.columns:
         visits["observationStartMJD"] = visits["mjd"]
@@ -40,11 +40,13 @@ class TestNightly(unittest.TestCase):
 
         fig = schedview.plot.nightly.plot_airmass_vs_time(visits, almanac_events)
 
+        bokeh.io.reset_output()
         with TemporaryDirectory() as dir:
             out_path = Path(dir)
             saved_html_fname = out_path.joinpath("test_page.html")
             bokeh.plotting.output_file(filename=saved_html_fname, title="Test Page")
             bokeh.plotting.save(fig)
+        bokeh.io.reset_output()
 
 
 if __name__ == "__main__":
