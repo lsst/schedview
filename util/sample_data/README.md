@@ -26,5 +26,4 @@ To copy the generated files into place:
 
 ```
 cp sample_* ../../schedview/data
-cp sim_metadata.yaml ../../schedview/data
 ```
