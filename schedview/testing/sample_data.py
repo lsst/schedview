@@ -13,6 +13,11 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 import numpy as np
+from astropy.time import Time
+from rubin_scheduler.scheduler import sim_runner
+from rubin_scheduler.scheduler.example import example_scheduler
+from rubin_scheduler.scheduler.model_observatory import ModelObservatory
+from rubin_scheduler.scheduler.utils import SchemaConverter
 
 SAMPLE_DATA_DIR_ENV_VAR = "SCHEDVIEW_SAMPLE_DATA_DIR"
 SAMPLE_PICKLE_ENV_VAR = "SCHED_PICKLE"
@@ -37,7 +42,13 @@ __all__ = [
 
 
 def _get_sample_data_dir() -> Path:
-    """Return the directory holding sample test data"""
+    """Return the directory holding sample test data.
+
+    Returns
+    -------
+    directory : `pathlib.Path`
+        Directory containing the sample data artifacts.
+    """
     override_dir = os.environ.get(SAMPLE_DATA_DIR_ENV_VAR)
     if override_dir:
         return Path(override_dir)
@@ -47,11 +58,29 @@ def _get_sample_data_dir() -> Path:
 
 
 def get_sample_data_path(file_name: str) -> Path:
-    """Return the path to a sample test data artifact"""
+    """Return the path to a sample test data artifact.
+
+    Parameters
+    ----------
+    file_name : `str`
+        Basename of the sample data artifact.
+
+    Returns
+    -------
+    path : `pathlib.Path`
+        Path to the requested sample data artifact.
+    """
     return _get_sample_data_dir().joinpath(file_name)
 
 
 def _default_sample_date() -> str:
+    """Return the default date used for sample-data generation.
+
+    Returns
+    -------
+    date : `str`
+        ISO date string for the scheduler survey start night.
+    """
     from astropy.time import Time
     from rubin_scheduler.utils import SURVEY_START_MJD
 
@@ -59,6 +88,11 @@ def _default_sample_date() -> str:
 
 
 def _configure_generation_warnings() -> None:
+    """Configure warning filters for sample-data generation.
+
+    The filters suppress known noisy warnings emitted by dependencies during
+    scheduler simulation and artifact generation.
+    """
     warnings.filterwarnings(
         "ignore",
         module="astropy.time",
@@ -92,6 +126,21 @@ def _configure_generation_warnings() -> None:
 
 
 def _manifest(date: str | None = None, duration: int | None = None) -> dict[str, object]:
+    """Build the cache manifest for a sample-data generation request.
+
+    Parameters
+    ----------
+    date : `str`, optional
+        Date of the simulated night in ISO format. If `None`, use the
+        scheduler survey start night.
+    duration : `int`, optional
+        Number of hours to simulate. If `None`, simulate the full night.
+
+    Returns
+    -------
+    manifest : `dict` [`str`, `object`]
+        Manifest describing the generation inputs and expected artifact set.
+    """
     resolved_date = _default_sample_date() if date is None else date
     source_hash = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 
@@ -119,13 +168,27 @@ def write_sample_data(
     date: str | None = None,
     duration: int | None = None,
 ) -> dict[str, Path]:
-    """Write sample test data artifacts"""
-    from astropy.time import Time
-    from rubin_scheduler.scheduler import sim_runner
-    from rubin_scheduler.scheduler.example import example_scheduler
-    from rubin_scheduler.scheduler.model_observatory import ModelObservatory
-    from rubin_scheduler.scheduler.utils import SchemaConverter
+    """Generate and write the sample test data artifacts.
 
+    Parameters
+    ----------
+    opsim_output_path : `str` or `pathlib.Path`
+        Output path for the generated opsim database.
+    scheduler_output_path : `str` or `pathlib.Path`
+        Output path for the generated scheduler pickle.
+    rewards_output_path : `str` or `pathlib.Path`
+        Output path for the generated rewards file.
+    date : `str`, optional
+        Date of the simulated night in ISO format. If `None`, use the
+        scheduler survey start night.
+    duration : `int`, optional
+        Number of hours to simulate. If `None`, simulate the full night.
+
+    Returns
+    -------
+    output_paths : `dict` [`str`, `pathlib.Path`]
+        Mapping from sample artifact filename to the generated output path.
+    """
     _configure_generation_warnings()
 
     resolved_date = _default_sample_date() if date is None else date
@@ -178,7 +241,23 @@ def _generate_sample_data_dir(
     date: str | None = None,
     duration: int | None = None,
 ) -> Path:
-    """Generate a complete sample test data directory"""
+    """Generate a complete sample test data directory.
+
+    Parameters
+    ----------
+    output_dir : `str` or `pathlib.Path`
+        Directory in which the sample artifacts will be written.
+    date : `str`, optional
+        Date of the simulated night in ISO format. If `None`, use the
+        scheduler survey start night.
+    duration : `int`, optional
+        Number of hours to simulate. If `None`, simulate the full night.
+
+    Returns
+    -------
+    output_dir : `pathlib.Path`
+        Directory containing the generated sample data artifacts.
+    """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     write_sample_data(
@@ -197,7 +276,27 @@ def ensure_cached_sample_data(
     date: str | None = None,
     duration: int | None = None,
 ) -> Path:
-    """Return a cached directory of generated sample test data"""
+    """Return a cache directory containing generated sample test data.
+
+    The cache directory name is derived from a hash of a manifest that
+    records the generation inputs and expected artifact set.
+
+    Parameters
+    ----------
+    cache_root : `str` or `pathlib.Path`
+        Directory under which hashed cache entries are created.
+    date : `str`, optional
+        Date of the simulated night in ISO format. If `None`, use the
+        scheduler survey start night.
+    duration : `int`, optional
+        Number of hours to simulate. If `None`, simulate the full night.
+
+    Returns
+    -------
+    cache_dir : `pathlib.Path`
+        Directory containing the generated sample data artifacts for the
+        requested inputs.
+    """
     cache_root = Path(cache_root)
     cache_root.mkdir(parents=True, exist_ok=True)
 
