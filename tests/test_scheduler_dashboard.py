@@ -28,17 +28,16 @@ from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 # Objects to test instances against.
 from rubin_scheduler.scheduler.schedulers.core_scheduler import CoreScheduler
 
-import schedview
 from schedview.app.scheduler_dashboard.scheduler_dashboard_app import (
     SchedulerSnapshotDashboard,
     scheduler_app,
 )
 from schedview.app.scheduler_dashboard.utils import get_sky_brightness_date_bounds
-from schedview.testing.sample_data import get_sample_data_path
 
 # Schedview methods.
 from schedview.compute.scheduler import make_scheduler_summary_df
 from schedview.compute.survey import compute_maps
+from schedview.testing.sample_data import get_sample_data_path
 
 TEST_PICKLE = str(get_sample_data_path("sample_scheduler.pickle.xz"))
 MJD_START = get_sky_brightness_date_bounds()[0]
