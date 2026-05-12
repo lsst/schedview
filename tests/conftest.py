@@ -5,13 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from schedview.testing.sample_data import (
-    SAMPLE_DATA_DIR_ENV_VAR,
-    SAMPLE_PICKLE_ENV_VAR,
-    SAMPLE_SCHEDULER_PICKLE,
-    ensure_cached_sample_data,
-)
+from schedview.testing.sample_data import SAMPLE_DATA_DIR_ENV_VAR, SAMPLE_PICKLE_ENV_VAR, ensure_cached_sample_data
 
+SAMPLE_SCHEDULER_PICKLE = "sample_scheduler.pickle.xz"
 
 
 def _resolve_sample_data_dir(root_path: Path) -> Path:

@@ -16,19 +16,27 @@ import numpy as np
 
 SAMPLE_DATA_DIR_ENV_VAR = "SCHEDVIEW_SAMPLE_DATA_DIR"
 SAMPLE_PICKLE_ENV_VAR = "SCHED_PICKLE"
-CACHE_SCHEMA_VERSION = 1
-SAMPLE_OPSIM_DB = "sample_opsim.db"
-SAMPLE_REWARDS_H5 = "sample_rewards.h5"
-SAMPLE_SCHEDULER_PICKLE = "sample_scheduler.pickle.xz"
-MANIFEST_JSON = "manifest.json"
-SAMPLE_DATA_FILE_NAMES = (
-    SAMPLE_OPSIM_DB,
-    SAMPLE_REWARDS_H5,
-    SAMPLE_SCHEDULER_PICKLE,
+_CACHE_SCHEMA_VERSION = 1
+_SAMPLE_OPSIM_DB = "sample_opsim.db"
+_SAMPLE_REWARDS_H5 = "sample_rewards.h5"
+_SAMPLE_SCHEDULER_PICKLE = "sample_scheduler.pickle.xz"
+_MANIFEST_JSON = "manifest.json"
+_SAMPLE_DATA_FILE_NAMES = (
+    _SAMPLE_OPSIM_DB,
+    _SAMPLE_REWARDS_H5,
+    _SAMPLE_SCHEDULER_PICKLE,
 )
 
+__all__ = [
+    "SAMPLE_DATA_DIR_ENV_VAR",
+    "SAMPLE_PICKLE_ENV_VAR",
+    "ensure_cached_sample_data",
+    "get_sample_data_path",
+    "write_sample_data",
+]
 
-def get_sample_data_dir() -> Path:
+
+def _get_sample_data_dir() -> Path:
     """Return the directory holding sample test data"""
     override_dir = os.environ.get(SAMPLE_DATA_DIR_ENV_VAR)
     if override_dir:
@@ -41,15 +49,7 @@ def get_sample_data_dir() -> Path:
 
 def get_sample_data_path(file_name: str) -> Path:
     """Return the path to a sample test data artifact"""
-    return get_sample_data_dir().joinpath(file_name)
-
-
-
-def _get_package_version(package_name: str) -> str:
-    try:
-        return version(package_name)
-    except PackageNotFoundError:
-        return "unknown"
+    return _get_sample_data_dir().joinpath(file_name)
 
 
 
@@ -98,15 +98,26 @@ def _configure_generation_warnings() -> None:
 def _manifest(date: str | None = None, duration: int | None = None) -> dict[str, object]:
     resolved_date = _default_sample_date() if date is None else date
     source_hash = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+
+    try:
+        rubin_scheduler_version = version("rubin-scheduler")
+    except PackageNotFoundError:
+        rubin_scheduler_version = "unknown"
+
+    try:
+        rubin_sim_version = version("rubin-sim")
+    except PackageNotFoundError:
+        rubin_sim_version = "unknown"
+
     return {
-        "cache_schema_version": CACHE_SCHEMA_VERSION,
+        "cache_schema_version": _CACHE_SCHEMA_VERSION,
         "python": ".".join(str(part) for part in sys.version_info[:2]),
-        "rubin_scheduler": _get_package_version("rubin-scheduler"),
-        "rubin_sim": _get_package_version("rubin-sim"),
+        "rubin_scheduler": rubin_scheduler_version,
+        "rubin_sim": rubin_sim_version,
         "date": resolved_date,
         "duration_hours": duration,
         "generator_source_hash": source_hash,
-        "file_names": list(SAMPLE_DATA_FILE_NAMES),
+        "file_names": list(_SAMPLE_DATA_FILE_NAMES),
     }
 
 
@@ -164,14 +175,14 @@ def write_sample_data(
     obs_rewards.to_hdf(str(rewards_output_path), key="obs_rewards")
 
     return {
-        SAMPLE_OPSIM_DB: opsim_output_path,
-        SAMPLE_SCHEDULER_PICKLE: scheduler_output_path,
-        SAMPLE_REWARDS_H5: rewards_output_path,
+        _SAMPLE_OPSIM_DB: opsim_output_path,
+        _SAMPLE_SCHEDULER_PICKLE: scheduler_output_path,
+        _SAMPLE_REWARDS_H5: rewards_output_path,
     }
 
 
 
-def generate_sample_data_dir(
+def _generate_sample_data_dir(
     output_dir: str | Path,
     *,
     date: str | None = None,
@@ -181,9 +192,9 @@ def generate_sample_data_dir(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     write_sample_data(
-        output_dir.joinpath(SAMPLE_OPSIM_DB),
-        output_dir.joinpath(SAMPLE_SCHEDULER_PICKLE),
-        output_dir.joinpath(SAMPLE_REWARDS_H5),
+        output_dir.joinpath(_SAMPLE_OPSIM_DB),
+        output_dir.joinpath(_SAMPLE_SCHEDULER_PICKLE),
+        output_dir.joinpath(_SAMPLE_REWARDS_H5),
         date=date,
         duration=duration,
     )
@@ -205,8 +216,8 @@ def ensure_cached_sample_data(
     manifest_json = json.dumps(manifest, sort_keys=True)
     digest = hashlib.sha256(manifest_json.encode("utf-8")).hexdigest()[:16]
     cache_dir = cache_root.joinpath(digest)
-    manifest_path = cache_dir.joinpath(MANIFEST_JSON)
-    required_paths = [cache_dir.joinpath(file_name) for file_name in SAMPLE_DATA_FILE_NAMES]
+    manifest_path = cache_dir.joinpath(_MANIFEST_JSON)
+    required_paths = [cache_dir.joinpath(file_name) for file_name in _SAMPLE_DATA_FILE_NAMES]
 
     if manifest_path.exists() and all(path.exists() for path in required_paths):
         cached_manifest = json.loads(manifest_path.read_text())
@@ -216,7 +227,7 @@ def ensure_cached_sample_data(
     if cache_dir.exists():
         shutil.rmtree(cache_dir)
 
-    generate_sample_data_dir(
+    _generate_sample_data_dir(
         cache_dir,
         date=manifest["date"],
         duration=duration,

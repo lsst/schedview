@@ -1,8 +1,6 @@
 import argparse
 
-from schedview.testing.sample_data import _default_sample_date, write_sample_data
-
-DEFAULT_DATE = _default_sample_date()
+from schedview.testing.sample_data import write_sample_data
 
 
 def make_sample_test_data():
@@ -28,8 +26,8 @@ def make_sample_test_data():
     parser.add_argument(
         "--date",
         type=str,
-        default=DEFAULT_DATE,
-        help="Date of the night to simulate (YYYY-MM-DD).",
+        default=None,
+        help="Date of the night to simulate (YYYY-MM-DD). Defaults to the scheduler survey start night.",
     )
     parser.add_argument(
         "--duration",
