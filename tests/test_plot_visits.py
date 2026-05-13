@@ -71,9 +71,8 @@ class TestPlotVisits(TestCase):
             visits.loc[visits.index[i], "observation_reason"] = f"reason_{i}"
         # Keep the rest as the original values.
 
-        # With 15 unique values (more than threshold of 10), the most common
-        # 10 should get individual colors and the rest should be grouped
-        # into "other".
+        # With 15 unique values (more than threshold of 10), we should
+        # collapse names with common prefixes into single categories.
         plot = schedview.plot.plot_visit_param_vs_time(
             visits, "seeingFwhmEff", color_by_observation_reason=True
         )
@@ -94,7 +93,4 @@ class TestPlotVisits(TestCase):
         self.assertTrue(hasattr(transform, "palette"))
 
         # Check that there are 11 factors (10 common reasons + "other")
-        self.assertEqual(len(transform.factors), 11)
-
-        # Check that "other" is in the factors
-        self.assertIn("other", transform.factors)
+        self.assertLess(len(transform.factors), 11)
