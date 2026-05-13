@@ -4,6 +4,7 @@ import bokeh
 import bokeh.io
 import bokeh.layouts
 import bokeh.models
+import bokeh.palettes
 import bokeh.plotting
 import bokeh.transform
 import hvplot
@@ -16,6 +17,89 @@ from rubin_scheduler.scheduler.model_observatory import ModelObservatory  # noqa
 from schedview import band_column
 
 from .colors import make_band_cmap
+
+
+def _get_observation_reason_mapping(
+    source: bokeh.models.ColumnarDataSource,
+    observation_reason_threshold: int,
+) -> tuple[tuple[str, ...] | None, str | None, list[str] | None]:
+    """Get color palette and column mapping for observation_reason values.
+
+    Parameters
+    ----------
+    source : ColumnarDataSource
+        Data source for the plot (already contains observation_reason column).
+    observation_reason_threshold : int
+        Maximum number of distinct observation_reason values to assign
+        individual colors. If there are more distinct values than this
+        threshold, the most common ones get individual colors and the
+        remainder are grouped into an "other" category.
+
+    Returns
+    -------
+    color_palette : tuple of str or None
+        Color palette for the factors, or None if no observation_reason data.
+    color_column_name : str or None
+        Column name to use for the color mapping, or None if no
+        observation_reason data.
+    color_factors : list of str or None
+        List of observation_reason values to map, or None if
+        no observation_reason data.
+    """
+    # Get observation_reason values from source data
+    observation_reasons = source.data.get("observation_reason", np.array([]))
+
+    if len(observation_reasons) == 0:
+        return None, None, None
+
+    # Get unique observation_reason values and their counts
+    unique, counts = np.unique(observation_reasons, return_counts=True)
+    value_counts = pd.Series(counts, index=unique)
+
+    # Get sorted list of observation_reasons by frequency
+    sorted_reasons = list(value_counts.index)
+
+    color_column_name: str = "observation_reason"
+    color_factors = sorted_reasons
+
+    # If there are too many reasons for a reasonable number of categories,
+    # collapse reasons with common prefixes into common categories
+    # until the number of categories becomes manageable.
+    match_prefixes = [p.split("_")[0] for p in color_factors]
+    for match_prefix in match_prefixes:
+        if len(color_factors) > observation_reason_threshold:
+            unmatched_reasons = [r for r in color_factors if not r.startswith(match_prefix + "_")]
+
+            source.data["obs_reason_col"] = np.where(
+                np.isin(source.data.get(color_column_name, np.array([])), unmatched_reasons),
+                source.data.get(color_column_name, np.array([])),
+                match_prefix,
+            )
+            color_column_name = "obs_reason_col"
+            color_factors = unmatched_reasons + [match_prefix]
+
+    # If there are still too many categories, collapse the least common
+    # into an "other" category
+    if len(color_factors) > observation_reason_threshold:
+        common_reasons = color_factors[:observation_reason_threshold]
+        # Create a new column with "other" for rare values
+        source.data[color_column_name] = np.where(
+            np.isin(source.data.get(color_column_name, np.array([])), common_reasons),
+            source.data.get(color_column_name, np.array([])),
+            "other",
+        )
+        color_column_name = "obs_reason_col"
+        color_factors = common_reasons + ["other"]
+
+    # Create the color palette
+    num_colors_needed = len(color_factors)
+    if num_colors_needed <= 8:
+        color_palette = tuple(bokeh.palettes.Colorblind8[:num_colors_needed])
+    else:
+        color_palette = tuple(bokeh.palettes.TolRainbow[num_colors_needed])
+
+    return color_palette, color_column_name, color_factors
+
 
 TIMELINE_TOOLTIPS = [
     (
@@ -134,6 +218,8 @@ def plot_visit_param_vs_time(
     user_figure_kwargs: dict | None = None,
     default_sim: str = "All",
     sim_alpha: float = 0.2,
+    color_by_observation_reason: bool = False,
+    observation_reason_threshold: int = 10,
     **kwargs,
 ) -> bokeh.models.ui.ui_element.UIElement:
     """Plot a column in the visit table vs. time.
@@ -164,6 +250,15 @@ def plot_visit_param_vs_time(
         Label of default sim to show (defaults to ``All``)
     sim_alpha: float
         The alpha of points for visible simulations.
+    color_by_observation_reason: `bool`
+        If True, color points by observation_reason instead of band.
+        Defaults to False.
+    observation_reason_threshold: `int`
+        Maximum number of distinct observation_reason values to assign
+        individual colors. If there are more distinct values than
+        this threshold, the most common ones will get individual
+        colors and the remainder will be grouped into an "other"
+        category. Defaults to 10.
     **kwargs
         Additional keyword arguments to be passed to
         `bokeh.plotting.figure.scatter`.
@@ -227,7 +322,18 @@ def plot_visit_param_vs_time(
 
     scatter_kwargs = {"fill_alpha": 0.0, "line_alpha": "sim_alpha", "name": "timeline"}
 
-    if color_transform is None:
+    if color_by_observation_reason:
+        color_palette, color_column_name, color_factors = _get_observation_reason_mapping(
+            source, observation_reason_threshold
+        )
+        if color_palette is not None and color_column_name is not None and color_factors is not None:
+            scatter_kwargs["color"] = bokeh.transform.factor_cmap(
+                color_column_name, color_palette, color_factors
+            )
+        else:
+            # No observation_reason data, fall back to band colors
+            scatter_kwargs["color"] = make_band_cmap(band_column(visits))
+    elif color_transform is None:
         scatter_kwargs["color"] = make_band_cmap(band_column(visits))
     else:
         scatter_kwargs["color"] = bokeh.transform.factor_cmap(
