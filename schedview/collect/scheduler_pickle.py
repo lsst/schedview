@@ -7,10 +7,13 @@ import lzma
 import os
 import pickle
 from collections.abc import Sequence
+from pathlib import Path
 
 from lsst.resources import ResourcePath
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 from rubin_scheduler.scheduler.schedulers.core_scheduler import CoreScheduler
+
+from schedview.testing.sample_data import SAMPLE_DATA_DIR_ENV_VAR
 
 try:
     PICKLE_FNAME = os.environ["SCHED_PICKLE"]
@@ -124,6 +127,12 @@ def sample_pickle(base_fname="sample_scheduler.pickle.xz"):
     fname : `str`
         File name of the sample pickle.
     """
+    sample_data_dir = os.environ.get(SAMPLE_DATA_DIR_ENV_VAR)
+    if sample_data_dir is not None:
+        sample_path = Path(sample_data_dir).joinpath(base_fname)
+        if sample_path.exists():
+            return str(sample_path)
+
     root_package = __package__.split(".")[0]
 
     try:

@@ -1,4 +1,3 @@
-import importlib.resources
 import os
 import time
 import unittest
@@ -7,9 +6,9 @@ from tempfile import TemporaryDirectory
 
 import bokeh
 
-import schedview
 import schedview.collect.rewards
 import schedview.plot.rewards
+from schedview.testing.sample_data import get_sample_data_path
 
 WRITE_TIMEOUT_SECONDS = 20
 
@@ -35,8 +34,9 @@ class TestPlotRewards(unittest.TestCase):
             time.sleep(1)
 
     def setUp(self):
-        rewards_rp = importlib.resources.files("schedview").joinpath("data").joinpath("sample_rewards.h5")
-        self.rewards_df, self.obs_reward = schedview.collect.read_rewards(rewards_rp)
+        self.rewards_df, self.obs_reward = schedview.collect.read_rewards(
+            str(get_sample_data_path("sample_rewards.h5"))
+        )
         self.tier = 3
         self.day_obs_mjd = int(self.rewards_df["queue_start_mjd"].min() - 0.5)
 

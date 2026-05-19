@@ -6,7 +6,6 @@ import healpy as hp
 import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
-from lsst.resources import ResourcePath
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 
 import schedview
@@ -18,6 +17,7 @@ from schedview.plot.survey_skyproj import (
     map_healpix,
     map_visits_over_healpix,
 )
+from schedview.testing.sample_data import get_sample_data_path
 
 RANDOM_SEED = 6563
 
@@ -45,8 +45,7 @@ def test_compute_circle_points():
 def test_map_visits_over_healpix():
     hp_map = np.random.default_rng(RANDOM_SEED).uniform(0, 1, hp.nside2npix(4))
 
-    visits_path = ResourcePath("resource://schedview/data/sample_opsim.db")
-    visits = schedview.collect.read_opsim(visits_path)
+    visits = schedview.collect.read_opsim(str(get_sample_data_path("sample_opsim.db")))
     visits_mjd = visits["observationStartMJD"].median()
     time_datetime = Time(visits_mjd - 0.5, format="mjd").datetime
 
@@ -64,8 +63,7 @@ def test_create_hpix_visit_map_grid():
     for band in "ugrizy":
         hpix_maps[band] = np.random.default_rng(RANDOM_SEED).uniform(0, 1, hp.nside2npix(4))
 
-    visits_path = ResourcePath("resource://schedview/data/sample_opsim.db")
-    visits = schedview.collect.read_opsim(visits_path)
+    visits = schedview.collect.read_opsim(str(get_sample_data_path("sample_opsim.db")))
     visits_mjd = visits["observationStartMJD"].median()
     time_datetime = Time(visits_mjd - 0.5, format="mjd").datetime
 

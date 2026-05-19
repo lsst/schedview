@@ -1,4 +1,3 @@
-import importlib.resources
 import os
 import unittest
 from pathlib import Path
@@ -6,6 +5,7 @@ from tempfile import TemporaryDirectory
 
 import astropy.utils.exceptions
 import astropy.utils.iers
+import bokeh.io
 from rubin_scheduler.utils import SURVEY_START_MJD
 
 from schedview.dayobs import DayObs
@@ -27,6 +27,7 @@ from schedview.examples.surveyrewards import make_survey_reward_plot
 from schedview.examples.visitmap import make_visit_map
 from schedview.examples.visitparam import make_visit_param_vs_time_plot
 from schedview.examples.visittable import make_visit_table
+from schedview.testing.sample_data import get_sample_data_path
 
 astropy.utils.iers.conf.iers_degraded_accuracy = "ignore"
 
@@ -35,6 +36,9 @@ USE_CONSDB = os.environ.get("TEST_WITH_CONSDB", "F").upper() in ("T", "TRUE", "1
 
 
 class TestExamples(unittest.TestCase):
+
+    def setUp(self):
+        bokeh.io.reset_output()
 
     def test_nightevents(self):
         with TemporaryDirectory() as dir:
@@ -80,18 +84,14 @@ class TestExamples(unittest.TestCase):
     def test_surveyrewards(self):
         with TemporaryDirectory() as dir:
             report = str(Path(dir).joinpath("surveyrewards.html"))
-            rewards_uri: str = str(
-                importlib.resources.files("schedview").joinpath("data").joinpath("sample_rewards.h5")
-            )
+            rewards_uri: str = str(get_sample_data_path("sample_rewards.h5"))
             make_survey_reward_plot(TEST_ISO_DATE, rewards_uri, report=report)
             assert os.path.exists(report)
 
     def test_bfrewards(self):
         with TemporaryDirectory() as dir:
             report = str(Path(dir).joinpath("surveyrewards.html"))
-            rewards_uri: str = str(
-                importlib.resources.files("schedview").joinpath("data").joinpath("sample_rewards.h5")
-            )
+            rewards_uri: str = str(get_sample_data_path("sample_rewards.h5"))
             make_basis_function_reward_plot(TEST_ISO_DATE, rewards_uri, report=report)
             assert os.path.exists(report)
 

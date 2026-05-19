@@ -1,5 +1,4 @@
 import functools
-import importlib.resources
 import os
 import re
 import subprocess
@@ -29,7 +28,6 @@ from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 # Objects to test instances against.
 from rubin_scheduler.scheduler.schedulers.core_scheduler import CoreScheduler
 
-import schedview
 from schedview.app.scheduler_dashboard.scheduler_dashboard_app import (
     SchedulerSnapshotDashboard,
     scheduler_app,
@@ -39,8 +37,9 @@ from schedview.app.scheduler_dashboard.utils import get_sky_brightness_date_boun
 # Schedview methods.
 from schedview.compute.scheduler import make_scheduler_summary_df
 from schedview.compute.survey import compute_maps
+from schedview.testing.sample_data import get_sample_data_path
 
-TEST_PICKLE = str(importlib.resources.files(schedview).joinpath("data", "sample_scheduler.pickle.xz"))
+TEST_PICKLE = str(get_sample_data_path("sample_scheduler.pickle.xz"))
 MJD_START = get_sky_brightness_date_bounds()[0]
 TEST_DATE = Time(MJD_START + 0.2, format="mjd").datetime
 DEFAULT_TIMEZONE = "America/Santiago"
