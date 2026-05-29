@@ -883,3 +883,508 @@ class TimelineBuilder:
 - All time values are converted from MJD (float) to `numpy.datetime64` when creating `ColumnDataSource`
 - Bokeh figures use `x_axis_type="datetime"` for datetime x-axes
 - X-axis ticks are formatted as HH:MM using `DatetimeTickFormatter(hours="%H:%M")`
+
+# Implementation Plan
+
+This document outlines a step-by-step implementation plan for the Timeline Builder (tlbuilder) module. Each iteration adds a set of features with corresponding tests, including CLI enhancements to allow command-line exploration of the growing functionality.
+
+## Overview
+
+The implementation follows a progressive enhancement strategy with CLI support at each step:
+
+1. **Iteration 0: Foundation** - Basic builder structure, core data types, and minimal plotting
+2. **Iteration 1: Scatter Plots** - Basic scatter plot support with y-axis selection
+3. **Iteration 1.5: CLI v1** - Basic CLI for scatter plot generation
+4. **Iteration 2: Visit Data** - Visit data handling with band coloring
+5. **Iteration 2.5: CLI v2** - CLI with visit data support
+6. **Iteration 3: Color Stripes** - Background color stripes for continuous data
+7. **Iteration 3.5: CLI v3** - CLI with background stripes
+8. **Iteration 4: Interactive Controls** - Visibility toggles and column selectors
+9. **Iteration 4.5: CLI v4** - CLI with interactive controls
+10. **Iteration 5: Stacked Layouts** - Multi-plot stacking with shared x-axis
+11. **Iteration 5.5: CLI v5** - Complete CLI for full timeline generation
+
+## Iteration 0: Foundation and Core Types
+
+### Features to Implement
+
+1. **New module structure** (`schedview/plot/tlbuilder/`)
+   - `__init__.py` - Package initialization with public API exports
+   - `core.py` - Core data types and builder class skeleton
+
+2. **Core data types** (as simple classes/NamedTuples initially):
+   - `ScatterPlotConfig` - Configuration for scatter plots
+   - `ColorStripeConfig` - Configuration for color stripes
+   - `VisitDataSet` - Visit data source with styling options
+
+3. **TimelineBuilder class skeleton**:
+   - `__init__(dayobs)` - Initialize with DayObs
+   - `add_scatter()` - Add scatter plot config (stub)
+   - `add_visits()` - Add visit data config (stub)
+   - `add_color_stripe()` - Add color stripe config (stub)
+   - `build()` - Return empty layout (stub)
+
+### CLI (No CLI in iteration 0)
+
+- CLI not applicable at this stage
+
+### Tests to Add
+
+1. **`tests/test_tlbuilder_core.py`**:
+   - Test `ScatterPlotConfig` instantiation
+   - Test `ColorStripeConfig` instantiation
+   - Test `VisitDataSet` instantiation
+   - Test `TimelineBuilder` initialization
+   - Test method chaining returns `Self`
+
+### Deliverables
+
+- New `schedview.plot.tlbuilder` package
+- Basic type definitions
+- Empty `build()` returning a placeholder layout
+
+---
+
+## Iteration 1: Scatter Plot Support
+
+### Features to Implement
+
+1. **Scatter plot rendering** (`schedview/plot/tlbuilder/scatter.py`):
+   - `_create_scatter_figure()` method in TimelineBuilder
+   - Y-axis column selector dropdown (`bokeh.models.Select`)
+   - Hover tooltips configuration
+   - Custom figure kwargs support
+
+2. **ScatterPlotConfig enhancement**:
+   - Store height per plot
+   - Store offered_columns for selector
+   - Store tooltips configuration
+
+3. **Y-axis selector widget**:
+   - Dropdown with column names from visit data
+   - Default to first column if offered_columns empty
+   - JavaScript callback to update y column on change
+
+### CLI (CLI v1)
+
+1. **Command-line interface** (`schedview/plot/tlbuilder/cli.py`):
+   - `buildtl` command entry point
+   - argparse configuration:
+     - `--date` or positional DayObs argument
+     - `--y-column` to specify scatter y-axis
+     - `--offered-columns` for selector dropdown
+     - `--output` for output file path
+   - Basic scatter plot generation
+
+2. **Example usage**:
+   ```bash
+   buildtl 2026-05-23 --y-column altitude --output timeline.html
+   ```
+
+### Tests to Add
+
+1. **`tests/test_tlbuilder_scatter.py`**:
+   - Test scatter plot creation with default y column
+   - Test scatter plot with custom offered columns
+   - Test scatter plot with custom height
+   - Test scatter plot with custom tooltips
+   - Test scatter plot with custom figure kwargs
+   - Verify y-axis selector appears when offered_columns provided
+   - Test that selector dropdown has correct options
+
+### Deliverables
+
+- Working scatter plot rendering
+- Y-axis column selector widget
+- Configurable plot appearance
+
+---
+
+## Iteration 1.5: CLI v1
+
+### CLI Enhancements
+
+1. **Basic CLI for iteration 1 features**:
+   - Accept DayObs as positional argument
+   - Generate HTML file with scatter plot
+   - Configure y-axis column and offered columns
+   - Output to specified file
+
+2. **Integration tests**:
+   - Test CLI with basic scatter plot
+   - Verify HTML output is valid Bokeh document
+
+### Tests to Add
+
+1. **`tests/test_tlbuilder_cli.py`** (iteration 1.5):
+   - Test CLI imports and entry point
+   - Test CLI with basic arguments
+   - Test HTML output file creation
+   - Test HTML output is valid
+
+### Deliverables
+
+- Working `buildtl` command for scatter plots
+
+---
+
+## Iteration 2: Visit Data Support
+
+### Features to Implement
+
+1. **Visit data handling** (`schedview/plot/tlbuilder/visits.py`):
+   - `_create_visit_source()` - Convert DataFrame to ColumnDataSource
+   - Band-based coloring with `make_band_cmap()`
+   - Alpha and marker configuration
+   - Visibility tracking
+
+2. **VisitDataSet class**:
+   - Store source, label, alpha, marker, color_by_band, visible
+   - Track visit set visibility state
+
+3. **add_visits() implementation**:
+   - Process visits DataFrame
+   - Create ColumnDataSource with color column if band present
+   - Store in _visit_sets dict
+   - Add to _elements list
+
+### CLI (CLI v2)
+
+1. **CLI enhancements**:
+   - `--visits` option to specify OpSim database file(s)
+   - `--label` option to name visit sets
+   - `--alpha` option to control point transparency
+   - `--color-by-band` flag (default: true)
+   - Display visits as scatter points on scatter plots
+   - Show multiple visit sets with different colors
+
+2. **Example usage**:
+   ```bash
+   buildtl 2026-05-23 --y-column altitude \
+       --visits baseline_v1.db --label v1 \
+       --visits baseline_v2.db --label v2 --alpha 0.5 \
+       --output timeline.html
+   ```
+
+### Tests to Add
+
+1. **`tests/test_tlbuilder_visits.py`**:
+   - Test add_visits with band column (colored output)
+   - Test add_visits without band column (single color)
+   - Test add_visits with custom alpha
+   - Test add_visits with custom marker
+   - Test add_visits with show_visibility_toggle=False
+   - Test multiple visit sets can be added
+   - Verify band colors are correctly applied
+
+### Deliverables
+
+- Visit data rendering with band coloring
+- Multiple visit set support
+- Alpha and marker configuration
+
+---
+
+## Iteration 2.5: CLI v2
+
+### CLI Enhancements
+
+1. **Visit data integration**:
+   - Parse OpSim database files using `read_opsim()`
+   - Compute DayObs from date argument
+   - Collect and combine multiple visit files
+   - Apply label, alpha, and color_by_band settings
+
+2. **Integration tests**:
+   - Test CLI with single visit file
+   - Test CLI with multiple visit files
+   - Verify different visit sets are plotted with different colors
+
+### Tests to Add
+
+1. **`tests/test_tlbuilder_cli.py`** (iteration 2.5):
+   - Test CLI with single visit file
+   - Test CLI with multiple visit files
+   - Test CLI with custom label and alpha
+
+### Deliverables
+
+- Working CLI with visit data support
+
+---
+
+## Iteration 3: Color Stripe Background
+
+### Features to Implement
+
+1. **Color stripe rendering** (`schedview/plot/tlbuilder/stripe.py`):
+   - `_create_color_stripe_figure()` method
+   - `LinearColorMapper` for continuous data
+   - Rectangle glyph for stripe display
+   - Colormap selection
+
+2. **ColorStripeConfig enhancement**:
+   - Store colormap name
+   - Store value range for normalization
+   - Create color_mapper instance
+
+3. **Convenience methods**:
+   - `add_solar_elevation_stripe()` - Use astro.sun_elevation
+   - `add_lunar_elevation_stripe()` - Use astro.moon_elevation
+   - Auto-compute value range if not provided
+
+### CLI (CLI v3)
+
+1. **CLI enhancements**:
+   - `--background` option: `sun_alt`, `moon_alt`, `sky_brightness`
+   - `--sbstripe` flag for sky brightness stripe
+   - `--moon-el-stripe` flag for moon elevation stripe
+   - `--colormap` option to specify colormap
+   - Display color stripes as background plots
+
+2. **Example usage**:
+   ```bash
+   buildtl 2026-05-23 --y-column altitude --visits baseline.db \
+       --background sun_alt --sbstripe --moon-el-stripe \
+       --output timeline.html
+   ```
+
+### Tests to Add
+
+1. **`tests/test_tlbuilder_stripe.py`**:
+   - Test color stripe from pandas Series
+   - Test color stripe from pandas DataFrame
+   - Test color stripe with custom colormap
+   - Test color stripe with custom value range
+   - Test solar elevation stripe (integration)
+   - Test lunar elevation stripe (integration)
+   - Verify colormap normalization works correctly
+
+### Deliverables
+
+- Color stripe background rendering
+- Support for continuous data series
+- Convenience methods for sun/moon elevation
+
+---
+
+## Iteration 3.5: CLI v3
+
+### CLI Enhancements
+
+1. **Astronomical data computation**:
+   - Use `schedview.compute.astro.sun_elevation()` for sun background
+   - Use `schedview.compute.astro.moon_elevation()` for moon background
+   - Use `schedview.compute.astro.get_median_model_sky()` for sky brightness
+
+2. **Stripe configuration**:
+   - Map CLI flags to appropriate stripe types
+   - Apply colormap and value range options
+
+3. **Integration tests**:
+   - Test CLI with sun elevation background
+   - Test CLI with moon elevation background
+   - Test CLI with sky brightness stripe
+
+### Tests to Add
+
+1. **`tests/test_tlbuilder_cli.py`** (iteration 3.5):
+   - Test CLI with `--background sun_alt`
+   - Test CLI with `--sbstripe`
+   - Test CLI with `--moon-el-stripe`
+   - Test CLI with multiple background stripes
+
+### Deliverables
+
+- Working CLI with background color stripes
+
+---
+
+## Iteration 4: Interactive Controls
+
+### Features to Implement
+
+1. **Visit visibility selector** (`schedview/plot/tlbuilder/controls.py`):
+   - `add_visit_visibility_selector()` method
+   - `MultiChoice` widget with visit set labels
+   - JavaScript callback to toggle visibility
+   - Integration with visit set visibility state
+
+2. **Visibility state management**:
+   - Track visible state per visit set
+   - Update source.visible on selector change
+   - Emit change event for Bokeh update
+
+### CLI (CLI v4)
+
+1. **CLI enhancements**:
+   - `--no-visibility-selector` flag to disable visibility controls
+   - `--default-visible` to set initial visibility state
+   - CLI now produces interactive HTML with visibility toggles
+
+2. **Example usage**:
+   ```bash
+   buildtl 2026-05-23 --y-column altitude --visits v1.db v2.db \
+       --background sun_alt \
+       --output timeline.html
+   ```
+   - Result: Interactive HTML with visit visibility toggle
+
+### Tests to Add
+
+1. **`tests/test_tlbuilder_controls.py`**:
+   - Test visibility selector creation
+   - Test selector has correct options
+   - Test JavaScript callback registration
+   - Test visibility toggle updates source.visible
+   - Test selector only includes sets with show_visibility_toggle=True
+
+### Deliverables
+
+- Working visit set visibility toggles
+- MultiChoice widget integration
+- JavaScript callback for interactivity
+
+---
+
+## Iteration 4.5: CLI v4
+
+### CLI Enhancements
+
+1. **Interactive control integration**:
+   - Add visibility selector by default (or with `--visibility-selector`)
+   - Store visibility state for each visit set
+   - Generate JavaScript for toggling
+
+2. **Integration tests**:
+   - Test CLI output includes visibility controls
+   - Test toggle controls show/hide correct visit sets
+
+### Tests to Add
+
+1. **`tests/test_tlbuilder_cli.py`** (iteration 4.5):
+   - Test CLI output includes visibility selector
+   - Test selector options match visit set labels
+
+### Deliverables
+
+- Working CLI with interactive controls
+
+---
+
+## Iteration 5: Stacked Layouts
+
+### Features to Implement
+
+1. **build() implementation** (`schedview/plot/tlbuilder/build.py`):
+   - Create shared x-axis range from DayObs
+   - Sort elements to determine display order
+   - Create figures for each element type
+   - Arrange vertically using `bokeh.layouts.column()`
+   - Add visibility selector at top if configured
+
+2. **Layout configuration**:
+   - Support per-plot heights from _plot_heights
+   - Default heights for different element types
+   - Common x-axis range across all plots
+   - Shared datetime formatter on all x-axes
+
+3. **Output formats**:
+   - Return Bokeh layout for embedding
+   - HTML generation via `bokeh.embed.file_html()`
+   - Panel component conversion
+
+### CLI (CLI v5)
+
+1. **CLI enhancements**:
+   - `--num-scatter` option to specify number of scatter plots
+   - `--scatter-height` and `--stripe-height` for layout control
+   - `--width` option for figure width
+   - Complete stacked layout with shared x-axis
+   - All previously supported features work together
+
+2. **Example usage**:
+   ```bash
+   buildtl 2026-05-23 \
+       --num-scatter 2 \
+       --visits baseline_v1.db --label v1 \
+       --visits baseline_v2.db --label v2 --alpha 0.5 \
+       --background sun_alt --sbstripe --moon-el-stripe \
+       --width 1200 \
+       --output full_timeline.html
+   ```
+
+### Tests to Add
+
+1. **`tests/test_tlbuilder_layout.py`**:
+   - Test build returns valid Bokeh layout
+   - Test all plots share same x-axis range
+   - Test all x-axes use datetime formatter
+   - Test layout contains expected number of figures
+   - Test layout order matches element addition order
+   - Test visibility selector appears when added
+   - Test HTML export works
+
+### Deliverables
+
+- Complete stacked timeline visualization
+- Shared x-axis alignment
+- Multiple output formats
+
+---
+
+## Iteration 5.5: CLI v5
+
+### CLI Enhancements
+
+1. **Full feature integration**:
+   - All CLI options work together
+   - Stacked layouts with multiple scatter plots
+   - Multiple visit sets with band coloring
+   - Multiple background stripes
+   - Interactive visibility controls
+
+2. **Integration tests**:
+   - Test complete CLI workflow end-to-end
+   - Test all combinations of options
+   - Verify HTML output is valid and interactive
+
+### Tests to Add
+
+1. **`tests/test_tlbuilder_cli.py`** (iteration 5.5):
+   - Test complete CLI with all options
+   - Test stacked layout generation
+   - Test HTML interactivity
+
+### Deliverables
+
+- Complete, fully-functional CLI tool
+
+---
+
+## Migration Notes
+
+During implementation:
+
+1. **Keep old timeline module** - No breaking changes to existing code
+2. **Deprecation warnings** - Add warnings to old timeline module
+3. **Documentation** - Update docstrings and add examples
+4. **Test coverage** - Aim for 80%+ coverage on new code
+
+## Testing Strategy
+
+Each iteration follows this pattern:
+
+1. Create test file matching implementation module
+2. Add tests for all public functions/classes
+3. Test both happy path and edge cases
+4. Use fixture data from `schedview/data/` where possible
+5. Mock external dependencies where appropriate
+
+## Progression Criteria
+
+Move to next iteration when:
+- All tests for current iteration pass
+- Implementation matches design in design section
+- Documentation is updated
+- No major technical debt introduced
