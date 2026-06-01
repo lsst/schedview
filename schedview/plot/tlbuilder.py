@@ -128,8 +128,8 @@ class TimelineBuilder:
         self._dayobs = dayobs
         self._elements: list[ScatterPlotConfig | ColorStripeConfig] = []
         self._visit_sets: dict[str, VisitDataSet] = {}
-        start_time = Time(float(dayobs.start.mjd), format="mjd").datetime64
-        end_time = Time(float(dayobs.end.mjd), format="mjd").datetime64
+        start_time = Time(float(dayobs.sunset.mjd), format="mjd").datetime64
+        end_time = Time(float(dayobs.sunrise.mjd), format="mjd").datetime64
         self._shared_x_range = Range1d(start=start_time, end=end_time)
         self._figure_kwargs: dict = {"width": 1000}
         self._plot_heights: dict[str, int] = {}
@@ -319,20 +319,14 @@ class TimelineBuilder:
         # Compute adjacent rectangle widths for continuous coverage.
         # Bokeh datetime axes store values in milliseconds since epoch, so widths
         # must also be in milliseconds.
-        widths = []
         if len(times) >= 2:
-            for i in range(len(times)):
-                if i == 0:
-                    mid_to_next = (times[i + 1] - times[i]) / 2
-                    width = float(mid_to_next / np.timedelta64(1, 'ms'))
-                elif i == len(times) - 1:
-                    mid_to_prev = (times[i] - times[i - 1]) / 2
-                    width = float(mid_to_prev / np.timedelta64(1, 'ms'))
-                else:
-                    mid_to_prev = (times[i] - times[i - 1]) / 2
-                    mid_to_next = (times[i + 1] - times[i]) / 2
-                    width = float((mid_to_prev + mid_to_next) / np.timedelta64(1, 'ms'))
-                widths.append(width)
+            # Calculate half-gaps between adjacent midpoints
+            half_gaps = np.diff(times) / 2
+            # Extend left edge (first half-gap) and right edge (last half-gap)
+            left = np.concatenate([[half_gaps[0]], half_gaps])
+            right = np.concatenate([half_gaps, [half_gaps[-1]]])
+            # Compute widths in milliseconds
+            widths = ((left + right) / np.timedelta64(1, "ms")).tolist()
         else:
             # Single point: 1-hour wide in milliseconds
             widths = [3_600_000.0] * len(times) if len(times) > 0 else []
@@ -654,7 +648,7 @@ def build_timeline(dayobs: DayObs, scatter_columns: list[str]) -> column:
 
 
 def _sample_body_elevation(body_name: str, dayobs: DayObs) -> pd.Series:
-    """Sample a celestial body's elevation throughout a day.
+    """Sample a celestial body's elevation from sunset to sunrise.
 
     Parameters
     ----------
@@ -670,7 +664,7 @@ def _sample_body_elevation(body_name: str, dayobs: DayObs) -> pd.Series:
     """
     from astropy.coordinates import AltAz, get_body
 
-    mjds = np.arange(float(dayobs.start.mjd), float(dayobs.end.mjd), 1 / 24)
+    mjds = np.arange(float(dayobs.sunset.mjd), float(dayobs.sunrise.mjd), 1 / 24)
     times_ap = Time(mjds, format="mjd")
     altaz_frame = AltAz(location=dayobs.location, obstime=times_ap)
     altaz = get_body(body_name, times_ap).transform_to(altaz_frame)

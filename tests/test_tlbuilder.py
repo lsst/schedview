@@ -241,14 +241,14 @@ class TestAddScatter:
         assert isinstance(builder._shared_x_range, Range1d)
 
     def test_shared_x_range_bounds_from_dayobs(self):
-        """Shared x-range uses DayObs start/end times as datetime64."""
+        """Shared x-range uses DayObs sunset/sunrise times as datetime64."""
         dayobs = DayObs.from_date("2025-06-15")
         builder = TimelineBuilder(dayobs)
         builder.add_scatter(y_column="altitude")
         x_range = builder._shared_x_range
 
-        expected_start = Time(float(dayobs.start.mjd), format="mjd").datetime64
-        expected_end = Time(float(dayobs.end.mjd), format="mjd").datetime64
+        expected_start = Time(float(dayobs.sunset.mjd), format="mjd").datetime64
+        expected_end = Time(float(dayobs.sunrise.mjd), format="mjd").datetime64
 
         assert x_range.start == expected_start
         assert x_range.end == expected_end
