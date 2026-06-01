@@ -107,8 +107,6 @@ class TestVisitDataSet:
         assert dataset.alpha == 1.0
         assert dataset.marker == "circle"
         assert dataset.color_by_band is True
-        assert dataset.visible is True
-        assert dataset.show_visibility_toggle is True
 
     def test_custom_values(self):
         """VisitDataSet stores custom values correctly."""
@@ -119,7 +117,6 @@ class TestVisitDataSet:
             alpha=0.5,
             marker="triangle",
             color_by_band=False,
-            visible=False,
             show_visibility_toggle=False
         )
         assert dataset.source is source
@@ -127,7 +124,6 @@ class TestVisitDataSet:
         assert dataset.alpha == 0.5
         assert dataset.marker == "triangle"
         assert dataset.color_by_band is False
-        assert dataset.visible is False
         assert dataset.show_visibility_toggle is False
 
 
@@ -340,7 +336,7 @@ class TestAddVisits:
         assert isinstance(dataset, VisitDataSet)
 
     def test_stores_visit_dataset_attributes(self):
-        """VisitDataSet stores label, alpha, marker, color_by_band, visible."""
+        """VisitDataSet stores label, alpha, marker, color_by_band."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         visits_df = pd.DataFrame({
             "observationStartMJD": [59999.0],
@@ -353,7 +349,6 @@ class TestAddVisits:
         assert dataset.alpha == 0.7
         assert dataset.marker == "triangle"
         assert dataset.color_by_band is False
-        assert dataset.visible is True
 
     def test_respects_height_parameter(self):
         """add_visits respects height parameter as explicit argument."""

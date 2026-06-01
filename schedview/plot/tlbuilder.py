@@ -87,8 +87,6 @@ class VisitDataSet:
         Marker type for scatter glyphs.
     color_by_band : bool
         Whether to color points by band.
-    visible : bool
-        Whether the visit set is visible by default.
     """
 
     source: ColumnDataSource | None = None
@@ -96,7 +94,6 @@ class VisitDataSet:
     alpha: float = 1.0
     marker: str = "circle"
     color_by_band: bool = True
-    visible: bool = True
     show_visibility_toggle: bool = True
 
 
@@ -252,7 +249,6 @@ class TimelineBuilder:
             alpha=alpha,
             marker=marker,
             color_by_band=color_by_band,
-            visible=True,
             show_visibility_toggle=show_visibility_toggle,
         )
         # Visits are overlaid on scatter panels — they do not create their own figures.
@@ -372,7 +368,7 @@ class TimelineBuilder:
         # Only include visits with show_visibility_toggle=True
         options = [
             label for label, dataset in self._visit_sets.items()
-            if dataset.visible and dataset.show_visibility_toggle
+            if dataset.show_visibility_toggle
         ]
 
         self._visibility_selector = MultiChoice(
@@ -419,7 +415,7 @@ class TimelineBuilder:
             # Build visit set info with actual renderer references
             visit_sets_for_callback = {}
             for label, dataset in self._visit_sets.items():
-                if dataset.visible and dataset.show_visibility_toggle:
+                if dataset.show_visibility_toggle:
                     # Get renderers for this visit set, or empty list if none tracked
                     renderers = visit_renderers.get(label, [])
                     visit_sets_for_callback[label] = {"renderers": renderers}
