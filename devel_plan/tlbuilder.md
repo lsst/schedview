@@ -419,3 +419,178 @@ The tlbuilder uses Modified Julian Date (MJD) values from the scheduler for time
 - **Tick formatting**: The x-axis uses `DatetimeTickFormatter` with `hours="%H:%M"` to display time of day in HH:MM format
 
 # Design
+
+---
+
+Great — I now have the contents of `tlbuilder.py` and the conceptual design document `tlbuilder.md`. Below is a **senior‑engineer–level software design document**, written in Markdown, inspired by **IEEE‑1016**, **IEEE‑1471**, and **UML design practices**. It references and synthesizes the code and conceptual material you provided, without repeating either file verbatim.
+
+If you'd like, I can also produce a PDF‑ready version, split the document into multiple files, or generate a corresponding architecture diagram set.
+
+---
+
+# Design
+
+## Overview
+
+The Timeline Builder is positioned in the **plotting layer** of schedview, consuming time-series data (visit tables, astronomical event computations, continuous elevation data, etc.) and producing interactive Bokeh layouts for notebooks, dashboards, or HTML export.
+
+The system integrates with:
+
+- `schedview.dayobs.DayObs` for nightly time boundaries.
+- Visit ingestion tools (e.g., `read_visits()`).
+- Astro‑compute functions (sun/moon elevation, sky brightness).
+- Bokeh models (Figure, ColumnDataSource, Select, MultiChoice, CustomJS, etc.).
+
+## Architecte
+
+### Module Structure
+
+```
+tlbuilder/
+ └── tlbuilder.py
+       - ScatterPlotConfig
+       - ColorStripeConfig
+       - VisitDataSet
+       - BAND_COLORS
+       - TimelineBuilder
+       - build_timeline()
+       - main()  (click CLI)
+```
+
+### Primary Components
+
+#### TimelineBuilder
+
+A stateful builder responsible for:
+
+- holding references to all plot elements to be composed,
+- generating Bokeh models,
+- enforcing vertically stacked layout with shared x-axis ranges,
+- optional creation of widget controls.
+
+#### ScatterPlotConfig / ColorStripeConfig
+
+Typed parameter bundles for controlling plot appearance.
+
+#### VisitDataSet
+
+Represents a visit source’s associated data, label, and stylistic options.
+
+## Design Viewpoints
+
+### Logical View
+
+#### Class Diagram
+
+```mermaid
+classDiagram
+    class TimelineBuilder {
+        +dayobs: DayObs
+        +scatter_elements: list
+        +visit_sets: list
+        +stripe_elements: list
+        +add_scatter(...)
+        +add_visits(...)
+        +add_color_stripe(...)
+        +add_visit_visibility_selector()
+        +build() : column
+    }
+
+    class ScatterPlotConfig {
+        +y_column: str
+        +name: str
+        +offered_columns: list
+        +height: int
+    }
+
+    class ColorStripeConfig {
+        +data: Series/DataFrame
+        +name: str
+        +height: int
+    }
+
+    class VisitDataSet {
+        +df: DataFrame
+        +label: str
+        +alpha: float
+    }
+
+    TimelineBuilder --> ScatterPlotConfig
+    TimelineBuilder --> ColorStripeConfig
+    TimelineBuilder --> VisitDataSet
+```
+
+### Data View
+
+#### Data Sources and Conversions
+
+- **Input formats**
+  - Visit tables: pandas DataFrames with MJD time columns.
+  - Background data: pandas Series/DataFrames.
+  - Astronomical event tables: numeric or datetime fields.
+
+- **Internal**
+  - All temporal values converted to `numpy.datetime64` for compatibility with Bokeh’s `x_axis_type="datetime"`.
+
+- **Derived values**
+  - Band colors mapped through `BAND_COLORS`.
+  - ColumnDataSource used universally for binding.
+
+## Detailed Component Design
+
+### TimelineBuilder
+
+#### Responsibilities
+
+- Manage element configuration.
+- Create consistent shared x-axis.
+- Build Bokeh figures and glyphs.
+- Optionally add widgets (Select, MultiChoice).
+- Produce a single Bokeh `column` layout.
+
+#### Key Internals
+
+- Holds lists: `scatter_elements`, `visit_sets`, `stripe_elements`.
+- Transforms MJD→datetime64 on ingestion.
+- Uses Bokeh glyphs:
+  - `Scatter` for visit/scatter data,
+  - `LinearColorMapper` or `CategoricalColorMapper`,
+  - `Range1d` for shared x-axis ranges.
+
+#### Error Handling
+
+- Validates required columns exist in visit/scatter datasets.
+- Ensures consistent time bounds relative to DayObs.
+
+### Scatter Plot Support
+
+Each scatter plot:
+
+- Has its own y-axis but shares an x-axis.
+- May include a y-axis selector widget (Select → CustomJS callback).
+- Respects user-specified height (default from CLI).
+
+### Visit Data Support
+
+- Accepts multiple visit sets.
+- Applies LSST band mapping through `BAND_COLORS`.
+- Each visit set can be toggled in visibility with a MultiChoice widget (optional).
+
+### Color Stripes
+
+- Represent continuous background fields (sun elevation, moon elevation, sky metrics).
+- Rendered using small-height horizontal plots (default = 40px per tlbuilder.md).
+- Always stack at the top or bottom depending on builder order.
+
+### CLI Tool
+
+`main()` provides:
+
+- Date selection.
+- Multiple scatter columns (`--scatter ...`).
+- Multiple visit sources (`--visits ...`).
+- Background stripe selection (`--background sun_elevation`).
+- Output HTML file path.
+- Optional widget enablement.
+
+Defined via `click` decorators in `tlbuilder.py`.
