@@ -14,14 +14,12 @@ from astropy.time import Time
 from bokeh.embed import file_html
 from bokeh.layouts import column
 from bokeh.models import (
-    CategoricalColorMapper,
     ColumnDataSource,
     CustomJS,
     DatetimeTickFormatter,
     LinearColorMapper,
     MultiChoice,
     Range1d,
-    Scatter,
     Select,
 )
 from bokeh.plotting import figure
@@ -133,15 +131,12 @@ class TimelineBuilder:
         self._dayobs = dayobs
         self._elements: list[ScatterPlotConfig | ColorStripeConfig] = []
         self._visit_sets: dict[str, VisitDataSet] = {}
-        self._color_stripes: dict[str, ColorStripeConfig] = {}
         start_time = Time(float(dayobs.start.mjd), format="mjd").datetime64
         end_time = Time(float(dayobs.end.mjd), format="mjd").datetime64
         self._shared_x_range = Range1d(start=start_time, end=end_time)
         self._figure_kwargs: dict = {"width": 1000}
         self._plot_heights: dict[str, int] = {}
         self._visibility_selector: MultiChoice | None = None
-        # Track y-axis selectors for each scatter plot
-        self._scatter_y_selectors: dict[str, Select] = {}
 
     def add_scatter(
         self,
@@ -282,7 +277,7 @@ class TimelineBuilder:
         name : str
             Identifier for this stripe.
         height : int, optional
-            Height of the stripe in pixels. Default is 20.
+            Height of the stripe in pixels. Default is 40.
         colormap : str, optional
             Bokeh colormap name. Default is "Cividis256".
         value_range : tuple[float, float], optional
@@ -296,8 +291,6 @@ class TimelineBuilder:
         Self
             Returns self for method chaining.
         """
-        # Store height (default 20 px)
-        # Default height for color stripes is 40 px (was 20 px) for better visibility
         stripe_height = height if height is not None else 40
         self._plot_heights[name] = stripe_height
 
@@ -358,7 +351,6 @@ class TimelineBuilder:
             colormap=colormap,
             value_range=value_range,
         )
-        self._color_stripes[name] = stripe_config
 
         # Add to elements
         self._elements.append(stripe_config)
@@ -430,11 +422,7 @@ class TimelineBuilder:
                 if dataset.visible and dataset.show_visibility_toggle:
                     # Get renderers for this visit set, or empty list if none tracked
                     renderers = visit_renderers.get(label, [])
-                    visit_sets_for_callback[label] = {
-                        "source": dataset.source,
-                        "visible": dataset.visible,
-                        "renderers": renderers
-                    }
+                    visit_sets_for_callback[label] = {"renderers": renderers}
 
             if visit_sets_for_callback:
                 # Create CustomJS callback to toggle visibility of visit renderers
