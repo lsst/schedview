@@ -528,22 +528,23 @@ class TimelineBuilder:
         )
 
         # Create CustomJS callback to update y-field and y-axis label
+        # Use fig.change.emit() to trigger a full render update
         callback_code = """
             const new_y = cb_obj.value;
-            // Find the glyph renderer and update its y field
+            // Update the y-field for all scatter glyphs
             for (const renderer of fig.renderers) {
                 if (renderer.glyph && renderer.glyph.type === 'Scatter') {
                     renderer.glyph.y = new_y;
-                    renderer.change.emit();
                 }
             }
             // Update y-axis label
             for (const axis of fig.axes) {
                 if (axis.type === 'LinearAxis') {
                     axis.axis_label = new_y;
-                    axis.change.emit();
                 }
             }
+            // Trigger a render update
+            fig.change.emit();
         """
 
         selector.js_on_change(
@@ -758,6 +759,12 @@ def build_timeline(dayobs: DayObs, scatter_columns: list[str]) -> column:
     default=None,
     help="Height for color stripe plots in pixels.",
 )
+@click.option(
+    "--y-columns",
+    multiple=True,
+    required=False,
+    help="Comma-separated list of columns to offer in y-axis selector for scatter plots.",
+)
 def main(
     date: str,
     scatter: tuple[str, ...],
@@ -768,6 +775,7 @@ def main(
     num_scatter: int | None,
     scatter_height: int | None,
     stripe_height: int | None,
+    y_columns: tuple[str, ...],
 ) -> None:
     """CLI entry point."""
     import pandas as pd
@@ -780,18 +788,24 @@ def main(
     # Build the timeline
     builder = TimelineBuilder(dayobs)
 
-    # Handle scatter plots - either use provided columns or num_scatter option
+    # Parse y-columns option (single value applied to all scatter plots)
+    y_columns_offered = ()
+    if y_columns:
+        # Take the first y-columns value if provided (can be specified only once)
+        y_cols = y_columns[0]
+        y_columns_offered = tuple(c.strip() for c in y_cols.split(",") if c.strip())
+
     if num_scatter is not None and num_scatter > 0:
         # Create num_scatter scatter plots, all using the first scatter column
         first_column = scatter[0] if scatter else "altitude"
         for i in range(num_scatter):
             name = f"scatter_{i+1}"
-            builder.add_scatter(y_column=first_column, name=name, height=scatter_height)
+            builder.add_scatter(y_column=first_column, offered_columns=y_columns_offered, name=name, height=scatter_height)
     else:
         # Add scatter plots for each provided column
         for column_name in scatter:
             name = column_name
-            builder.add_scatter(y_column=column_name, name=name, height=scatter_height)
+            builder.add_scatter(y_column=column_name, offered_columns=y_columns_offered, name=name, height=scatter_height)
 
     # Add visits
     for visit_source in visits:
