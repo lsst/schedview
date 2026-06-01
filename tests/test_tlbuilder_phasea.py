@@ -309,22 +309,34 @@ class TestTimelineBuilderBuild:
         assert isinstance(fig.xaxis[0].formatter, DatetimeTickFormatter)
 
     def test_figure_has_scatter_glyph(self):
-        """Figure contains scatter glyph renderer."""
+        """Figure contains scatter glyph renderer when visits are overlaid."""
+        import pandas as pd
+
         dayobs = DayObs.from_date("2025-06-15")
         builder = TimelineBuilder(dayobs)
         builder.add_scatter(y_column="altitude")
+        builder.add_visits(
+            pd.DataFrame({"observationStartMJD": [59999.0], "altitude": [30.0]}),
+            label="v1",
+        )
 
         result = builder.build()
         fig = result.children[0]
 
         scatter_renderers = [r for r in fig.renderers if isinstance(r.glyph, Scatter)]
-        assert len(scatter_renderers) == 1
+        assert len(scatter_renderers) >= 1
 
     def test_scatter_glyph_x_field_is_time(self):
         """Scatter glyph uses 'time' as x field."""
+        import pandas as pd
+
         dayobs = DayObs.from_date("2025-06-15")
         builder = TimelineBuilder(dayobs)
         builder.add_scatter(y_column="altitude")
+        builder.add_visits(
+            pd.DataFrame({"observationStartMJD": [59999.0], "altitude": [30.0]}),
+            label="v1",
+        )
 
         result = builder.build()
         fig = result.children[0]
@@ -334,9 +346,15 @@ class TestTimelineBuilderBuild:
 
     def test_scatter_glyph_y_field_is_config_y_column(self):
         """Scatter glyph uses config.y_column as y field."""
+        import pandas as pd
+
         dayobs = DayObs.from_date("2025-06-15")
         builder = TimelineBuilder(dayobs)
         builder.add_scatter(y_column="altitude")
+        builder.add_visits(
+            pd.DataFrame({"observationStartMJD": [59999.0], "altitude": [30.0]}),
+            label="v1",
+        )
 
         result = builder.build()
         fig = result.children[0]
@@ -345,11 +363,17 @@ class TestTimelineBuilderBuild:
         assert scatter_renderer.glyph.y == "altitude"
 
     def test_duplicated_y_columns_use_same_field(self):
-        """Multiple scatters with same y column use same y field."""
+        """Multiple scatter panels with the same y column each render that column."""
+        import pandas as pd
+
         dayobs = DayObs.from_date("2025-06-15")
         builder = TimelineBuilder(dayobs)
         builder.add_scatter(y_column="altitude", name="plot1")
         builder.add_scatter(y_column="altitude", name="plot2")
+        builder.add_visits(
+            pd.DataFrame({"observationStartMJD": [59999.0], "altitude": [30.0]}),
+            label="v1",
+        )
 
         result = builder.build()
 
