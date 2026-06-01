@@ -653,6 +653,30 @@ def build_timeline(dayobs: DayObs, scatter_columns: list[str]) -> column:
     return builder.build()
 
 
+def _sample_body_elevation(body_name: str, dayobs: DayObs) -> pd.Series:
+    """Sample a celestial body's elevation throughout a day.
+
+    Parameters
+    ----------
+    body_name : str
+        The name of the body to sample ("sun" or "moon").
+    dayobs : DayObs
+        The observing day.
+
+    Returns
+    -------
+    pd.Series
+        Series of elevation angles in degrees, indexed by MJD.
+    """
+    from astropy.coordinates import AltAz, get_body
+
+    mjds = np.arange(float(dayobs.start.mjd), float(dayobs.end.mjd), 1 / 24)
+    times_ap = Time(mjds, format="mjd")
+    altaz_frame = AltAz(location=dayobs.location, obstime=times_ap)
+    altaz = get_body(body_name, times_ap).transform_to(altaz_frame)
+    return pd.Series(altaz.alt.deg, index=mjds)
+
+
 @click.command(
     help="Build timeline visualizations for Rubin Observatory observing nights."
 )
@@ -775,59 +799,11 @@ def main(
     # Add background stripes
     for bg_type in background:
         if bg_type == "sun_elevation":
-            # Compute sun elevation throughout the day
-            times = []
-            elevations = []
-
-            # Sample sun position every hour
-            start_mjd = float(dayobs.start.mjd)
-            end_mjd = float(dayobs.end.mjd)
-
-            from astropy.coordinates import get_body, AltAz
-            from astropy.time import Time
-
-            # Generate hourly samples
-            current_mjd = start_mjd
-            while current_mjd <= end_mjd:
-                times.append(current_mjd)
-                # Get sun position at this time
-                sun = get_body("sun", Time(current_mjd, format="mjd"))
-
-                # Create AltAz frame with location and obstime, then transform
-                altaz_frame = AltAz(location=dayobs.location, obstime=Time(current_mjd, format="mjd"))
-                sun_altaz = sun.transform_to(altaz_frame)
-                elevations.append(sun_altaz.alt.deg)
-                current_mjd += 1 / 24  # One hour
-
-            sun_data = pd.Series(elevations, index=times)
+            sun_data = _sample_body_elevation("sun", dayobs)
             builder.add_color_stripe(sun_data, name="sun_elevation", height=stripe_height if stripe_height is not None else 100)
 
         elif bg_type == "moon_elevation":
-            # Compute moon elevation throughout the day
-            times = []
-            elevations = []
-
-            # Sample moon position every hour
-            start_mjd = float(dayobs.start.mjd)
-            end_mjd = float(dayobs.end.mjd)
-
-            from astropy.coordinates import get_body, AltAz
-            from astropy.time import Time
-
-            # Generate hourly samples
-            current_mjd = start_mjd
-            while current_mjd <= end_mjd:
-                times.append(current_mjd)
-                # Get moon position at this time
-                moon = get_body("moon", Time(current_mjd, format="mjd"))
-
-                # Create AltAz frame with location and obstime, then transform
-                altaz_frame = AltAz(location=dayobs.location, obstime=Time(current_mjd, format="mjd"))
-                moon_altaz = moon.transform_to(altaz_frame)
-                elevations.append(moon_altaz.alt.deg)
-                current_mjd += 1 / 24  # One hour
-
-            moon_data = pd.Series(elevations, index=times)
+            moon_data = _sample_body_elevation("moon", dayobs)
             builder.add_color_stripe(moon_data, name="moon_elevation", height=stripe_height if stripe_height is not None else 100)
 
         else:
