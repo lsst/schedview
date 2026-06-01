@@ -134,7 +134,9 @@ class TimelineBuilder:
         self._elements: list[ScatterPlotConfig | ColorStripeConfig] = []
         self._visit_sets: dict[str, VisitDataSet] = {}
         self._color_stripes: dict[str, ColorStripeConfig] = {}
-        self._shared_x_range: Range1d | None = None
+        start_time = Time(float(dayobs.start.mjd), format="mjd").datetime64
+        end_time = Time(float(dayobs.end.mjd), format="mjd").datetime64
+        self._shared_x_range = Range1d(start=start_time, end=end_time)
         self._figure_kwargs: dict = {"width": 1000}
         self._plot_heights: dict[str, int] = {}
         self._visibility_selector: MultiChoice | None = None
@@ -172,13 +174,6 @@ class TimelineBuilder:
         Self
             Returns self for method chaining.
         """
-        # Initialize shared x-range on first scatter
-        if self._shared_x_range is None:
-            # Convert DayObs start/end MJD to datetime64
-            start_time = Time(float(self._dayobs.start.mjd), format="mjd").datetime64
-            end_time = Time(float(self._dayobs.end.mjd), format="mjd").datetime64
-            self._shared_x_range = Range1d(start=start_time, end=end_time)
-
         # Store height if provided
         if height is not None:
             self._plot_heights[name] = height
@@ -229,12 +224,6 @@ class TimelineBuilder:
         Self
             Returns self for method chaining.
         """
-        # Initialize shared x-range if not already done
-        if self._shared_x_range is None:
-            start_time = Time(float(self._dayobs.start.mjd), format="mjd").datetime64
-            end_time = Time(float(self._dayobs.end.mjd), format="mjd").datetime64
-            self._shared_x_range = Range1d(start=start_time, end=end_time)
-
         # Store height if provided
         if "height" in scatter_kwargs:
             self._plot_heights[label] = scatter_kwargs["height"]
@@ -307,12 +296,6 @@ class TimelineBuilder:
         Self
             Returns self for method chaining.
         """
-        # Initialize shared x-range if not already done
-        if self._shared_x_range is None:
-            start_time = Time(float(self._dayobs.start.mjd), format="mjd").datetime64
-            end_time = Time(float(self._dayobs.end.mjd), format="mjd").datetime64
-            self._shared_x_range = Range1d(start=start_time, end=end_time)
-
         # Store height (default 20 px)
         # Default height for color stripes is 40 px (was 20 px) for better visibility
         stripe_height = height if height is not None else 40
