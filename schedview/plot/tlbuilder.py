@@ -20,10 +20,13 @@ from bokeh.layouts import column
 from bokeh.models import (
     CategoricalColorMapper,
     ColumnDataSource,
+    CustomJS,
     DatetimeTickFormatter,
     LinearColorMapper,
+    MultiChoice,
     Range1d,
     Scatter,
+    Select,
 )
 from bokeh.plotting import figure
 
@@ -100,6 +103,7 @@ class VisitDataSet:
     marker: str = "circle"
     color_by_band: bool = True
     visible: bool = True
+    show_visibility_toggle: bool = True
 
 
 # Band colors mapping (LSST ugrizy)
@@ -151,6 +155,9 @@ class TimelineBuilder:
         self._shared_x_range: Range1d | None = None
         self._figure_kwargs: dict = {"width": 1000}
         self._plot_heights: dict[str, int] = {}
+        self._visibility_selector: MultiChoice | None = None
+        # Track y-axis selectors for each scatter plot
+        self._scatter_y_selectors: dict[str, Select] = {}
 
     def add_scatter(
         self,
@@ -280,6 +287,7 @@ class TimelineBuilder:
             marker=marker,
             color_by_band=color_by_band,
             visible=True,
+            show_visibility_toggle=show_visibility_toggle,
         )
         # Visits are overlaid on scatter panels — they do not create their own figures.
         return self
@@ -392,36 +400,172 @@ class TimelineBuilder:
 
         return self
 
+    def add_visit_visibility_selector(self) -> Self:
+        """Add a MultiChoice widget to toggle visibility of visit sets.
+
+        Creates a MultiChoice widget that allows users to show/hide
+        different visit data sets that were added with show_visibility_toggle=True.
+
+        Returns
+        -------
+        Self
+            Returns self for method chaining.
+        """
+        # Get list of visit set labels that should be visible by default
+        # Only include visits with show_visibility_toggle=True
+        options = [
+            label for label, dataset in self._visit_sets.items()
+            if dataset.visible and dataset.show_visibility_toggle
+        ]
+
+        self._visibility_selector = MultiChoice(
+            value=options,
+            options=options,
+            width=400,
+        )
+
+        return self
+
     def build(self) -> column:
         """Build and return the final Bokeh layout.
 
-        Creates scatter plots, visit plots, and color stripes.
+        Creates scatter plots, visit plots, and color stripes with optional
+        interactive widgets for y-axis selection and visit visibility toggling.
 
         Returns
         -------
         column
-            Bokeh column layout containing all figures.
+            Bokeh column layout containing all figures and widgets.
         """
-        figures = []
+        layout_components = []
+        # Track visit renderers for visibility toggling
+        visit_renderers: dict[str, list] = {}
 
+        # Process elements in insertion order
         for element in self._elements:
             if isinstance(element, ScatterPlotConfig):
-                fig = self._create_scatter_figure(element)
+                # Create scatter figure with renderer tracking
+                fig = self._create_scatter_figure(element, visit_renderers=visit_renderers)
+                layout_components.append(fig)
+                # Create y-axis selector if multiple offered_columns
+                # (placed after figure since figure is needed for callback)
+                y_selector = self._create_scatter_y_selector(element, fig)
+                if y_selector is not None:
+                    layout_components.insert(len(layout_components) - 1, y_selector)
             elif isinstance(element, ColorStripeConfig):
+                # No y-axis selector for stripes
                 fig = self._create_stripe_figure(element)
-            else:
-                continue
-            figures.append(fig)
+                layout_components.append(fig)
 
-        return column(*figures)
+        # Wire up visibility selector callback with tracked renderers
+        if self._visibility_selector is not None:
+            # Build visit set info with actual renderer references
+            visit_sets_for_callback = {}
+            for label, dataset in self._visit_sets.items():
+                if dataset.visible and dataset.show_visibility_toggle:
+                    # Get renderers for this visit set, or empty list if none tracked
+                    renderers = visit_renderers.get(label, [])
+                    visit_sets_for_callback[label] = {
+                        "source": dataset.source,
+                        "visible": dataset.visible,
+                        "renderers": renderers
+                    }
 
-    def _create_scatter_figure(self, config: ScatterPlotConfig) -> figure:
+            if visit_sets_for_callback:
+                # Create CustomJS callback to toggle visibility of visit renderers
+                callback_code = """
+                    const selected_labels = this.value;
+                    for (const [label, visit_info] of Object.entries(visit_sets)) {
+                        const isVisible = selected_labels.includes(label);
+                        for (const renderer of visit_info.renderers) {
+                            renderer.visible = isVisible;
+                            renderer.change.emit();
+                        }
+                    }
+                """
+
+                self._visibility_selector.js_on_change(
+                    'value',
+                    CustomJS(
+                        args={'visit_sets': visit_sets_for_callback},
+                        code=callback_code
+                    )
+                )
+
+            # Add visibility selector to layout (first, before figures)
+            layout_components.insert(0, self._visibility_selector)
+
+        return column(*layout_components)
+
+    def _create_scatter_y_selector(self, config: ScatterPlotConfig, fig: figure) -> Select | None:
+        """Create a y-axis selector widget for a scatter plot.
+
+        Creates a Select widget with offered_columns as options.
+        The widget is positioned directly above its corresponding scatter figure.
+
+        Parameters
+        ----------
+        config : ScatterPlotConfig
+            Configuration for the scatter plot.
+        fig : figure
+            The scatter figure this selector controls.
+
+        Returns
+        -------
+        Select or None
+            The y-axis selector widget if multiple offered_columns, else None.
+        """
+        # Only create selector if multiple columns offered
+        if len(config.offered_columns) <= 1:
+            return None
+
+        # Create the Select widget with offered columns
+        selector = Select(
+            title="Y-Axis:",
+            value=config.y_column,
+            options=list(config.offered_columns),
+            width=200,
+        )
+
+        # Create CustomJS callback to update y-field and y-axis label
+        callback_code = """
+            const new_y = cb_obj.value;
+            // Find the glyph renderer and update its y field
+            for (const renderer of fig.renderers) {
+                if (renderer.glyph && renderer.glyph.type === 'Scatter') {
+                    renderer.glyph.y = new_y;
+                    renderer.change.emit();
+                }
+            }
+            // Update y-axis label
+            for (const axis of fig.axes) {
+                if (axis.type === 'LinearAxis') {
+                    axis.axis_label = new_y;
+                    axis.change.emit();
+                }
+            }
+        """
+
+        selector.js_on_change(
+            'value',
+            CustomJS(
+                args={'fig': fig},
+                code=callback_code
+            )
+        )
+
+        return selector
+
+    def _create_scatter_figure(self, config: ScatterPlotConfig, visit_renderers: dict[str, list] | None = None) -> figure:
         """Create a scatter plot figure.
 
         Parameters
         ----------
         config : ScatterPlotConfig
             Configuration for the scatter plot.
+        visit_renderers : dict[str, list] | None
+            Dictionary mapping visit set labels to lists of renderer references.
+            If provided, renderers will be added to these lists for visibility toggling.
 
         Returns
         -------
@@ -447,7 +591,7 @@ class TimelineBuilder:
             if config.y_column not in visit_set.source.data:
                 continue
             color = "color" if visit_set.color_by_band else "#1f77b4"
-            fig.scatter(
+            renderer = fig.scatter(
                 x="time",
                 y=config.y_column,
                 source=visit_set.source,
@@ -459,6 +603,13 @@ class TimelineBuilder:
                 line_alpha=visit_set.alpha,
                 legend_label=visit_set.label,
             )
+
+            # Track this renderer for visibility toggling
+            # Always initialize the list for each visit set label if visit_renderers is provided
+            if visit_renderers is not None:
+                if visit_set.label not in visit_renderers:
+                    visit_renderers[visit_set.label] = []
+                visit_renderers[visit_set.label].append(renderer)
 
         # Apply datetime tick formatter
         fig.xaxis[0].formatter = DatetimeTickFormatter(hours="%H:%M")
@@ -583,12 +734,40 @@ def build_timeline(dayobs: DayObs, scatter_columns: list[str]) -> column:
     default="timeline.html",
     help="Output HTML file path (default: timeline.html).",
 )
+@click.option(
+    "--enable-visibility-toggle",
+    is_flag=True,
+    default=False,
+    help="Enable visit set visibility toggle widget.",
+)
+@click.option(
+    "--num-scatter",
+    type=int,
+    default=None,
+    help="Number of scatter plots to create (duplicates the first scatter column).",
+)
+@click.option(
+    "--scatter-height",
+    type=int,
+    default=None,
+    help="Height for scatter plots in pixels.",
+)
+@click.option(
+    "--stripe-height",
+    type=int,
+    default=None,
+    help="Height for color stripe plots in pixels.",
+)
 def main(
     date: str,
     scatter: tuple[str, ...],
     visits: tuple[str, ...],
     background: tuple[str, ...],
     output: str,
+    enable_visibility_toggle: bool,
+    num_scatter: int | None,
+    scatter_height: int | None,
+    stripe_height: int | None,
 ) -> None:
     """CLI entry point."""
     import pandas as pd
@@ -601,9 +780,18 @@ def main(
     # Build the timeline
     builder = TimelineBuilder(dayobs)
 
-    # Add scatter plots
-    for column_name in scatter:
-        builder.add_scatter(y_column=column_name)
+    # Handle scatter plots - either use provided columns or num_scatter option
+    if num_scatter is not None and num_scatter > 0:
+        # Create num_scatter scatter plots, all using the first scatter column
+        first_column = scatter[0] if scatter else "altitude"
+        for i in range(num_scatter):
+            name = f"scatter_{i+1}"
+            builder.add_scatter(y_column=first_column, name=name, height=scatter_height)
+    else:
+        # Add scatter plots for each provided column
+        for column_name in scatter:
+            name = column_name
+            builder.add_scatter(y_column=column_name, name=name, height=scatter_height)
 
     # Add visits
     for visit_source in visits:
@@ -619,7 +807,7 @@ def main(
         else:
             label = Path(visit_source).stem
 
-        builder.add_visits(visits_df, label=label)
+        builder.add_visits(visits_df, label=label, show_visibility_toggle=True)
 
     # Add background stripes
     for bg_type in background:
@@ -649,7 +837,7 @@ def main(
                 current_mjd += 1 / 24  # One hour
 
             sun_data = pd.Series(elevations, index=times)
-            builder.add_color_stripe(sun_data, name="sun_elevation", height=100)
+            builder.add_color_stripe(sun_data, name="sun_elevation", height=stripe_height if stripe_height is not None else 100)
 
         elif bg_type == "moon_elevation":
             # Compute moon elevation throughout the day
@@ -677,11 +865,15 @@ def main(
                 current_mjd += 1 / 24  # One hour
 
             moon_data = pd.Series(elevations, index=times)
-            builder.add_color_stripe(moon_data, name="moon_elevation", height=100)
+            builder.add_color_stripe(moon_data, name="moon_elevation", height=stripe_height if stripe_height is not None else 100)
 
         else:
             # Unknown background type - could be extended in future
             pass
+
+    # Add visibility toggle if enabled
+    if enable_visibility_toggle:
+        builder.add_visit_visibility_selector()
 
     # Build the layout
     layout = builder.build()
