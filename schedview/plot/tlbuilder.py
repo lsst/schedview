@@ -1,8 +1,4 @@
-"""Timeline Builder - Phase B implementation.
-
-Core builder infrastructure, scatter plot support,
-visit plots, color stripes, shared datetime x-axis,
-and CLI v2.
+"""Timeline Builder
 """
 
 from __future__ import annotations
@@ -120,20 +116,6 @@ BAND_COLORS = {
 class TimelineBuilder:
     """Build interactive timeline visualizations.
 
-    Phase A provides:
-    - Core builder infrastructure
-    - Scatter plot support
-    - Shared datetime x-axis
-    - Correct MJD to datetime64 conversion
-    - Vertical stacking of scatter figures
-    - Minimal CLI v1
-
-    Phase B adds:
-    - Visit plots via add_visits()
-    - Color stripes via add_color_stripe()
-    - Mixed-element stacked layouts
-    - CLI v2 with --visits and --background options
-
     Parameters
     ----------
     dayobs : DayObs
@@ -181,7 +163,7 @@ class TimelineBuilder:
         height : int, optional
             Height of the plot in pixels.
         tooltips : list or None, optional
-            Hover tooltips (not implemented in Phase A).
+            Hover tooltips
         **figure_kwargs
             Additional arguments to pass to bokeh.plotting.figure.
 
@@ -236,7 +218,7 @@ class TimelineBuilder:
         color_by_band : bool, optional
             Whether to color points by band column.
         show_visibility_toggle : bool, optional
-            Whether to show visibility toggle (not implemented in Phase B).
+            Whether to show visibility toggle.
         time_column : str, optional
             Column name containing MJD timestamps.
         **scatter_kwargs
@@ -527,23 +509,23 @@ class TimelineBuilder:
             width=200,
         )
 
-        # Create CustomJS callback to update y-field and y-axis label
-        # Use fig.change.emit() to trigger a full render update
+        # Create CustomJS callback to update y-field and y-axis label.
+        # Must use {field: new_y} rather than a plain string: Bokeh 3.x treats
+        # a bare string as a constant value, not a column reference, which causes
+        # the glyph to disappear when a new column is selected.
         callback_code = """
             const new_y = cb_obj.value;
-            // Update the y-field for all scatter glyphs
             for (const renderer of fig.renderers) {
                 if (renderer.glyph && renderer.glyph.type === 'Scatter') {
-                    renderer.glyph.y = new_y;
+                    renderer.glyph.y = {field: new_y};
+                    renderer.glyph.change.emit();
                 }
             }
-            // Update y-axis label
             for (const axis of fig.axes) {
                 if (axis.type === 'LinearAxis') {
                     axis.axis_label = new_y;
                 }
             }
-            // Trigger a render update
             fig.change.emit();
         """
 
