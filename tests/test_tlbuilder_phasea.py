@@ -437,7 +437,12 @@ class TestCLI:
                         mock_path.write_text = lambda x: None
 
                         from schedview.plot.tlbuilder import main
-                        main.callback(date="2025-06-15", scatter=("altitude",), visits=(), background=(), output="output.html")
+                        main.callback(
+                            date="2025-06-15", scatter=("altitude",), visits=(),
+                            background=(), output="output.html",
+                            enable_visibility_toggle=False, num_scatter=None,
+                            scatter_height=None, stripe_height=None
+                        )
 
                         MockBuilder.assert_called_once_with(dayobs)
 
@@ -467,7 +472,9 @@ class TestCLI:
                             scatter=("altitude", "HA", "fieldRA"),
                             visits=(),
                             background=(),
-                            output="output.html"
+                            output="output.html",
+                            enable_visibility_toggle=False, num_scatter=None,
+                            scatter_height=None, stripe_height=None
                         )
 
                         assert mock_builder.add_scatter.call_count == 3
@@ -497,7 +504,12 @@ class TestCLI:
                         mock_path.write_text = lambda x: None
 
                         from schedview.plot.tlbuilder import main
-                        main.callback(date="2025-06-15", scatter=("altitude",), visits=(), background=(), output="output.html")
+                        main.callback(
+                            date="2025-06-15", scatter=("altitude",), visits=(),
+                            background=(), output="output.html",
+                            enable_visibility_toggle=False, num_scatter=None,
+                            scatter_height=None, stripe_height=None
+                        )
 
                         mock_builder.build.assert_called_once()
 
@@ -522,7 +534,12 @@ class TestCLI:
                         mock_path.write_text = lambda x: None
 
                         from schedview.plot.tlbuilder import main
-                        main.callback(date="2025-06-15", scatter=("altitude",), visits=(), background=(), output="output.html")
+                        main.callback(
+                            date="2025-06-15", scatter=("altitude",), visits=(),
+                            background=(), output="output.html",
+                            enable_visibility_toggle=False, num_scatter=None,
+                            scatter_height=None, stripe_height=None
+                        )
 
                         mock_file_html.assert_called_once()
                         args, kwargs = mock_file_html.call_args
@@ -549,7 +566,12 @@ class TestCLI:
                         mock_path.write_text = lambda x: None
 
                         from schedview.plot.tlbuilder import main
-                        main.callback(date="2025-06-15", scatter=("altitude",), visits=(), background=(), output="output.html")
+                        main.callback(
+                            date="2025-06-15", scatter=("altitude",), visits=(),
+                            background=(), output="output.html",
+                            enable_visibility_toggle=False, num_scatter=None,
+                            scatter_height=None, stripe_height=None
+                        )
 
                         assert mock_builder.add_scatter.call_count == 1
 
@@ -577,7 +599,12 @@ class TestCLI:
                         mock_path.write_text = capture_write
 
                         from schedview.plot.tlbuilder import main
-                        main.callback(date="2025-06-15", scatter=("altitude",), visits=(), background=(), output="timeline.html")
+                        main.callback(
+                            date="2025-06-15", scatter=("altitude",), visits=(),
+                            background=(), output="timeline.html",
+                            enable_visibility_toggle=False, num_scatter=None,
+                            scatter_height=None, stripe_height=None
+                        )
 
                         assert len(write_calls) > 0
                         assert write_calls[0][0] is not None
