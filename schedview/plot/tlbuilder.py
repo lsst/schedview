@@ -6,11 +6,11 @@ shared datetime x-axis, and minimal CLI.
 
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Self
 
+import click
 import numpy as np
 from astropy.time import Time
 from bokeh.embed import file_html
@@ -202,36 +202,6 @@ class TimelineBuilder:
         return fig
 
 
-def create_parser() -> argparse.ArgumentParser:
-    """Create the argument parser for the CLI.
-
-    Returns
-    -------
-    ArgumentParser
-        Configured argument parser.
-    """
-    parser = argparse.ArgumentParser(
-        description="Build timeline visualizations for Rubin Observatory observing nights."
-    )
-    parser.add_argument(
-        "--date",
-        required=True,
-        help="Date of the observing night (YYYY-MM-DD format).",
-    )
-    parser.add_argument(
-        "--scatter",
-        action="append",
-        default=[],
-        help="Column name to plot as a scatter plot (can be specified multiple times).",
-    )
-    parser.add_argument(
-        "--output",
-        default="timeline.html",
-        help="Output HTML file path (default: timeline.html).",
-    )
-    return parser
-
-
 def build_timeline(dayobs: DayObs, scatter_columns: list[str]) -> column:
     """Build a timeline with scatter plots.
 
@@ -255,19 +225,35 @@ def build_timeline(dayobs: DayObs, scatter_columns: list[str]) -> column:
     return builder.build()
 
 
-def main() -> None:
+@click.command(
+    help="Build timeline visualizations for Rubin Observatory observing nights."
+)
+@click.option(
+    "--date",
+    required=True,
+    help="Date of the observing night (YYYY-MM-DD format).",
+)
+@click.option(
+    "--scatter",
+    multiple=True,
+    required=True,
+    help="Column name to plot as a scatter plot (can be specified multiple times).",
+)
+@click.option(
+    "--output",
+    default="timeline.html",
+    help="Output HTML file path (default: timeline.html).",
+)
+def main(date: str, scatter: tuple[str, ...], output: str) -> None:
     """CLI entry point."""
-    parser = create_parser()
-    args = parser.parse_args()
-
     # Create DayObs from date
-    dayobs = DayObs.from_date(args.date)
+    dayobs = DayObs.from_date(date)
 
     # Build the timeline
-    layout = build_timeline(dayobs, args.scatter)
+    layout = build_timeline(dayobs, list(scatter))
 
     # Write to HTML file
-    output_path = Path(args.output)
+    output_path = Path(output)
     html = file_html(layout)
     output_path.write_text(html)
 
