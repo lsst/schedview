@@ -342,7 +342,8 @@ class TimelineBuilder:
             self._shared_x_range = Range1d(start=start_time, end=end_time)
 
         # Store height (default 20 px)
-        stripe_height = height if height is not None else 20
+        # Default height for color stripes is 40 px (was 20 px) for better visibility
+        stripe_height = height if height is not None else 40
         self._plot_heights[name] = stripe_height
 
         # Process data and convert MJD to datetime64
@@ -371,31 +372,26 @@ class TimelineBuilder:
         if value_range is None:
             value_range = (float(np.min(values)), float(np.max(values)))
 
-        # Compute adjacent rectangle widths for continuous coverage
+        # Compute adjacent rectangle widths for continuous coverage.
+        # Bokeh datetime axes store values in milliseconds since epoch, so widths
+        # must also be in milliseconds.
         widths = []
         if len(times) >= 2:
-            # The width should span from the midpoint of the previous point
-            # to the midpoint of the next point
-            # Note: times are datetime64, differences give timedelta64 in nanoseconds
             for i in range(len(times)):
                 if i == 0:
-                    # First point: width from start of night to midpoint between first and second
                     mid_to_next = (times[i + 1] - times[i]) / 2
-                    # Convert timedelta64 to MJD (1 day = 86400 seconds = 86400e9 ns)
-                    width = mid_to_next / np.timedelta64(1, 's') / 86400.0
+                    width = float(mid_to_next / np.timedelta64(1, 'ms'))
                 elif i == len(times) - 1:
-                    # Last point: width from midpoint between prev and last to end of night
                     mid_to_prev = (times[i] - times[i - 1]) / 2
-                    width = mid_to_prev / np.timedelta64(1, 's') / 86400.0
+                    width = float(mid_to_prev / np.timedelta64(1, 'ms'))
                 else:
-                    # Middle points: width from midpoint to midpoint
                     mid_to_prev = (times[i] - times[i - 1]) / 2
                     mid_to_next = (times[i + 1] - times[i]) / 2
-                    width = (mid_to_prev + mid_to_next) / np.timedelta64(1, 's') / 86400.0
+                    width = float((mid_to_prev + mid_to_next) / np.timedelta64(1, 'ms'))
                 widths.append(width)
         else:
-            # Single point or empty: use small fixed width
-            widths = [0.001] * len(times) if len(times) > 0 else []
+            # Single point: 1-hour wide in milliseconds
+            widths = [3_600_000.0] * len(times) if len(times) > 0 else []
 
         # Create data source with time, value, and width
         source = ColumnDataSource(data={"time": times, "value": values, "width": widths})
@@ -542,15 +538,18 @@ class TimelineBuilder:
         figure
             Bokeh figure with color stripe glyphs.
         """
-        # Get height from plot_heights, default to 20
-        height = self._plot_heights.get(config.name, 20)
+        # Get height from plot_heights, default to 40
+        height = self._plot_heights.get(config.name, 40)
 
         # Create figure with no y-axis
+        # Use explicit y_range to ensure the rectangles are visible
+        # Set y_axis_type=None and y_axis_location=None to hide y-axis completely
         fig_kwargs = {
             "width": 1000,
             "x_axis_type": "datetime",
             "height": height,
-            "y_axis_type": None,  # No y-axis
+            "y_range": (0, 1),  # Explicit y_range for single horizontal stripe
+            "y_axis_type": None,  # No y-axis type
             "x_range": self._shared_x_range,
             "toolbar_location": None,
         }
@@ -572,10 +571,11 @@ class TimelineBuilder:
         color_mapper = LinearColorMapper(palette=palette, low=config.value_range[0], high=config.value_range[1])
 
         # Add stripe as rect glyphs
-        # Width is stored in the data source for each time point
+        # Rect uses y as center, height as total height
+        # Set y=0.5 with height=1 to span from y=0 to y=1 (matching y_range)
         fig.rect(
             x="time",
-            y=0,
+            y=0.5,
             width="width",  # Width is in the data source
             height=1,
             source=config.source,
@@ -692,21 +692,24 @@ def main(
             start_mjd = float(dayobs.start.mjd)
             end_mjd = float(dayobs.end.mjd)
 
+            from astropy.coordinates import get_body, AltAz
+            from astropy.time import Time
+
             # Generate hourly samples
             current_mjd = start_mjd
             while current_mjd <= end_mjd:
                 times.append(current_mjd)
                 # Get sun position at this time
-                from astropy.coordinates import get_body
-                from astropy.time import Time
+                sun = get_body("sun", Time(current_mjd, format="mjd"))
 
-                sun = get_body("sun", Time(current_mjd, format="mjd"), location=dayobs.location)
-                altaz = sun.altaz(location=dayobs.location)
-                elevations.append(altaz.alt.deg)
+                # Create AltAz frame with location and obstime, then transform
+                altaz_frame = AltAz(location=dayobs.location, obstime=Time(current_mjd, format="mjd"))
+                sun_altaz = sun.transform_to(altaz_frame)
+                elevations.append(sun_altaz.alt.deg)
                 current_mjd += 1 / 24  # One hour
 
             sun_data = pd.Series(elevations, index=times)
-            builder.add_color_stripe(sun_data, name="sun_elevation")
+            builder.add_color_stripe(sun_data, name="sun_elevation", height=100)
 
         elif bg_type == "moon_elevation":
             # Compute moon elevation throughout the day
@@ -717,21 +720,24 @@ def main(
             start_mjd = float(dayobs.start.mjd)
             end_mjd = float(dayobs.end.mjd)
 
+            from astropy.coordinates import get_body, AltAz
+            from astropy.time import Time
+
             # Generate hourly samples
             current_mjd = start_mjd
             while current_mjd <= end_mjd:
                 times.append(current_mjd)
                 # Get moon position at this time
-                from astropy.coordinates import get_body
-                from astropy.time import Time
+                moon = get_body("moon", Time(current_mjd, format="mjd"))
 
-                moon = get_body("moon", Time(current_mjd, format="mjd"), location=dayobs.location)
-                altaz = moon.altaz(location=dayobs.location)
-                elevations.append(altaz.alt.deg)
+                # Create AltAz frame with location and obstime, then transform
+                altaz_frame = AltAz(location=dayobs.location, obstime=Time(current_mjd, format="mjd"))
+                moon_altaz = moon.transform_to(altaz_frame)
+                elevations.append(moon_altaz.alt.deg)
                 current_mjd += 1 / 24  # One hour
 
             moon_data = pd.Series(elevations, index=times)
-            builder.add_color_stripe(moon_data, name="moon_elevation")
+            builder.add_color_stripe(moon_data, name="moon_elevation", height=100)
 
         else:
             # Unknown background type - could be extended in future

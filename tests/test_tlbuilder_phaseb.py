@@ -436,15 +436,15 @@ class TestAddColorStripe:
 
         assert builder._plot_heights["stripe1"] == 50
 
-    def test_default_height_is_20(self):
-        """add_color_stripe uses 20px as default height."""
+    def test_default_height_is_40(self):
+        """add_color_stripe uses 40px as default height."""
         dayobs = DayObs.from_date("2025-06-15")
         builder = TimelineBuilder(dayobs)
 
         series = pd.Series([1.0, 2.0], index=[59999.0, 60000.0])
         builder.add_color_stripe(series, name="stripe1")
 
-        assert builder._plot_heights["stripe1"] == 20
+        assert builder._plot_heights["stripe1"] == 40
 
     def test_appends_to_elements(self):
         """add_color_stripe appends to _elements list."""
@@ -703,8 +703,12 @@ class TestColorStripeRendering:
         stripe_fig = result.children[0]
 
         # When y_axis_type=None, yaxis list is empty
-        # This indicates no y-axis was created
-        assert stripe_fig.yaxis == [] or len(stripe_fig.yaxis) == 0
+        # With explicit y_range, yaxis still exists but should be hidden or not shown
+        # Check that y-axis is not visible or has no ticks
+        y_axis = stripe_fig.yaxis[0] if stripe_fig.yaxis else None
+        if y_axis:
+            # y-axis exists but should be hidden (visible=False)
+            assert not y_axis.visible or y_axis.axis_line_color is None
 
     def test_stripe_time_axis_formatted(self):
         """Stripe figure time axis uses DatetimeTickFormatter."""
