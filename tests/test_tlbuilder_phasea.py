@@ -53,16 +53,26 @@ class TestScatterPlotConfig:
 
 
 class TestColorStripeConfig:
-    """Tests for ColorStripeConfig stub class."""
+    """Tests for ColorStripeConfig dataclass."""
 
     def test_class_exists(self):
         """ColorStripeConfig class exists."""
         assert ColorStripeConfig is not None
 
     def test_can_instantiate(self):
-        """ColorStripeConfig can be instantiated."""
-        config = ColorStripeConfig()
+        """ColorStripeConfig can be instantiated with required args."""
+        # ColorStripeConfig is now a dataclass with required arguments
+        from bokeh.models import ColumnDataSource
+        source = ColumnDataSource(data={"time": [], "value": []})
+        config = ColorStripeConfig(
+            name="test_stripe",
+            source=source,
+            colormap="Cividis256",
+            value_range=(0.0, 1.0)
+        )
         assert config is not None
+        assert config.name == "test_stripe"
+        assert config.colormap == "Cividis256"
 
 
 class TestVisitDataSet:
@@ -403,7 +413,7 @@ class TestCLI:
                         mock_path.write_text = lambda x: None
 
                         from schedview.plot.tlbuilder import main
-                        main.callback(date="2025-06-15", scatter=("altitude",), output="output.html")
+                        main.callback(date="2025-06-15", scatter=("altitude",), visits=(), background=(), output="output.html")
 
                         MockBuilder.assert_called_once_with(dayobs)
 
@@ -431,6 +441,8 @@ class TestCLI:
                         main.callback(
                             date="2025-06-15",
                             scatter=("altitude", "HA", "fieldRA"),
+                            visits=(),
+                            background=(),
                             output="output.html"
                         )
 
@@ -461,7 +473,7 @@ class TestCLI:
                         mock_path.write_text = lambda x: None
 
                         from schedview.plot.tlbuilder import main
-                        main.callback(date="2025-06-15", scatter=("altitude",), output="output.html")
+                        main.callback(date="2025-06-15", scatter=("altitude",), visits=(), background=(), output="output.html")
 
                         mock_builder.build.assert_called_once()
 
@@ -486,7 +498,7 @@ class TestCLI:
                         mock_path.write_text = lambda x: None
 
                         from schedview.plot.tlbuilder import main
-                        main.callback(date="2025-06-15", scatter=("altitude",), output="output.html")
+                        main.callback(date="2025-06-15", scatter=("altitude",), visits=(), background=(), output="output.html")
 
                         mock_file_html.assert_called_once()
                         args, kwargs = mock_file_html.call_args
@@ -513,7 +525,7 @@ class TestCLI:
                         mock_path.write_text = lambda x: None
 
                         from schedview.plot.tlbuilder import main
-                        main.callback(date="2025-06-15", scatter=("altitude",), output="output.html")
+                        main.callback(date="2025-06-15", scatter=("altitude",), visits=(), background=(), output="output.html")
 
                         assert mock_builder.add_scatter.call_count == 1
 
@@ -541,7 +553,7 @@ class TestCLI:
                         mock_path.write_text = capture_write
 
                         from schedview.plot.tlbuilder import main
-                        main.callback(date="2025-06-15", scatter=("altitude",), output="timeline.html")
+                        main.callback(date="2025-06-15", scatter=("altitude",), visits=(), background=(), output="timeline.html")
 
                         assert len(write_calls) > 0
                         assert write_calls[0][0] is not None

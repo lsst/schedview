@@ -371,8 +371,34 @@ class TimelineBuilder:
         if value_range is None:
             value_range = (float(np.min(values)), float(np.max(values)))
 
-        # Create data source
-        source = ColumnDataSource(data={"time": times, "value": values})
+        # Compute adjacent rectangle widths for continuous coverage
+        widths = []
+        if len(times) >= 2:
+            # The width should span from the midpoint of the previous point
+            # to the midpoint of the next point
+            # Note: times are datetime64, differences give timedelta64 in nanoseconds
+            for i in range(len(times)):
+                if i == 0:
+                    # First point: width from start of night to midpoint between first and second
+                    mid_to_next = (times[i + 1] - times[i]) / 2
+                    # Convert timedelta64 to MJD (1 day = 86400 seconds = 86400e9 ns)
+                    width = mid_to_next / np.timedelta64(1, 's') / 86400.0
+                elif i == len(times) - 1:
+                    # Last point: width from midpoint between prev and last to end of night
+                    mid_to_prev = (times[i] - times[i - 1]) / 2
+                    width = mid_to_prev / np.timedelta64(1, 's') / 86400.0
+                else:
+                    # Middle points: width from midpoint to midpoint
+                    mid_to_prev = (times[i] - times[i - 1]) / 2
+                    mid_to_next = (times[i + 1] - times[i]) / 2
+                    width = (mid_to_prev + mid_to_next) / np.timedelta64(1, 's') / 86400.0
+                widths.append(width)
+        else:
+            # Single point or empty: use small fixed width
+            widths = [0.001] * len(times) if len(times) > 0 else []
+
+        # Create data source with time, value, and width
+        source = ColumnDataSource(data={"time": times, "value": values, "width": widths})
 
         # Create color stripe config
         stripe_config = ColorStripeConfig(
@@ -546,11 +572,11 @@ class TimelineBuilder:
         color_mapper = LinearColorMapper(palette=palette, low=config.value_range[0], high=config.value_range[1])
 
         # Add stripe as rect glyphs
-        # Each stripe is a horizontal band at y=0
+        # Width is stored in the data source for each time point
         fig.rect(
             x="time",
             y=0,
-            width=0.001,  # Small width in time units
+            width="width",  # Width is in the data source
             height=1,
             source=config.source,
             fill_color={"field": "value", "transform": color_mapper},
@@ -604,7 +630,7 @@ def build_timeline(dayobs: DayObs, scatter_columns: list[str]) -> column:
     "--visits",
     multiple=True,
     required=False,
-    help="Path to visits file (parquet or CSV) to plot as visit markers.",
+    help="Visit source: 'baseline' for the default baseline, an SQLite3 filename, or any valid visit_source string accepted by read_visits.",
 )
 @click.option(
     "--background",
@@ -640,12 +666,18 @@ def main(
         builder.add_scatter(y_column=column_name)
 
     # Add visits
-    for visits_path in visits:
-        # Load visits data
-        visits_df = read_visits(dayobs, str(visits_path))
+    for visit_source in visits:
+        # Load visits data using read_visits
+        # visit_source can be "baseline", an SQLite3 filename, or any valid source
+        visits_df = read_visits(dayobs, str(visit_source))
 
-        # Use filename stem as label
-        label = Path(visits_path).stem
+        # Generate label from visit source
+        # For "baseline", use "baseline" as label
+        # For files, use the filename stem
+        if visit_source == "baseline":
+            label = "baseline"
+        else:
+            label = Path(visit_source).stem
 
         builder.add_visits(visits_df, label=label)
 
