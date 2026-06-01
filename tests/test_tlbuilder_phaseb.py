@@ -84,7 +84,9 @@ class TestAddVisits:
             "altitude": [30.0, 45.0, 60.0],
         })
         builder.add_visits(visits_df)
-        assert len(builder._elements) == 1
+        # Visits are overlaid on scatter panels; they don't create their own elements.
+        assert len(builder._elements) == 0
+        assert "visits" in builder._visit_sets
 
     def test_converts_mjd_to_datetime64(self):
         """add_visits converts MJD timestamps to datetime64."""
@@ -161,7 +163,7 @@ class TestAddVisits:
         assert dataset.visible is True  # Default
 
     def test_creates_element_in_elements_list(self):
-        """add_visits adds ScatterPlotConfig to self._elements."""
+        """add_visits stores VisitDataSet in _visit_sets, not a separate element."""
         dayobs = DayObs.from_date("2025-06-15")
         builder = TimelineBuilder(dayobs)
 
@@ -171,9 +173,8 @@ class TestAddVisits:
         })
         builder.add_visits(visits_df, label="test_visits")
 
-        assert len(builder._elements) == 1
-        assert isinstance(builder._elements[0], ScatterPlotConfig)
-        assert builder._elements[0].name == "test_visits"
+        assert len(builder._elements) == 0
+        assert "test_visits" in builder._visit_sets
 
     def test_respects_height_parameter(self):
         """add_visits respects height parameter in scatter_kwargs."""
@@ -297,7 +298,9 @@ class TestAddVisits:
         )
 
         assert result is builder
-        assert len(builder._elements) == 3
+        # Two scatters in _elements; visits go into _visit_sets only.
+        assert len(builder._elements) == 2
+        assert "visits1" in builder._visit_sets
 
 
 class TestAddColorStripe:
@@ -475,7 +478,7 @@ class TestBuildMixedElements:
     """Tests for TimelineBuilder.build with mixed element types."""
 
     def test_scatter_and_visits_combined(self):
-        """build handles scatter and visits together."""
+        """build overlays visits onto scatter panels rather than adding a separate figure."""
         dayobs = DayObs.from_date("2025-06-15")
         builder = TimelineBuilder(dayobs)
 
@@ -490,10 +493,9 @@ class TestBuildMixedElements:
 
         result = builder.build()
 
-        assert len(result.children) == 2
-        # First should be scatter, second should be visits
+        # One scatter panel; visits are overlaid on it.
+        assert len(result.children) == 1
         assert len(result.children[0].renderers) >= 1
-        assert len(result.children[1].renderers) >= 1
 
     def test_scatter_and_stripe_combined(self):
         """build handles scatter and color stripe together."""
@@ -511,7 +513,7 @@ class TestBuildMixedElements:
         assert len(result.children) == 2
 
     def test_visits_and_stripe_combined(self):
-        """build handles visits and color stripe together."""
+        """build with only visits and a stripe produces just the stripe panel."""
         dayobs = DayObs.from_date("2025-06-15")
         builder = TimelineBuilder(dayobs)
 
@@ -529,10 +531,11 @@ class TestBuildMixedElements:
 
         result = builder.build()
 
-        assert len(result.children) == 2
+        # Only the stripe creates a panel; visits need a scatter to attach to.
+        assert len(result.children) == 1
 
     def test_all_three_types_combined(self):
-        """build handles scatter + visits + stripe together."""
+        """build handles scatter + visits + stripe: scatter and stripe get panels."""
         dayobs = DayObs.from_date("2025-06-15")
         builder = TimelineBuilder(dayobs)
 
@@ -551,10 +554,11 @@ class TestBuildMixedElements:
 
         result = builder.build()
 
-        assert len(result.children) == 3
+        # scatter1 + stripe1 = 2 panels; visits1 overlays scatter1.
+        assert len(result.children) == 2
 
     def test_order_matches_insertion_order(self):
-        """Figure order matches insertion order in _elements."""
+        """Figure order matches insertion order of scatter/stripe elements."""
         dayobs = DayObs.from_date("2025-06-15")
         builder = TimelineBuilder(dayobs)
 
@@ -573,7 +577,8 @@ class TestBuildMixedElements:
 
         result = builder.build()
 
-        assert len(result.children) == 3
+        # "first" scatter + "third" stripe = 2 panels in insertion order.
+        assert len(result.children) == 2
 
     def test_all_figures_share_same_x_range(self):
         """All figures share the same Range1d object."""
@@ -649,11 +654,12 @@ class TestBuildMixedElements:
             x_axis = fig.xaxis[0]
             assert isinstance(x_axis.formatter, DatetimeTickFormatter)
 
-    def test_visits_figure_has_scatter_glyph(self):
-        """Visit figure contains scatter glyph."""
+    def test_visits_overlaid_on_scatter_figure(self):
+        """Visit data is overlaid as a scatter glyph on the scatter panel."""
         dayobs = DayObs.from_date("2025-06-15")
         builder = TimelineBuilder(dayobs)
 
+        builder.add_scatter(y_column="altitude", name="main")
         builder.add_visits(
             pd.DataFrame({
                 "observationStartMJD": [59999.0],
@@ -663,9 +669,9 @@ class TestBuildMixedElements:
         )
 
         result = builder.build()
-        visits_fig = result.children[0]
+        scatter_fig = result.children[0]
 
-        scatter_renderers = [r for r in visits_fig.renderers if isinstance(r.glyph, Scatter)]
+        scatter_renderers = [r for r in scatter_fig.renderers if isinstance(r.glyph, Scatter)]
         assert len(scatter_renderers) >= 1
 
 
@@ -741,7 +747,7 @@ class TestBuildReturnsBokehLayout:
         assert isinstance(result, type(column()))
 
     def test_children_count_matches_element_count(self):
-        """Number of figures matches number of elements."""
+        """Number of figures equals the number of scatter + stripe elements."""
         dayobs = DayObs.from_date("2025-06-15")
         builder = TimelineBuilder(dayobs)
 
@@ -760,7 +766,9 @@ class TestBuildReturnsBokehLayout:
 
         result = builder.build()
 
+        # _elements contains s1 (scatter) + c1 (stripe); v1 is in _visit_sets only.
         assert len(result.children) == len(builder._elements)
+        assert len(result.children) == 2
 
 
 class TestCLIv2Visits:

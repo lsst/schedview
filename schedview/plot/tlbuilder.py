@@ -257,30 +257,23 @@ class TimelineBuilder:
         else:
             times = np.array([], dtype="datetime64[us]")
 
-        # Create data source
-        source_data = {"time": times}
+        # Build source with ALL data columns so any scatter y_column can use the data.
+        source_data: dict = {"time": times}
+        for col in visits.columns:
+            if col != time_column:
+                source_data[col] = visits[col].values
 
-        # Get y-column data (default to altitude if it exists)
-        if "altitude" in visits.columns:
-            source_data["altitude"] = visits["altitude"].values
-        elif len(visits.columns) > 1:
-            # Use first non-time column
-            y_col = [c for c in visits.columns if c != time_column][0]
-            source_data[y_col] = visits[y_col].values
-
-        # Add band colors if band column exists and color_by_band is True
+        # Add band colors
         if color_by_band and "band" in visits.columns:
             bands = visits["band"].values
             colors = [BAND_COLORS.get(b, "#888888") for b in bands]
             source_data["color"] = colors
         else:
-            # Use default color
             source_data["color"] = ["#1f77b4"] * len(visits) if len(visits) > 0 else []
 
         source = ColumnDataSource(data=source_data)
 
-        # Store visit data set
-        visit_set = VisitDataSet(
+        self._visit_sets[label] = VisitDataSet(
             source=source,
             label=label,
             alpha=alpha,
@@ -288,18 +281,7 @@ class TimelineBuilder:
             color_by_band=color_by_band,
             visible=True,
         )
-        self._visit_sets[label] = visit_set
-
-        # Create scatter config for this visit set
-        y_column = "altitude" if "altitude" in visits.columns else "value"
-        config = ScatterPlotConfig(
-            name=label,
-            y_column=y_column,
-            offered_columns=tuple(visits.columns),
-            figure_kwargs=scatter_kwargs,
-        )
-        self._elements.append(config)
-
+        # Visits are overlaid on scatter panels — they do not create their own figures.
         return self
 
     def add_color_stripe(
@@ -424,19 +406,11 @@ class TimelineBuilder:
 
         for element in self._elements:
             if isinstance(element, ScatterPlotConfig):
-                if element.name in self._visit_sets:
-                    # Visit plot
-                    fig = self._create_visit_figure(element)
-                else:
-                    # Standard scatter plot
-                    fig = self._create_scatter_figure(element)
+                fig = self._create_scatter_figure(element)
             elif isinstance(element, ColorStripeConfig):
-                # Color stripe
                 fig = self._create_stripe_figure(element)
             else:
-                # Fallback for unknown element types
                 continue
-
             figures.append(fig)
 
         return column(*figures)
@@ -468,57 +442,23 @@ class TimelineBuilder:
 
         fig = figure(**fig_kwargs)
 
-        # Add scatter glyph with empty initial data
-        scatter = Scatter(x="time", y=config.y_column, size=5)
-        fig.add_glyph(ColumnDataSource(data={"time": [], config.y_column: []}), scatter)
-
-        # Apply datetime tick formatter
-        fig.xaxis[0].formatter = DatetimeTickFormatter(hours="%H:%M")
-
-        return fig
-
-    def _create_visit_figure(self, config: ScatterPlotConfig) -> figure:
-        """Create a visit scatter plot figure.
-
-        Parameters
-        ----------
-        config : ScatterPlotConfig
-            Configuration for the visit plot.
-
-        Returns
-        -------
-        figure
-            Bokeh figure with visit scatter glyphs.
-        """
-        # Get visit data set
-        visit_set = self._visit_sets[config.name]
-
-        # Get height from plot_heights, default to 200
-        height = self._plot_heights.get(config.name, 200)
-
-        # Combine default figure kwargs with config kwargs
-        fig_kwargs = {"width": 1000, "x_axis_type": "datetime"}
-        if self._figure_kwargs:
-            fig_kwargs.update(self._figure_kwargs)
-        if config.figure_kwargs:
-            fig_kwargs.update(config.figure_kwargs)
-        fig_kwargs["height"] = height
-        fig_kwargs["x_range"] = self._shared_x_range
-
-        fig = figure(**fig_kwargs)
-
-        # Create scatter glyph with visit properties
-        scatter = Scatter(
-            x="time",
-            y=config.y_column,
-            size=5,
-            marker=visit_set.marker,
-            fill_color="color" if visit_set.color_by_band else "blue",
-            line_color="color" if visit_set.color_by_band else "blue",
-        )
-
-        # Use the stored source from VisitDataSet
-        fig.add_glyph(visit_set.source, scatter)
+        # Overlay all visit sets onto this scatter panel using the panel's y_column.
+        for visit_set in self._visit_sets.values():
+            if config.y_column not in visit_set.source.data:
+                continue
+            color = "color" if visit_set.color_by_band else "#1f77b4"
+            fig.scatter(
+                x="time",
+                y=config.y_column,
+                source=visit_set.source,
+                size=5,
+                marker=visit_set.marker,
+                fill_color=color,
+                line_color=color,
+                fill_alpha=visit_set.alpha,
+                line_alpha=visit_set.alpha,
+                legend_label=visit_set.label,
+            )
 
         # Apply datetime tick formatter
         fig.xaxis[0].formatter = DatetimeTickFormatter(hours="%H:%M")
