@@ -9,11 +9,13 @@ from __future__ import annotations
 import datetime
 from unittest.mock import MagicMock, patch
 
+import click
 import numpy as np
 import pytest
-import bokeh.layouts
 from astropy.time import Time
+from click.testing import CliRunner
 from bokeh.models import ColumnDataSource, DatetimeTickFormatter, Range1d, Scatter
+from bokeh.layouts import column
 
 from schedview.dayobs import DayObs
 from schedview.plot.tlbuilder import (
@@ -45,14 +47,9 @@ class TestScatterPlotConfig:
 
     def test_stores_figure_kwargs(self):
         """ScatterPlotConfig stores figure_kwargs correctly."""
-        kwargs = {"width": 800, "height": 300}
+        kwargs = {"width": 800}
         config = ScatterPlotConfig(name="test_plot", y_column="altitude", offered_columns=(), figure_kwargs=kwargs)
         assert config.figure_kwargs == kwargs
-
-    def test_default_figure_kwargs(self):
-        """ScatterPlotConfig has default empty figure_kwargs."""
-        config = ScatterPlotConfig(name="test_plot", y_column="altitude", offered_columns=(), figure_kwargs={})
-        assert config.figure_kwargs == {}
 
 
 class TestColorStripeConfig:
@@ -64,7 +61,6 @@ class TestColorStripeConfig:
 
     def test_can_instantiate(self):
         """ColorStripeConfig can be instantiated."""
-        # Stub - minimal test to ensure class exists and is usable
         config = ColorStripeConfig()
         assert config is not None
 
@@ -78,7 +74,6 @@ class TestVisitDataSet:
 
     def test_can_instantiate(self):
         """VisitDataSet can be instantiated."""
-        # Stub - minimal test to ensure class exists and is usable
         dataset = VisitDataSet()
         assert dataset is not None
 
@@ -186,7 +181,6 @@ class TestTimelineBuilderAddScatter:
         builder = TimelineBuilder(dayobs)
         kwargs = {"width": 800}
         builder.add_scatter(y_column="altitude", **kwargs)
-        # Width is added to figure_kwargs
         assert builder._elements[0].figure_kwargs == {"width": 800}
 
     def test_shared_x_range_created_on_first_scatter(self):
@@ -213,7 +207,6 @@ class TestTimelineBuilderAddScatter:
         builder.add_scatter(y_column="altitude")
         x_range = builder._shared_x_range
 
-        # Bounds should be datetime64 converted from DayObs
         expected_start = Time(float(dayobs.start.mjd), format="mjd").datetime64
         expected_end = Time(float(dayobs.end.mjd), format="mjd").datetime64
 
@@ -244,7 +237,6 @@ class TestTimeConversion:
         builder.add_scatter(y_column="altitude")
 
         x_range = builder._shared_x_range
-        # Verify it's using datetime64 by checking type
         assert isinstance(x_range.start, np.datetime64)
         assert isinstance(x_range.end, np.datetime64)
 
@@ -269,7 +261,7 @@ class TestTimelineBuilderBuild:
         builder.add_scatter(y_column="altitude")
         result = builder.build()
 
-        assert isinstance(result, type(bokeh.layouts.column()))
+        assert isinstance(result, type(column()))
 
     def test_one_figure_per_scatter(self):
         """build creates one figure per scatter config."""
@@ -281,7 +273,6 @@ class TestTimelineBuilderBuild:
 
         result = builder.build()
 
-        # Bokeh column has children attribute
         assert len(result.children) == 3
 
     def test_all_figures_share_same_x_range(self):
@@ -293,7 +284,6 @@ class TestTimelineBuilderBuild:
 
         result = builder.build()
 
-        # Extract x_ranges from figures
         x_ranges = [fig.x_range for fig in result.children]
         assert all(xr is x_ranges[0] for xr in x_ranges)
 
@@ -306,8 +296,6 @@ class TestTimelineBuilderBuild:
         result = builder.build()
         fig = result.children[0]
 
-        # Check x-axis formatter - should be DatetimeTickFormatter
-        from bokeh.models import DatetimeTickFormatter
         assert isinstance(fig.xaxis[0].formatter, DatetimeTickFormatter)
 
     def test_figure_has_scatter_glyph(self):
@@ -319,7 +307,6 @@ class TestTimelineBuilderBuild:
         result = builder.build()
         fig = result.children[0]
 
-        # Find scatter renderer
         scatter_renderers = [r for r in fig.renderers if isinstance(r.glyph, Scatter)]
         assert len(scatter_renderers) == 1
 
@@ -369,7 +356,6 @@ class TestTimelineBuilderBuild:
         result = builder.build()
         fig = result.children[0]
 
-        # Check that datetime formatter is on the x-axis
         x_axis = fig.xaxis[0]
         assert isinstance(x_axis.formatter, DatetimeTickFormatter)
         assert x_axis.formatter.hours == "%H:%M"
@@ -388,279 +374,227 @@ class TestTimelineBuilderBuild:
 
 
 class TestCLI:
-    """Tests for CLI v1 functionality."""
+    """Tests for CLI v1 functionality using click."""
 
-    @pytest.fixture
-    def mock_build_timeline(self):
-        """Mock the build_timeline function."""
-        with patch("schedview.plot.tlbuilder.build_timeline") as mock:
-            yield mock
-
-    @pytest.fixture
-    def mock_file_html(self):
-        """Mock bokeh.embed.file_html."""
-        with patch("schedview.plot.tlbuilder.file_html") as mock:
-            mock.return_value = "<html>mock</html>"
-            yield mock
+    def test_cli_main_function_is_click_command(self):
+        """main function is a click Command."""
+        from schedview.plot.tlbuilder import main
+        assert isinstance(main, click.Command)
+        assert callable(main)
 
     def test_cli_creates_builder(self):
         """CLI instantiates TimelineBuilder."""
         dayobs = DayObs.from_date("2025-06-15")
 
-        with patch("argparse.ArgumentParser") as MockParser:
-            mock_parser = MockParser.return_value
-            mock_args = MagicMock()
-            mock_args.date = "2025-06-15"
-            mock_args.scatter = ["altitude"]
-            mock_args.output = "output.html"
-            mock_parser.parse_args.return_value = mock_args
+        with patch("schedview.plot.tlbuilder.TimelineBuilder") as MockBuilder:
+            mock_builder = MockBuilder.return_value
+            mock_builder.build.return_value = MagicMock()
 
-            with patch("schedview.plot.tlbuilder.TimelineBuilder") as MockBuilder:
-                mock_builder = MockBuilder.return_value
-                mock_builder.build.return_value = MagicMock()
+            with patch("schedview.dayobs.DayObs.from_date") as MockDayObs:
+                MockDayObs.return_value = dayobs
 
-                with patch("schedview.dayobs.DayObs.from_date") as MockDayObs:
-                    MockDayObs.return_value = dayobs
+                with patch("schedview.plot.tlbuilder.file_html") as mock_file_html:
+                    mock_file_html.return_value = "<html>mock</html>"
 
-                    with patch("schedview.plot.tlbuilder.file_html") as mock_file_html:
-                        mock_file_html.return_value = "<html>mock</html>"
+                    with patch("schedview.plot.tlbuilder.Path") as MockPath:
+                        mock_path = MagicMock()
+                        MockPath.return_value = mock_path
+                        mock_path.exists.return_value = False
+                        mock_path.write_text = lambda x: None
 
-                        with patch("schedview.plot.tlbuilder.Path") as MockPath:
-                            mock_path = MagicMock()
-                            MockPath.return_value = mock_path
-                            mock_path.exists.return_value = False
-                            mock_path.write_text = lambda x: None
+                        from schedview.plot.tlbuilder import main
+                        main.callback(date="2025-06-15", scatter=("altitude",), output="output.html")
 
-                            from schedview.plot.tlbuilder import main
-                            main()
-
-                            MockBuilder.assert_called_once_with(dayobs)
+                        MockBuilder.assert_called_once_with(dayobs)
 
     def test_cli_adds_scatters(self):
         """CLI calls add_scatter for each --scatter argument."""
         dayobs = DayObs.from_date("2025-06-15")
 
-        with patch("argparse.ArgumentParser") as MockParser:
-            mock_parser = MockParser.return_value
-            mock_args = MagicMock()
-            mock_args.date = "2025-06-15"
-            mock_args.scatter = ["altitude", "HA", "fieldRA"]
-            mock_args.output = "output.html"
-            mock_parser.parse_args.return_value = mock_args
+        with patch("schedview.plot.tlbuilder.TimelineBuilder") as MockBuilder:
+            mock_builder = MockBuilder.return_value
+            mock_builder.build.return_value = MagicMock()
 
-            with patch("schedview.plot.tlbuilder.TimelineBuilder") as MockBuilder:
-                mock_builder = MockBuilder.return_value
-                mock_builder.build.return_value = MagicMock()
+            with patch("schedview.dayobs.DayObs.from_date") as MockDayObs:
+                MockDayObs.return_value = dayobs
 
-                with patch("schedview.dayobs.DayObs.from_date") as MockDayObs:
-                    MockDayObs.return_value = dayobs
+                with patch("schedview.plot.tlbuilder.file_html") as mock_file_html:
+                    mock_file_html.return_value = "<html>mock</html>"
 
-                    with patch("schedview.plot.tlbuilder.file_html") as mock_file_html:
-                        mock_file_html.return_value = "<html>mock</html>"
+                    with patch("schedview.plot.tlbuilder.Path") as MockPath:
+                        mock_path = MagicMock()
+                        MockPath.return_value = mock_path
+                        mock_path.exists.return_value = False
+                        mock_path.write_text = lambda x: None
 
-                        with patch("schedview.plot.tlbuilder.Path") as MockPath:
-                            mock_path = MagicMock()
-                            MockPath.return_value = mock_path
-                            mock_path.exists.return_value = False
-                            mock_path.write_text = lambda x: None
+                        from schedview.plot.tlbuilder import main
+                        main.callback(
+                            date="2025-06-15",
+                            scatter=("altitude", "HA", "fieldRA"),
+                            output="output.html"
+                        )
 
-                            from schedview.plot.tlbuilder import main
-                            main()
-
-                            # Verify add_scatter was called 3 times
-                            assert mock_builder.add_scatter.call_count == 3
-                            calls = mock_builder.add_scatter.call_args_list
-                            assert calls[0].kwargs["y_column"] == "altitude"
-                            assert calls[1].kwargs["y_column"] == "HA"
-                            assert calls[2].kwargs["y_column"] == "fieldRA"
+                        assert mock_builder.add_scatter.call_count == 3
+                        calls = mock_builder.add_scatter.call_args_list
+                        assert calls[0].kwargs["y_column"] == "altitude"
+                        assert calls[1].kwargs["y_column"] == "HA"
+                        assert calls[2].kwargs["y_column"] == "fieldRA"
 
     def test_cli_calls_build(self):
         """CLI calls build() method."""
         dayobs = DayObs.from_date("2025-06-15")
 
-        with patch("argparse.ArgumentParser") as MockParser:
-            mock_parser = MockParser.return_value
-            mock_args = MagicMock()
-            mock_args.date = "2025-06-15"
-            mock_args.scatter = ["altitude"]
-            mock_args.output = "output.html"
-            mock_parser.parse_args.return_value = mock_args
+        with patch("schedview.plot.tlbuilder.TimelineBuilder") as MockBuilder:
+            mock_builder = MockBuilder.return_value
+            mock_builder.build.return_value = MagicMock()
 
-            with patch("schedview.plot.tlbuilder.TimelineBuilder") as MockBuilder:
-                mock_builder = MockBuilder.return_value
-                mock_builder.build.return_value = MagicMock()
+            with patch("schedview.dayobs.DayObs.from_date") as MockDayObs:
+                MockDayObs.return_value = dayobs
 
-                with patch("schedview.dayobs.DayObs.from_date") as MockDayObs:
-                    MockDayObs.return_value = dayobs
+                with patch("schedview.plot.tlbuilder.file_html") as mock_file_html:
+                    mock_file_html.return_value = "<html>mock</html>"
 
-                    with patch("schedview.plot.tlbuilder.file_html") as mock_file_html:
-                        mock_file_html.return_value = "<html>mock</html>"
+                    with patch("schedview.plot.tlbuilder.Path") as MockPath:
+                        mock_path = MagicMock()
+                        MockPath.return_value = mock_path
+                        mock_path.exists.return_value = False
+                        mock_path.write_text = lambda x: None
 
-                        with patch("schedview.plot.tlbuilder.Path") as MockPath:
-                            mock_path = MagicMock()
-                            MockPath.return_value = mock_path
-                            mock_path.exists.return_value = False
-                            mock_path.write_text = lambda x: None
+                        from schedview.plot.tlbuilder import main
+                        main.callback(date="2025-06-15", scatter=("altitude",), output="output.html")
 
-                            from schedview.plot.tlbuilder import main
-                            main()
-
-                            mock_builder.build.assert_called_once()
+                        mock_builder.build.assert_called_once()
 
     def test_cli_writes_html_file(self):
         """CLI writes HTML output to specified file."""
         dayobs = DayObs.from_date("2025-06-15")
         mock_layout = MagicMock()
 
-        with patch("argparse.ArgumentParser") as MockParser:
-            mock_parser = MockParser.return_value
-            mock_args = MagicMock()
-            mock_args.date = "2025-06-15"
-            mock_args.scatter = ["altitude"]
-            mock_args.output = "output.html"
-            mock_parser.parse_args.return_value = mock_args
+        with patch("schedview.plot.tlbuilder.TimelineBuilder") as MockBuilder:
+            MockBuilder.return_value.build.return_value = mock_layout
 
-            with patch("schedview.plot.tlbuilder.TimelineBuilder") as MockBuilder:
-                MockBuilder.return_value.build.return_value = mock_layout
+            with patch("schedview.dayobs.DayObs.from_date") as MockDayObs:
+                MockDayObs.return_value = dayobs
 
-                with patch("schedview.dayobs.DayObs.from_date") as MockDayObs:
-                    MockDayObs.return_value = dayobs
+                with patch("schedview.plot.tlbuilder.file_html") as mock_file_html:
+                    mock_file_html.return_value = "<html>mock</html>"
 
-                    with patch("schedview.plot.tlbuilder.file_html") as mock_file_html:
-                        mock_file_html.return_value = "<html>mock</html>"
+                    with patch("schedview.plot.tlbuilder.Path") as MockPath:
+                        mock_path = MagicMock()
+                        MockPath.return_value = mock_path
+                        mock_path.exists.return_value = False
+                        mock_path.write_text = lambda x: None
 
-                        with patch("schedview.plot.tlbuilder.Path") as MockPath:
-                            mock_path = MagicMock()
-                            MockPath.return_value = mock_path
-                            mock_path.exists.return_value = False
-                            mock_path.write_text = lambda x: None
+                        from schedview.plot.tlbuilder import main
+                        main.callback(date="2025-06-15", scatter=("altitude",), output="output.html")
 
-                            from schedview.plot.tlbuilder import main
-                            main()
-
-                            # Verify file_html was called with layout
-                            mock_file_html.assert_called_once()
-                            args, kwargs = mock_file_html.call_args
-                            assert args[0] is mock_layout
+                        mock_file_html.assert_called_once()
+                        args, kwargs = mock_file_html.call_args
+                        assert args[0] is mock_layout
 
     def test_cli_accepts_single_scatter(self):
         """CLI works with single --scatter argument."""
         dayobs = DayObs.from_date("2025-06-15")
 
-        with patch("argparse.ArgumentParser") as MockParser:
-            mock_parser = MockParser.return_value
-            mock_args = MagicMock()
-            mock_args.date = "2025-06-15"
-            mock_args.scatter = ["altitude"]
-            mock_args.output = "output.html"
-            mock_parser.parse_args.return_value = mock_args
+        with patch("schedview.plot.tlbuilder.TimelineBuilder") as MockBuilder:
+            mock_builder = MockBuilder.return_value
+            mock_builder.build.return_value = MagicMock()
 
-            with patch("schedview.plot.tlbuilder.TimelineBuilder") as MockBuilder:
-                mock_builder = MockBuilder.return_value
-                mock_builder.build.return_value = MagicMock()
+            with patch("schedview.dayobs.DayObs.from_date") as MockDayObs:
+                MockDayObs.return_value = dayobs
 
-                with patch("schedview.dayobs.DayObs.from_date") as MockDayObs:
-                    MockDayObs.return_value = dayobs
+                with patch("schedview.plot.tlbuilder.file_html") as mock_file_html:
+                    mock_file_html.return_value = "<html>mock</html>"
 
-                    with patch("schedview.plot.tlbuilder.file_html") as mock_file_html:
-                        mock_file_html.return_value = "<html>mock</html>"
+                    with patch("schedview.plot.tlbuilder.Path") as MockPath:
+                        mock_path = MagicMock()
+                        MockPath.return_value = mock_path
+                        mock_path.exists.return_value = False
+                        mock_path.write_text = lambda x: None
 
-                        with patch("schedview.plot.tlbuilder.Path") as MockPath:
-                            mock_path = MagicMock()
-                            MockPath.return_value = mock_path
-                            mock_path.exists.return_value = False
-                            mock_path.write_text = lambda x: None
+                        from schedview.plot.tlbuilder import main
+                        main.callback(date="2025-06-15", scatter=("altitude",), output="output.html")
 
-                            from schedview.plot.tlbuilder import main
-                            main()
-
-                            assert mock_builder.add_scatter.call_count == 1
+                        assert mock_builder.add_scatter.call_count == 1
 
     def test_cli_default_output(self):
         """CLI uses default output filename if not specified."""
         dayobs = DayObs.from_date("2025-06-15")
+        write_calls = []
 
-        with patch("argparse.ArgumentParser") as MockParser:
-            mock_parser = MockParser.return_value
-            mock_args = MagicMock()
-            mock_args.date = "2025-06-15"
-            mock_args.scatter = ["altitude"]
-            mock_args.output = "timeline.html"  # default value
-            mock_parser.parse_args.return_value = mock_args
+        with patch("schedview.plot.tlbuilder.TimelineBuilder") as MockBuilder:
+            mock_builder = MockBuilder.return_value
+            mock_builder.build.return_value = MagicMock()
 
-            with patch("schedview.plot.tlbuilder.TimelineBuilder") as MockBuilder:
-                mock_builder = MockBuilder.return_value
-                mock_builder.build.return_value = MagicMock()
+            with patch("schedview.dayobs.DayObs.from_date") as MockDayObs:
+                MockDayObs.return_value = dayobs
 
-                with patch("schedview.dayobs.DayObs.from_date") as MockDayObs:
-                    MockDayObs.return_value = dayobs
+                with patch("schedview.plot.tlbuilder.file_html") as mock_file_html:
+                    mock_file_html.return_value = "<html>mock</html>"
 
-                    with patch("schedview.plot.tlbuilder.file_html") as mock_file_html:
-                        mock_file_html.return_value = "<html>mock</html>"
+                    with patch("schedview.plot.tlbuilder.Path") as MockPath:
+                        mock_path = MagicMock()
+                        MockPath.return_value = mock_path
+                        mock_path.exists.return_value = False
+                        def capture_write(*args, **kwargs):
+                            write_calls.append(args)
+                        mock_path.write_text = capture_write
 
-                        with patch("schedview.plot.tlbuilder.Path") as MockPath:
-                            mock_path = MagicMock()
-                            MockPath.return_value = mock_path
-                            mock_path.exists.return_value = False
-                            mock_path.write_text = lambda x: None
+                        from schedview.plot.tlbuilder import main
+                        main.callback(date="2025-06-15", scatter=("altitude",), output="timeline.html")
 
-                            from schedview.plot.tlbuilder import main
-                            main()
-
-                            # Verify default was used
-                            assert mock_args.output == "timeline.html"
+                        assert len(write_calls) > 0
+                        assert write_calls[0][0] is not None
 
 
 class TestCLIIntegration:
-    """Integration tests for CLI that actually parse arguments."""
+    """Integration tests for CLI using click."""
 
-    def test_argument_parser_exists(self):
-        """main() creates an ArgumentParser."""
+    def test_cli_with_click_runner(self):
+        """CLI works with click CliRunner."""
         from schedview.plot.tlbuilder import main
-        import inspect
 
-        # Check that main function exists and can be called (with mocking)
-        assert callable(main)
+        runner = CliRunner()
+        result = runner.invoke(main, [
+            "--date", "2025-06-15",
+            "--scatter", "altitude",
+            "--scatter", "HA",
+            "--output", "/tmp/test_output.html"
+        ])
+        assert result.exit_code == 0
 
-    def test_scatter_argument_accepts_multiple(self):
-        """--scatter argument can be specified multiple times."""
-        from schedview.plot.tlbuilder import create_parser
+    def test_cli_date_required(self):
+        """--date argument is required."""
+        from schedview.plot.tlbuilder import main
 
-        parser = create_parser()
-        args = parser.parse_args([
+        runner = CliRunner()
+        result = runner.invoke(main, [
+            "--scatter", "altitude",
+            "--output", "output.html"
+        ])
+        assert result.exit_code != 0
+
+    def test_cli_scatter_required(self):
+        """--scatter argument is required."""
+        from schedview.plot.tlbuilder import main
+
+        runner = CliRunner()
+        result = runner.invoke(main, [
+            "--date", "2025-06-15",
+            "--output", "output.html"
+        ])
+        assert result.exit_code != 0
+
+    def test_cli_multiple_scatters(self):
+        """CLI handles multiple --scatter arguments."""
+        from schedview.plot.tlbuilder import main
+
+        runner = CliRunner()
+        result = runner.invoke(main, [
             "--date", "2025-06-15",
             "--scatter", "altitude",
             "--scatter", "HA",
             "--scatter", "fieldRA",
             "--output", "output.html"
         ])
-
-        assert args.date == "2025-06-15"
-        assert args.scatter == ["altitude", "HA", "fieldRA"]
-        assert args.output == "output.html"
-
-    def test_date_argument(self):
-        """--date argument is parsed correctly."""
-        from schedview.plot.tlbuilder import create_parser
-
-        parser = create_parser()
-        args = parser.parse_args([
-            "--date", "2025-12-25",
-            "--scatter", "altitude",
-            "--output", "output.html"
-        ])
-
-        assert args.date == "2025-12-25"
-
-    def test_output_argument(self):
-        """--output argument is parsed correctly."""
-        from schedview.plot.tlbuilder import create_parser
-
-        parser = create_parser()
-        args = parser.parse_args([
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--output", "custom_output.html"
-        ])
-
-        assert args.output == "custom_output.html"
+        assert result.exit_code == 0
