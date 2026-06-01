@@ -107,8 +107,6 @@ class TestVisitDataSet:
         assert dataset.alpha == 1.0
         assert dataset.marker == "circle"
         assert dataset.color_by_band is True
-        assert dataset.visible is True
-        assert dataset.show_visibility_toggle is True
 
     def test_custom_values(self):
         """VisitDataSet stores custom values correctly."""
@@ -119,7 +117,6 @@ class TestVisitDataSet:
             alpha=0.5,
             marker="triangle",
             color_by_band=False,
-            visible=False,
             show_visibility_toggle=False
         )
         assert dataset.source is source
@@ -127,7 +124,6 @@ class TestVisitDataSet:
         assert dataset.alpha == 0.5
         assert dataset.marker == "triangle"
         assert dataset.color_by_band is False
-        assert dataset.visible is False
         assert dataset.show_visibility_toggle is False
 
 
@@ -154,15 +150,15 @@ class TestTimelineBuilderInitialization:
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         assert builder._visit_sets == {}
 
-    def test_initializes_empty_color_stripes(self):
-        """TimelineBuilder initializes _color_stripes as empty dict."""
+    def test_initializes_empty_elements(self):
+        """TimelineBuilder initializes _elements as empty list."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        assert builder._color_stripes == {}
+        assert builder._elements == []
 
-    def test_initializes_shared_x_range_none(self):
-        """TimelineBuilder initializes _shared_x_range as None."""
+    def test_initializes_shared_x_range(self):
+        """TimelineBuilder initializes _shared_x_range from dayobs."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        assert builder._shared_x_range is None
+        assert isinstance(builder._shared_x_range, Range1d)
 
     def test_initializes_figure_kwargs(self):
         """TimelineBuilder initializes _figure_kwargs with defaults."""
@@ -231,10 +227,10 @@ class TestAddScatter:
         builder.add_scatter(y_column="altitude", **kwargs)
         assert builder._elements[0].figure_kwargs == {"width": 800}
 
-    def test_shared_x_range_created_on_first_scatter(self):
-        """add_scatter creates shared x-range on first call."""
+    def test_shared_x_range_exists_before_scatter(self):
+        """Shared x-range is initialized in the constructor."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        assert builder._shared_x_range is None
+        assert builder._shared_x_range is not None
         builder.add_scatter(y_column="altitude")
         assert builder._shared_x_range is not None
 
@@ -340,7 +336,7 @@ class TestAddVisits:
         assert isinstance(dataset, VisitDataSet)
 
     def test_stores_visit_dataset_attributes(self):
-        """VisitDataSet stores label, alpha, marker, color_by_band, visible."""
+        """VisitDataSet stores label, alpha, marker, color_by_band."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         visits_df = pd.DataFrame({
             "observationStartMJD": [59999.0],
@@ -353,10 +349,9 @@ class TestAddVisits:
         assert dataset.alpha == 0.7
         assert dataset.marker == "triangle"
         assert dataset.color_by_band is False
-        assert dataset.visible is True
 
     def test_respects_height_parameter(self):
-        """add_visits respects height parameter in scatter_kwargs."""
+        """add_visits respects height parameter as explicit argument."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         visits_df = pd.DataFrame({
             "observationStartMJD": [59999.0],
@@ -487,8 +482,10 @@ class TestAddColorStripe:
         series = pd.Series([1.0, 2.0], index=[59999.0, 60000.0])
         builder.add_color_stripe(series, name="stripe1")
 
-        assert "stripe1" in builder._color_stripes
-        stripe_config = builder._color_stripes["stripe1"]
+        assert len(builder._elements) == 1
+        stripe_config = builder._elements[0]
+        assert isinstance(stripe_config, ColorStripeConfig)
+        assert stripe_config.name == "stripe1"
         source = stripe_config.source
         time_data = source.data.get("time", [])
 
@@ -501,8 +498,8 @@ class TestAddColorStripe:
         series = pd.Series([1.0, 2.0, 3.0], index=[59999.0, 60000.0, 60001.0])
         builder.add_color_stripe(series, name="stripe1", colormap="Viridis256")
 
-        assert "stripe1" in builder._color_stripes
-        config = builder._color_stripes["stripe1"]
+        assert len(builder._elements) == 1
+        config = builder._elements[0]
         assert isinstance(config, ColorStripeConfig)
         assert config.name == "stripe1"
         assert config.colormap == "Viridis256"
@@ -513,7 +510,8 @@ class TestAddColorStripe:
         series = pd.Series([10.0, 20.0, 30.0], index=[59999.0, 60000.0, 60001.0])
         builder.add_color_stripe(series, name="stripe1")
 
-        config = builder._color_stripes["stripe1"]
+        assert len(builder._elements) == 1
+        config = builder._elements[0]
         assert config.value_range is not None
         assert config.value_range[0] == 10.0
         assert config.value_range[1] == 30.0
@@ -524,7 +522,8 @@ class TestAddColorStripe:
         series = pd.Series([1.0, 2.0, 3.0], index=[59999.0, 60000.0, 60001.0])
         builder.add_color_stripe(series, name="stripe1", value_range=(0.0, 100.0))
 
-        config = builder._color_stripes["stripe1"]
+        assert len(builder._elements) == 1
+        config = builder._elements[0]
         assert config.value_range == (0.0, 100.0)
 
     def test_default_colormap_is_cividis256(self):
@@ -533,7 +532,8 @@ class TestAddColorStripe:
         series = pd.Series([1.0, 2.0], index=[59999.0, 60000.0])
         builder.add_color_stripe(series, name="stripe1")
 
-        config = builder._color_stripes["stripe1"]
+        assert len(builder._elements) == 1
+        config = builder._elements[0]
         assert config.colormap == "Cividis256"
 
     def test_custom_colormap_works(self):
@@ -542,7 +542,8 @@ class TestAddColorStripe:
         series = pd.Series([1.0, 2.0], index=[59999.0, 60000.0])
         builder.add_color_stripe(series, name="stripe1", colormap="Viridis256")
 
-        config = builder._color_stripes["stripe1"]
+        assert len(builder._elements) == 1
+        config = builder._elements[0]
         assert config.colormap == "Viridis256"
 
     def test_creates_column_data_source(self):
@@ -551,7 +552,8 @@ class TestAddColorStripe:
         series = pd.Series([1.0, 2.0], index=[59999.0, 60000.0])
         builder.add_color_stripe(series, name="stripe1")
 
-        config = builder._color_stripes["stripe1"]
+        assert len(builder._elements) == 1
+        config = builder._elements[0]
         source = config.source
 
         assert isinstance(source, ColumnDataSource)

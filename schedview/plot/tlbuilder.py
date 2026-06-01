@@ -14,14 +14,12 @@ from astropy.time import Time
 from bokeh.embed import file_html
 from bokeh.layouts import column
 from bokeh.models import (
-    CategoricalColorMapper,
     ColumnDataSource,
     CustomJS,
     DatetimeTickFormatter,
     LinearColorMapper,
     MultiChoice,
     Range1d,
-    Scatter,
     Select,
 )
 from bokeh.plotting import figure
@@ -89,8 +87,6 @@ class VisitDataSet:
         Marker type for scatter glyphs.
     color_by_band : bool
         Whether to color points by band.
-    visible : bool
-        Whether the visit set is visible by default.
     """
 
     source: ColumnDataSource | None = None
@@ -98,7 +94,6 @@ class VisitDataSet:
     alpha: float = 1.0
     marker: str = "circle"
     color_by_band: bool = True
-    visible: bool = True
     show_visibility_toggle: bool = True
 
 
@@ -133,15 +128,12 @@ class TimelineBuilder:
         self._dayobs = dayobs
         self._elements: list[ScatterPlotConfig | ColorStripeConfig] = []
         self._visit_sets: dict[str, VisitDataSet] = {}
-        self._color_stripes: dict[str, ColorStripeConfig] = {}
         start_time = Time(float(dayobs.start.mjd), format="mjd").datetime64
         end_time = Time(float(dayobs.end.mjd), format="mjd").datetime64
         self._shared_x_range = Range1d(start=start_time, end=end_time)
         self._figure_kwargs: dict = {"width": 1000}
         self._plot_heights: dict[str, int] = {}
         self._visibility_selector: MultiChoice | None = None
-        # Track y-axis selectors for each scatter plot
-        self._scatter_y_selectors: dict[str, Select] = {}
 
     def add_scatter(
         self,
@@ -196,7 +188,7 @@ class TimelineBuilder:
         color_by_band: bool = True,
         show_visibility_toggle: bool = True,
         time_column: str = "observationStartMJD",
-        **scatter_kwargs,
+        height: int | None = None,
     ) -> Self:
         """Add a visit plot to the timeline.
 
@@ -216,8 +208,8 @@ class TimelineBuilder:
             Whether to show visibility toggle.
         time_column : str, optional
             Column name containing MJD timestamps.
-        **scatter_kwargs
-            Additional arguments, including `height` for plot height.
+        height : int, optional
+            Height of the plot in pixels.
 
         Returns
         -------
@@ -225,8 +217,8 @@ class TimelineBuilder:
             Returns self for method chaining.
         """
         # Store height if provided
-        if "height" in scatter_kwargs:
-            self._plot_heights[label] = scatter_kwargs["height"]
+        if height is not None:
+            self._plot_heights[label] = height
 
         # Convert MJD to datetime64
         if len(visits) > 0:
@@ -257,7 +249,6 @@ class TimelineBuilder:
             alpha=alpha,
             marker=marker,
             color_by_band=color_by_band,
-            visible=True,
             show_visibility_toggle=show_visibility_toggle,
         )
         # Visits are overlaid on scatter panels — they do not create their own figures.
@@ -282,7 +273,7 @@ class TimelineBuilder:
         name : str
             Identifier for this stripe.
         height : int, optional
-            Height of the stripe in pixels. Default is 20.
+            Height of the stripe in pixels. Default is 40.
         colormap : str, optional
             Bokeh colormap name. Default is "Cividis256".
         value_range : tuple[float, float], optional
@@ -296,8 +287,6 @@ class TimelineBuilder:
         Self
             Returns self for method chaining.
         """
-        # Store height (default 20 px)
-        # Default height for color stripes is 40 px (was 20 px) for better visibility
         stripe_height = height if height is not None else 40
         self._plot_heights[name] = stripe_height
 
@@ -358,7 +347,6 @@ class TimelineBuilder:
             colormap=colormap,
             value_range=value_range,
         )
-        self._color_stripes[name] = stripe_config
 
         # Add to elements
         self._elements.append(stripe_config)
@@ -380,7 +368,7 @@ class TimelineBuilder:
         # Only include visits with show_visibility_toggle=True
         options = [
             label for label, dataset in self._visit_sets.items()
-            if dataset.visible and dataset.show_visibility_toggle
+            if dataset.show_visibility_toggle
         ]
 
         self._visibility_selector = MultiChoice(
@@ -427,14 +415,10 @@ class TimelineBuilder:
             # Build visit set info with actual renderer references
             visit_sets_for_callback = {}
             for label, dataset in self._visit_sets.items():
-                if dataset.visible and dataset.show_visibility_toggle:
+                if dataset.show_visibility_toggle:
                     # Get renderers for this visit set, or empty list if none tracked
                     renderers = visit_renderers.get(label, [])
-                    visit_sets_for_callback[label] = {
-                        "source": dataset.source,
-                        "visible": dataset.visible,
-                        "renderers": renderers
-                    }
+                    visit_sets_for_callback[label] = {"renderers": renderers}
 
             if visit_sets_for_callback:
                 # Create CustomJS callback to toggle visibility of visit renderers
@@ -669,6 +653,30 @@ def build_timeline(dayobs: DayObs, scatter_columns: list[str]) -> column:
     return builder.build()
 
 
+def _sample_body_elevation(body_name: str, dayobs: DayObs) -> pd.Series:
+    """Sample a celestial body's elevation throughout a day.
+
+    Parameters
+    ----------
+    body_name : str
+        The name of the body to sample ("sun" or "moon").
+    dayobs : DayObs
+        The observing day.
+
+    Returns
+    -------
+    pd.Series
+        Series of elevation angles in degrees, indexed by MJD.
+    """
+    from astropy.coordinates import AltAz, get_body
+
+    mjds = np.arange(float(dayobs.start.mjd), float(dayobs.end.mjd), 1 / 24)
+    times_ap = Time(mjds, format="mjd")
+    altaz_frame = AltAz(location=dayobs.location, obstime=times_ap)
+    altaz = get_body(body_name, times_ap).transform_to(altaz_frame)
+    return pd.Series(altaz.alt.deg, index=mjds)
+
+
 @click.command(
     help="Build timeline visualizations for Rubin Observatory observing nights."
 )
@@ -791,59 +799,11 @@ def main(
     # Add background stripes
     for bg_type in background:
         if bg_type == "sun_elevation":
-            # Compute sun elevation throughout the day
-            times = []
-            elevations = []
-
-            # Sample sun position every hour
-            start_mjd = float(dayobs.start.mjd)
-            end_mjd = float(dayobs.end.mjd)
-
-            from astropy.coordinates import get_body, AltAz
-            from astropy.time import Time
-
-            # Generate hourly samples
-            current_mjd = start_mjd
-            while current_mjd <= end_mjd:
-                times.append(current_mjd)
-                # Get sun position at this time
-                sun = get_body("sun", Time(current_mjd, format="mjd"))
-
-                # Create AltAz frame with location and obstime, then transform
-                altaz_frame = AltAz(location=dayobs.location, obstime=Time(current_mjd, format="mjd"))
-                sun_altaz = sun.transform_to(altaz_frame)
-                elevations.append(sun_altaz.alt.deg)
-                current_mjd += 1 / 24  # One hour
-
-            sun_data = pd.Series(elevations, index=times)
+            sun_data = _sample_body_elevation("sun", dayobs)
             builder.add_color_stripe(sun_data, name="sun_elevation", height=stripe_height if stripe_height is not None else 100)
 
         elif bg_type == "moon_elevation":
-            # Compute moon elevation throughout the day
-            times = []
-            elevations = []
-
-            # Sample moon position every hour
-            start_mjd = float(dayobs.start.mjd)
-            end_mjd = float(dayobs.end.mjd)
-
-            from astropy.coordinates import get_body, AltAz
-            from astropy.time import Time
-
-            # Generate hourly samples
-            current_mjd = start_mjd
-            while current_mjd <= end_mjd:
-                times.append(current_mjd)
-                # Get moon position at this time
-                moon = get_body("moon", Time(current_mjd, format="mjd"))
-
-                # Create AltAz frame with location and obstime, then transform
-                altaz_frame = AltAz(location=dayobs.location, obstime=Time(current_mjd, format="mjd"))
-                moon_altaz = moon.transform_to(altaz_frame)
-                elevations.append(moon_altaz.alt.deg)
-                current_mjd += 1 / 24  # One hour
-
-            moon_data = pd.Series(elevations, index=times)
+            moon_data = _sample_body_elevation("moon", dayobs)
             builder.add_color_stripe(moon_data, name="moon_elevation", height=stripe_height if stripe_height is not None else 100)
 
         else:
