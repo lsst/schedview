@@ -356,7 +356,7 @@ class TestAddVisits:
         assert dataset.visible is True
 
     def test_respects_height_parameter(self):
-        """add_visits respects height parameter in scatter_kwargs."""
+        """add_visits respects height parameter as explicit argument."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         visits_df = pd.DataFrame({
             "observationStartMJD": [59999.0],

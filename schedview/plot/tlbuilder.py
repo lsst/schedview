@@ -191,7 +191,7 @@ class TimelineBuilder:
         color_by_band: bool = True,
         show_visibility_toggle: bool = True,
         time_column: str = "observationStartMJD",
-        **scatter_kwargs,
+        height: int | None = None,
     ) -> Self:
         """Add a visit plot to the timeline.
 
@@ -211,8 +211,8 @@ class TimelineBuilder:
             Whether to show visibility toggle.
         time_column : str, optional
             Column name containing MJD timestamps.
-        **scatter_kwargs
-            Additional arguments, including `height` for plot height.
+        height : int, optional
+            Height of the plot in pixels.
 
         Returns
         -------
@@ -220,8 +220,8 @@ class TimelineBuilder:
             Returns self for method chaining.
         """
         # Store height if provided
-        if "height" in scatter_kwargs:
-            self._plot_heights[label] = scatter_kwargs["height"]
+        if height is not None:
+            self._plot_heights[label] = height
 
         # Convert MJD to datetime64
         if len(visits) > 0:
