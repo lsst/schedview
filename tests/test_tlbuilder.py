@@ -351,17 +351,6 @@ class TestAddVisits:
         assert dataset.marker == "triangle"
         assert dataset.color_by_band is False
 
-    def test_respects_height_parameter(self):
-        """add_visits respects height parameter as explicit argument."""
-        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0],
-            "altitude": [30.0],
-        })
-        builder.add_visits(visits_df, label="test_visits", height=250)
-
-        assert builder._plot_heights["test_visits"] == 250
-
     def test_applies_band_coloring_when_band_exists(self):
         """add_visits assigns colors based on band column when color_by_band=True."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
@@ -1092,7 +1081,6 @@ class TestBuildMixedElements:
                 "altitude": [30.0],
             }),
             label="visits1",
-            height=200
         )
         builder.add_color_stripe(
             pd.Series([1.0, 2.0], index=[59999.0, 60000.0]),
@@ -1102,7 +1090,8 @@ class TestBuildMixedElements:
         result = builder.build()
 
         assert builder._plot_heights["scatter1"] == 150
-        assert builder._plot_heights["visits1"] == 200
+        # visits do not store height (they are overlaid on scatter panels)
+        assert builder._plot_heights.get("visits1") is None
         assert builder._plot_heights["stripe1"] == 30
 
     def test_datetime_formatter_on_all_figures(self):
