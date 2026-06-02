@@ -779,6 +779,7 @@ def _sample_body_elevation(body_name: str, dayobs: DayObs) -> pd.Series:
     "--background",
     multiple=True,
     required=False,
+    type=click.Choice(["sun_elevation", "moon_elevation"], case_sensitive=False),
     help="Background stripe type: sun_elevation, moon_elevation.",
 )
 @click.option(
@@ -885,8 +886,8 @@ def main(
             builder.add_color_stripe(moon_data, name="moon_elevation", height=stripe_height if stripe_height is not None else 100)
 
         else:
-            # Unknown background type - could be extended in future
-            pass
+            # This should never happen since click.Choice validates the value
+            raise click.BadParameter(f"Unknown background type: {bg_type}")
 
     # Add visibility toggle if enabled
     if enable_visibility_toggle:

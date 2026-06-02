@@ -1602,6 +1602,60 @@ class TestCLI:
         ])
         assert result.exit_code == 0
 
+    def test_cli_rejects_invalid_background_value(self):
+        """CLI rejects invalid --background value with error."""
+        from schedview.plot.tlbuilder import main
+
+        runner = CliRunner()
+        result = runner.invoke(main, [
+            "--date", "2025-06-15",
+            "--scatter", "altitude",
+            "--background", "invalid_type",
+            "--output", "/tmp/cli_test.html"
+        ])
+        assert result.exit_code != 0
+        assert "invalid_type" in result.output or "Choice" in result.output
+
+    def test_cli_accepts_sun_elevation_background(self):
+        """CLI accepts sun_elevation as valid --background value."""
+        from schedview.plot.tlbuilder import main
+
+        runner = CliRunner()
+        result = runner.invoke(main, [
+            "--date", "2025-06-15",
+            "--scatter", "altitude",
+            "--background", "sun_elevation",
+            "--output", "/tmp/cli_test.html"
+        ])
+        assert result.exit_code == 0
+
+    def test_cli_accepts_moon_elevation_background(self):
+        """CLI accepts moon_elevation as valid --background value."""
+        from schedview.plot.tlbuilder import main
+
+        runner = CliRunner()
+        result = runner.invoke(main, [
+            "--date", "2025-06-15",
+            "--scatter", "altitude",
+            "--background", "moon_elevation",
+            "--output", "/tmp/cli_test.html"
+        ])
+        assert result.exit_code == 0
+
+    def test_cli_accepts_multiple_background_types(self):
+        """CLI accepts multiple --background options."""
+        from schedview.plot.tlbuilder import main
+
+        runner = CliRunner()
+        result = runner.invoke(main, [
+            "--date", "2025-06-15",
+            "--scatter", "altitude",
+            "--background", "sun_elevation",
+            "--background", "moon_elevation",
+            "--output", "/tmp/cli_test.html"
+        ])
+        assert result.exit_code == 0
+
 
 # ============================================================================
 # Time Conversion Tests
