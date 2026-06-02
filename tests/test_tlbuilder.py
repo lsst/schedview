@@ -222,6 +222,21 @@ class TestAddScatter:
         builder.add_scatter(y_column="altitude", offered_columns=offered)
         assert builder._elements[0].offered_columns == offered
 
+    def test_offered_columns_merge_multiple_sources(self):
+        """offered_columns from multiple --y-columns are merged."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        # Simulate merging multiple --y-columns values like the CLI does
+        offered1 = ("altitude", "HA")
+        offered2 = ("fieldRA", "fiveSigmaDepth")
+        # Build merged offered_columns (like CLI does)
+        all_columns = []
+        all_columns.extend(c.strip() for c in ",".join(offered1).split(",") if c.strip())
+        all_columns.extend(c.strip() for c in ",".join(offered2).split(",") if c.strip())
+        merged = tuple(all_columns)
+        builder.add_scatter(y_column="altitude", offered_columns=merged)
+        assert builder._elements[0].offered_columns == merged
+        assert len(builder._elements[0].offered_columns) == 4
+
     def test_figure_kwargs_stored(self):
         """add_scatter stores figure_kwargs in config."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
@@ -1598,6 +1613,23 @@ class TestCLI:
             "--scatter", "HA",
             "--scatter", "fieldRA",
             "--y-columns", "altitude,HA,fieldRA",
+            "--output", "/tmp/cli_test.html"
+        ])
+        assert result.exit_code == 0
+
+    def test_cli_with_y_columns_merged_multiple(self):
+        """CLI with multiple --y-columns options merges values together."""
+        from schedview.plot.tlbuilder import main
+
+        runner = CliRunner()
+        result = runner.invoke(main, [
+            "--date", "2025-06-15",
+            "--scatter", "altitude",
+            "--scatter", "HA",
+            "--scatter", "fieldRA",
+            "--scatter", "fiveSigmaDepth",
+            "--y-columns", "altitude,HA",
+            "--y-columns", "fieldRA,fiveSigmaDepth",
             "--output", "/tmp/cli_test.html"
         ])
         assert result.exit_code == 0

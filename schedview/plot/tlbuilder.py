@@ -840,12 +840,15 @@ def main(
     # Build the timeline
     builder = TimelineBuilder(dayobs)
 
-    # Parse y-columns option (single value applied to all scatter plots)
+    # Parse y-columns option (supports both single comma-separated value
+    # and multiple --y-columns options that are merged together)
     y_columns_offered = ()
     if y_columns:
-        # Take the first y-columns value if provided (can be specified only once)
-        y_cols = y_columns[0]
-        y_columns_offered = tuple(c.strip() for c in y_cols.split(",") if c.strip())
+        # Merge all --y-columns values together, splitting comma-separated values
+        all_columns = []
+        for y_cols in y_columns:
+            all_columns.extend(c.strip() for c in y_cols.split(",") if c.strip())
+        y_columns_offered = tuple(all_columns)
 
     if num_scatter is not None and num_scatter > 0:
         # Create num_scatter scatter plots, all using the first scatter column
