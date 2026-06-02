@@ -25,6 +25,7 @@ from bokeh.models import (
 from bokeh.plotting import figure
 
 from schedview.dayobs import DayObs
+from schedview.plot.colors import PLOT_BAND_COLORS
 
 
 @dataclass
@@ -95,17 +96,6 @@ class VisitDataSet:
     marker: str = "circle"
     color_by_band: bool = True
     show_visibility_toggle: bool = True
-
-
-# Band colors mapping (LSST ugrizy)
-BAND_COLORS = {
-    "u": "#3B449B",  # blue
-    "g": "#20B2AA",  # light sea green
-    "r": "#FF4500",  # orange red
-    "i": "#FFD700",  # gold
-    "z": "#8B4513",  # saddle brown
-    "y": "#800080",  # purple
-}
 
 
 class TimelineBuilder:
@@ -236,7 +226,7 @@ class TimelineBuilder:
         # Add band colors
         if color_by_band and "band" in visits.columns:
             bands = visits["band"].values
-            colors = [BAND_COLORS.get(b, "#888888") for b in bands]
+            colors = [PLOT_BAND_COLORS.get(b, "#888888") for b in bands]
             source_data["color"] = colors
         else:
             source_data["color"] = ["#1f77b4"] * len(visits) if len(visits) > 0 else []
