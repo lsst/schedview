@@ -14,12 +14,14 @@ from astropy.time import Time
 from bokeh.embed import file_html
 from bokeh.layouts import column
 from bokeh.models import (
+    Column,
     ColumnDataSource,
     CustomJS,
     DatetimeTickFormatter,
     HoverTool,
     LinearColorMapper,
     MultiChoice,
+    Plot,
     Range1d,
     Select,
 )
@@ -434,7 +436,7 @@ class TimelineBuilder:
         self._needs_visit_visibility_selector = True
         return self
 
-    def build(self) -> column:
+    def build(self) -> Column:
         """Build and return the final Bokeh layout.
 
         Creates scatter plots, visit plots, and color stripes with optional
@@ -515,7 +517,7 @@ class TimelineBuilder:
 
         return column(*layout_components)
 
-    def _create_scatter_y_selector(self, config: ScatterPlotConfig, fig: figure) -> Select | None:
+    def _create_scatter_y_selector(self, config: ScatterPlotConfig, fig: Plot) -> Select | None:
         """Create a y-axis selector widget for a scatter plot.
 
         Creates a Select widget with offered_columns as options.
@@ -525,7 +527,7 @@ class TimelineBuilder:
         ----------
         config : ScatterPlotConfig
             Configuration for the scatter plot.
-        fig : figure
+        fig : Plot
             The scatter figure this selector controls.
 
         Returns
@@ -578,7 +580,7 @@ class TimelineBuilder:
 
         return selector
 
-    def _create_scatter_figure(self, config: ScatterPlotConfig, visit_renderers: dict[str, list] | None = None) -> figure:
+    def _create_scatter_figure(self, config: ScatterPlotConfig, visit_renderers: dict[str, list] | None = None) -> Plot:
         """Create a scatter plot figure.
 
         Parameters
@@ -642,7 +644,7 @@ class TimelineBuilder:
 
         return fig
 
-    def _create_stripe_figure(self, config: ColorStripeConfig) -> figure:
+    def _create_stripe_figure(self, config: ColorStripeConfig) -> Plot:
         """Create a color stripe figure.
 
         Parameters
@@ -706,7 +708,7 @@ class TimelineBuilder:
         return fig
 
 
-def build_timeline(dayobs: DayObs, scatter_columns: list[str]) -> column:
+def build_timeline(dayobs: DayObs, scatter_columns: list[str]) -> Column:
     """Build a timeline with scatter plots.
 
     Parameters
