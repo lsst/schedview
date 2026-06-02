@@ -29,6 +29,40 @@ from schedview.dayobs import DayObs
 from schedview.plot.colors import PLOT_BAND_COLORS
 
 
+def _find_time_column(df: pd.DataFrame, time_column: str | None = None) -> str:
+    """Find the column containing MJD timestamps in a DataFrame.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The DataFrame to search for a time column.
+    time_column : str or None, optional
+        Explicit column name to use. If provided, this column is used
+        directly without heuristic search.
+
+    Returns
+    -------
+    str
+        The name of the column containing MJD timestamps.
+
+    Notes
+    -----
+    When time_column is not provided, the method uses a heuristic:
+    1. Look for columns containing 'mjd' (case-insensitive) or exactly 'time_mjd'
+    2. If no match found, use the first column as the time column
+    """
+    if time_column is not None:
+        return time_column
+
+    # Heuristic: look for columns with 'mjd' in name or 'time_mjd'
+    for col in df.columns:
+        if "mjd" in col.lower() or col == "time_mjd":
+            return col
+
+    # Use first column as time
+    return df.columns[0]
+
+
 @dataclass
 class ScatterPlotConfig:
     """Configuration for a scatter plot element.
@@ -182,7 +216,7 @@ class TimelineBuilder:
         marker: str = "circle",
         color_by_band: bool = True,
         show_visibility_toggle: bool = True,
-        time_column: str = "observationStartMJD",
+        time_column: str | None = None,
         height: int | None = None,
     ) -> Self:
         """Add a visit plot to the timeline.
@@ -201,8 +235,10 @@ class TimelineBuilder:
             Whether to color points by band column.
         show_visibility_toggle : bool, optional
             Whether to show visibility toggle.
-        time_column : str, optional
-            Column name containing MJD timestamps.
+        time_column : str or None, optional
+            Column name containing MJD timestamps. If not provided,
+            defaults to 'observationStartMJD' or uses heuristic to find
+            a column containing 'mjd'.
         height : int, optional
             Height of the plot in pixels.
 
@@ -217,7 +253,8 @@ class TimelineBuilder:
 
         # Convert MJD to datetime64
         if len(visits) > 0:
-            mjd_times = visits[time_column].values
+            mjd_col = _find_time_column(visits, time_column)
+            mjd_times = visits[mjd_col].values
             times = Time(mjd_times, format="mjd").datetime64
         else:
             times = np.array([], dtype="datetime64[us]")
@@ -257,6 +294,7 @@ class TimelineBuilder:
         colormap: str = "Cividis256",
         value_range: tuple[float, float] | None = None,
         value_column: str = "value",
+        time_column: str | None = None,
     ) -> Self:
         """Add a color stripe for continuous time-series data.
 
@@ -276,6 +314,11 @@ class TimelineBuilder:
             Auto-computed if not provided.
         value_column : str, optional
             Column name containing values in a DataFrame.
+        time_column : str or None, optional
+            Column name containing MJD timestamps in a DataFrame.
+            If provided, this column is used directly. Otherwise,
+            the method uses a heuristic to detect the time column
+            (column with 'mjd' in name or 'time_mjd', or first column).
 
         Returns
         -------
@@ -291,16 +334,8 @@ class TimelineBuilder:
             mjd_times = np.array(data.index)
             values = data.values
         else:
-            # DataFrame with MJD column (we need to detect which column is time)
-            # Assume the first numeric column with 'mjd' in name or 'time'
-            mjd_col = None
-            for col in data.columns:
-                if "mjd" in col.lower() or col == "time_mjd":
-                    mjd_col = col
-                    break
-            if mjd_col is None:
-                # Use first column as time
-                mjd_col = data.columns[0]
+            # DataFrame with MJD column
+            mjd_col = _find_time_column(data, time_column)
             mjd_times = data[mjd_col].values
             values = data[value_column].values
 

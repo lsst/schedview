@@ -447,6 +447,67 @@ class TestAddVisits:
 
 
 # ============================================================================
+# Helper function Tests
+# ============================================================================
+
+class TestFindTimeColumn:
+    """Tests for _find_time_column helper function."""
+
+    def test_returns_explicit_time_column(self):
+        """_find_time_column returns explicit time_column when provided."""
+        from schedview.plot.tlbuilder import _find_time_column
+
+        df = pd.DataFrame({"timestamp": [1.0, 2.0], "value": [10.0, 20.0]})
+        result = _find_time_column(df, time_column="timestamp")
+        assert result == "timestamp"
+
+    def test_heuristic_finds_mjd_column(self):
+        """_find_time_column heuristic finds column with 'mjd' in name."""
+        from schedview.plot.tlbuilder import _find_time_column
+
+        df = pd.DataFrame({
+            "observationStartMJD": [1.0, 2.0],
+            "value": [10.0, 20.0],
+        })
+        result = _find_time_column(df)
+        assert result == "observationStartMJD"
+
+    def test_heuristic_finds_lowercase_mjd(self):
+        """_find_time_column heuristic is case-insensitive for 'mjd'."""
+        from schedview.plot.tlbuilder import _find_time_column
+
+        df = pd.DataFrame({
+            "time_mjd": [1.0, 2.0],
+            "value": [10.0, 20.0],
+        })
+        result = _find_time_column(df)
+        assert result == "time_mjd"
+
+    def test_heuristic_finds_first_column_when_no_mjd(self):
+        """_find_time_column heuristic uses first column when no 'mjd' found."""
+        from schedview.plot.tlbuilder import _find_time_column
+
+        df = pd.DataFrame({
+            "timestamp": [1.0, 2.0],
+            "value": [10.0, 20.0],
+        })
+        result = _find_time_column(df)
+        assert result == "timestamp"
+
+    def test_heuristic_prefers_mjd_over_first_column(self):
+        """_find_time_column heuristic prefers 'mjd' column over first column."""
+        from schedview.plot.tlbuilder import _find_time_column
+
+        df = pd.DataFrame({
+            "first_col": [0.0, 1.0],
+            "observationStartMJD": [1.0, 2.0],
+            "value": [10.0, 20.0],
+        })
+        result = _find_time_column(df)
+        assert result == "observationStartMJD"
+
+
+# ============================================================================
 # TimelineBuilder.add_color_stripe Tests
 # ============================================================================
 
@@ -596,6 +657,67 @@ class TestAddColorStripe:
 
         assert result is builder
         assert len(builder._elements) == 2
+
+    def test_explicit_time_column_with_dataframe(self):
+        """add_color_stripe uses explicit time_column when provided."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        # DataFrame with a non-standard time column name
+        df = pd.DataFrame({
+            "timestamp": [59999.0, 60000.0, 60001.0],  # Not 'time_mjd' or含有 'mjd'
+            "value": [1.0, 2.0, 3.0],
+        })
+        builder.add_color_stripe(df, name="stripe1", time_column="timestamp", value_column="value")
+        assert len(builder._elements) == 1
+
+        # Verify the time data was correctly extracted
+        config = builder._elements[0]
+        source = config.source
+        time_data = source.data.get("time", [])
+        assert len(time_data) == 3
+        assert isinstance(time_data[0], np.datetime64)
+
+    def test_explicit_time_column_overrides_heuristic(self):
+        """add_color_stripe uses explicit time_column even when heuristic would pick different column."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        # DataFrame with multiple numeric columns
+        df = pd.DataFrame({
+            "time_mjd": [59998.0, 59999.0, 60000.0],  # Heuristic would pick this
+            "timestamp": [59999.0, 60000.0, 60001.0],  # But we want this one
+            "value": [1.0, 2.0, 3.0],
+        })
+        # Explicit time_column should override the heuristic
+        builder.add_color_stripe(df, name="stripe1", time_column="timestamp", value_column="value")
+
+        config = builder._elements[0]
+        source = config.source
+        time_data = source.data.get("time", [])
+
+        # With explicit time_column="timestamp", times should be [59999, 60000, 60001]
+        # Convert back to MJD for comparison
+        mjds = []
+        for t in time_data:
+            mjd = Time(t, format="datetime64").mjd
+            mjds.append(round(mjd))
+        assert mjds == [59999, 60000, 60001]
+
+    def test_time_column_with_series_ignored(self):
+        """add_color_stripe time_column is ignored for Series (uses index)."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        # time_column should be ignored for Series
+        series = pd.Series([1.0, 2.0], index=[59999.0, 60000.0])
+        # time_column argument should not cause issues for Series
+        builder.add_color_stripe(series, name="stripe1", time_column="some_column")
+
+        config = builder._elements[0]
+        source = config.source
+        time_data = source.data.get("time", [])
+
+        # Times should come from Series index, not time_column
+        mjds = []
+        for t in time_data:
+            mjd = Time(t, format="datetime64").mjd
+            mjds.append(round(mjd))
+        assert mjds == [59999, 60000]
 
 
 # ============================================================================
