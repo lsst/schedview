@@ -163,6 +163,21 @@ class TimelineBuilder:
         self._plot_heights: dict[str, int] = {}
         self._visibility_selector: MultiChoice | None = None
 
+    def _get_available_columns(self) -> set[str]:
+        """Get columns available in visit data sources.
+
+        Returns
+        -------
+        set[str]
+            Set of column names available in at least one visit set ColumnDataSource.
+        """
+        available: set[str] = set()
+        for visit_set in self._visit_sets.values():
+            if visit_set.source is not None:
+                source_cols = set(visit_set.source.data.keys())
+                available |= source_cols  # Union of all columns from all visit sets
+        return available
+
     def add_scatter(
         self,
         y_column: str,
@@ -180,6 +195,9 @@ class TimelineBuilder:
             The initial column to plot on the y-axis.
         offered_columns : Iterable[str], optional
             Columns to offer in the y-axis selector dropdown.
+            If provided, columns are filtered to those present in at least
+            one visit set source. If no visit sets are present, all offered
+            columns are kept.
         name : str, optional
             Identifier for this scatter plot.
         height : int, optional
@@ -198,10 +216,25 @@ class TimelineBuilder:
         if height is not None:
             self._plot_heights[name] = height
 
+        # Filter offered_columns to only include those present in visit data
+        # If no visit sets, keep all offered columns (backward compatible)
+        offered_list = list(offered_columns)
+        if offered_list:
+            available = self._get_available_columns()
+            if available:
+                # Filter to only columns that exist in at least one visit set
+                filtered_offered = [col for col in offered_list if col in available]
+                # If the initial y_column is not available, use the first available
+                if y_column not in available and filtered_offered:
+                    y_column = filtered_offered[0]
+                offered_list = filtered_offered
+            # If no available columns from visits, keep all offered columns
+            # (this preserves behavior when no visits are present)
+
         config = ScatterPlotConfig(
             name=name,
             y_column=y_column,
-            offered_columns=tuple(offered_columns),
+            offered_columns=tuple(offered_list),
             figure_kwargs=figure_kwargs,
             tooltips=tuple(tooltips) if tooltips is not None else None,
         )
@@ -508,9 +541,12 @@ class TimelineBuilder:
             return None
 
         # Create the Select widget with offered columns
+        # Use the first offered column if y_column is not in offered_columns
+        # (this can happen if y_column was filtered out during add_scatter)
+        initial_value = config.y_column if config.y_column in config.offered_columns else config.offered_columns[0] if config.offered_columns else None
         selector = Select(
             title="Y-Axis:",
-            value=config.y_column,
+            value=initial_value,
             options=list(config.offered_columns),
             width=200,
         )
