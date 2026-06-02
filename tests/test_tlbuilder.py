@@ -719,6 +719,48 @@ class TestAddColorStripe:
             mjds.append(round(mjd))
         assert mjds == [59999, 60000]
 
+    def test_handles_mixed_finite_and_nan_values(self):
+        """add_color_stripe handles mixed finite+NaN values using nanmin/nanmax."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        # Mixed finite and NaN values
+        series = pd.Series([1.0, np.nan, 5.0, np.nan, 10.0], index=[59999.0, 60000.0, 60001.0, 60002.0, 60003.0])
+        builder.add_color_stripe(series, name="mixed_stripe")
+
+        config = builder._elements[0]
+        # Should compute range using only finite values
+        assert config.value_range == (1.0, 10.0)
+
+    def test_handles_all_nan_values_raises_error(self):
+        """add_color_stripe raises ValueError for all-NaN values."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        # All NaN values
+        series = pd.Series([np.nan, np.nan, np.nan], index=[59999.0, 60000.0, 60001.0])
+
+        with pytest.raises(ValueError, match="no finite values|all-NaN|empty"):
+            builder.add_color_stripe(series, name="all_nan_stripe")
+
+    def test_handles_empty_series_raises_error(self):
+        """add_color_stripe raises ValueError for empty series."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        # Empty Series
+        series = pd.Series([], dtype=float, index=[])
+
+        with pytest.raises(ValueError, match="no finite values|all-NaN|empty"):
+            builder.add_color_stripe(series, name="empty_stripe")
+
+    def test_handles_dataframe_with_nan_values(self):
+        """add_color_stripe handles DataFrame with NaN values correctly."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        df = pd.DataFrame({
+            "time_mjd": [59999.0, 60000.0, 60001.0],
+            "value": [np.nan, 5.0, 15.0],
+        })
+        builder.add_color_stripe(df, name="nan_stripe", value_column="value")
+
+        config = builder._elements[0]
+        # Should compute range using only finite values
+        assert config.value_range == (5.0, 15.0)
+
 
 # ============================================================================
 # TimelineBuilder.add_visit_visibility_selector Tests
