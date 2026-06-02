@@ -1472,55 +1472,75 @@ class TestCLI:
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--visits", "/tmp/test_visits.parquet",
-            "--output", "/tmp/cli_test.html"
-        ])
-        assert result.exit_code in (0, 1)
+        # Mock read_visits to return empty DataFrame so CLI succeeds
+        with patch("schedview.collect.visits.read_visits") as mock_read:
+            mock_read.return_value = pd.DataFrame()
+            result = runner.invoke(main, [
+                "--date", "2025-06-15",
+                "--scatter", "altitude",
+                "--visits", "/tmp/test_visits.parquet",
+                "--output", "/tmp/cli_test.html"
+            ])
+        assert result.exit_code == 0, f"CLI failed with: {result.output}"
 
     def test_cli_accepts_multiple_visits_files(self):
         """CLI accepts multiple --visits arguments."""
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--visits", "/tmp/visits1.parquet",
-            "--visits", "/tmp/visits2.parquet",
-            "--output", "/tmp/cli_test.html"
-        ])
-        assert result.exit_code in (0, 1)
+        # Mock read_visits to return empty DataFrame so CLI succeeds
+        with patch("schedview.collect.visits.read_visits") as mock_read:
+            mock_read.return_value = pd.DataFrame()
+            result = runner.invoke(main, [
+                "--date", "2025-06-15",
+                "--scatter", "altitude",
+                "--visits", "/tmp/visits1.parquet",
+                "--visits", "/tmp/visits2.parquet",
+                "--output", "/tmp/cli_test.html"
+            ])
+        assert result.exit_code == 0, f"CLI failed with: {result.output}"
 
     def test_cli_accepts_background_argument(self):
         """CLI accepts --background argument."""
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--background", "sun_elevation",
-            "--output", "/tmp/cli_test.html"
-        ])
-        assert result.exit_code in (0, 1)
+        # Mock read_visits to return empty DataFrame
+        # Mock _sample_body_elevation to return non-empty Series for valid color stripe
+        with patch("schedview.collect.visits.read_visits") as mock_read:
+            with patch("schedview.plot.tlbuilder._sample_body_elevation") as mock_bg:
+                mock_read.return_value = pd.DataFrame()
+                # Return Series with some values to avoid empty data error
+                mock_bg.return_value = pd.Series([0.0, 10.0, 20.0, 10.0, 0.0], index=[58000.0, 58000.1, 58000.2, 58000.3, 58000.4])
+                result = runner.invoke(main, [
+                    "--date", "2025-06-15",
+                    "--scatter", "altitude",
+                    "--background", "sun_elevation",
+                    "--output", "/tmp/cli_test.html"
+                ])
+        assert result.exit_code == 0, f"CLI failed with: {result.output}"
 
     def test_cli_with_all_options(self):
         """CLI works with scatter, visits, and background together."""
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--scatter", "HA",
-            "--visits", "/tmp/visits.parquet",
-            "--background", "sun_elevation",
-            "--output", "/tmp/cli_test.html"
-        ])
-        assert result.exit_code in (0, 1)
+        # Mock read_visits to return empty DataFrame
+        # Mock _sample_body_elevation to return non-empty Series for valid color stripe
+        with patch("schedview.collect.visits.read_visits") as mock_read:
+            with patch("schedview.plot.tlbuilder._sample_body_elevation") as mock_bg:
+                mock_read.return_value = pd.DataFrame()
+                # Return Series with some values to avoid empty data error
+                mock_bg.return_value = pd.Series([0.0, 10.0, 20.0, 10.0, 0.0], index=[58000.0, 58000.1, 58000.2, 58000.3, 58000.4])
+                result = runner.invoke(main, [
+                    "--date", "2025-06-15",
+                    "--scatter", "altitude",
+                    "--scatter", "HA",
+                    "--visits", "/tmp/visits.parquet",
+                    "--background", "sun_elevation",
+                    "--output", "/tmp/cli_test.html"
+                ])
+        assert result.exit_code == 0, f"CLI failed with: {result.output}"
 
     def test_cli_with_enable_visibility_toggle_flag(self):
         """CLI with --enable-visibility-toggle flag."""
