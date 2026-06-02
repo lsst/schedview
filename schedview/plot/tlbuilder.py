@@ -339,12 +339,27 @@ class TimelineBuilder:
             mjd_times = data[mjd_col].values
             values = data[value_column].values
 
+        # Check for empty data before datetime conversion
+        if len(values) == 0:
+            raise ValueError(
+                f"Color stripe '{name}' has no data. "
+                "Cannot auto-compute value_range with empty data."
+            )
+
         # Convert MJD to datetime64
         times = Time(mjd_times, format="mjd").datetime64
 
         # Auto-compute value range if not provided
         if value_range is None:
-            value_range = (float(np.min(values)), float(np.max(values)))
+            # Use nanmin/nanmax for NaN-safe calculation
+            # Filter out NaN and infinite values for range computation
+            finite_values = values[np.isfinite(values)]
+            if len(finite_values) == 0:
+                raise ValueError(
+                    f"Color stripe '{name}' has no finite values. "
+                    "Cannot auto-compute value_range with all-NaN or empty data."
+                )
+            value_range = (float(np.nanmin(finite_values)), float(np.nanmax(finite_values)))
 
         # Compute adjacent rectangle widths for continuous coverage.
         # Bokeh datetime axes store values in milliseconds since epoch, so widths
