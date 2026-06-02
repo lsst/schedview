@@ -20,6 +20,7 @@ from bokeh.models import (
     ColumnDataSource,
     CustomJS,
     DatetimeTickFormatter,
+    HoverTool,
     MultiChoice,
     Range1d,
     Scatter,
@@ -1438,3 +1439,89 @@ class TestScatterPlotRendering:
         for fig in result.children:
             scatter_renderer = [r for r in fig.renderers if isinstance(r.glyph, Scatter)][0]
             assert scatter_renderer.glyph.y == "altitude"
+
+
+# ============================================================================
+# Tooltips Tests
+# ============================================================================
+
+class TestScatterTooltips:
+    """Tests for scatter plot tooltips functionality."""
+
+    def test_add_scatter_stores_tooltips_in_config(self):
+        """add_scatter stores tooltips in ScatterPlotConfig."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        tooltips = [("Time", "@time"), ("Altitude", "@altitude")]
+        builder.add_scatter(y_column="altitude", tooltips=tooltips)
+        
+        config = builder._elements[0]
+        assert isinstance(config, ScatterPlotConfig)
+        assert config.tooltips == tuple(tooltips)
+
+    def test_add_scatter_default_tooltips_is_none(self):
+        """add_scatter defaults tooltips to None when not provided."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        builder.add_scatter(y_column="altitude")
+        
+        config = builder._elements[0]
+        assert config.tooltips is None
+
+    def test_figure_has_hover_tool_with_explicit_tooltips(self):
+        """Figure has HoverTool when tooltips are provided."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        tooltips = [("Time", "@time"), ("Altitude", "@altitude")]
+        builder.add_scatter(y_column="altitude", tooltips=tooltips)
+        result = builder.build()
+
+        fig = result.children[0]
+        hover_tools = [t for t in fig.tools if isinstance(t, HoverTool)]
+        assert len(hover_tools) == 1
+        assert hover_tools[0].tooltips == tooltips
+
+    def test_figure_has_no_hover_tool_without_tooltips(self):
+        """Figure has no HoverTool when tooltips are not provided."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        builder.add_scatter(y_column="altitude")
+        result = builder.build()
+
+        fig = result.children[0]
+        hover_tools = [t for t in fig.tools if isinstance(t, HoverTool)]
+        assert len(hover_tools) == 0
+
+    def test_multiple_scatter_plots_with_tooltips(self):
+        """Multiple scatter plots can each have their own tooltips."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        builder.add_scatter(y_column="altitude", tooltips=[("Time", "@time"), ("Alt", "@altitude")], name="plot1")
+        builder.add_scatter(y_column="HA", tooltips=[("Time", "@time"), ("HA", "@HA")], name="plot2")
+        result = builder.build()
+
+        # Find HoverTools in the figures
+        hover_tools = []
+        for child in result.children:
+            if hasattr(child, 'tools'):
+                hover_tools.extend([t for t in child.tools if isinstance(t, HoverTool)])
+        assert len(hover_tools) == 2
+
+    def test_tooltips_work_with_visit_data(self):
+        """Tooltips work correctly when visit data is overlaid."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        tooltips = [("Time", "@time"), ("Altitude", "@altitude"), ("Band", "@band")]
+        builder.add_scatter(y_column="altitude", tooltips=tooltips)
+        builder.add_visits(
+            pd.DataFrame({
+                "observationStartMJD": [59999.0, 59999.1],
+                "altitude": [30.0, 45.0],
+                "band": ["g", "r"]
+            }),
+            label="v1",
+        )
+        result = builder.build()
+        
+        fig = result.children[0]
+        # Should have HoverTool
+        hover_tools = [t for t in fig.tools if isinstance(t, HoverTool)]
+        assert len(hover_tools) == 1
+        assert hover_tools[0].tooltips == tooltips
+        # Should also have scatter renderers from visits
+        scatter_renderers = [r for r in fig.renderers if isinstance(r.glyph, Scatter)]
+        assert len(scatter_renderers) >= 1

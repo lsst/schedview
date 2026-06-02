@@ -17,6 +17,7 @@ from bokeh.models import (
     ColumnDataSource,
     CustomJS,
     DatetimeTickFormatter,
+    HoverTool,
     LinearColorMapper,
     MultiChoice,
     Range1d,
@@ -42,12 +43,15 @@ class ScatterPlotConfig:
         Columns available for y-axis selection.
     figure_kwargs : dict
         Additional arguments for bokeh.plotting.figure.
+    tooltips : tuple or None
+        Hover tooltips for the scatter plot.
     """
 
     name: str
     y_column: str
     offered_columns: tuple[str, ...]
     figure_kwargs: dict
+    tooltips: tuple | None = None
 
 
 @dataclass
@@ -165,6 +169,7 @@ class TimelineBuilder:
             y_column=y_column,
             offered_columns=tuple(offered_columns),
             figure_kwargs=figure_kwargs,
+            tooltips=tuple(tooltips) if tooltips is not None else None,
         )
         self._elements.append(config)
         return self
@@ -519,6 +524,10 @@ class TimelineBuilder:
         fig_kwargs["x_range"] = self._shared_x_range
 
         fig = figure(**fig_kwargs)
+
+        # Add hover tooltips if specified
+        if config.tooltips is not None:
+            fig.add_tools(HoverTool(tooltips=list(config.tooltips)))
 
         # Overlay all visit sets onto this scatter panel using the panel's y_column.
         for visit_set in self._visit_sets.values():
