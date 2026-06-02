@@ -1,5 +1,4 @@
-"""Timeline Builder
-"""
+"""Timeline Builder"""
 
 from __future__ import annotations
 
@@ -50,7 +49,7 @@ def _find_time_column(df: pd.DataFrame, time_column: str | None = None) -> str:
     Notes
     -----
     When time_column is not provided, the method uses a heuristic:
-    1. Look for columns containing 'mjd' (case-insensitive) or exactly 'time_mjd'
+    1. Look for columns containing 'mjd' (case-insensitive)
     2. If no match found, use the first column as the time column
     """
     if time_column is not None:
@@ -172,7 +171,7 @@ class TimelineBuilder:
         Returns
         -------
         set[str]
-            Set of column names available in at least one visit set ColumnDataSource.
+            Column names available in at least one visit set source.
         """
         available: set[str] = set()
         for visit_set in self._visit_sets.values():
@@ -225,9 +224,9 @@ class TimelineBuilder:
         if offered_list:
             available = self._get_available_columns()
             if available:
-                # Filter to only columns that exist in at least one visit set
+                # Filter to only columns that exist in at least one visit set.
                 filtered_offered = [col for col in offered_list if col in available]
-                # If the initial y_column is not available, use the first available
+                # If y_column is not available, use the first available.
                 if y_column not in available and filtered_offered:
                     y_column = filtered_offered[0]
                 offered_list = filtered_offered
@@ -288,7 +287,7 @@ class TimelineBuilder:
         else:
             times = np.array([], dtype="datetime64[us]")
 
-        # Build source with ALL data columns so any scatter y_column can use the data.
+        # Build source with all data columns for scatter y_column access.
         source_data: dict = {"time": times}
         for col in visits.columns:
             if col != time_column:
@@ -312,7 +311,7 @@ class TimelineBuilder:
             color_by_band=color_by_band,
             show_visibility_toggle=show_visibility_toggle,
         )
-        # Visits are overlaid on scatter panels — they do not create their own figures.
+        # Visits are overlaid on scatter panels; they don't create figures.
         return self
 
     def add_color_stripe(
@@ -371,8 +370,7 @@ class TimelineBuilder:
         # Check for empty data before datetime conversion
         if len(values) == 0:
             raise ValueError(
-                f"Color stripe '{name}' has no data. "
-                "Cannot auto-compute value_range with empty data."
+                f"Color stripe '{name}' has no data. " "Cannot auto-compute value_range with empty data."
             )
 
         # Convert MJD to datetime64
@@ -391,8 +389,7 @@ class TimelineBuilder:
             value_range = (float(np.nanmin(finite_values)), float(np.nanmax(finite_values)))
 
         # Compute adjacent rectangle widths for continuous coverage.
-        # Bokeh datetime axes store values in milliseconds since epoch, so widths
-        # must also be in milliseconds.
+        # Bokeh datetime axes use milliseconds since epoch.
         if len(times) >= 2:
             # Calculate half-gaps between adjacent midpoints
             half_gaps = np.diff(times) / 2
@@ -470,29 +467,26 @@ class TimelineBuilder:
         # Create visibility selector at build time with current visit sets
         if self._needs_visit_visibility_selector:
             # Build list of visit set labels with visibility toggle enabled
-            options = [
-                label for label, dataset in self._visit_sets.items()
-                if dataset.show_visibility_toggle
-            ]
-            
-            # Only create selector if there are visit sets with visibility toggle
+            options = [label for label, dataset in self._visit_sets.items() if dataset.show_visibility_toggle]
+
+            # Only create selector if there are visit sets with toggle.
             if options:
                 self._visibility_selector = MultiChoice(
                     value=options,
                     options=options,
                     width=400,
                 )
-                
-                # Build visit set info with actual renderer references
+
+                # Build visit set info with renderer references.
                 visit_sets_for_callback = {}
                 for label, dataset in self._visit_sets.items():
                     if dataset.show_visibility_toggle:
-                        # Get renderers for this visit set, or empty list if none tracked
+                        # Get renderers; empty if none tracked.
                         renderers = visit_renderers.get(label, [])
                         visit_sets_for_callback[label] = {"renderers": renderers}
 
                 if visit_sets_for_callback:
-                    # Create CustomJS callback to toggle visibility of visit renderers
+                    # Create callback to toggle visit renderer visibility.
                     callback_code = """
                         const selected_labels = this.value;
                         for (const [label, visit_info] of Object.entries(visit_sets)) {
@@ -505,13 +499,9 @@ class TimelineBuilder:
                     """
 
                     self._visibility_selector.js_on_change(
-                        'value',
-                        CustomJS(
-                            args={'visit_sets': visit_sets_for_callback},
-                            code=callback_code
-                        )
+                        "value", CustomJS(args={"visit_sets": visit_sets_for_callback}, code=callback_code)
                     )
-                
+
                 # Add visibility selector to layout (first, before figures)
                 layout_components.insert(0, self._visibility_selector)
 
@@ -520,8 +510,8 @@ class TimelineBuilder:
     def _create_scatter_y_selector(self, config: ScatterPlotConfig, fig: Plot) -> Select | None:
         """Create a y-axis selector widget for a scatter plot.
 
-        Creates a Select widget with offered_columns as options.
-        The widget is positioned directly above its corresponding scatter figure.
+        Creates a Select widget with offered_columns as options positioned
+        above the scatter figure.
 
         Parameters
         ----------
@@ -535,14 +525,15 @@ class TimelineBuilder:
         Select or None
             The y-axis selector widget if multiple offered_columns, else None.
         """
-        # Only create selector if multiple columns offered
+        # Only create selector if multiple columns offered.
         if len(config.offered_columns) <= 1:
             return None
 
-        # Create the Select widget with offered columns
-        # Use the first offered column if y_column is not in offered_columns
-        # (this can happen if y_column was filtered out during add_scatter)
-        initial_value = config.y_column if config.y_column in config.offered_columns else config.offered_columns[0] if config.offered_columns else None
+        # Create the Select widget with offered columns.
+        # Use first offered column if y_column is not available.
+        initial_value = config.y_column
+        if config.y_column not in config.offered_columns:
+            initial_value = config.offered_columns[0] if config.offered_columns else None
         selector = Select(
             title="Y-Axis:",
             value=initial_value,
@@ -550,10 +541,9 @@ class TimelineBuilder:
             width=200,
         )
 
-        # Create CustomJS callback to update y-field and y-axis label.
-        # Must use {field: new_y} rather than a plain string: Bokeh 3.x treats
-        # a bare string as a constant value, not a column reference, which causes
-        # the glyph to disappear when a new column is selected.
+        # Create CustomJS callback to update y-field.
+        # Bokeh 3.x requires {field: new_y} for column references;
+        # a plain string is treated as a constant value.
         callback_code = """
             const new_y = cb_obj.value;
             for (const renderer of fig.renderers) {
@@ -570,17 +560,15 @@ class TimelineBuilder:
             fig.change.emit();
         """
 
-        selector.js_on_change(
-            'value',
-            CustomJS(
-                args={'fig': fig},
-                code=callback_code
-            )
-        )
+        selector.js_on_change("value", CustomJS(args={"fig": fig}, code=callback_code))
 
         return selector
 
-    def _create_scatter_figure(self, config: ScatterPlotConfig, visit_renderers: dict[str, list] | None = None) -> Plot:
+    def _create_scatter_figure(
+        self,
+        config: ScatterPlotConfig,
+        visit_renderers: dict[str, list] | None = None,
+    ) -> Plot:
         """Create a scatter plot figure.
 
         Parameters
@@ -588,8 +576,7 @@ class TimelineBuilder:
         config : ScatterPlotConfig
             Configuration for the scatter plot.
         visit_renderers : dict[str, list] | None
-            Dictionary mapping visit set labels to lists of renderer references.
-            If provided, renderers will be added to these lists for visibility toggling.
+            Maps visit set labels to renderer lists for visibility toggling.
 
         Returns
         -------
@@ -614,7 +601,7 @@ class TimelineBuilder:
         if config.tooltips is not None:
             fig.add_tools(HoverTool(tooltips=list(config.tooltips)))
 
-        # Overlay all visit sets onto this scatter panel using the panel's y_column.
+        # Overlay visit sets onto this scatter panel using y_column.
         for visit_set in self._visit_sets.values():
             if config.y_column not in visit_set.source.data:
                 continue
@@ -632,8 +619,8 @@ class TimelineBuilder:
                 legend_label=visit_set.label,
             )
 
-            # Track this renderer for visibility toggling
-            # Always initialize the list for each visit set label if visit_renderers is provided
+            # Track renderer for visibility toggling.
+            # Initialize list for each visit set if visit_renderers provided.
             if visit_renderers is not None:
                 if visit_set.label not in visit_renderers:
                     visit_renderers[visit_set.label] = []
@@ -660,9 +647,7 @@ class TimelineBuilder:
         # Get height from plot_heights, default to 40
         height = self._plot_heights.get(config.name, 40)
 
-        # Create figure with no y-axis
-        # Use explicit y_range to ensure the rectangles are visible
-        # Set y_axis_type=None and y_axis_location=None to hide y-axis completely
+        # Create figure with no y-axis and explicit y_range.
         fig_kwargs = {
             "width": 1000,
             "x_axis_type": "datetime",
@@ -686,8 +671,12 @@ class TimelineBuilder:
             # Default to Viridis256
             palette = palettes.Viridis256
 
-        # Create linear color mapper
-        color_mapper = LinearColorMapper(palette=palette, low=config.value_range[0], high=config.value_range[1])
+        # Create linear color mapper.
+        color_mapper = LinearColorMapper(
+            palette=palette,
+            low=config.value_range[0],
+            high=config.value_range[1],
+        )
 
         # Add stripe as rect glyphs
         # Rect uses y as center, height as total height
@@ -755,9 +744,7 @@ def _sample_body_elevation(body_name: str, dayobs: DayObs) -> pd.Series:
     return pd.Series(altaz.alt.deg, index=mjds)
 
 
-@click.command(
-    help="Build timeline visualizations for Rubin Observatory observing nights."
-)
+@click.command(help="Build timeline visualizations for Rubin Observatory observing nights.")
 @click.option(
     "--date",
     required=True,
@@ -773,7 +760,9 @@ def _sample_body_elevation(body_name: str, dayobs: DayObs) -> pd.Series:
     "--visits",
     multiple=True,
     required=False,
-    help="Visit source: 'baseline' for the default baseline, an SQLite3 filename, or any valid visit_source string accepted by read_visits.",
+    help=(
+        "Visit source: 'baseline', an SQLite3 filename, or any valid " "visit_source string for read_visits."
+    ),
 )
 @click.option(
     "--background",
@@ -830,8 +819,6 @@ def main(
     y_columns: tuple[str, ...],
 ) -> None:
     """CLI entry point."""
-    import pandas as pd
-
     from schedview.collect.visits import read_visits
 
     # Create DayObs from date
@@ -844,28 +831,38 @@ def main(
     # and multiple --y-columns options that are merged together)
     y_columns_offered = ()
     if y_columns:
-        # Merge all --y-columns values together, splitting comma-separated values
+        # Merge --y-columns, splitting comma-separated values
         all_columns = []
         for y_cols in y_columns:
             all_columns.extend(c.strip() for c in y_cols.split(",") if c.strip())
         y_columns_offered = tuple(all_columns)
 
     if num_scatter is not None and num_scatter > 0:
-        # Create num_scatter scatter plots, all using the first scatter column
+        # Create num_scatter scatter plots using first scatter column.
         first_column = scatter[0] if scatter else "altitude"
         for i in range(num_scatter):
             name = f"scatter_{i+1}"
-            builder.add_scatter(y_column=first_column, offered_columns=y_columns_offered, name=name, height=scatter_height)
+            builder.add_scatter(
+                y_column=first_column,
+                offered_columns=y_columns_offered,
+                name=name,
+                height=scatter_height,
+            )
     else:
-        # Add scatter plots for each provided column
+        # Add scatter plots for each provided column.
         for column_name in scatter:
             name = column_name
-            builder.add_scatter(y_column=column_name, offered_columns=y_columns_offered, name=name, height=scatter_height)
+            builder.add_scatter(
+                y_column=column_name,
+                offered_columns=y_columns_offered,
+                name=name,
+                height=scatter_height,
+            )
 
     # Add visits
     for visit_source in visits:
-        # Load visits data using read_visits
-        # visit_source can be "baseline", an SQLite3 filename, or any valid source
+        # Load visits via read_visits
+        # visit_source can be "baseline", an SQLite3 file, or valid source
         visits_df = read_visits(dayobs, str(visit_source))
 
         # Generate label from visit source
@@ -878,15 +875,17 @@ def main(
 
         builder.add_visits(visits_df, label=label, show_visibility_toggle=True)
 
-    # Add background stripes
+    # Add background stripes.
     for bg_type in background:
         if bg_type == "sun_elevation":
             sun_data = _sample_body_elevation("sun", dayobs)
-            builder.add_color_stripe(sun_data, name="sun_elevation", height=stripe_height if stripe_height is not None else 100)
+            stripe_h = stripe_height if stripe_height is not None else 100
+            builder.add_color_stripe(sun_data, name="sun_elevation", height=stripe_h)
 
         elif bg_type == "moon_elevation":
             moon_data = _sample_body_elevation("moon", dayobs)
-            builder.add_color_stripe(moon_data, name="moon_elevation", height=stripe_height if stripe_height is not None else 100)
+            stripe_h = stripe_height if stripe_height is not None else 100
+            builder.add_color_stripe(moon_data, name="moon_elevation", height=stripe_h)
 
         else:
             # This should never happen since click.Choice validates the value

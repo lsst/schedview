@@ -6,30 +6,28 @@ in the schedview.plot.tlbuilder module.
 
 from __future__ import annotations
 
-import datetime
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
+import click
 import numpy as np
 import pandas as pd
 import pytest
 from astropy.time import Time
-from click.testing import CliRunner
-import click
+from bokeh.layouts import column
 from bokeh.models import (
     ColumnDataSource,
     CustomJS,
     DatetimeTickFormatter,
     HoverTool,
     MultiChoice,
+    Quad,
     Range1d,
+    Rect,
     Scatter,
     Select,
-    Rect,
-    Quad,
 )
-from bokeh.layouts import column
 from bokeh.plotting import figure
+from click.testing import CliRunner
 
 from schedview.dayobs import DayObs
 from schedview.plot.tlbuilder import (
@@ -39,34 +37,54 @@ from schedview.plot.tlbuilder import (
     VisitDataSet,
 )
 
-
 # ============================================================================
 # Dataclass Tests
 # ============================================================================
+
 
 class TestScatterPlotConfig:
     """Tests for ScatterPlotConfig dataclass."""
 
     def test_stores_name(self):
         """ScatterPlotConfig stores name correctly."""
-        config = ScatterPlotConfig(name="test_plot", y_column="altitude", offered_columns=(), figure_kwargs={})
+        config = ScatterPlotConfig(
+            name="test_plot",
+            y_column="altitude",
+            offered_columns=(),
+            figure_kwargs={},
+        )
         assert config.name == "test_plot"
 
     def test_stores_y_column(self):
         """ScatterPlotConfig stores y_column correctly."""
-        config = ScatterPlotConfig(name="test_plot", y_column="altitude", offered_columns=(), figure_kwargs={})
+        config = ScatterPlotConfig(
+            name="test_plot",
+            y_column="altitude",
+            offered_columns=(),
+            figure_kwargs={},
+        )
         assert config.y_column == "altitude"
 
     def test_stores_offered_columns(self):
         """ScatterPlotConfig stores offered_columns correctly."""
         offered = ("altitude", "HA", "fieldRA")
-        config = ScatterPlotConfig(name="test_plot", y_column="altitude", offered_columns=offered, figure_kwargs={})
+        config = ScatterPlotConfig(
+            name="test_plot",
+            y_column="altitude",
+            offered_columns=offered,
+            figure_kwargs={},
+        )
         assert config.offered_columns == offered
 
     def test_stores_figure_kwargs(self):
         """ScatterPlotConfig stores figure_kwargs correctly."""
         kwargs = {"width": 800}
-        config = ScatterPlotConfig(name="test_plot", y_column="altitude", offered_columns=(), figure_kwargs=kwargs)
+        config = ScatterPlotConfig(
+            name="test_plot",
+            y_column="altitude",
+            offered_columns=(),
+            figure_kwargs=kwargs,
+        )
         assert config.figure_kwargs == kwargs
 
 
@@ -81,10 +99,7 @@ class TestColorStripeConfig:
         """ColorStripeConfig can be instantiated with required args."""
         source = ColumnDataSource(data={"time": [], "value": []})
         config = ColorStripeConfig(
-            name="test_stripe",
-            source=source,
-            colormap="Cividis256",
-            value_range=(0.0, 1.0)
+            name="test_stripe", source=source, colormap="Cividis256", value_range=(0.0, 1.0)
         )
         assert config is not None
         assert config.name == "test_stripe"
@@ -119,7 +134,7 @@ class TestVisitDataSet:
             alpha=0.5,
             marker="triangle",
             color_by_band=False,
-            show_visibility_toggle=False
+            show_visibility_toggle=False,
         )
         assert dataset.source is source
         assert dataset.label == "custom_visits"
@@ -132,6 +147,7 @@ class TestVisitDataSet:
 # ============================================================================
 # TimelineBuilder Initialization Tests
 # ============================================================================
+
 
 class TestTimelineBuilderInitialization:
     """Tests for TimelineBuilder initialization."""
@@ -152,11 +168,6 @@ class TestTimelineBuilderInitialization:
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         assert builder._visit_sets == {}
 
-    def test_initializes_empty_elements(self):
-        """TimelineBuilder initializes _elements as empty list."""
-        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        assert builder._elements == []
-
     def test_initializes_shared_x_range(self):
         """TimelineBuilder initializes _shared_x_range from dayobs."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
@@ -176,6 +187,7 @@ class TestTimelineBuilderInitialization:
 # ============================================================================
 # TimelineBuilder.add_scatter Tests
 # ============================================================================
+
 
 class TestAddScatter:
     """Tests for TimelineBuilder.add_scatter method."""
@@ -287,6 +299,7 @@ class TestAddScatter:
 # TimelineBuilder.add_visits Tests
 # ============================================================================
 
+
 class TestAddVisits:
     """Tests for TimelineBuilder.add_visits method."""
 
@@ -299,20 +312,24 @@ class TestAddVisits:
     def test_accepts_visits_dataframe(self):
         """add_visits accepts a pandas DataFrame."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0, 60000.0, 60001.0],
-            "altitude": [30.0, 45.0, 60.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0, 60000.0, 60001.0],
+                "altitude": [30.0, 45.0, 60.0],
+            }
+        )
         builder.add_visits(visits_df)
         assert "visits" in builder._visit_sets
 
     def test_converts_mjd_to_datetime64(self):
         """add_visits converts MJD timestamps to datetime64."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0, 60000.0, 60001.0],
-            "altitude": [30.0, 45.0, 60.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0, 60000.0, 60001.0],
+                "altitude": [30.0, 45.0, 60.0],
+            }
+        )
         builder.add_visits(visits_df)
 
         dataset = builder._visit_sets["visits"]
@@ -325,11 +342,13 @@ class TestAddVisits:
     def test_creates_column_data_source(self):
         """add_visits creates a ColumnDataSource with correct fields."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0, 60000.0],
-            "altitude": [30.0, 45.0],
-            "band": ["g", "r"],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0, 60000.0],
+                "altitude": [30.0, 45.0],
+                "band": ["g", "r"],
+            }
+        )
         builder.add_visits(visits_df)
 
         dataset = builder._visit_sets["visits"]
@@ -342,10 +361,12 @@ class TestAddVisits:
     def test_stores_visit_dataset(self):
         """add_visits stores VisitDataSet in self._visit_sets."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0],
-            "altitude": [30.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+            }
+        )
         builder.add_visits(visits_df, label="my_visits")
 
         assert "my_visits" in builder._visit_sets
@@ -355,10 +376,12 @@ class TestAddVisits:
     def test_stores_visit_dataset_attributes(self):
         """VisitDataSet stores label, alpha, marker, color_by_band."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0],
-            "altitude": [30.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+            }
+        )
         builder.add_visits(visits_df, label="test_visits", alpha=0.7, marker="triangle", color_by_band=False)
 
         dataset = builder._visit_sets["test_visits"]
@@ -368,13 +391,15 @@ class TestAddVisits:
         assert dataset.color_by_band is False
 
     def test_applies_band_coloring_when_band_exists(self):
-        """add_visits assigns colors based on band column when color_by_band=True."""
+        """When color_by_band=True, add_visits assigns colors based on band."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0, 60000.0, 60001.0],
-            "altitude": [30.0, 45.0, 60.0],
-            "band": ["u", "g", "r"],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0, 60000.0, 60001.0],
+                "altitude": [30.0, 45.0, 60.0],
+                "band": ["u", "g", "r"],
+            }
+        )
         builder.add_visits(visits_df, label="band_visits", color_by_band=True)
 
         dataset = builder._visit_sets["band_visits"]
@@ -386,11 +411,13 @@ class TestAddVisits:
     def test_default_color_by_band_is_true(self):
         """add_visits has color_by_band=True by default."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0],
-            "altitude": [30.0],
-            "band": ["g"],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "band": ["g"],
+            }
+        )
         builder.add_visits(visits_df, label="default_band")
 
         dataset = builder._visit_sets["default_band"]
@@ -399,10 +426,12 @@ class TestAddVisits:
     def test_custom_marker_works(self):
         """add_visits respects custom marker parameter."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0],
-            "altitude": [30.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+            }
+        )
         builder.add_visits(visits_df, label="triangle_visits", marker="triangle")
 
         dataset = builder._visit_sets["triangle_visits"]
@@ -411,10 +440,12 @@ class TestAddVisits:
     def test_custom_alpha_works(self):
         """add_visits respects custom alpha parameter."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0],
-            "altitude": [30.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+            }
+        )
         builder.add_visits(visits_df, label="alpha_visits", alpha=0.3)
 
         dataset = builder._visit_sets["alpha_visits"]
@@ -423,10 +454,12 @@ class TestAddVisits:
     def test_custom_time_column(self):
         """add_visits can use custom time column."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df = pd.DataFrame({
-            "custom_time_mjd": [59999.0, 60000.0],
-            "altitude": [30.0, 45.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "custom_time_mjd": [59999.0, 60000.0],
+                "altitude": [30.0, 45.0],
+            }
+        )
         builder.add_visits(visits_df, label="custom_time", time_column="custom_time_mjd")
 
         dataset = builder._visit_sets["custom_time"]
@@ -435,10 +468,12 @@ class TestAddVisits:
     def test_method_chaining(self):
         """add_visits can be chained with other methods."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0],
-            "altitude": [30.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+            }
+        )
 
         result = (
             builder.add_scatter(y_column="altitude", name="scatter1")
@@ -455,6 +490,7 @@ class TestAddVisits:
 # Helper function Tests
 # ============================================================================
 
+
 class TestFindTimeColumn:
     """Tests for _find_time_column helper function."""
 
@@ -470,10 +506,12 @@ class TestFindTimeColumn:
         """_find_time_column heuristic finds column with 'mjd' in name."""
         from schedview.plot.tlbuilder import _find_time_column
 
-        df = pd.DataFrame({
-            "observationStartMJD": [1.0, 2.0],
-            "value": [10.0, 20.0],
-        })
+        df = pd.DataFrame(
+            {
+                "observationStartMJD": [1.0, 2.0],
+                "value": [10.0, 20.0],
+            }
+        )
         result = _find_time_column(df)
         assert result == "observationStartMJD"
 
@@ -481,33 +519,39 @@ class TestFindTimeColumn:
         """_find_time_column heuristic is case-insensitive for 'mjd'."""
         from schedview.plot.tlbuilder import _find_time_column
 
-        df = pd.DataFrame({
-            "time_mjd": [1.0, 2.0],
-            "value": [10.0, 20.0],
-        })
+        df = pd.DataFrame(
+            {
+                "time_mjd": [1.0, 2.0],
+                "value": [10.0, 20.0],
+            }
+        )
         result = _find_time_column(df)
         assert result == "time_mjd"
 
     def test_heuristic_finds_first_column_when_no_mjd(self):
-        """_find_time_column heuristic uses first column when no 'mjd' found."""
+        """_find_time_column uses first column when no 'mjd' found."""
         from schedview.plot.tlbuilder import _find_time_column
 
-        df = pd.DataFrame({
-            "timestamp": [1.0, 2.0],
-            "value": [10.0, 20.0],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": [1.0, 2.0],
+                "value": [10.0, 20.0],
+            }
+        )
         result = _find_time_column(df)
         assert result == "timestamp"
 
     def test_heuristic_prefers_mjd_over_first_column(self):
-        """_find_time_column heuristic prefers 'mjd' column over first column."""
+        """_find_time_column prefers 'mjd' column over first column."""
         from schedview.plot.tlbuilder import _find_time_column
 
-        df = pd.DataFrame({
-            "first_col": [0.0, 1.0],
-            "observationStartMJD": [1.0, 2.0],
-            "value": [10.0, 20.0],
-        })
+        df = pd.DataFrame(
+            {
+                "first_col": [0.0, 1.0],
+                "observationStartMJD": [1.0, 2.0],
+                "value": [10.0, 20.0],
+            }
+        )
         result = _find_time_column(df)
         assert result == "observationStartMJD"
 
@@ -515,6 +559,7 @@ class TestFindTimeColumn:
 # ============================================================================
 # TimelineBuilder.add_color_stripe Tests
 # ============================================================================
+
 
 class TestAddColorStripe:
     """Tests for TimelineBuilder.add_color_stripe method."""
@@ -536,10 +581,12 @@ class TestAddColorStripe:
     def test_accepts_dataframe_with_mjd_column(self):
         """add_color_stripe accepts a DataFrame with MJD column."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        df = pd.DataFrame({
-            "time_mjd": [59999.0, 60000.0, 60001.0],
-            "value": [1.0, 2.0, 3.0],
-        })
+        df = pd.DataFrame(
+            {
+                "time_mjd": [59999.0, 60000.0, 60001.0],
+                "value": [1.0, 2.0, 3.0],
+            }
+        )
         builder.add_color_stripe(df, name="test_stripe", value_column="value")
         assert len(builder._elements) == 1
 
@@ -667,10 +714,12 @@ class TestAddColorStripe:
         """add_color_stripe uses explicit time_column when provided."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         # DataFrame with a non-standard time column name
-        df = pd.DataFrame({
-            "timestamp": [59999.0, 60000.0, 60001.0],  # Not 'time_mjd' or含有 'mjd'
-            "value": [1.0, 2.0, 3.0],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": [59999.0, 60000.0, 60001.0],  # Not 'time_mjd' or含有 'mjd'
+                "value": [1.0, 2.0, 3.0],
+            }
+        )
         builder.add_color_stripe(df, name="stripe1", time_column="timestamp", value_column="value")
         assert len(builder._elements) == 1
 
@@ -682,14 +731,16 @@ class TestAddColorStripe:
         assert isinstance(time_data[0], np.datetime64)
 
     def test_explicit_time_column_overrides_heuristic(self):
-        """add_color_stripe uses explicit time_column even when heuristic would pick different column."""
+        """add_color_stripe uses explicit time_column over heuristic."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         # DataFrame with multiple numeric columns
-        df = pd.DataFrame({
-            "time_mjd": [59998.0, 59999.0, 60000.0],  # Heuristic would pick this
-            "timestamp": [59999.0, 60000.0, 60001.0],  # But we want this one
-            "value": [1.0, 2.0, 3.0],
-        })
+        df = pd.DataFrame(
+            {
+                "time_mjd": [59998.0, 59999.0, 60000.0],  # Heuristic would pick this
+                "timestamp": [59999.0, 60000.0, 60001.0],  # But we want this one
+                "value": [1.0, 2.0, 3.0],
+            }
+        )
         # Explicit time_column should override the heuristic
         builder.add_color_stripe(df, name="stripe1", time_column="timestamp", value_column="value")
 
@@ -697,7 +748,7 @@ class TestAddColorStripe:
         source = config.source
         time_data = source.data.get("time", [])
 
-        # With explicit time_column="timestamp", times should be [59999, 60000, 60001]
+        # With explicit time_column="timestamp", times should match input
         # Convert back to MJD for comparison
         mjds = []
         for t in time_data:
@@ -710,7 +761,7 @@ class TestAddColorStripe:
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         # time_column should be ignored for Series
         series = pd.Series([1.0, 2.0], index=[59999.0, 60000.0])
-        # time_column argument should not cause issues for Series
+        # time_column argument should not cause issues
         builder.add_color_stripe(series, name="stripe1", time_column="some_column")
 
         config = builder._elements[0]
@@ -725,10 +776,13 @@ class TestAddColorStripe:
         assert mjds == [59999, 60000]
 
     def test_handles_mixed_finite_and_nan_values(self):
-        """add_color_stripe handles mixed finite+NaN values using nanmin/nanmax."""
+        """add_color_stripe uses nanmin/nanmax for mixed finite+NaN values."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        # Mixed finite and NaN values
-        series = pd.Series([1.0, np.nan, 5.0, np.nan, 10.0], index=[59999.0, 60000.0, 60001.0, 60002.0, 60003.0])
+        # Mixed finite and NaN
+        series = pd.Series(
+            [1.0, np.nan, 5.0, np.nan, 10.0],
+            index=[59999.0, 60000.0, 60001.0, 60002.0, 60003.0],
+        )
         builder.add_color_stripe(series, name="mixed_stripe")
 
         config = builder._elements[0]
@@ -756,10 +810,12 @@ class TestAddColorStripe:
     def test_handles_dataframe_with_nan_values(self):
         """add_color_stripe handles DataFrame with NaN values correctly."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        df = pd.DataFrame({
-            "time_mjd": [59999.0, 60000.0, 60001.0],
-            "value": [np.nan, 5.0, 15.0],
-        })
+        df = pd.DataFrame(
+            {
+                "time_mjd": [59999.0, 60000.0, 60001.0],
+                "value": [np.nan, 5.0, 15.0],
+            }
+        )
         builder.add_color_stripe(df, name="nan_stripe", value_column="value")
 
         config = builder._elements[0]
@@ -771,6 +827,7 @@ class TestAddColorStripe:
 # TimelineBuilder.add_visit_visibility_selector Tests
 # ============================================================================
 
+
 class TestAddVisitVisibilitySelector:
     """Tests for TimelineBuilder.add_visit_visibility_selector method."""
 
@@ -778,26 +835,30 @@ class TestAddVisitVisibilitySelector:
         """add_visit_visibility_selector adds a MultiChoice widget."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude", name="scatter1")
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0],
-            "altitude": [30.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+            }
+        )
         builder.add_visits(visits_df, label="visit1", show_visibility_toggle=True)
         result = builder.add_visit_visibility_selector()
         builder.build()  # Build to create the selector
 
         assert result is builder
-        assert hasattr(builder, '_visibility_selector')
+        assert hasattr(builder, "_visibility_selector")
         assert isinstance(builder._visibility_selector, MultiChoice)
 
     def test_widget_options_match_visit_labels(self):
-        """Widget options correspond to visit set labels with show_visibility_toggle=True."""
+        """Widget options match visit labels when visibility toggle is True."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude", name="scatter1")
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0],
-            "altitude": [30.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+            }
+        )
         builder.add_visits(visits_df, label="visible_visit", show_visibility_toggle=True)
         builder.add_visits(visits_df, label="hidden_visit", show_visibility_toggle=False)
         builder.add_visits(visits_df, label="another_visible", show_visibility_toggle=True)
@@ -811,14 +872,16 @@ class TestAddVisitVisibilitySelector:
         assert "hidden_visit" not in widget.options
 
     def test_widget_positioned_above_plots(self):
-        """Visibility selector appears once and above all plot blocks in final layout."""
+        """Visibility selector appears once above all plots in final layout."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude", name="scatter1")
         builder.add_scatter(y_column="HA", name="scatter2")
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0],
-            "altitude": [30.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+            }
+        )
         builder.add_visits(visits_df, label="visit1", show_visibility_toggle=True)
         builder.add_visits(visits_df, label="visit2", show_visibility_toggle=True)
         builder.add_visit_visibility_selector()
@@ -832,10 +895,12 @@ class TestAddVisitVisibilitySelector:
         """CustomJS callback toggles .visible for visit set renderers."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude", name="scatter1")
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0],
-            "altitude": [30.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+            }
+        )
         builder.add_visits(visits_df, label="visit1", show_visibility_toggle=True)
         builder.add_visits(visits_df, label="visit2", show_visibility_toggle=True)
         builder.add_visit_visibility_selector()
@@ -844,7 +909,7 @@ class TestAddVisitVisibilitySelector:
         widget = result.children[0]
         assert isinstance(widget, MultiChoice)
 
-        callbacks = widget.js_property_callbacks.get('change:value', [])
+        callbacks = widget.js_property_callbacks.get("change:value", [])
         assert len(callbacks) > 0
         has_customjs = any(isinstance(cb, CustomJS) for cb in callbacks)
         assert has_customjs
@@ -853,10 +918,12 @@ class TestAddVisitVisibilitySelector:
         """Visibility toggle affects only visit set renderers."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude", name="scatter1")
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0, 60000.0],
-            "altitude": [30.0, 45.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0, 60000.0],
+                "altitude": [30.0, 45.0],
+            }
+        )
         builder.add_visits(visits_df, label="visit1", show_visibility_toggle=True)
         builder.add_visit_visibility_selector()
         result = builder.build()
@@ -870,6 +937,7 @@ class TestAddVisitVisibilitySelector:
 # TimelineBuilder.add_visit_visibility_selector robustness Tests
 # ============================================================================
 
+
 class TestVisitVisibilitySelectorCallOrder:
     """Tests for robustness of add_visit_visibility_selector to call order."""
 
@@ -877,17 +945,19 @@ class TestVisitVisibilitySelectorCallOrder:
         """Selector works correctly when called before visits are added."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude", name="scatter1")
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0],
-            "altitude": [30.0],
-        })
-        
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+            }
+        )
+
         # Add selector BEFORE visits - should still work
         builder.add_visit_visibility_selector()
         builder.add_visits(visits_df, label="visit1", show_visibility_toggle=True)
-        
+
         result = builder.build()
-        
+
         # Selector should exist and have correct options
         assert isinstance(result.children[0], MultiChoice)
         widget = result.children[0]
@@ -897,17 +967,19 @@ class TestVisitVisibilitySelectorCallOrder:
         """Selector works correctly when called after visits are added."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude", name="scatter1")
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0],
-            "altitude": [30.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+            }
+        )
         builder.add_visits(visits_df, label="visit1", show_visibility_toggle=True)
-        
+
         # Add selector AFTER visits
         builder.add_visit_visibility_selector()
-        
+
         result = builder.build()
-        
+
         assert isinstance(result.children[0], MultiChoice)
         widget = result.children[0]
         assert "visit1" in widget.options
@@ -916,39 +988,43 @@ class TestVisitVisibilitySelectorCallOrder:
         """Multiple visits added after selector are all included."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude", name="scatter1")
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0],
-            "altitude": [30.0],
-        })
-        
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+            }
+        )
+
         # Add selector first
         builder.add_visit_visibility_selector()
-        
+
         # Add multiple visits after
         builder.add_visits(visits_df, label="visit1", show_visibility_toggle=True)
         builder.add_visits(visits_df, label="visit2", show_visibility_toggle=True)
         builder.add_visits(visits_df, label="visit3", show_visibility_toggle=False)
-        
+
         result = builder.build()
-        
+
         widget = result.children[0]
         assert "visit1" in widget.options
         assert "visit2" in widget.options
         assert "visit3" not in widget.options
 
     def test_no_selector_when_no_visits_with_toggle(self):
-        """Selector not created when no visits have show_visibility_toggle=True."""
+        """Selector not created when no visits have toggle enabled."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude", name="scatter1")
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0],
-            "altitude": [30.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+            }
+        )
         builder.add_visits(visits_df, label="visit1", show_visibility_toggle=False)
-        
+
         builder.add_visit_visibility_selector()
         result = builder.build()
-        
+
         # No selector should be created since no visits have toggle enabled
         assert not isinstance(result.children[0], MultiChoice)
         # The first child should be the scatter figure
@@ -960,17 +1036,14 @@ class TestVisitVisibilitySelectorCallOrder:
 # ============================================================================
 
 
-
 class TestScatterYAxisSelector:
     """Tests for scatter y-axis selector widgets."""
 
     def test_select_widget_created_for_multiple_offered_columns(self):
-        """Y-axis selector is created when offered_columns has multiple items."""
+        """Y-axis selector created for multiple offered_columns."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(
-            y_column="altitude",
-            offered_columns=["altitude", "HA", "fieldRA"],
-            name="scatter1"
+            y_column="altitude", offered_columns=["altitude", "HA", "fieldRA"], name="scatter1"
         )
         result = builder.build()
 
@@ -990,11 +1063,7 @@ class TestScatterYAxisSelector:
     def test_no_widget_for_single_offered_column(self):
         """No y-axis selector when offered_columns has only one item."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        builder.add_scatter(
-            y_column="altitude",
-            offered_columns=["altitude"],
-            name="scatter1"
-        )
+        builder.add_scatter(y_column="altitude", offered_columns=["altitude"], name="scatter1")
         result = builder.build()
 
         first_child = result.children[0]
@@ -1003,32 +1072,20 @@ class TestScatterYAxisSelector:
     def test_widget_positioned_above_scatter(self):
         """Y-axis selector appears immediately above its scatter figure."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        builder.add_scatter(
-            y_column="altitude",
-            offered_columns=["altitude", "HA"],
-            name="scatter1"
-        )
-        builder.add_scatter(
-            y_column="HA",
-            offered_columns=["HA", "fieldRA"],
-            name="scatter2"
-        )
+        builder.add_scatter(y_column="altitude", offered_columns=["altitude", "HA"], name="scatter1")
+        builder.add_scatter(y_column="HA", offered_columns=["HA", "fieldRA"], name="scatter2")
         result = builder.build()
 
         assert len(result.children) == 4
         assert isinstance(result.children[0], Select)
-        assert hasattr(result.children[1], 'x_range')
+        assert hasattr(result.children[1], "x_range")
         assert isinstance(result.children[2], Select)
-        assert hasattr(result.children[3], 'x_range')
+        assert hasattr(result.children[3], "x_range")
 
     def test_selector_updates_y_axis_label(self):
         """Y-axis selector callback updates the y-axis label."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        builder.add_scatter(
-            y_column="altitude",
-            offered_columns=["altitude", "HA"],
-            name="scatter1"
-        )
+        builder.add_scatter(y_column="altitude", offered_columns=["altitude", "HA"], name="scatter1")
         result = builder.build()
 
         assert isinstance(result.children[0], Select)
@@ -1037,6 +1094,7 @@ class TestScatterYAxisSelector:
 # ============================================================================
 # TimelineBuilder.build Tests
 # ============================================================================
+
 
 class TestBuild:
     """Tests for TimelineBuilder.build method."""
@@ -1098,19 +1156,22 @@ class TestBuild:
 # Build Mixed Elements Tests
 # ============================================================================
 
+
 class TestBuildMixedElements:
     """Tests for TimelineBuilder.build with mixed element types."""
 
     def test_scatter_and_visits_combined(self):
-        """build overlays visits onto scatter panels rather than adding a separate figure."""
+        """build overlays visits on scatter panels, no separate figures."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude", name="scatter1")
         builder.add_visits(
-            pd.DataFrame({
-                "observationStartMJD": [59999.0],
-                "altitude": [30.0],
-            }),
-            label="visits1"
+            pd.DataFrame(
+                {
+                    "observationStartMJD": [59999.0],
+                    "altitude": [30.0],
+                }
+            ),
+            label="visits1",
         )
         result = builder.build()
         assert len(result.children) == 1
@@ -1120,45 +1181,40 @@ class TestBuildMixedElements:
         """build handles scatter and color stripe together."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude", name="scatter1")
-        builder.add_color_stripe(
-            pd.Series([1.0, 2.0], index=[59999.0, 60000.0]),
-            name="stripe1"
-        )
+        builder.add_color_stripe(pd.Series([1.0, 2.0], index=[59999.0, 60000.0]), name="stripe1")
         result = builder.build()
         assert len(result.children) == 2
 
     def test_visits_and_stripe_combined(self):
-        """build with only visits and a stripe produces just the stripe panel."""
+        """build with only visits and stripe produces the stripe panel."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_visits(
-            pd.DataFrame({
-                "observationStartMJD": [59999.0],
-                "altitude": [30.0],
-            }),
-            label="visits1"
+            pd.DataFrame(
+                {
+                    "observationStartMJD": [59999.0],
+                    "altitude": [30.0],
+                }
+            ),
+            label="visits1",
         )
-        builder.add_color_stripe(
-            pd.Series([1.0, 2.0], index=[59999.0, 60000.0]),
-            name="stripe1"
-        )
+        builder.add_color_stripe(pd.Series([1.0, 2.0], index=[59999.0, 60000.0]), name="stripe1")
         result = builder.build()
         assert len(result.children) == 1
 
     def test_all_three_types_combined(self):
-        """build handles scatter + visits + stripe: scatter and stripe get panels."""
+        """build handles scatter+visits+stripe with separate panels."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude", name="scatter1")
         builder.add_visits(
-            pd.DataFrame({
-                "observationStartMJD": [59999.0],
-                "altitude": [30.0],
-            }),
-            label="visits1"
+            pd.DataFrame(
+                {
+                    "observationStartMJD": [59999.0],
+                    "altitude": [30.0],
+                }
+            ),
+            label="visits1",
         )
-        builder.add_color_stripe(
-            pd.Series([1.0, 2.0], index=[59999.0, 60000.0]),
-            name="stripe1"
-        )
+        builder.add_color_stripe(pd.Series([1.0, 2.0], index=[59999.0, 60000.0]), name="stripe1")
         result = builder.build()
         assert len(result.children) == 2
 
@@ -1167,16 +1223,15 @@ class TestBuildMixedElements:
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude", name="first")
         builder.add_visits(
-            pd.DataFrame({
-                "observationStartMJD": [59999.0],
-                "altitude": [30.0],
-            }),
-            label="second"
+            pd.DataFrame(
+                {
+                    "observationStartMJD": [59999.0],
+                    "altitude": [30.0],
+                }
+            ),
+            label="second",
         )
-        builder.add_color_stripe(
-            pd.Series([1.0, 2.0], index=[59999.0, 60000.0]),
-            name="third"
-        )
+        builder.add_color_stripe(pd.Series([1.0, 2.0], index=[59999.0, 60000.0]), name="third")
         result = builder.build()
         assert len(result.children) == 2
 
@@ -1185,18 +1240,16 @@ class TestBuildMixedElements:
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude", name="scatter1", height=150)
         builder.add_visits(
-            pd.DataFrame({
-                "observationStartMJD": [59999.0],
-                "altitude": [30.0],
-            }),
+            pd.DataFrame(
+                {
+                    "observationStartMJD": [59999.0],
+                    "altitude": [30.0],
+                }
+            ),
             label="visits1",
         )
-        builder.add_color_stripe(
-            pd.Series([1.0, 2.0], index=[59999.0, 60000.0]),
-            name="stripe1",
-            height=30
-        )
-        result = builder.build()
+        builder.add_color_stripe(pd.Series([1.0, 2.0], index=[59999.0, 60000.0]), name="stripe1", height=30)
+        builder.build()
 
         assert builder._plot_heights["scatter1"] == 150
         # visits do not store height (they are overlaid on scatter panels)
@@ -1208,16 +1261,15 @@ class TestBuildMixedElements:
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude", name="scatter1")
         builder.add_visits(
-            pd.DataFrame({
-                "observationStartMJD": [59999.0],
-                "altitude": [30.0],
-            }),
-            label="visits1"
+            pd.DataFrame(
+                {
+                    "observationStartMJD": [59999.0],
+                    "altitude": [30.0],
+                }
+            ),
+            label="visits1",
         )
-        builder.add_color_stripe(
-            pd.Series([1.0, 2.0], index=[59999.0, 60000.0]),
-            name="stripe1"
-        )
+        builder.add_color_stripe(pd.Series([1.0, 2.0], index=[59999.0, 60000.0]), name="stripe1")
         result = builder.build()
         for fig in result.children:
             x_axis = fig.xaxis[0]
@@ -1228,11 +1280,13 @@ class TestBuildMixedElements:
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude", name="main")
         builder.add_visits(
-            pd.DataFrame({
-                "observationStartMJD": [59999.0],
-                "altitude": [30.0],
-            }),
-            label="visits1"
+            pd.DataFrame(
+                {
+                    "observationStartMJD": [59999.0],
+                    "altitude": [30.0],
+                }
+            ),
+            label="visits1",
         )
         result = builder.build()
         scatter_fig = result.children[0]
@@ -1244,16 +1298,14 @@ class TestBuildMixedElements:
 # Color Stripe Rendering Tests
 # ============================================================================
 
+
 class TestColorStripeRendering:
     """Tests for color stripe rendering in build()."""
 
     def test_stripe_figure_has_rect_or_quad_glyph(self):
         """Stripe figure contains rect or quad glyph."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        builder.add_color_stripe(
-            pd.Series([1.0, 2.0], index=[59999.0, 60000.0]),
-            name="stripe1"
-        )
+        builder.add_color_stripe(pd.Series([1.0, 2.0], index=[59999.0, 60000.0]), name="stripe1")
         result = builder.build()
         stripe_fig = result.children[0]
         rect_renderers = [r for r in stripe_fig.renderers if isinstance(r.glyph, (Rect, Quad))]
@@ -1262,10 +1314,7 @@ class TestColorStripeRendering:
     def test_stripe_figure_has_no_y_axis(self):
         """Stripe figure has no y-axis (or y-axis is hidden)."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        builder.add_color_stripe(
-            pd.Series([1.0, 2.0], index=[59999.0, 60000.0]),
-            name="stripe1"
-        )
+        builder.add_color_stripe(pd.Series([1.0, 2.0], index=[59999.0, 60000.0]), name="stripe1")
         result = builder.build()
         stripe_fig = result.children[0]
         y_axis = stripe_fig.yaxis[0] if stripe_fig.yaxis else None
@@ -1275,10 +1324,7 @@ class TestColorStripeRendering:
     def test_stripe_time_axis_formatted(self):
         """Stripe figure time axis uses DatetimeTickFormatter."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        builder.add_color_stripe(
-            pd.Series([1.0, 2.0], index=[59999.0, 60000.0]),
-            name="stripe1"
-        )
+        builder.add_color_stripe(pd.Series([1.0, 2.0], index=[59999.0, 60000.0]), name="stripe1")
         result = builder.build()
         stripe_fig = result.children[0]
         x_axis = stripe_fig.xaxis[0]
@@ -1289,27 +1335,23 @@ class TestColorStripeRendering:
 # Final Layout Assembly Tests
 # ============================================================================
 
+
 class TestFinalLayoutAssembly:
     """Tests for the final build layout with widgets and figures."""
 
     def test_layout_order_widgets_then_scatters_then_stripes(self):
-        """Layout order: visibility selector, then scatters (with y-selectors), then stripes."""
+        """Layout: visibility selector, then scatters, then stripes."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        builder.add_scatter(
-            y_column="altitude",
-            offered_columns=["altitude", "HA"],
-            name="scatter1"
+        builder.add_scatter(y_column="altitude", offered_columns=["altitude", "HA"], name="scatter1")
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+            }
         )
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0],
-            "altitude": [30.0],
-        })
         builder.add_visits(visits_df, label="visit1", show_visibility_toggle=True)
         builder.add_visit_visibility_selector()
-        builder.add_color_stripe(
-            pd.Series([1.0, 2.0], index=[59999.0, 60000.0]),
-            name="stripe1"
-        )
+        builder.add_color_stripe(pd.Series([1.0, 2.0], index=[59999.0, 60000.0]), name="stripe1")
         result = builder.build()
 
         assert isinstance(result.children[0], MultiChoice)
@@ -1318,23 +1360,12 @@ class TestFinalLayoutAssembly:
     def test_all_figures_share_single_range1d_x_range(self):
         """All figures share a single Range1d x-range object."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        builder.add_scatter(
-            y_column="altitude",
-            offered_columns=["altitude", "HA"],
-            name="scatter1"
-        )
-        builder.add_scatter(
-            y_column="HA",
-            offered_columns=["HA", "fieldRA"],
-            name="scatter2"
-        )
-        builder.add_color_stripe(
-            pd.Series([1.0, 2.0], index=[59999.0, 60000.0]),
-            name="stripe1"
-        )
+        builder.add_scatter(y_column="altitude", offered_columns=["altitude", "HA"], name="scatter1")
+        builder.add_scatter(y_column="HA", offered_columns=["HA", "fieldRA"], name="scatter2")
+        builder.add_color_stripe(pd.Series([1.0, 2.0], index=[59999.0, 60000.0]), name="stripe1")
         result = builder.build()
 
-        figures = [child for child in result.children if hasattr(child, 'x_range')]
+        figures = [child for child in result.children if hasattr(child, "x_range")]
         x_ranges = [fig.x_range for fig in figures]
         assert all(xr is x_ranges[0] for xr in x_ranges)
 
@@ -1342,23 +1373,11 @@ class TestFinalLayoutAssembly:
         """All element heights are respected in final layout."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(
-            y_column="altitude",
-            offered_columns=["altitude", "HA"],
-            name="scatter1",
-            height=150
+            y_column="altitude", offered_columns=["altitude", "HA"], name="scatter1", height=150
         )
-        builder.add_scatter(
-            y_column="HA",
-            offered_columns=["HA"],
-            name="scatter2",
-            height=180
-        )
-        builder.add_color_stripe(
-            pd.Series([1.0, 2.0], index=[59999.0, 60000.0]),
-            name="stripe1",
-            height=30
-        )
-        result = builder.build()
+        builder.add_scatter(y_column="HA", offered_columns=["HA"], name="scatter2", height=180)
+        builder.add_color_stripe(pd.Series([1.0, 2.0], index=[59999.0, 60000.0]), name="stripe1", height=30)
+        builder.build()
 
         assert builder._plot_heights["scatter1"] == 150
         assert builder._plot_heights["scatter2"] == 180
@@ -1367,15 +1386,8 @@ class TestFinalLayoutAssembly:
     def test_stripe_figures_have_no_y_axis(self):
         """Stripe figures have no visible y-axis."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        builder.add_scatter(
-            y_column="altitude",
-            offered_columns=["altitude"],
-            name="scatter1"
-        )
-        builder.add_color_stripe(
-            pd.Series([1.0, 2.0], index=[59999.0, 60000.0]),
-            name="stripe1"
-        )
+        builder.add_scatter(y_column="altitude", offered_columns=["altitude"], name="scatter1")
+        builder.add_color_stripe(pd.Series([1.0, 2.0], index=[59999.0, 60000.0]), name="stripe1")
         result = builder.build()
         stripe_fig = result.children[-1]
         y_axis = stripe_fig.yaxis[0] if stripe_fig.yaxis else None
@@ -1385,23 +1397,12 @@ class TestFinalLayoutAssembly:
     def test_order_matches_insertion_order(self):
         """Figure order matches insertion order of elements."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        builder.add_scatter(
-            y_column="altitude",
-            offered_columns=["altitude"],
-            name="first"
-        )
-        builder.add_color_stripe(
-            pd.Series([1.0], index=[59999.0]),
-            name="second"
-        )
-        builder.add_scatter(
-            y_column="HA",
-            offered_columns=["HA"],
-            name="third"
-        )
+        builder.add_scatter(y_column="altitude", offered_columns=["altitude"], name="first")
+        builder.add_color_stripe(pd.Series([1.0], index=[59999.0]), name="second")
+        builder.add_scatter(y_column="HA", offered_columns=["HA"], name="third")
         result = builder.build()
 
-        figures = [child for child in result.children if hasattr(child, 'x_range')]
+        figures = [child for child in result.children if hasattr(child, "x_range")]
         assert len(figures) == 3
 
 
@@ -1409,12 +1410,14 @@ class TestFinalLayoutAssembly:
 # CLI Tests
 # ============================================================================
 
+
 class TestCLI:
     """Tests for CLI functionality using click."""
 
     def test_cli_main_function_is_click_command(self):
         """main function is a click Command."""
         from schedview.plot.tlbuilder import main
+
         assert isinstance(main, click.Command)
         assert callable(main)
 
@@ -1423,12 +1426,19 @@ class TestCLI:
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--scatter", "HA",
-            "--output", "/tmp/test_output.html"
-        ])
+        result = runner.invoke(
+            main,
+            [
+                "--date",
+                "2025-06-15",
+                "--scatter",
+                "altitude",
+                "--scatter",
+                "HA",
+                "--output",
+                "/tmp/test_output.html",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_cli_date_required(self):
@@ -1436,10 +1446,7 @@ class TestCLI:
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--scatter", "altitude",
-            "--output", "output.html"
-        ])
+        result = runner.invoke(main, ["--scatter", "altitude", "--output", "output.html"])
         assert result.exit_code != 0
 
     def test_cli_scatter_required(self):
@@ -1447,10 +1454,7 @@ class TestCLI:
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--output", "output.html"
-        ])
+        result = runner.invoke(main, ["--date", "2025-06-15", "--output", "output.html"])
         assert result.exit_code != 0
 
     def test_cli_multiple_scatters(self):
@@ -1458,13 +1462,21 @@ class TestCLI:
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--scatter", "HA",
-            "--scatter", "fieldRA",
-            "--output", "output.html"
-        ])
+        result = runner.invoke(
+            main,
+            [
+                "--date",
+                "2025-06-15",
+                "--scatter",
+                "altitude",
+                "--scatter",
+                "HA",
+                "--scatter",
+                "fieldRA",
+                "--output",
+                "output.html",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_cli_accepts_visits_file(self):
@@ -1475,12 +1487,19 @@ class TestCLI:
         # Mock read_visits to return empty DataFrame so CLI succeeds
         with patch("schedview.collect.visits.read_visits") as mock_read:
             mock_read.return_value = pd.DataFrame()
-            result = runner.invoke(main, [
-                "--date", "2025-06-15",
-                "--scatter", "altitude",
-                "--visits", "/tmp/test_visits.parquet",
-                "--output", "/tmp/cli_test.html"
-            ])
+            result = runner.invoke(
+                main,
+                [
+                    "--date",
+                    "2025-06-15",
+                    "--scatter",
+                    "altitude",
+                    "--visits",
+                    "/tmp/test_visits.parquet",
+                    "--output",
+                    "/tmp/cli_test.html",
+                ],
+            )
         assert result.exit_code == 0, f"CLI failed with: {result.output}"
 
     def test_cli_accepts_multiple_visits_files(self):
@@ -1491,13 +1510,21 @@ class TestCLI:
         # Mock read_visits to return empty DataFrame so CLI succeeds
         with patch("schedview.collect.visits.read_visits") as mock_read:
             mock_read.return_value = pd.DataFrame()
-            result = runner.invoke(main, [
-                "--date", "2025-06-15",
-                "--scatter", "altitude",
-                "--visits", "/tmp/visits1.parquet",
-                "--visits", "/tmp/visits2.parquet",
-                "--output", "/tmp/cli_test.html"
-            ])
+            result = runner.invoke(
+                main,
+                [
+                    "--date",
+                    "2025-06-15",
+                    "--scatter",
+                    "altitude",
+                    "--visits",
+                    "/tmp/visits1.parquet",
+                    "--visits",
+                    "/tmp/visits2.parquet",
+                    "--output",
+                    "/tmp/cli_test.html",
+                ],
+            )
         assert result.exit_code == 0, f"CLI failed with: {result.output}"
 
     def test_cli_accepts_background_argument(self):
@@ -1505,19 +1532,27 @@ class TestCLI:
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        # Mock read_visits to return empty DataFrame
-        # Mock _sample_body_elevation to return non-empty Series for valid color stripe
+        # Mock read_visits and _sample_body_elevation for valid stripe
         with patch("schedview.collect.visits.read_visits") as mock_read:
             with patch("schedview.plot.tlbuilder._sample_body_elevation") as mock_bg:
                 mock_read.return_value = pd.DataFrame()
-                # Return Series with some values to avoid empty data error
-                mock_bg.return_value = pd.Series([0.0, 10.0, 20.0, 10.0, 0.0], index=[58000.0, 58000.1, 58000.2, 58000.3, 58000.4])
-                result = runner.invoke(main, [
-                    "--date", "2025-06-15",
-                    "--scatter", "altitude",
-                    "--background", "sun_elevation",
-                    "--output", "/tmp/cli_test.html"
-                ])
+                mock_bg.return_value = pd.Series(
+                    [0.0, 10.0, 20.0, 10.0, 0.0],
+                    index=[58000.0, 58000.1, 58000.2, 58000.3, 58000.4],
+                )
+                result = runner.invoke(
+                    main,
+                    [
+                        "--date",
+                        "2025-06-15",
+                        "--scatter",
+                        "altitude",
+                        "--background",
+                        "sun_elevation",
+                        "--output",
+                        "/tmp/cli_test.html",
+                    ],
+                )
         assert result.exit_code == 0, f"CLI failed with: {result.output}"
 
     def test_cli_with_all_options(self):
@@ -1525,21 +1560,31 @@ class TestCLI:
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        # Mock read_visits to return empty DataFrame
-        # Mock _sample_body_elevation to return non-empty Series for valid color stripe
+        # Mock read_visits and _sample_body_elevation for valid stripe
         with patch("schedview.collect.visits.read_visits") as mock_read:
             with patch("schedview.plot.tlbuilder._sample_body_elevation") as mock_bg:
                 mock_read.return_value = pd.DataFrame()
-                # Return Series with some values to avoid empty data error
-                mock_bg.return_value = pd.Series([0.0, 10.0, 20.0, 10.0, 0.0], index=[58000.0, 58000.1, 58000.2, 58000.3, 58000.4])
-                result = runner.invoke(main, [
-                    "--date", "2025-06-15",
-                    "--scatter", "altitude",
-                    "--scatter", "HA",
-                    "--visits", "/tmp/visits.parquet",
-                    "--background", "sun_elevation",
-                    "--output", "/tmp/cli_test.html"
-                ])
+                mock_bg.return_value = pd.Series(
+                    [0.0, 10.0, 20.0, 10.0, 0.0],
+                    index=[58000.0, 58000.1, 58000.2, 58000.3, 58000.4],
+                )
+                result = runner.invoke(
+                    main,
+                    [
+                        "--date",
+                        "2025-06-15",
+                        "--scatter",
+                        "altitude",
+                        "--scatter",
+                        "HA",
+                        "--visits",
+                        "/tmp/visits.parquet",
+                        "--background",
+                        "sun_elevation",
+                        "--output",
+                        "/tmp/cli_test.html",
+                    ],
+                )
         assert result.exit_code == 0, f"CLI failed with: {result.output}"
 
     def test_cli_with_enable_visibility_toggle_flag(self):
@@ -1547,13 +1592,20 @@ class TestCLI:
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--visits", "baseline",
-            "--enable-visibility-toggle",
-            "--output", "/tmp/cli_test.html"
-        ])
+        result = runner.invoke(
+            main,
+            [
+                "--date",
+                "2025-06-15",
+                "--scatter",
+                "altitude",
+                "--visits",
+                "baseline",
+                "--enable-visibility-toggle",
+                "--output",
+                "/tmp/cli_test.html",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_cli_with_num_scatter_option(self):
@@ -1561,13 +1613,21 @@ class TestCLI:
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--scatter", "HA",
-            "--num-scatter", "2",
-            "--output", "/tmp/cli_test.html"
-        ])
+        result = runner.invoke(
+            main,
+            [
+                "--date",
+                "2025-06-15",
+                "--scatter",
+                "altitude",
+                "--scatter",
+                "HA",
+                "--num-scatter",
+                "2",
+                "--output",
+                "/tmp/cli_test.html",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_cli_with_scatter_height_option(self):
@@ -1575,12 +1635,19 @@ class TestCLI:
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--scatter-height", "250",
-            "--output", "/tmp/cli_test.html"
-        ])
+        result = runner.invoke(
+            main,
+            [
+                "--date",
+                "2025-06-15",
+                "--scatter",
+                "altitude",
+                "--scatter-height",
+                "250",
+                "--output",
+                "/tmp/cli_test.html",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_cli_with_stripe_height_option(self):
@@ -1588,25 +1655,39 @@ class TestCLI:
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--stripe-height", "50",
-            "--output", "/tmp/cli_test.html"
-        ])
+        result = runner.invoke(
+            main,
+            [
+                "--date",
+                "2025-06-15",
+                "--scatter",
+                "altitude",
+                "--stripe-height",
+                "50",
+                "--output",
+                "/tmp/cli_test.html",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_cli_backward_compatible(self):
-        """CLI still works without new Stage C options (backward compatible)."""
+        """CLI works without new Stage C options (backward compatible)."""
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--scatter", "HA",
-            "--output", "/tmp/cli_test.html"
-        ])
+        result = runner.invoke(
+            main,
+            [
+                "--date",
+                "2025-06-15",
+                "--scatter",
+                "altitude",
+                "--scatter",
+                "HA",
+                "--output",
+                "/tmp/cli_test.html",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_cli_with_y_columns_option(self):
@@ -1614,12 +1695,19 @@ class TestCLI:
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--y-columns", "altitude,HA,fieldRA",
-            "--output", "/tmp/cli_test.html"
-        ])
+        result = runner.invoke(
+            main,
+            [
+                "--date",
+                "2025-06-15",
+                "--scatter",
+                "altitude",
+                "--y-columns",
+                "altitude,HA,fieldRA",
+                "--output",
+                "/tmp/cli_test.html",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_cli_with_y_columns_multiple_scatters(self):
@@ -1627,14 +1715,23 @@ class TestCLI:
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--scatter", "HA",
-            "--scatter", "fieldRA",
-            "--y-columns", "altitude,HA,fieldRA",
-            "--output", "/tmp/cli_test.html"
-        ])
+        result = runner.invoke(
+            main,
+            [
+                "--date",
+                "2025-06-15",
+                "--scatter",
+                "altitude",
+                "--scatter",
+                "HA",
+                "--scatter",
+                "fieldRA",
+                "--y-columns",
+                "altitude,HA,fieldRA",
+                "--output",
+                "/tmp/cli_test.html",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_cli_with_y_columns_merged_multiple(self):
@@ -1642,16 +1739,27 @@ class TestCLI:
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--scatter", "HA",
-            "--scatter", "fieldRA",
-            "--scatter", "fiveSigmaDepth",
-            "--y-columns", "altitude,HA",
-            "--y-columns", "fieldRA,fiveSigmaDepth",
-            "--output", "/tmp/cli_test.html"
-        ])
+        result = runner.invoke(
+            main,
+            [
+                "--date",
+                "2025-06-15",
+                "--scatter",
+                "altitude",
+                "--scatter",
+                "HA",
+                "--scatter",
+                "fieldRA",
+                "--scatter",
+                "fiveSigmaDepth",
+                "--y-columns",
+                "altitude,HA",
+                "--y-columns",
+                "fieldRA,fiveSigmaDepth",
+                "--output",
+                "/tmp/cli_test.html",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_cli_rejects_invalid_background_value(self):
@@ -1659,12 +1767,19 @@ class TestCLI:
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--background", "invalid_type",
-            "--output", "/tmp/cli_test.html"
-        ])
+        result = runner.invoke(
+            main,
+            [
+                "--date",
+                "2025-06-15",
+                "--scatter",
+                "altitude",
+                "--background",
+                "invalid_type",
+                "--output",
+                "/tmp/cli_test.html",
+            ],
+        )
         assert result.exit_code != 0
         assert "invalid_type" in result.output or "Choice" in result.output
 
@@ -1673,12 +1788,19 @@ class TestCLI:
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--background", "sun_elevation",
-            "--output", "/tmp/cli_test.html"
-        ])
+        result = runner.invoke(
+            main,
+            [
+                "--date",
+                "2025-06-15",
+                "--scatter",
+                "altitude",
+                "--background",
+                "sun_elevation",
+                "--output",
+                "/tmp/cli_test.html",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_cli_accepts_moon_elevation_background(self):
@@ -1686,12 +1808,19 @@ class TestCLI:
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--background", "moon_elevation",
-            "--output", "/tmp/cli_test.html"
-        ])
+        result = runner.invoke(
+            main,
+            [
+                "--date",
+                "2025-06-15",
+                "--scatter",
+                "altitude",
+                "--background",
+                "moon_elevation",
+                "--output",
+                "/tmp/cli_test.html",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_cli_accepts_multiple_background_types(self):
@@ -1699,19 +1828,28 @@ class TestCLI:
         from schedview.plot.tlbuilder import main
 
         runner = CliRunner()
-        result = runner.invoke(main, [
-            "--date", "2025-06-15",
-            "--scatter", "altitude",
-            "--background", "sun_elevation",
-            "--background", "moon_elevation",
-            "--output", "/tmp/cli_test.html"
-        ])
+        result = runner.invoke(
+            main,
+            [
+                "--date",
+                "2025-06-15",
+                "--scatter",
+                "altitude",
+                "--background",
+                "sun_elevation",
+                "--background",
+                "moon_elevation",
+                "--output",
+                "/tmp/cli_test.html",
+            ],
+        )
         assert result.exit_code == 0
 
 
 # ============================================================================
 # Time Conversion Tests
 # ============================================================================
+
 
 class TestTimeConversion:
     """Tests for MJD to datetime64 conversion."""
@@ -1736,6 +1874,7 @@ class TestTimeConversion:
 # ============================================================================
 # Scatter Plot Rendering Tests
 # ============================================================================
+
 
 class TestScatterPlotRendering:
     """Tests for scatter plot rendering in build()."""
@@ -1780,7 +1919,7 @@ class TestScatterPlotRendering:
         assert scatter_renderer.glyph.y == "altitude"
 
     def test_duplicated_y_columns_use_same_field(self):
-        """Multiple scatter panels with the same y column each render that column."""
+        """Each scatter panel with same y column renders that column."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude", name="plot1")
         builder.add_scatter(y_column="altitude", name="plot2")
@@ -1798,6 +1937,7 @@ class TestScatterPlotRendering:
 # Tooltips Tests
 # ============================================================================
 
+
 class TestScatterTooltips:
     """Tests for scatter plot tooltips functionality."""
 
@@ -1806,7 +1946,7 @@ class TestScatterTooltips:
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         tooltips = [("Time", "@time"), ("Altitude", "@altitude")]
         builder.add_scatter(y_column="altitude", tooltips=tooltips)
-        
+
         config = builder._elements[0]
         assert isinstance(config, ScatterPlotConfig)
         assert config.tooltips == tuple(tooltips)
@@ -1815,7 +1955,7 @@ class TestScatterTooltips:
         """add_scatter defaults tooltips to None when not provided."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude")
-        
+
         config = builder._elements[0]
         assert config.tooltips is None
 
@@ -1844,14 +1984,22 @@ class TestScatterTooltips:
     def test_multiple_scatter_plots_with_tooltips(self):
         """Multiple scatter plots can each have their own tooltips."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        builder.add_scatter(y_column="altitude", tooltips=[("Time", "@time"), ("Alt", "@altitude")], name="plot1")
-        builder.add_scatter(y_column="HA", tooltips=[("Time", "@time"), ("HA", "@HA")], name="plot2")
+        builder.add_scatter(
+            y_column="altitude",
+            tooltips=[("Time", "@time"), ("Alt", "@altitude")],
+            name="plot1",
+        )
+        builder.add_scatter(
+            y_column="HA",
+            tooltips=[("Time", "@time"), ("HA", "@HA")],
+            name="plot2",
+        )
         result = builder.build()
 
         # Find HoverTools in the figures
         hover_tools = []
         for child in result.children:
-            if hasattr(child, 'tools'):
+            if hasattr(child, "tools"):
                 hover_tools.extend([t for t in child.tools if isinstance(t, HoverTool)])
         assert len(hover_tools) == 2
 
@@ -1861,15 +2009,13 @@ class TestScatterTooltips:
         tooltips = [("Time", "@time"), ("Altitude", "@altitude"), ("Band", "@band")]
         builder.add_scatter(y_column="altitude", tooltips=tooltips)
         builder.add_visits(
-            pd.DataFrame({
-                "observationStartMJD": [59999.0, 59999.1],
-                "altitude": [30.0, 45.0],
-                "band": ["g", "r"]
-            }),
+            pd.DataFrame(
+                {"observationStartMJD": [59999.0, 59999.1], "altitude": [30.0, 45.0], "band": ["g", "r"]}
+            ),
             label="v1",
         )
         result = builder.build()
-        
+
         fig = result.children[0]
         # Should have HoverTool
         hover_tools = [t for t in fig.tools if isinstance(t, HoverTool)]
@@ -1884,23 +2030,24 @@ class TestScatterTooltips:
 # Y-Selector Column Filtering Tests
 # ============================================================================
 
+
 class TestYSelectorColumnFiltering:
     """Tests for filtering offered_columns against visit data availability."""
 
     def test_filters_offered_columns_to_available_visit_columns(self):
         """offered_columns are filtered to columns present in visit data."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0, 60000.0],
-            "altitude": [30.0, 45.0],
-            "HA": [1.0, 2.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0, 60000.0],
+                "altitude": [30.0, 45.0],
+                "HA": [1.0, 2.0],
+            }
+        )
         builder.add_visits(visits_df, label="visits1")
         # Offer columns including one that doesn't exist in visits
         builder.add_scatter(
-            y_column="altitude",
-            offered_columns=["altitude", "HA", "nonexistent_column"],
-            name="scatter1"
+            y_column="altitude", offered_columns=["altitude", "HA", "nonexistent_column"], name="scatter1"
         )
 
         config = builder._elements[0]
@@ -1914,9 +2061,7 @@ class TestYSelectorColumnFiltering:
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         # No visits added
         builder.add_scatter(
-            y_column="altitude",
-            offered_columns=["altitude", "HA", "fieldRA"],
-            name="scatter1"
+            y_column="altitude", offered_columns=["altitude", "HA", "fieldRA"], name="scatter1"
         )
 
         config = builder._elements[0]
@@ -1926,17 +2071,17 @@ class TestYSelectorColumnFiltering:
     def test_falls_back_to_first_available_column_when_y_column_unavailable(self):
         """y_column falls back to first available column if not in visits."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0, 60000.0],
-            "altitude": [30.0, 45.0],
-            "HA": [1.0, 2.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0, 60000.0],
+                "altitude": [30.0, 45.0],
+                "HA": [1.0, 2.0],
+            }
+        )
         builder.add_visits(visits_df, label="visits1")
         # Request y_column that doesn't exist in visits
         builder.add_scatter(
-            y_column="nonexistent_column",
-            offered_columns=["altitude", "HA"],
-            name="scatter1"
+            y_column="nonexistent_column", offered_columns=["altitude", "HA"], name="scatter1"
         )
 
         config = builder._elements[0]
@@ -1948,43 +2093,44 @@ class TestYSelectorColumnFiltering:
     def test_keeps_y_column_when_it_is_available(self):
         """y_column is kept when it exists in visit data."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0, 60000.0],
-            "altitude": [30.0, 45.0],
-            "HA": [1.0, 2.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0, 60000.0],
+                "altitude": [30.0, 45.0],
+                "HA": [1.0, 2.0],
+            }
+        )
         builder.add_visits(visits_df, label="visits1")
         builder.add_scatter(
-            y_column="altitude",
-            offered_columns=["altitude", "HA", "fieldRA"],
-            name="scatter1"
+            y_column="altitude", offered_columns=["altitude", "HA", "fieldRA"], name="scatter1"
         )
 
         config = builder._elements[0]
         # y_column should remain as specified since it's available
         assert config.y_column == "altitude"
 
-
     def test_filters_to_union_of_multiple_visit_sets(self):
-        """offered_columns are filtered to columns in at least one visit set."""
+        """offered_columns filtered to columns in at least one visit set."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df1 = pd.DataFrame({
-            "observationStartMJD": [59999.0],
-            "altitude": [30.0],
-            "HA": [1.0],
-        })
-        visits_df2 = pd.DataFrame({
-            "observationStartMJD": [59999.0],
-            "altitude": [35.0],
-            "fieldRA": [100.0],
-        })
+        visits_df1 = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "HA": [1.0],
+            }
+        )
+        visits_df2 = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [35.0],
+                "fieldRA": [100.0],
+            }
+        )
         builder.add_visits(visits_df1, label="visits1")
         builder.add_visits(visits_df2, label="visits2")
         # Offered columns should include all columns from any visit set
         builder.add_scatter(
-            y_column="altitude",
-            offered_columns=["altitude", "HA", "fieldRA", "nonexistent"],
-            name="scatter1"
+            y_column="altitude", offered_columns=["altitude", "HA", "fieldRA", "nonexistent"], name="scatter1"
         )
 
         config = builder._elements[0]
@@ -1997,17 +2143,15 @@ class TestYSelectorColumnFiltering:
     def test_filtering_does_not_affect_nonexistent_y_column_with_empty_visits(self):
         """When visits have no rows, offered_columns are still preserved."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [],
-            "altitude": [],
-            "HA": [],
-        })
-        builder.add_visits(visits_df, label="visits1")
-        builder.add_scatter(
-            y_column="altitude",
-            offered_columns=["altitude", "HA"],
-            name="scatter1"
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [],
+                "altitude": [],
+                "HA": [],
+            }
         )
+        builder.add_visits(visits_df, label="visits1")
+        builder.add_scatter(y_column="altitude", offered_columns=["altitude", "HA"], name="scatter1")
 
         config = builder._elements[0]
         # Empty visits still have columns in the source, so filtering applies
@@ -2018,16 +2162,16 @@ class TestYSelectorColumnFiltering:
     def test_selector_widget_uses_filtered_columns(self):
         """Y-axis selector widget uses filtered offered_columns."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0, 60000.0],
-            "altitude": [30.0, 45.0],
-            "HA": [1.0, 2.0],
-        })
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0, 60000.0],
+                "altitude": [30.0, 45.0],
+                "HA": [1.0, 2.0],
+            }
+        )
         builder.add_visits(visits_df, label="visits1")
         builder.add_scatter(
-            y_column="altitude",
-            offered_columns=["altitude", "HA", "nonexistent"],
-            name="scatter1"
+            y_column="altitude", offered_columns=["altitude", "HA", "nonexistent"], name="scatter1"
         )
         result = builder.build()
 
@@ -2041,23 +2185,21 @@ class TestYSelectorColumnFiltering:
     def test_selector_value_is_valid_when_y_column_filtered_out(self):
         """Selector uses first offered column when y_column is filtered."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
-        visits_df = pd.DataFrame({
-            "observationStartMJD": [59999.0, 60000.0],
-            "altitude": [30.0, 45.0],
-            "HA": [1.0, 2.0],
-        })
-        builder.add_visits(visits_df, label="visits1")
-        # Request y_column that doesn't exist, offered_columns has available ones
-        builder.add_scatter(
-            y_column="nonexistent",
-            offered_columns=["altitude", "HA"],
-            name="scatter1"
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0, 60000.0],
+                "altitude": [30.0, 45.0],
+                "HA": [1.0, 2.0],
+            }
         )
+        builder.add_visits(visits_df, label="visits1")
+        # Request nonexistent y_column, offered_columns has available ones
+        builder.add_scatter(y_column="nonexistent", offered_columns=["altitude", "HA"], name="scatter1")
         result = builder.build()
 
         selector = result.children[0]
         assert isinstance(selector, Select)
-        # y_column fell back to "altitude" (first available), which is also first option
+        # y_column fell back to "altitude" (first available option)
         assert selector.value == "altitude"
         assert "altitude" in selector.options
         assert "HA" in selector.options
