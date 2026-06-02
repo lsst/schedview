@@ -1689,3 +1689,186 @@ class TestScatterTooltips:
         # Should also have scatter renderers from visits
         scatter_renderers = [r for r in fig.renderers if isinstance(r.glyph, Scatter)]
         assert len(scatter_renderers) >= 1
+
+
+# ============================================================================
+# Y-Selector Column Filtering Tests
+# ============================================================================
+
+class TestYSelectorColumnFiltering:
+    """Tests for filtering offered_columns against visit data availability."""
+
+    def test_filters_offered_columns_to_available_visit_columns(self):
+        """offered_columns are filtered to columns present in visit data."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame({
+            "observationStartMJD": [59999.0, 60000.0],
+            "altitude": [30.0, 45.0],
+            "HA": [1.0, 2.0],
+        })
+        builder.add_visits(visits_df, label="visits1")
+        # Offer columns including one that doesn't exist in visits
+        builder.add_scatter(
+            y_column="altitude",
+            offered_columns=["altitude", "HA", "nonexistent_column"],
+            name="scatter1"
+        )
+
+        config = builder._elements[0]
+        # nonexistent_column should be filtered out
+        assert "nonexistent_column" not in config.offered_columns
+        assert "altitude" in config.offered_columns
+        assert "HA" in config.offered_columns
+
+    def test_preserves_all_offered_columns_when_no_visits(self):
+        """When no visits present, all offered_columns are preserved."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        # No visits added
+        builder.add_scatter(
+            y_column="altitude",
+            offered_columns=["altitude", "HA", "fieldRA"],
+            name="scatter1"
+        )
+
+        config = builder._elements[0]
+        # All offered columns should be preserved when no visits
+        assert config.offered_columns == ("altitude", "HA", "fieldRA")
+
+    def test_falls_back_to_first_available_column_when_y_column_unavailable(self):
+        """y_column falls back to first available column if not in visits."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame({
+            "observationStartMJD": [59999.0, 60000.0],
+            "altitude": [30.0, 45.0],
+            "HA": [1.0, 2.0],
+        })
+        builder.add_visits(visits_df, label="visits1")
+        # Request y_column that doesn't exist in visits
+        builder.add_scatter(
+            y_column="nonexistent_column",
+            offered_columns=["altitude", "HA"],
+            name="scatter1"
+        )
+
+        config = builder._elements[0]
+        # y_column should be set to first available column
+        assert config.y_column == "altitude"
+        assert "altitude" in config.offered_columns
+        assert "HA" in config.offered_columns
+
+    def test_keeps_y_column_when_it_is_available(self):
+        """y_column is kept when it exists in visit data."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame({
+            "observationStartMJD": [59999.0, 60000.0],
+            "altitude": [30.0, 45.0],
+            "HA": [1.0, 2.0],
+        })
+        builder.add_visits(visits_df, label="visits1")
+        builder.add_scatter(
+            y_column="altitude",
+            offered_columns=["altitude", "HA", "fieldRA"],
+            name="scatter1"
+        )
+
+        config = builder._elements[0]
+        # y_column should remain as specified since it's available
+        assert config.y_column == "altitude"
+
+
+    def test_filters_to_union_of_multiple_visit_sets(self):
+        """offered_columns are filtered to columns in at least one visit set."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df1 = pd.DataFrame({
+            "observationStartMJD": [59999.0],
+            "altitude": [30.0],
+            "HA": [1.0],
+        })
+        visits_df2 = pd.DataFrame({
+            "observationStartMJD": [59999.0],
+            "altitude": [35.0],
+            "fieldRA": [100.0],
+        })
+        builder.add_visits(visits_df1, label="visits1")
+        builder.add_visits(visits_df2, label="visits2")
+        # Offered columns should include all columns from any visit set
+        builder.add_scatter(
+            y_column="altitude",
+            offered_columns=["altitude", "HA", "fieldRA", "nonexistent"],
+            name="scatter1"
+        )
+
+        config = builder._elements[0]
+        # All columns from at least one visit set should be offered
+        assert "altitude" in config.offered_columns  # In both
+        assert "HA" in config.offered_columns  # Only in visits1
+        assert "fieldRA" in config.offered_columns  # Only in visits2
+        assert "nonexistent" not in config.offered_columns  # Not in any visit set
+
+    def test_filtering_does_not_affect_nonexistent_y_column_with_empty_visits(self):
+        """When visits have no rows, offered_columns are still preserved."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame({
+            "observationStartMJD": [],
+            "altitude": [],
+            "HA": [],
+        })
+        builder.add_visits(visits_df, label="visits1")
+        builder.add_scatter(
+            y_column="altitude",
+            offered_columns=["altitude", "HA"],
+            name="scatter1"
+        )
+
+        config = builder._elements[0]
+        # Empty visits still have columns in the source, so filtering applies
+        # But with empty data, the source should still have the columns
+        assert "altitude" in config.offered_columns
+        assert "HA" in config.offered_columns
+
+    def test_selector_widget_uses_filtered_columns(self):
+        """Y-axis selector widget uses filtered offered_columns."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame({
+            "observationStartMJD": [59999.0, 60000.0],
+            "altitude": [30.0, 45.0],
+            "HA": [1.0, 2.0],
+        })
+        builder.add_visits(visits_df, label="visits1")
+        builder.add_scatter(
+            y_column="altitude",
+            offered_columns=["altitude", "HA", "nonexistent"],
+            name="scatter1"
+        )
+        result = builder.build()
+
+        # The selector should only have available columns
+        selector = result.children[0]
+        assert isinstance(selector, Select)
+        assert "nonexistent" not in selector.options
+        assert "altitude" in selector.options
+        assert "HA" in selector.options
+
+    def test_selector_value_is_valid_when_y_column_filtered_out(self):
+        """Selector uses first offered column when y_column is filtered."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame({
+            "observationStartMJD": [59999.0, 60000.0],
+            "altitude": [30.0, 45.0],
+            "HA": [1.0, 2.0],
+        })
+        builder.add_visits(visits_df, label="visits1")
+        # Request y_column that doesn't exist, offered_columns has available ones
+        builder.add_scatter(
+            y_column="nonexistent",
+            offered_columns=["altitude", "HA"],
+            name="scatter1"
+        )
+        result = builder.build()
+
+        selector = result.children[0]
+        assert isinstance(selector, Select)
+        # y_column fell back to "altitude" (first available), which is also first option
+        assert selector.value == "altitude"
+        assert "altitude" in selector.options
+        assert "HA" in selector.options
