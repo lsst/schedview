@@ -162,6 +162,7 @@ class TimelineBuilder:
         self._figure_kwargs: dict = {"width": 1000}
         self._plot_heights: dict[str, int] = {}
         self._visibility_selector: MultiChoice | None = None
+        self._needs_visit_visibility_selector: bool = False
 
     def _get_available_columns(self) -> set[str]:
         """Get columns available in visit data sources.
@@ -421,27 +422,16 @@ class TimelineBuilder:
     def add_visit_visibility_selector(self) -> Self:
         """Add a MultiChoice widget to toggle visibility of visit sets.
 
-        Creates a MultiChoice widget that allows users to show/hide
-        different visit data sets that were added with show_visibility_toggle=True.
+        Records intent to include a visibility selector widget that allows
+        users to show/hide different visit data sets.
+        The selector is created during build() with current visit sets.
 
         Returns
         -------
         Self
             Returns self for method chaining.
         """
-        # Get list of visit set labels that should be visible by default
-        # Only include visits with show_visibility_toggle=True
-        options = [
-            label for label, dataset in self._visit_sets.items()
-            if dataset.show_visibility_toggle
-        ]
-
-        self._visibility_selector = MultiChoice(
-            value=options,
-            options=options,
-            width=400,
-        )
-
+        self._needs_visit_visibility_selector = True
         return self
 
     def build(self) -> column:
@@ -475,39 +465,53 @@ class TimelineBuilder:
                 fig = self._create_stripe_figure(element)
                 layout_components.append(fig)
 
-        # Wire up visibility selector callback with tracked renderers
-        if self._visibility_selector is not None:
-            # Build visit set info with actual renderer references
-            visit_sets_for_callback = {}
-            for label, dataset in self._visit_sets.items():
-                if dataset.show_visibility_toggle:
-                    # Get renderers for this visit set, or empty list if none tracked
-                    renderers = visit_renderers.get(label, [])
-                    visit_sets_for_callback[label] = {"renderers": renderers}
-
-            if visit_sets_for_callback:
-                # Create CustomJS callback to toggle visibility of visit renderers
-                callback_code = """
-                    const selected_labels = this.value;
-                    for (const [label, visit_info] of Object.entries(visit_sets)) {
-                        const isVisible = selected_labels.includes(label);
-                        for (const renderer of visit_info.renderers) {
-                            renderer.visible = isVisible;
-                            renderer.change.emit();
-                        }
-                    }
-                """
-
-                self._visibility_selector.js_on_change(
-                    'value',
-                    CustomJS(
-                        args={'visit_sets': visit_sets_for_callback},
-                        code=callback_code
-                    )
+        # Create visibility selector at build time with current visit sets
+        if self._needs_visit_visibility_selector:
+            # Build list of visit set labels with visibility toggle enabled
+            options = [
+                label for label, dataset in self._visit_sets.items()
+                if dataset.show_visibility_toggle
+            ]
+            
+            # Only create selector if there are visit sets with visibility toggle
+            if options:
+                self._visibility_selector = MultiChoice(
+                    value=options,
+                    options=options,
+                    width=400,
                 )
+                
+                # Build visit set info with actual renderer references
+                visit_sets_for_callback = {}
+                for label, dataset in self._visit_sets.items():
+                    if dataset.show_visibility_toggle:
+                        # Get renderers for this visit set, or empty list if none tracked
+                        renderers = visit_renderers.get(label, [])
+                        visit_sets_for_callback[label] = {"renderers": renderers}
 
-            # Add visibility selector to layout (first, before figures)
-            layout_components.insert(0, self._visibility_selector)
+                if visit_sets_for_callback:
+                    # Create CustomJS callback to toggle visibility of visit renderers
+                    callback_code = """
+                        const selected_labels = this.value;
+                        for (const [label, visit_info] of Object.entries(visit_sets)) {
+                            const isVisible = selected_labels.includes(label);
+                            for (const renderer of visit_info.renderers) {
+                                renderer.visible = isVisible;
+                                renderer.change.emit();
+                            }
+                        }
+                    """
+
+                    self._visibility_selector.js_on_change(
+                        'value',
+                        CustomJS(
+                            args={'visit_sets': visit_sets_for_callback},
+                            code=callback_code
+                        )
+                    )
+                
+                # Add visibility selector to layout (first, before figures)
+                layout_components.insert(0, self._visibility_selector)
 
         return column(*layout_components)
 
