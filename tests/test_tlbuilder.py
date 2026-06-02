@@ -29,6 +29,7 @@ from bokeh.models import (
     Quad,
 )
 from bokeh.layouts import column
+from bokeh.plotting import figure
 
 from schedview.dayobs import DayObs
 from schedview.plot.tlbuilder import (
@@ -768,6 +769,7 @@ class TestAddVisitVisibilitySelector:
         })
         builder.add_visits(visits_df, label="visit1", show_visibility_toggle=True)
         result = builder.add_visit_visibility_selector()
+        builder.build()  # Build to create the selector
 
         assert result is builder
         assert hasattr(builder, '_visibility_selector')
@@ -786,6 +788,7 @@ class TestAddVisitVisibilitySelector:
         builder.add_visits(visits_df, label="another_visible", show_visibility_toggle=True)
 
         builder.add_visit_visibility_selector()
+        builder.build()  # Build to create the selector
 
         widget = builder._visibility_selector
         assert "visible_visit" in widget.options
@@ -849,8 +852,99 @@ class TestAddVisitVisibilitySelector:
 
 
 # ============================================================================
+# TimelineBuilder.add_visit_visibility_selector robustness Tests
+# ============================================================================
+
+class TestVisitVisibilitySelectorCallOrder:
+    """Tests for robustness of add_visit_visibility_selector to call order."""
+
+    def test_selector_called_before_visits(self):
+        """Selector works correctly when called before visits are added."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        visits_df = pd.DataFrame({
+            "observationStartMJD": [59999.0],
+            "altitude": [30.0],
+        })
+        
+        # Add selector BEFORE visits - should still work
+        builder.add_visit_visibility_selector()
+        builder.add_visits(visits_df, label="visit1", show_visibility_toggle=True)
+        
+        result = builder.build()
+        
+        # Selector should exist and have correct options
+        assert isinstance(result.children[0], MultiChoice)
+        widget = result.children[0]
+        assert "visit1" in widget.options
+
+    def test_selector_called_after_visits(self):
+        """Selector works correctly when called after visits are added."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        visits_df = pd.DataFrame({
+            "observationStartMJD": [59999.0],
+            "altitude": [30.0],
+        })
+        builder.add_visits(visits_df, label="visit1", show_visibility_toggle=True)
+        
+        # Add selector AFTER visits
+        builder.add_visit_visibility_selector()
+        
+        result = builder.build()
+        
+        assert isinstance(result.children[0], MultiChoice)
+        widget = result.children[0]
+        assert "visit1" in widget.options
+
+    def test_multiple_visits_added_after_selector(self):
+        """Multiple visits added after selector are all included."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        visits_df = pd.DataFrame({
+            "observationStartMJD": [59999.0],
+            "altitude": [30.0],
+        })
+        
+        # Add selector first
+        builder.add_visit_visibility_selector()
+        
+        # Add multiple visits after
+        builder.add_visits(visits_df, label="visit1", show_visibility_toggle=True)
+        builder.add_visits(visits_df, label="visit2", show_visibility_toggle=True)
+        builder.add_visits(visits_df, label="visit3", show_visibility_toggle=False)
+        
+        result = builder.build()
+        
+        widget = result.children[0]
+        assert "visit1" in widget.options
+        assert "visit2" in widget.options
+        assert "visit3" not in widget.options
+
+    def test_no_selector_when_no_visits_with_toggle(self):
+        """Selector not created when no visits have show_visibility_toggle=True."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        visits_df = pd.DataFrame({
+            "observationStartMJD": [59999.0],
+            "altitude": [30.0],
+        })
+        builder.add_visits(visits_df, label="visit1", show_visibility_toggle=False)
+        
+        builder.add_visit_visibility_selector()
+        result = builder.build()
+        
+        # No selector should be created since no visits have toggle enabled
+        assert not isinstance(result.children[0], MultiChoice)
+        # The first child should be the scatter figure
+        assert isinstance(result.children[0], figure)
+
+
+# ============================================================================
 # TimelineBuilder.add_scatter_y_selector Tests
 # ============================================================================
+
+
 
 class TestScatterYAxisSelector:
     """Tests for scatter y-axis selector widgets."""
