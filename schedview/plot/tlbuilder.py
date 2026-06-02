@@ -250,7 +250,6 @@ class TimelineBuilder:
         color_by_band: bool = True,
         show_visibility_toggle: bool = True,
         time_column: str | None = None,
-        height: int | None = None,
     ) -> Self:
         """Add a visit plot to the timeline.
 
@@ -272,18 +271,12 @@ class TimelineBuilder:
             Column name containing MJD timestamps. If not provided,
             defaults to 'observationStartMJD' or uses heuristic to find
             a column containing 'mjd'.
-        height : int, optional
-            Height of the plot in pixels.
 
         Returns
         -------
         Self
             Returns self for method chaining.
         """
-        # Store height if provided
-        if height is not None:
-            self._plot_heights[label] = height
-
         # Convert MJD to datetime64
         if len(visits) > 0:
             mjd_col = _find_time_column(visits, time_column)
