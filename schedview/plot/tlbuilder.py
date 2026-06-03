@@ -698,6 +698,21 @@ class TimelineBuilder:
         if legend_fig is not None:
             layout_components.append(legend_fig)
 
+        # Hide x-axis tick labels on all but the bottom figure so panels sit closer together.
+        def _extract_figure(component):
+            if isinstance(component, Column):
+                for child in component.children:
+                    if hasattr(child, "xaxis"):
+                        return child
+            if hasattr(component, "xaxis"):
+                return component
+            return None
+
+        axis_figs = [f for c in layout_components if (f := _extract_figure(c)) is not None and len(f.xaxis) > 0]
+        for fig in axis_figs[:-1]:
+            fig.xaxis.major_label_text_font_size = "0pt"
+            fig.xaxis.major_tick_out = 0
+
         return column(*layout_components)
 
     def _create_scatter_y_selector(self, config: ScatterPlotConfig, fig: Plot) -> Select | None:
