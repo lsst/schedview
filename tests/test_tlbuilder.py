@@ -122,7 +122,7 @@ class TestVisitDataSet:
         """VisitDataSet has expected default values."""
         dataset = VisitDataSet()
         assert dataset.alpha == 1.0
-        assert dataset.marker == "circle"
+        assert dataset.marker is None
         assert dataset.show_visibility_toggle is True
 
     def test_custom_values(self):
@@ -2654,3 +2654,101 @@ class TestAddMarkerLegend:
             .build()
         )
         assert result is not None
+
+
+# ============================================================================
+# Auto-marker assignment Tests
+# ============================================================================
+
+
+class TestAutoMarkerAssignment:
+    """Tests for automatic marker assignment in TimelineBuilder."""
+
+    def test_auto_assigns_distinct_markers(self):
+        """Auto-assigns distinct markers when none specified."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "band": ["g"],
+            }
+        )
+        builder.add_visits(visits_df, label="v1")  # No marker - auto
+        builder.add_visits(visits_df, label="v2")  # No marker - auto
+        builder.add_visits(visits_df, label="v3")  # No marker - auto
+
+        result = builder.build()
+
+        markers = [d.marker for d in builder._visit_sets.values()]
+        assert len(markers) == len(set(markers)), "All markers should be distinct"
+
+    def test_auto_assigns_from_available_markers(self):
+        """Auto-assigned markers are from AVAILABLE_MARKERS."""
+        from schedview.plot.tlbuilder import AVAILABLE_MARKERS
+
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "band": ["g"],
+            }
+        )
+        builder.add_visits(visits_df, label="v1")  # No marker - auto
+
+        result = builder.build()
+
+        for dataset in builder._visit_sets.values():
+            if dataset.marker is not None:
+                assert dataset.marker in AVAILABLE_MARKERS
+
+    def test_auto_assign_skips_explicit_markers(self):
+        """Auto-assign skips visit sets that have explicit markers."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "band": ["g"],
+            }
+        )
+        builder.add_visits(visits_df, label="v1", marker="circle")  # Explicit
+        builder.add_visits(visits_df, label="v2")  # Auto
+        builder.add_visits(visits_df, label="v3")  # Auto
+
+        result = builder.build()
+
+        # v1 should keep its explicit marker
+        assert builder._visit_sets["v1"].marker == "circle"
+        # v2 and v3 should have auto-assigned markers (not "circle")
+        assert builder._visit_sets["v2"].marker is not None
+        assert builder._visit_sets["v3"].marker is not None
+        # And they should be different from each other
+        assert builder._visit_sets["v2"].marker != builder._visit_sets["v3"].marker
+
+    def test_auto_assignment_works_with_marker_legend(self):
+        """Auto-assigned markers appear correctly in marker legend."""
+        from bokeh.models import Legend
+
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "band": ["g"],
+            }
+        )
+        builder.add_visits(visits_df, label="v1")  # Auto
+        builder.add_visits(visits_df, label="v2")  # Auto
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        builder.add_marker_legend()
+        result = builder.build()
+
+        last_fig = result.children[-1]
+        below = last_fig.below
+        legend = below[0]
+        legend_labels = [item.label["value"] for item in legend.items]
+
+        assert "v1" in legend_labels
+        assert "v2" in legend_labels
