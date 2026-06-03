@@ -27,11 +27,16 @@ from bokeh.models import (
     Range1d,
     Select,
 )
+from bokeh.core.enums import MarkerType
 from bokeh.palettes import Colorblind
 from bokeh.plotting import figure
 
 from schedview.dayobs import DayObs
 from schedview.plot.colors import PLOT_BAND_COLORS
+
+# Available marker types for automatic assignment
+AVAILABLE_MARKERS = list(MarkerType)
+DEFAULT_MARKER = "circle"
 
 
 def _find_time_column(df: pd.DataFrame, time_column: str | None = None) -> str:
@@ -128,13 +133,15 @@ class VisitDataSet:
     alpha : float
         Opacity value for the glyphs.
     marker : str
-        Marker type for scatter glyphs.
+        Marker type for scatter glyphs. If not specified (None), a distinct
+        marker will be automatically assigned during build() to help
+        differentiate visit sets in the legend.
     """
 
     source: ColumnDataSource | None = None
     label: str = ""
     alpha: float = 1.0
-    marker: str = "circle"
+    marker: str | None = None
     show_visibility_toggle: bool = True
 
 
@@ -168,6 +175,7 @@ class TimelineBuilder:
         self._needs_visit_visibility_selector: bool = False
         self._needs_color_legend: bool = False
         self._needs_marker_legend: bool = False
+        self._assigned_markers: list[str] = []
 
     def _get_available_columns(self) -> set[str]:
         """Get columns available in visit data sources.
@@ -252,7 +260,7 @@ class TimelineBuilder:
         visits: pd.DataFrame,
         label: str = "visits",
         alpha: float = 1.0,
-        marker: str = "circle",
+        marker: str | None = None,
         show_visibility_toggle: bool = True,
         time_column: str | None = None,
     ) -> Self:
@@ -266,8 +274,10 @@ class TimelineBuilder:
             Identifier for this visit set.
         alpha : float, optional
             Opacity for the visit glyphs.
-        marker : str, optional
-            Marker type for scatter glyphs.
+        marker : str or None, optional
+            Marker type for scatter glyphs. If ``None`` (default), a distinct
+            marker will be automatically assigned to help differentiate visit
+            sets in the legend.
         show_visibility_toggle : bool, optional
             Whether to show visibility toggle.
         time_column : str or None, optional
@@ -559,6 +569,40 @@ class TimelineBuilder:
 
         return fig
 
+    def _assign_markers(self) -> None:
+        """Assign distinct markers to visit sets that don't have one specified.
+
+        Iterates through all visit sets and assigns a distinct marker from
+        AVAILABLE_MARKERS to any visit set with marker=None. Marks visited
+        markers to ensure uniqueness.
+
+        Notes
+        -----
+        If there are more visit sets than available markers, the method
+        cycles through the available markers.
+        """
+        # Collect visit sets that need marker assignment
+        unmarked_sets: list[tuple[str, VisitDataSet]] = []
+        used_markers: set[str] = set()
+
+        for label, dataset in self._visit_sets.items():
+            if dataset.marker is None:
+                unmarked_sets.append((label, dataset))
+            else:
+                used_markers.add(dataset.marker)
+
+        # Assign distinct markers to unmarked visit sets
+        for label, dataset in unmarked_sets:
+            # Find an unused marker
+            for marker in AVAILABLE_MARKERS:
+                if marker not in used_markers:
+                    dataset.marker = marker
+                    used_markers.add(marker)
+                    break
+            else:
+                # All markers exhausted, cycle back to first available
+                dataset.marker = AVAILABLE_MARKERS[0]
+
     def build(self) -> Column:
         """Build and return the final Bokeh layout.
 
@@ -573,6 +617,9 @@ class TimelineBuilder:
         layout_components = []
         # Track visit renderers for visibility toggling
         visit_renderers: dict[str, list] = {}
+
+        # Assign distinct markers to visit sets that don't have one specified
+        self._assign_markers()
 
         # Build color mapper once; mutates visit sources for "other" binning
         color_mapper = self._build_color_mapper()

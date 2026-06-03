@@ -145,6 +145,7 @@ The new tlbuilder module (`schedview.plot.tlbuilder`) will implement:
    - Configurable time column (default: `observationStartMJD`)
    - Configurable plot parameters (alpha, marker, etc.)
    - Visibility toggles for multiple visit sets
+   - Automatic distinct marker assignment for visit sets when no marker is specified (uses a variety of Bokeh marker types)
 
 4. **Color mapping support** - A single `map_colors(column)` method on `TimelineBuilder` configures how visit points are colored across all scatter plots:
    - When `column="band"` (the default), uses the standard LSST band palette (`PLOT_BAND_COLORS`) preserving current behavior
@@ -227,6 +228,13 @@ The proposed system consists of:
    - `map_colors(column)` - Set the visit column used for color encoding across all scatter panels (default: `"band"`)
    - `add_color_legend()` - Append a dedicated legend figure at the bottom mapping colors to values
    - `add_marker_legend()` - Append a marker legend to the same bottom figure mapping marker shape to visit set name
+
+3. **Marker assignment** - When multiple visit sets are added without explicit markers, the builder automatically assigns distinct marker shapes:
+   - Uses available Bokeh marker types to ensure visual distinction
+   - Each visit set receives a unique marker from the available pool when possible
+   - If more visit sets are added than available marker types, the system cycles through the available markers
+   - Users can still explicitly specify a marker via `add_visits(marker=...)` to override auto-assignment
+   - Auto-assigned markers ensure clear visual distinction in the legend and on the plots
 
 3. **Data types supported**:
    - `pandas.DataFrame` with time column (default: `observationStartMJD`)
@@ -376,12 +384,13 @@ The tlbuilder system provides the following improvements over the current implem
 3. **More flexible** - The fluent API allows users to easily combine different plot types and customize their appearance.
 
 4. **Better visit support** - Special handling for visit DataFrames with automatic band coloring and configurable parameters.
+5. **Automatic marker assignment** - When multiple visit sets are added without explicit markers, the builder automatically assigns distinct marker shapes from the available Bokeh marker types, cycling when necessary.
 
-5. **Easier maintenance** - The new codebase is cleaner and more modular, making it easier to add new features.
+6. **Easier maintenance** - The new codebase is cleaner and more modular, making it easier to add new features.
 
-6. **Interactive widgets** - Built-in MultiChoice and Select widgets for visit visibility toggling and y-axis column selection.
+7. **Interactive widgets** - Built-in MultiChoice and Select widgets for visit visibility toggling and y-axis column selection.
 
-7. **CLI tool** - Standalone HTML generation without needing to write Python code.
+8. **CLI tool** - Standalone HTML generation without needing to write Python code.
 
 ## Disadvantages and limitations
 
@@ -495,7 +504,7 @@ classDiagram
     class TimelineBuilder {
         +dayobs: DayObs
         +scatter_elements: list
-        +visit_sets: list
+        +visit_sets: dict
         +stripe_elements: list
         +color_column: str
         +add_scatter(...)
@@ -522,9 +531,10 @@ classDiagram
     }
 
     class VisitDataSet {
-        +df: DataFrame
+        +source: ColumnDataSource
         +label: str
         +alpha: float
+        +marker: str|null
     }
 
     TimelineBuilder --> ScatterPlotConfig
@@ -597,6 +607,16 @@ Each scatter plot:
   - any other string column → Bokeh `Colorblind` palette with automatic `"other"` binning for overflow values
 - The same color mapping is applied to visit points across all scatter panels.
 - Each visit set can be toggled in visibility with a MultiChoice widget (optional).
+
+### Marker Assignment
+
+When visit sets are added without specifying a marker (the default), the builder automatically assigns distinct marker shapes:
+
+- Uses available Bokeh marker types to ensure visual distinction
+- Each visit set receives the next unused marker from the pool when possible
+- If more visit sets are added than available marker types, the system cycles through the available markers
+- Explicit markers specified via `add_visits(marker=...)` are preserved and not overridden
+- The marker legend reflects the assigned markers, enabling users to identify visit sets by shape
 
 ### Color Legend
 
