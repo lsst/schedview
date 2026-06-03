@@ -37,6 +37,9 @@ from schedview.plot.colors import PLOT_BAND_COLORS
 # Available marker types for automatic assignment
 AVAILABLE_MARKERS = list(MarkerType)
 DEFAULT_MARKER = "circle"
+# Shared borders so scatter and stripe plot areas are pixel-aligned on both sides.
+_SHARED_MIN_BORDER_LEFT = 60
+_SHARED_MIN_BORDER_RIGHT = 10
 
 
 def _find_time_column(df: pd.DataFrame, time_column: str | None = None) -> str:
@@ -631,12 +634,18 @@ class TimelineBuilder:
                 fig = self._create_scatter_figure(
                     element, color_mapper=color_mapper, visit_renderers=visit_renderers
                 )
-                layout_components.append(fig)
                 # Create y-axis selector if multiple offered_columns
                 # (placed after figure since figure is needed for callback)
                 y_selector = self._create_scatter_y_selector(element, fig)
                 if y_selector is not None:
-                    layout_components.insert(len(layout_components) - 1, y_selector)
+                    # Wrap selector and figure in a Column for centering
+                    # Column with sizing_mode='stretch_width' makes children full width
+                    # align='center' centers the selector (which has fixed width)
+                    layout_components.append(
+                        Column(y_selector, fig, sizing_mode="stretch_width", align="center")
+                    )
+                else:
+                    layout_components.append(fig)
             elif isinstance(element, ColorStripeConfig):
                 # No y-axis selector for stripes
                 fig = self._create_stripe_figure(element)
@@ -693,7 +702,7 @@ class TimelineBuilder:
     def _create_scatter_y_selector(self, config: ScatterPlotConfig, fig: Plot) -> Select | None:
         """Create a y-axis selector widget for a scatter plot.
 
-        Creates a Select widget with offered_columns as options positioned
+        Creates a Select widget with offered_columns as options, centered
         above the scatter figure.
 
         Parameters
@@ -718,10 +727,10 @@ class TimelineBuilder:
         if config.y_column not in config.offered_columns:
             initial_value = config.offered_columns[0] if config.offered_columns else None
         selector = Select(
-            title="Y-Axis:",
             value=initial_value,
             options=list(config.offered_columns),
             width=200,
+            align="center",
         )
 
         # Create CustomJS callback to update y-field.
@@ -850,7 +859,13 @@ class TimelineBuilder:
         height = self._plot_heights.get(config.name, 200)
 
         # Combine default figure kwargs with config kwargs
-        fig_kwargs = {"width": 1000, "x_axis_type": "datetime"}
+        fig_kwargs = {
+            "width": 1000,
+            "x_axis_type": "datetime",
+            "toolbar_location": "above",
+            "min_border_left": _SHARED_MIN_BORDER_LEFT,
+            "min_border_right": _SHARED_MIN_BORDER_RIGHT,
+        }
         if self._figure_kwargs:
             fig_kwargs.update(self._figure_kwargs)
         if config.figure_kwargs:
@@ -937,6 +952,8 @@ class TimelineBuilder:
             "y_axis_type": None,  # No y-axis type
             "x_range": self._shared_x_range,
             "toolbar_location": None,
+            "min_border_left": _SHARED_MIN_BORDER_LEFT,
+            "min_border_right": _SHARED_MIN_BORDER_RIGHT,
         }
         if self._figure_kwargs:
             fig_kwargs.update(self._figure_kwargs)

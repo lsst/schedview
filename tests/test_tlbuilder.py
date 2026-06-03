@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from astropy.time import Time
-from bokeh.layouts import column
+from bokeh.layouts import Column, column
 from bokeh.models import (
     ColumnDataSource,
     CustomJS,
@@ -1161,9 +1161,12 @@ class TestScatterYAxisSelector:
         )
         result = builder.build()
 
-        assert len(result.children) >= 2  # selector + figure
+        # Selector and figure wrapped in a Column
+        assert len(result.children) >= 1
         first_child = result.children[0]
-        assert isinstance(first_child, Select)
+        assert isinstance(first_child, Column)
+        assert len(first_child.children) >= 2
+        assert isinstance(first_child.children[0], Select)
 
     def test_no_widget_for_empty_offered_columns(self):
         """No y-axis selector when offered_columns is empty."""
@@ -1190,11 +1193,16 @@ class TestScatterYAxisSelector:
         builder.add_scatter(y_column="HA", offered_columns=["HA", "fieldRA"], name="scatter2")
         result = builder.build()
 
-        assert len(result.children) == 4
-        assert isinstance(result.children[0], Select)
-        assert hasattr(result.children[1], "x_range")
-        assert isinstance(result.children[2], Select)
-        assert hasattr(result.children[3], "x_range")
+        # Each selector+figure pair is wrapped in a Column
+        assert len(result.children) == 2
+        # First scatter: Column(Select, Figure)
+        assert isinstance(result.children[0], Column)
+        assert isinstance(result.children[0].children[0], Select)
+        assert hasattr(result.children[0].children[1], "x_range")
+        # Second scatter: Column(Select, Figure)
+        assert isinstance(result.children[1], Column)
+        assert isinstance(result.children[1].children[0], Select)
+        assert hasattr(result.children[1].children[1], "x_range")
 
     def test_selector_updates_y_axis_label(self):
         """Y-axis selector callback updates the y-axis label."""
@@ -1202,7 +1210,9 @@ class TestScatterYAxisSelector:
         builder.add_scatter(y_column="altitude", offered_columns=["altitude", "HA"], name="scatter1")
         result = builder.build()
 
-        assert isinstance(result.children[0], Select)
+        # Selector is now wrapped in Column above the figure
+        assert isinstance(result.children[0], Column)
+        assert isinstance(result.children[0].children[0], Select)
 
 
 # ============================================================================
@@ -1454,7 +1464,7 @@ class TestFinalLayoutAssembly:
     """Tests for the final build layout with widgets and figures."""
 
     def test_layout_order_widgets_then_scatters_then_stripes(self):
-        """Layout: visibility selector, then scatters, then stripes."""
+        """Layout: visibility selector, then scatters (with y-selectors), then stripes."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude", offered_columns=["altitude", "HA"], name="scatter1")
         visits_df = pd.DataFrame(
@@ -1469,7 +1479,9 @@ class TestFinalLayoutAssembly:
         result = builder.build()
 
         assert isinstance(result.children[0], MultiChoice)
-        assert isinstance(result.children[1], Select)
+        # Y-axis selector is now wrapped with figure in a Column
+        assert isinstance(result.children[1], Column)
+        assert isinstance(result.children[1].children[0], Select)
 
     def test_all_figures_share_single_range1d_x_range(self):
         """All figures share a single Range1d x-range object."""
@@ -2289,8 +2301,10 @@ class TestYSelectorColumnFiltering:
         )
         result = builder.build()
 
-        # The selector should only have available columns
-        selector = result.children[0]
+        # Selector is now wrapped in Column with figure
+        selector_wrapper = result.children[0]
+        assert isinstance(selector_wrapper, Column)
+        selector = selector_wrapper.children[0]
         assert isinstance(selector, Select)
         assert "nonexistent" not in selector.options
         assert "altitude" in selector.options
@@ -2311,7 +2325,10 @@ class TestYSelectorColumnFiltering:
         builder.add_scatter(y_column="nonexistent", offered_columns=["altitude", "HA"], name="scatter1")
         result = builder.build()
 
-        selector = result.children[0]
+        # Selector is now wrapped in Column with figure
+        selector_wrapper = result.children[0]
+        assert isinstance(selector_wrapper, Column)
+        selector = selector_wrapper.children[0]
         assert isinstance(selector, Select)
         # y_column fell back to "altitude" (first available option)
         assert selector.value == "altitude"
