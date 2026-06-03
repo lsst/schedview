@@ -885,7 +885,6 @@ class TimelineBuilder:
                     line_color={"field": color_field, "transform": color_mapper},
                     fill_alpha=visit_set.alpha,
                     line_alpha=visit_set.alpha,
-                    legend_label=visit_set.label,
                 )
             else:
                 # No color mapping - use default blue
@@ -899,7 +898,6 @@ class TimelineBuilder:
                     line_color="#1f77b4",
                     fill_alpha=visit_set.alpha,
                     line_alpha=visit_set.alpha,
-                    legend_label=visit_set.label,
                 )
 
             # Track renderer for visibility toggling.
