@@ -143,22 +143,27 @@ The new tlbuilder module (`schedview.plot.tlbuilder`) will implement:
 
 3. **Visit data support** - Special handling for pandas DataFrames from `schedview.collect.visits.read_visits()` with:
    - Configurable time column (default: `observationStartMJD`)
-   - Optional band column for color encoding
    - Configurable plot parameters (alpha, marker, etc.)
    - Visibility toggles for multiple visit sets
 
-4. **Color stripe support** - For background color mapping of continuous quantities:
+4. **Color mapping support** - A single `map_colors(column)` method on `TimelineBuilder` configures how visit points are colored across all scatter plots:
+   - When `column="band"` (the default), uses the standard LSST band palette (`PLOT_BAND_COLORS`) preserving current behavior
+   - When `column` names any other string column, uses the Bokeh `Colorblind` palette
+   - If the column has more distinct values than the palette supports, the least-common values are collapsed into a single `"other"` bin before mapping
+   - The mapping applies uniformly to every scatter panel produced by `build()`
+
+5. **Color stripe support** - For background color mapping of continuous quantities:
    - Sun elevation (`--background sun_elevation`)
    - Moon elevation (`--background moon_elevation`)
    - Sky brightness (custom data series)
    - Default height of 40px for better visibility
 
-5. **Interactive controls** - Built-in widgets for:
+6. **Interactive controls** - Built-in widgets for:
    - Y-axis column selection for scatter plots (via Select widget with offered_columns)
    - Visit set visibility toggles (via MultiChoice widget)
    - Zoom/pan interactions (via Bokeh built-in tools)
 
-6. **CLI tool** - A command-line interface for generating standalone HTML files:
+7. **CLI tool** - A command-line interface for generating standalone HTML files:
    ```bash
    buildtl --date 2026-05-23 --scatter altitude --scatter HA --visits baseline_v1.db --visits baseline_v2.db --background sun_elevation --output timeline_2026-05-23.html
    ```
@@ -216,9 +221,11 @@ The proposed system consists of:
 
 2. **Builder methods** - Each method adds a specific type of element to the plot:
    - `add_scatter()` - Add a scatter plot with y-axis selector
-   - `add_visits()` - Add visit data as scatter points with optional band coloring
+   - `add_visits()` - Add visit data as scatter points
    - `add_color_stripe()` - Add a horizontal bar for color-coded data (default height: 40px)
    - `add_visit_visibility_selector()` - Add a widget to toggle visit set visibility
+   - `map_colors(column)` - Set the visit column used for color encoding across all scatter panels (default: `"band"`)
+   - `add_color_legend()` - Append a dedicated legend figure at the bottom mapping colors to values
 
 3. **Data types supported**:
    - `pandas.DataFrame` with time column (default: `observationStartMJD`)
@@ -470,11 +477,11 @@ A stateful builder responsible for:
 
 #### ScatterPlotConfig / ColorStripeConfig
 
-Typed parameter bundles for controlling plot appearance.
+Typed parameter bundles for controlling plot appearance. `ScatterPlotConfig` now includes a `color_column` field (default `"band"`) that specifies which visit column drives color encoding for overlaid visit points.
 
 #### VisitDataSet
 
-Represents a visit source’s associated data, label, and stylistic options.
+Represents a visit source’s associated data, label, and stylistic options. The `color_by_band` field has been removed; color encoding is now determined by each scatter plot’s `color_column`.
 
 ## Design Viewpoints
 
@@ -489,10 +496,13 @@ classDiagram
         +scatter_elements: list
         +visit_sets: list
         +stripe_elements: list
+        +color_column: str
         +add_scatter(...)
         +add_visits(...)
         +add_color_stripe(...)
         +add_visit_visibility_selector()
+        +map_colors(column) : Self
+        +add_color_legend() : Self
         +build() : column
     }
 
@@ -533,7 +543,10 @@ classDiagram
   - All temporal values converted to `numpy.datetime64` for compatibility with Bokeh’s `x_axis_type="datetime"`.
 
 - **Derived values**
-  - Band colors mapped through `BAND_COLORS`.
+  - Color encoding resolved via a single builder-level `color_column` (set by `map_colors()`; default `"band"`):
+    - `"band"` → `PLOT_BAND_COLORS` (standard LSST band palette)
+    - any other string column → Bokeh `Colorblind` palette; least-common values collapsed to `"other"` when distinct count exceeds palette size
+  - The same mapping is applied to every scatter panel; there is no per-panel override.
   - ColumnDataSource used universally for binding.
 
 ## Detailed Component Design
@@ -544,18 +557,22 @@ classDiagram
 
 - Manage element configuration.
 - Create consistent shared x-axis.
-- Build Bokeh figures and glyphs.
+- Hold a single builder-level `color_column` (default `"band"`) configurable via `map_colors()`.
+- Build Bokeh figures and glyphs, applying the color mapping uniformly across all scatter panels.
 - Optionally add widgets (Select, MultiChoice).
+- Optionally append a horizontal color legend figure at the bottom of the layout.
 - Produce a single Bokeh `column` layout.
 
 #### Key Internals
 
 - Holds lists: `scatter_elements`, `visit_sets`, `stripe_elements`.
 - Transforms MJD→datetime64 on ingestion.
+- `_build_color_mapper()` — called once per `build()` invocation; constructs the `CategoricalColorMapper` and mutates visit sources to add the `"other"` bin when needed.  All scatter figures receive the same mapper instance.
 - Uses Bokeh glyphs:
   - `Scatter` for visit/scatter data,
   - `LinearColorMapper` or `CategoricalColorMapper`,
-  - `Range1d` for shared x-axis ranges.
+  - `Range1d` for shared x-axis ranges,
+  - `Legend` / `LegendItem` for the optional color legend panel.
 
 #### Error Handling
 
@@ -572,9 +589,22 @@ Each scatter plot:
 
 ### Visit Data Support
 
-- Accepts multiple visit sets.
-- Applies LSST band mapping through `BAND_COLORS`.
+- Accepts multiple visit sets; `add_visits()` does not accept `color_by_band`.
+- Color encoding is resolved at `build()` time using the builder-level `color_column` set by `map_colors()` (default `"band"`):
+  - `"band"` → `PLOT_BAND_COLORS` (existing LSST palette, preserving current behavior)
+  - any other string column → Bokeh `Colorblind` palette with automatic `"other"` binning for overflow values
+- The same color mapping is applied to visit points across all scatter panels.
 - Each visit set can be toggled in visibility with a MultiChoice widget (optional).
+
+### Color Legend
+
+When `add_color_legend()` has been called, `build()` appends a dedicated thin figure at the bottom of the layout:
+
+- The figure has `height=1`, no axes, no toolbar, and no outline, so it renders only the legend itself.
+- A Bokeh `Legend` with `orientation="horizontal"` is attached via `fig.add_layout(legend, "below")`.
+- Each `LegendItem` corresponds to one factor from the `CategoricalColorMapper`.  The item uses a hidden `Scatter` renderer carrying the correct swatch color.
+- If the color column required an `"other"` bin (more distinct values than the `Colorblind` palette supports), an `"other"` item is included with gray (`#888888`).
+- The legend figure is only created when a `CategoricalColorMapper` exists (i.e., at least one visit set contains the color column).  If there are no visit sets or the color column is absent, `add_color_legend()` is a no-op at render time.
 
 ### Color Stripes
 

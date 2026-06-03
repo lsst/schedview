@@ -19,14 +19,16 @@ from bokeh.models import (
     CustomJS,
     DatetimeTickFormatter,
     HoverTool,
+    Legend,
+    LegendItem,
     LinearColorMapper,
     MultiChoice,
     Plot,
     Range1d,
     Select,
 )
-from bokeh.plotting import figure
 from bokeh.palettes import Colorblind
+from bokeh.plotting import figure
 
 from schedview.dayobs import DayObs
 from schedview.plot.colors import PLOT_BAND_COLORS
@@ -164,6 +166,8 @@ class TimelineBuilder:
         self._plot_heights: dict[str, int] = {}
         self._visibility_selector: MultiChoice | None = None
         self._needs_visit_visibility_selector: bool = False
+        self._needs_color_legend: bool = False
+        self._needs_color_legend: bool = False
 
     def _get_available_columns(self) -> set[str]:
         """Get columns available in visit data sources.
@@ -443,6 +447,70 @@ class TimelineBuilder:
         self._color_column = column
         return self
 
+    def add_color_legend(self) -> Self:
+        """Add a color legend panel at the bottom of the timeline.
+
+        The legend maps each color value to the label from the column set by
+        `map_colors()` (default ``"band"``).  Values collapsed into the
+        ``"other"`` bin are shown with the label ``"other"``.
+
+        The legend is rendered as a dedicated figure appended after all other
+        elements and is only materialised during `build()`, so it always
+        reflects the final color mapping.
+
+        Returns
+        -------
+        Self
+            Returns self for method chaining.
+        """
+        self._needs_color_legend = True
+        return self
+
+    def _build_color_legend_figure(self, color_mapper: CategoricalColorMapper) -> Plot:
+        """Build a thin figure containing a horizontal Bokeh Legend.
+
+        Parameters
+        ----------
+        color_mapper : CategoricalColorMapper
+            The mapper whose factors and palette are used to populate the legend.
+
+        Returns
+        -------
+        Plot
+            A short Bokeh figure with a horizontal legend and no axes.
+        """
+        fig_width = self._figure_kwargs.get("width", 1000)
+
+        fig = figure(
+            width=fig_width,
+            height=1,
+            toolbar_location=None,
+            x_axis_type=None,
+            y_axis_type=None,
+            x_range=(0, 1),
+            y_range=(0, 1),
+        )
+        fig.xgrid.visible = False
+        fig.ygrid.visible = False
+        fig.outline_line_color = None
+
+        items = []
+        for factor, color in zip(color_mapper.factors, color_mapper.palette):
+            renderer = fig.scatter(
+                x=[0.5],
+                y=[0.5],
+                fill_color=color,
+                line_color=None,
+                size=12,
+            )
+            renderer.visible = False
+            items.append(LegendItem(label=str(factor), renderers=[renderer]))
+
+        legend = Legend(items=items, orientation="horizontal", location="center")
+        fig.add_layout(legend, "below")
+
+        return fig
+
     def build(self) -> Column:
         """Build and return the final Bokeh layout.
 
@@ -458,11 +526,16 @@ class TimelineBuilder:
         # Track visit renderers for visibility toggling
         visit_renderers: dict[str, list] = {}
 
+        # Build color mapper once; mutates visit sources for "other" binning
+        color_mapper = self._build_color_mapper()
+
         # Process elements in insertion order
         for element in self._elements:
             if isinstance(element, ScatterPlotConfig):
                 # Create scatter figure with renderer tracking
-                fig = self._create_scatter_figure(element, visit_renderers=visit_renderers)
+                fig = self._create_scatter_figure(
+                    element, color_mapper=color_mapper, visit_renderers=visit_renderers
+                )
                 layout_components.append(fig)
                 # Create y-axis selector if multiple offered_columns
                 # (placed after figure since figure is needed for callback)
@@ -514,6 +587,10 @@ class TimelineBuilder:
 
                 # Add visibility selector to layout (first, before figures)
                 layout_components.insert(0, self._visibility_selector)
+
+        # Append color legend as a thin dedicated figure at the bottom
+        if self._needs_color_legend and color_mapper is not None:
+            layout_components.append(self._build_color_legend_figure(color_mapper))
 
         return column(*layout_components)
 
@@ -574,6 +651,64 @@ class TimelineBuilder:
 
         return selector
 
+    def _build_color_mapper(self) -> CategoricalColorMapper | None:
+        """Build and return the CategoricalColorMapper for visit color encoding.
+
+        Mutates visit sources to add an ``<column>_color`` field when the
+        ``"other"`` bin is needed (more distinct values than palette size).
+
+        Returns
+        -------
+        CategoricalColorMapper or None
+            The mapper, or ``None`` when no visit sets contain the color column.
+        """
+        color_col_name, all_values = self._get_color_column_data()
+        if all_values is None:
+            return None
+
+        if self._color_column == "band":
+            existing_bands = [b for b in all_values if b in PLOT_BAND_COLORS]
+            if not existing_bands:
+                return None
+            return CategoricalColorMapper(
+                factors=existing_bands,
+                palette=[PLOT_BAND_COLORS[b] for b in existing_bands],
+            )
+
+        # Non-band column: use Colorblind palette
+        palette_size = len(Colorblind[8])
+        if len(all_values) <= palette_size:
+            return CategoricalColorMapper(
+                factors=all_values,
+                palette=list(Colorblind[8][: len(all_values)]),
+            )
+
+        # Too many values — collapse least-common into "other"
+        value_counts: dict[str, int] = {}
+        for visit_set in self._visit_sets.values():
+            if visit_set.source is not None and color_col_name in visit_set.source.data:
+                for val in visit_set.source.data[color_col_name]:
+                    value_counts[val] = value_counts.get(val, 0) + 1
+
+        sorted_values = sorted(value_counts.items(), key=lambda x: x[1], reverse=True)
+        top_values = [v[0] for v in sorted_values[:palette_size]]
+        palette = list(Colorblind[8][: len(top_values)]) + ["#888888"]
+
+        mapper = CategoricalColorMapper(
+            factors=top_values + ["other"],
+            palette=palette,
+        )
+
+        # Remap source data: values not in top_values become "other"
+        for visit_set in self._visit_sets.values():
+            if visit_set.source is not None and color_col_name in visit_set.source.data:
+                orig = visit_set.source.data[color_col_name]
+                visit_set.source.data[f"{color_col_name}_color"] = [
+                    v if v in top_values else "other" for v in orig
+                ]
+
+        return mapper
+
     def _get_color_column_data(self) -> tuple[str, list[str] | None]:
         """Get the color column data from all visit sets.
 
@@ -595,6 +730,7 @@ class TimelineBuilder:
     def _create_scatter_figure(
         self,
         config: ScatterPlotConfig,
+        color_mapper: CategoricalColorMapper | None = None,
         visit_renderers: dict[str, list] | None = None,
     ) -> Plot:
         """Create a scatter plot figure.
@@ -603,6 +739,9 @@ class TimelineBuilder:
         ----------
         config : ScatterPlotConfig
             Configuration for the scatter plot.
+        color_mapper : CategoricalColorMapper or None
+            Pre-built color mapper (from ``_build_color_mapper``).  When
+            ``None``, visit points are rendered in the default blue.
         visit_renderers : dict[str, list] | None
             Maps visit set labels to renderer lists for visibility toggling.
 
@@ -629,67 +768,7 @@ class TimelineBuilder:
         if config.tooltips is not None:
             fig.add_tools(HoverTool(tooltips=list(config.tooltips)))
 
-        # Get color column data from all visit sets
-        color_col_name, all_values = self._get_color_column_data()
-
-        # Build color mapping based on color_column setting
-        color_mapper: CategoricalColorMapper | None = None
-        if all_values is not None:
-            if self._color_column == "band":
-                # Use standard LSST band palette for band column
-                # Filter to only bands that exist in data
-                existing_bands = [b for b in all_values if b in PLOT_BAND_COLORS]
-                if existing_bands:
-                    color_mapper = CategoricalColorMapper(
-                        factors=existing_bands,
-                        palette=[PLOT_BAND_COLORS[b] for b in existing_bands],
-                    )
-            else:
-                # Use Colorblind palette for other columns
-                # Get palette size (Colorblind has 8 colors)
-                palette_size = len(Colorblind[8])
-
-                if len(all_values) <= palette_size:
-                    # All values fit in palette
-                    color_mapper = CategoricalColorMapper(
-                        factors=all_values,
-                        palette=Colorblind[8][: len(all_values)],
-                    )
-                else:
-                    # Too many values - collapse least common into "other"
-                    # Count occurrences of each value
-                    value_counts: dict[str, int] = {}
-                    for visit_set in self._visit_sets.values():
-                        if visit_set.source is not None and color_col_name in visit_set.source.data:
-                            col_data = visit_set.source.data[color_col_name]
-                            for val in col_data:
-                                value_counts[val] = value_counts.get(val, 0) + 1
-
-                    # Sort by count descending, take top N, group rest as "other"
-                    sorted_values = sorted(value_counts.items(), key=lambda x: x[1], reverse=True)
-                    top_values = [v[0] for v in sorted_values[:palette_size]]
-                    other_values = [v[0] for v in sorted_values[palette_size:]]
-
-                    # Create palette: top values + gray for "other"
-                    palette = list(Colorblind[8][: len(top_values)]) + ["#888888"]
-
-                    color_mapper = CategoricalColorMapper(
-                        factors=top_values + ["other"],
-                        palette=palette,
-                    )
-
-                    # Add "other" to source data for values that aren't in top_values
-                    for visit_set in self._visit_sets.values():
-                        if visit_set.source is not None and color_col_name in visit_set.source.data:
-                            orig_colors = visit_set.source.data.get(color_col_name, [])
-                            new_colors = []
-                            for val in orig_colors:
-                                if val in top_values:
-                                    new_colors.append(val)
-                                else:
-                                    new_colors.append("other")
-                            # Store the mapped colors back
-                            visit_set.source.data[f"{color_col_name}_color"] = new_colors
+        color_col_name = self._color_column
 
         # Overlay visit sets onto this scatter panel using y_column.
         for visit_set in self._visit_sets.values():
@@ -1002,6 +1081,9 @@ def main(
     # Add visibility toggle if enabled
     if enable_visibility_toggle:
         builder.add_visit_visibility_selector()
+
+    # Always include a color legend when visits are present
+    builder.add_color_legend()
 
     # Build the layout
     layout = builder.build()

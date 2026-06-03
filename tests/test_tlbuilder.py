@@ -2317,3 +2317,150 @@ class TestYSelectorColumnFiltering:
         assert selector.value == "altitude"
         assert "altitude" in selector.options
         assert "HA" in selector.options
+
+
+# ============================================================================
+# add_color_legend Tests
+# ============================================================================
+
+
+class TestAddColorLegend:
+    """Tests for TimelineBuilder.add_color_legend method."""
+
+    def test_returns_self_for_chaining(self):
+        """add_color_legend returns self for method chaining."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        result = builder.add_color_legend()
+        assert result is builder
+
+    def test_sets_needs_color_legend_flag(self):
+        """add_color_legend sets the internal flag."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        assert builder._needs_color_legend is False
+        builder.add_color_legend()
+        assert builder._needs_color_legend is True
+
+    def test_legend_figure_appended_after_scatter(self):
+        """Legend figure is appended after all other figures."""
+        from bokeh.models import Legend
+
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0, 60000.0],
+                "altitude": [30.0, 45.0],
+                "band": ["g", "r"],
+            }
+        )
+        builder.add_visits(visits_df, label="visits1")
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        builder.add_color_legend()
+        result = builder.build()
+
+        # Last child should be the legend figure (has a Legend layout)
+        last_fig = result.children[-1]
+        legends = [obj for obj in last_fig.center if isinstance(obj, Legend)]
+        below_legends = last_fig.below
+        assert len(below_legends) >= 1
+
+    def test_legend_not_added_without_color_mapper(self):
+        """No legend figure is appended when there are no visit sets."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        builder.add_color_legend()
+        result = builder.build()
+
+        # With no visits there is no color mapper, so no legend figure is added
+        assert len(result.children) == 1
+
+    def test_legend_contains_band_factors(self):
+        """Legend items match the bands present in visit data."""
+        from bokeh.models import Legend
+
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0, 60000.0, 60001.0],
+                "altitude": [30.0, 45.0, 60.0],
+                "band": ["g", "r", "i"],
+            }
+        )
+        builder.add_visits(visits_df, label="visits1")
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        builder.add_color_legend()
+        result = builder.build()
+
+        last_fig = result.children[-1]
+        below = last_fig.below
+        assert len(below) >= 1
+        legend = below[0]
+        assert isinstance(legend, Legend)
+        legend_labels = [item.label["value"] for item in legend.items]
+        assert "g" in legend_labels
+        assert "r" in legend_labels
+        assert "i" in legend_labels
+
+    def test_legend_contains_other_for_overflow_values(self):
+        """Legend includes 'other' when distinct values exceed palette size."""
+        from bokeh.models import Legend
+
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        num_visits = 20
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0 + i / 100 for i in range(num_visits)],
+                "altitude": [30.0 + i for i in range(num_visits)],
+                "visitId": [f"v{i}" for i in range(num_visits)],
+            }
+        )
+        builder.map_colors("visitId")
+        builder.add_visits(visits_df, label="visits1")
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        builder.add_color_legend()
+        result = builder.build()
+
+        last_fig = result.children[-1]
+        legend = last_fig.below[0]
+        assert isinstance(legend, Legend)
+        legend_labels = [item.label["value"] for item in legend.items]
+        assert "other" in legend_labels
+
+    def test_legend_is_horizontal(self):
+        """Legend orientation is horizontal."""
+        from bokeh.models import Legend
+
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "band": ["g"],
+            }
+        )
+        builder.add_visits(visits_df, label="visits1")
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        builder.add_color_legend()
+        result = builder.build()
+
+        last_fig = result.children[-1]
+        legend = last_fig.below[0]
+        assert isinstance(legend, Legend)
+        assert legend.orientation == "horizontal"
+
+    def test_method_chaining_with_other_methods(self):
+        """add_color_legend chains fluently with add_scatter and add_visits."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "band": ["g"],
+            }
+        )
+        result = (
+            builder.add_visits(visits_df, label="v1")
+            .add_scatter(y_column="altitude")
+            .add_color_legend()
+            .build()
+        )
+        assert result is not None
