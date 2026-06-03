@@ -167,7 +167,7 @@ class TimelineBuilder:
         self._visibility_selector: MultiChoice | None = None
         self._needs_visit_visibility_selector: bool = False
         self._needs_color_legend: bool = False
-        self._needs_color_legend: bool = False
+        self._needs_marker_legend: bool = False
 
     def _get_available_columns(self) -> set[str]:
         """Get columns available in visit data sources.
@@ -466,19 +466,49 @@ class TimelineBuilder:
         self._needs_color_legend = True
         return self
 
-    def _build_color_legend_figure(self, color_mapper: CategoricalColorMapper) -> Plot:
-        """Build a thin figure containing a horizontal Bokeh Legend.
+    def add_marker_legend(self) -> Self:
+        """Add a marker legend panel at the bottom of the timeline.
 
-        Parameters
-        ----------
-        color_mapper : CategoricalColorMapper
-            The mapper whose factors and palette are used to populate the legend.
+        The legend maps each marker shape to the label of the visit set
+        added via `add_visits()`.  This legend appears next to the color
+        legend at the bottom of the visualization, attached to the same
+        ``height=1`` figure.
+
+        The marker legend is only materialised during `build()`, so it always
+        reflects the final visit sets.
 
         Returns
         -------
-        Plot
-            A short Bokeh figure with a horizontal legend and no axes.
+        Self
+            Returns self for method chaining.
         """
+        self._needs_marker_legend = True
+        return self
+
+    def _build_color_legend_figure(
+        self, color_mapper: CategoricalColorMapper | None
+    ) -> Plot | None:
+        """Build a thin figure containing horizontal Bokeh Legends for color and marker.
+
+        Parameters
+        ----------
+        color_mapper : CategoricalColorMapper or None
+            The mapper whose factors and palette are used to populate the color legend.
+            If ``None``, no color legend is created.
+
+        Returns
+        -------
+        Plot or None
+            A short Bokeh figure with horizontal legends and no axes, or ``None``
+            if neither color legend nor marker legend is needed.
+        """
+        # Determine if we need any legend
+        needs_color = self._needs_color_legend and color_mapper is not None
+        needs_marker = self._needs_marker_legend and len(self._visit_sets) > 0
+
+        if not needs_color and not needs_marker:
+            return None
+
         fig_width = self._figure_kwargs.get("width", 1000)
 
         fig = figure(
@@ -494,17 +524,35 @@ class TimelineBuilder:
         fig.ygrid.visible = False
         fig.outline_line_color = None
 
-        items = []
-        for factor, color in zip(color_mapper.factors, color_mapper.palette):
-            renderer = fig.scatter(
-                x=[0.5],
-                y=[0.5],
-                fill_color=color,
-                line_color=None,
-                size=12,
-            )
-            renderer.visible = False
-            items.append(LegendItem(label=str(factor), renderers=[renderer]))
+        items: list[LegendItem] = []
+
+        # Build color legend items first
+        if needs_color:
+            for factor, color in zip(color_mapper.factors, color_mapper.palette):
+                renderer = fig.scatter(
+                    x=[0.5],
+                    y=[0.5],
+                    fill_color=color,
+                    line_color=None,
+                    size=12,
+                )
+                renderer.visible = False
+                items.append(LegendItem(label=str(factor), renderers=[renderer]))
+
+        # Build marker legend items (attached to same figure)
+        if needs_marker:
+            # Create invisible scatter renderers for each visit set's marker
+            for label, visit_set in self._visit_sets.items():
+                renderer = fig.scatter(
+                    x=[0.5],
+                    y=[0.5],
+                    marker=visit_set.marker,
+                    fill_color="black",
+                    line_color="black",
+                    size=12,
+                )
+                renderer.visible = False
+                items.append(LegendItem(label=label, renderers=[renderer]))
 
         legend = Legend(items=items, orientation="horizontal", location="center")
         fig.add_layout(legend, "below")
@@ -588,9 +636,10 @@ class TimelineBuilder:
                 # Add visibility selector to layout (first, before figures)
                 layout_components.insert(0, self._visibility_selector)
 
-        # Append color legend as a thin dedicated figure at the bottom
-        if self._needs_color_legend and color_mapper is not None:
-            layout_components.append(self._build_color_legend_figure(color_mapper))
+        # Append legend figure (with color and/or marker legend) at the bottom
+        legend_fig = self._build_color_legend_figure(color_mapper)
+        if legend_fig is not None:
+            layout_components.append(legend_fig)
 
         return column(*layout_components)
 
@@ -1082,8 +1131,9 @@ def main(
     if enable_visibility_toggle:
         builder.add_visit_visibility_selector()
 
-    # Always include a color legend when visits are present
+    # Always include legends when visits are present
     builder.add_color_legend()
+    builder.add_marker_legend()
 
     # Build the layout
     layout = builder.build()

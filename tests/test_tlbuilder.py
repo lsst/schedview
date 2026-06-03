@@ -2464,3 +2464,193 @@ class TestAddColorLegend:
             .build()
         )
         assert result is not None
+
+
+# ============================================================================
+# add_marker_legend Tests
+# ============================================================================
+
+
+class TestAddMarkerLegend:
+    """Tests for TimelineBuilder.add_marker_legend method."""
+
+    def test_returns_self_for_chaining(self):
+        """add_marker_legend returns self for method chaining."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        result = builder.add_marker_legend()
+        assert result is builder
+
+    def test_sets_needs_marker_legend_flag(self):
+        """add_marker_legend sets the internal flag."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        assert builder._needs_marker_legend is False
+        builder.add_marker_legend()
+        assert builder._needs_marker_legend is True
+
+    def test_marker_legend_figure_appended_after_scatter(self):
+        """Marker legend figure is appended after all other figures."""
+        from bokeh.models import Legend
+
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0, 60000.0],
+                "altitude": [30.0, 45.0],
+                "band": ["g", "r"],
+            }
+        )
+        builder.add_visits(visits_df, label="visits1", marker="triangle")
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        builder.add_marker_legend()
+        result = builder.build()
+
+        # Last child should be the legend figure (has a Legend layout)
+        last_fig = result.children[-1]
+        below_legends = last_fig.below
+        assert len(below_legends) >= 1
+
+    def test_marker_legend_contains_visit_labels(self):
+        """Marker legend items contain visit set labels."""
+        from bokeh.models import Legend
+
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "band": ["g"],
+            }
+        )
+        builder.add_visits(visits_df, label="visits1", marker="triangle")
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        builder.add_marker_legend()
+        result = builder.build()
+
+        last_fig = result.children[-1]
+        below = last_fig.below
+        assert len(below) >= 1
+        legend = below[0]
+        assert isinstance(legend, Legend)
+        legend_labels = [item.label["value"] for item in legend.items]
+        assert "visits1" in legend_labels
+
+    def test_marker_legend_contains_multiple_visit_sets(self):
+        """Marker legend includes all visit set labels when multiple visit sets."""
+        from bokeh.models import Legend
+
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df1 = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "band": ["g"],
+            }
+        )
+        visits_df2 = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [35.0],
+                "band": ["r"],
+            }
+        )
+        builder.add_visits(visits_df1, label="v1", marker="circle")
+        builder.add_visits(visits_df2, label="v2", marker="square")
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        builder.add_marker_legend()
+        result = builder.build()
+
+        last_fig = result.children[-1]
+        below = last_fig.below
+        legend = below[0]
+        legend_labels = [item.label["value"] for item in legend.items]
+        assert "v1" in legend_labels
+        assert "v2" in legend_labels
+
+    def test_marker_legend_with_custom_markers(self):
+        """Marker legend respects custom marker types from add_visits."""
+        from bokeh.models import Legend
+
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "band": ["g"],
+            }
+        )
+        builder.add_visits(visits_df, label="visits1", marker="triangle")
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        builder.add_marker_legend()
+        result = builder.build()
+
+        last_fig = result.children[-1]
+        below = last_fig.below
+        legend = below[0]
+
+        # Find the legend item for visits1 and check its renderer marker
+        for item in legend.items:
+            if item.label["value"] == "visits1":
+                # Check that the renderer uses triangle marker
+                renderer = item.renderers[0]
+                assert renderer.glyph.marker == "triangle"
+                break
+        else:
+            pytest.fail("Could not find 'visits1' in legend items")
+
+    def test_marker_legend_not_added_without_visits(self):
+        """No marker legend figure is appended when there are no visit sets."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        builder.add_marker_legend()
+        result = builder.build()
+
+        # With no visits, no legend figure is added
+        assert len(result.children) == 1
+
+    def test_color_and_marker_legend_together(self):
+        """Both color and marker legends appear on same figure when both requested."""
+        from bokeh.models import Legend
+
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "band": ["g"],
+            }
+        )
+        builder.add_visits(visits_df, label="visits1", marker="triangle")
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        builder.add_color_legend()
+        builder.add_marker_legend()
+        result = builder.build()
+
+        # Should have 2 children: scatter + legend figure
+        assert len(result.children) == 2
+
+        last_fig = result.children[-1]
+        below = last_fig.below
+        legend = below[0]
+        legend_labels = [item.label["value"] for item in legend.items]
+
+        # Should have both color (band) and marker (visit label) entries
+        assert "g" in legend_labels
+        assert "visits1" in legend_labels
+
+    def test_method_chaining_with_other_methods(self):
+        """add_marker_legend chains fluently with add_scatter and add_visits."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "band": ["g"],
+            }
+        )
+        result = (
+            builder.add_visits(visits_df, label="v1", marker="circle")
+            .add_scatter(y_column="altitude")
+            .add_marker_legend()
+            .build()
+        )
+        assert result is not None

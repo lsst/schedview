@@ -226,6 +226,7 @@ The proposed system consists of:
    - `add_visit_visibility_selector()` - Add a widget to toggle visit set visibility
    - `map_colors(column)` - Set the visit column used for color encoding across all scatter panels (default: `"band"`)
    - `add_color_legend()` - Append a dedicated legend figure at the bottom mapping colors to values
+   - `add_marker_legend()` - Append a marker legend to the same bottom figure mapping marker shape to visit set name
 
 3. **Data types supported**:
    - `pandas.DataFrame` with time column (default: `observationStartMJD`)
@@ -503,6 +504,7 @@ classDiagram
         +add_visit_visibility_selector()
         +map_colors(column) : Self
         +add_color_legend() : Self
+        +add_marker_legend() : Self
         +build() : column
     }
 
@@ -560,7 +562,7 @@ classDiagram
 - Hold a single builder-level `color_column` (default `"band"`) configurable via `map_colors()`.
 - Build Bokeh figures and glyphs, applying the color mapping uniformly across all scatter panels.
 - Optionally add widgets (Select, MultiChoice).
-- Optionally append a horizontal color legend figure at the bottom of the layout.
+- Optionally append a horizontal color legend and/or marker legend to a shared figure at the bottom of the layout.
 - Produce a single Bokeh `column` layout.
 
 #### Key Internals
@@ -572,7 +574,7 @@ classDiagram
   - `Scatter` for visit/scatter data,
   - `LinearColorMapper` or `CategoricalColorMapper`,
   - `Range1d` for shared x-axis ranges,
-  - `Legend` / `LegendItem` for the optional color legend panel.
+  - `Legend` / `LegendItem` for the optional color legend and marker legend panels, both attached to a single shared bottom figure.
 
 #### Error Handling
 
@@ -605,6 +607,16 @@ When `add_color_legend()` has been called, `build()` appends a dedicated thin fi
 - Each `LegendItem` corresponds to one factor from the `CategoricalColorMapper`.  The item uses a hidden `Scatter` renderer carrying the correct swatch color.
 - If the color column required an `"other"` bin (more distinct values than the `Colorblind` palette supports), an `"other"` item is included with gray (`#888888`).
 - The legend figure is only created when a `CategoricalColorMapper` exists (i.e., at least one visit set contains the color column).  If there are no visit sets or the color column is absent, `add_color_legend()` is a no-op at render time.
+
+### Marker Legend
+
+When `add_marker_legend()` has been called, `build()` attaches a second horizontal `Legend` to the same shared bottom figure used by `add_color_legend()`:
+
+- Each `LegendItem` corresponds to one `VisitDataSet`, using that dataset's marker shape and label (visit set name) as the swatch.
+- If neither `add_color_legend()` nor `add_marker_legend()` was called, no bottom figure is created.
+- If only one of the two is called, only that legend is attached and the shared figure is still created.
+- When both are called, both legends are attached to the same `height=1` figure: the color legend is added first (`"below"`), then the marker legend is appended alongside it.
+- The marker legend is only created when at least one `VisitDataSet` has been added; if there are no visit sets it is a no-op at render time.
 
 ### Color Stripes
 
