@@ -987,7 +987,8 @@ class TimelineBuilder:
             height=1,
             source=config.source,
             fill_color={"field": "value", "transform": color_mapper},
-            line_color=None,
+            line_color={"field": "value", "transform": color_mapper},
+            line_width=1,
         )
 
         # Apply datetime tick formatter
@@ -1049,7 +1050,7 @@ def _sample_body_elevation(body_name: str, dayobs: DayObs) -> pd.Series:
     """
     from astropy.coordinates import AltAz, get_body
 
-    mjds = np.arange(float(dayobs.sunset.mjd), float(dayobs.sunrise.mjd), 1 / 24)
+    mjds = np.arange(float(dayobs.sunset.mjd), float(dayobs.sunrise.mjd), 4 / (24 * 60))
     times_ap = Time(mjds, format="mjd")
     altaz_frame = AltAz(location=dayobs.location, obstime=times_ap)
     altaz = get_body(body_name, times_ap).transform_to(altaz_frame)
@@ -1192,7 +1193,7 @@ def main(
         if bg_type == "sun_elevation":
             sun_data = _sample_body_elevation("sun", dayobs)
             stripe_h = stripe_height if stripe_height is not None else 100
-            builder.add_color_stripe(sun_data, name="sun_elevation", height=stripe_h)
+            builder.add_color_stripe(sun_data, name="sun_elevation", height=stripe_h, value_range=(-18.0, 0.0))
 
         elif bg_type == "moon_elevation":
             moon_data = _sample_body_elevation("moon", dayobs)
