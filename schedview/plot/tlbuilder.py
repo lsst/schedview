@@ -13,6 +13,7 @@ from astropy.time import Time
 from bokeh.embed import file_html
 from bokeh.layouts import column
 from bokeh.models import (
+    CategoricalColorMapper,
     Column,
     ColumnDataSource,
     CustomJS,
@@ -25,6 +26,7 @@ from bokeh.models import (
     Select,
 )
 from bokeh.plotting import figure
+from bokeh.palettes import Colorblind
 
 from schedview.dayobs import DayObs
 from schedview.plot.colors import PLOT_BAND_COLORS
@@ -125,15 +127,12 @@ class VisitDataSet:
         Opacity value for the glyphs.
     marker : str
         Marker type for scatter glyphs.
-    color_by_band : bool
-        Whether to color points by band.
     """
 
     source: ColumnDataSource | None = None
     label: str = ""
     alpha: float = 1.0
     marker: str = "circle"
-    color_by_band: bool = True
     show_visibility_toggle: bool = True
 
 
@@ -157,6 +156,7 @@ class TimelineBuilder:
         self._dayobs = dayobs
         self._elements: list[ScatterPlotConfig | ColorStripeConfig] = []
         self._visit_sets: dict[str, VisitDataSet] = {}
+        self._color_column: str = "band"
         start_time = Time(float(dayobs.sunset.mjd), format="mjd").datetime64
         end_time = Time(float(dayobs.sunrise.mjd), format="mjd").datetime64
         self._shared_x_range = Range1d(start=start_time, end=end_time)
@@ -249,7 +249,6 @@ class TimelineBuilder:
         label: str = "visits",
         alpha: float = 1.0,
         marker: str = "circle",
-        color_by_band: bool = True,
         show_visibility_toggle: bool = True,
         time_column: str | None = None,
     ) -> Self:
@@ -265,8 +264,6 @@ class TimelineBuilder:
             Opacity for the visit glyphs.
         marker : str, optional
             Marker type for scatter glyphs.
-        color_by_band : bool, optional
-            Whether to color points by band column.
         show_visibility_toggle : bool, optional
             Whether to show visibility toggle.
         time_column : str or None, optional
@@ -293,14 +290,6 @@ class TimelineBuilder:
             if col != time_column:
                 source_data[col] = visits[col].values
 
-        # Add band colors
-        if color_by_band and "band" in visits.columns:
-            bands = visits["band"].values
-            colors = [PLOT_BAND_COLORS.get(b, "#888888") for b in bands]
-            source_data["color"] = colors
-        else:
-            source_data["color"] = ["#1f77b4"] * len(visits) if len(visits) > 0 else []
-
         source = ColumnDataSource(data=source_data)
 
         self._visit_sets[label] = VisitDataSet(
@@ -308,7 +297,6 @@ class TimelineBuilder:
             label=label,
             alpha=alpha,
             marker=marker,
-            color_by_band=color_by_band,
             show_visibility_toggle=show_visibility_toggle,
         )
         # Visits are overlaid on scatter panels; they don't create figures.
@@ -431,6 +419,28 @@ class TimelineBuilder:
             Returns self for method chaining.
         """
         self._needs_visit_visibility_selector = True
+        return self
+
+    def map_colors(self, column: str) -> Self:
+        """Set the column to use for color encoding visit points.
+
+        This setting applies to all scatter plots in the timeline.
+
+        Parameters
+        ----------
+        column : str
+            Column name to use for color encoding. Default is "band".
+            When "band", uses the standard LSST band palette (PLOT_BAND_COLORS).
+            For any other column, uses Bokeh's "Colorblind" palette.
+            If there are more distinct values than palette size, least common
+            values are combined into an "other" bin.
+
+        Returns
+        -------
+        Self
+            Returns self for method chaining.
+        """
+        self._color_column = column
         return self
 
     def build(self) -> Column:
@@ -564,6 +574,24 @@ class TimelineBuilder:
 
         return selector
 
+    def _get_color_column_data(self) -> tuple[str, list[str] | None]:
+        """Get the color column data from all visit sets.
+
+        Returns a tuple of (column_name, all_unique_values) where all_unique_values
+        is the list of all distinct values seen across all visit sets for the
+        color column, or None if the color column doesn't exist in any visit set.
+        """
+        all_values: list[str] = []
+        for visit_set in self._visit_sets.values():
+            if visit_set.source is not None and self._color_column in visit_set.source.data:
+                col_data = visit_set.source.data[self._color_column]
+                for val in col_data:
+                    if val not in all_values:
+                        all_values.append(val)
+        if len(all_values) == 0:
+            return (self._color_column, None)
+        return (self._color_column, all_values)
+
     def _create_scatter_figure(
         self,
         config: ScatterPlotConfig,
@@ -601,23 +629,103 @@ class TimelineBuilder:
         if config.tooltips is not None:
             fig.add_tools(HoverTool(tooltips=list(config.tooltips)))
 
+        # Get color column data from all visit sets
+        color_col_name, all_values = self._get_color_column_data()
+
+        # Build color mapping based on color_column setting
+        color_mapper: CategoricalColorMapper | None = None
+        if all_values is not None:
+            if self._color_column == "band":
+                # Use standard LSST band palette for band column
+                # Filter to only bands that exist in data
+                existing_bands = [b for b in all_values if b in PLOT_BAND_COLORS]
+                if existing_bands:
+                    color_mapper = CategoricalColorMapper(
+                        factors=existing_bands,
+                        palette=[PLOT_BAND_COLORS[b] for b in existing_bands],
+                    )
+            else:
+                # Use Colorblind palette for other columns
+                # Get palette size (Colorblind has 8 colors)
+                palette_size = len(Colorblind[8])
+
+                if len(all_values) <= palette_size:
+                    # All values fit in palette
+                    color_mapper = CategoricalColorMapper(
+                        factors=all_values,
+                        palette=Colorblind[8][: len(all_values)],
+                    )
+                else:
+                    # Too many values - collapse least common into "other"
+                    # Count occurrences of each value
+                    value_counts: dict[str, int] = {}
+                    for visit_set in self._visit_sets.values():
+                        if visit_set.source is not None and color_col_name in visit_set.source.data:
+                            col_data = visit_set.source.data[color_col_name]
+                            for val in col_data:
+                                value_counts[val] = value_counts.get(val, 0) + 1
+
+                    # Sort by count descending, take top N, group rest as "other"
+                    sorted_values = sorted(value_counts.items(), key=lambda x: x[1], reverse=True)
+                    top_values = [v[0] for v in sorted_values[:palette_size]]
+                    other_values = [v[0] for v in sorted_values[palette_size:]]
+
+                    # Create palette: top values + gray for "other"
+                    palette = list(Colorblind[8][: len(top_values)]) + ["#888888"]
+
+                    color_mapper = CategoricalColorMapper(
+                        factors=top_values + ["other"],
+                        palette=palette,
+                    )
+
+                    # Add "other" to source data for values that aren't in top_values
+                    for visit_set in self._visit_sets.values():
+                        if visit_set.source is not None and color_col_name in visit_set.source.data:
+                            orig_colors = visit_set.source.data.get(color_col_name, [])
+                            new_colors = []
+                            for val in orig_colors:
+                                if val in top_values:
+                                    new_colors.append(val)
+                                else:
+                                    new_colors.append("other")
+                            # Store the mapped colors back
+                            visit_set.source.data[f"{color_col_name}_color"] = new_colors
+
         # Overlay visit sets onto this scatter panel using y_column.
         for visit_set in self._visit_sets.values():
             if config.y_column not in visit_set.source.data:
                 continue
-            color = "color" if visit_set.color_by_band else "#1f77b4"
-            renderer = fig.scatter(
-                x="time",
-                y=config.y_column,
-                source=visit_set.source,
-                size=5,
-                marker=visit_set.marker,
-                fill_color=color,
-                line_color=color,
-                fill_alpha=visit_set.alpha,
-                line_alpha=visit_set.alpha,
-                legend_label=visit_set.label,
-            )
+
+            # Determine color field based on mapper
+            if color_mapper is not None:
+                # Use the color column with the mapper
+                color_field = f"{color_col_name}_color" if f"{color_col_name}_color" in visit_set.source.data else color_col_name
+                renderer = fig.scatter(
+                    x="time",
+                    y=config.y_column,
+                    source=visit_set.source,
+                    size=5,
+                    marker=visit_set.marker,
+                    fill_color={"field": color_field, "transform": color_mapper},
+                    line_color={"field": color_field, "transform": color_mapper},
+                    fill_alpha=visit_set.alpha,
+                    line_alpha=visit_set.alpha,
+                    legend_label=visit_set.label,
+                )
+            else:
+                # No color mapping - use default blue
+                renderer = fig.scatter(
+                    x="time",
+                    y=config.y_column,
+                    source=visit_set.source,
+                    size=5,
+                    marker=visit_set.marker,
+                    fill_color="#1f77b4",
+                    line_color="#1f77b4",
+                    fill_alpha=visit_set.alpha,
+                    line_alpha=visit_set.alpha,
+                    legend_label=visit_set.label,
+                )
 
             # Track renderer for visibility toggling.
             # Initialize list for each visit set if visit_renderers provided.
