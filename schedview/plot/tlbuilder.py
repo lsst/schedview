@@ -19,6 +19,7 @@ from bokeh.models import (
     CustomJS,
     DatetimeTickFormatter,
     HoverTool,
+    Label,
     Legend,
     LegendItem,
     LinearColorMapper,
@@ -994,6 +995,16 @@ class TimelineBuilder:
 
         fig.add_tools(HoverTool(tooltips=[("time", "@time{%H:%M}"), (config.name, "@value{0.2f}")],
                                 formatters={"@time": "datetime"}))
+
+        label_text = config.name.replace("_", " ").title()
+        fig.add_layout(Label(
+            x=5, y=0.95,
+            x_units="screen", y_units="data",
+            text=label_text,
+            text_font_size="11px",
+            text_color="white",
+            text_baseline="top",
+        ))
 
         return fig
 
