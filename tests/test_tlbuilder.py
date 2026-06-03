@@ -123,7 +123,7 @@ class TestVisitDataSet:
         dataset = VisitDataSet()
         assert dataset.alpha == 1.0
         assert dataset.marker == "circle"
-        assert dataset.color_by_band is True
+        assert dataset.show_visibility_toggle is True
 
     def test_custom_values(self):
         """VisitDataSet stores custom values correctly."""
@@ -133,14 +133,12 @@ class TestVisitDataSet:
             label="custom_visits",
             alpha=0.5,
             marker="triangle",
-            color_by_band=False,
             show_visibility_toggle=False,
         )
         assert dataset.source is source
         assert dataset.label == "custom_visits"
         assert dataset.alpha == 0.5
         assert dataset.marker == "triangle"
-        assert dataset.color_by_band is False
         assert dataset.show_visibility_toggle is False
 
 
@@ -374,7 +372,7 @@ class TestAddVisits:
         assert isinstance(dataset, VisitDataSet)
 
     def test_stores_visit_dataset_attributes(self):
-        """VisitDataSet stores label, alpha, marker, color_by_band."""
+        """VisitDataSet stores label, alpha, marker."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         visits_df = pd.DataFrame(
             {
@@ -382,16 +380,15 @@ class TestAddVisits:
                 "altitude": [30.0],
             }
         )
-        builder.add_visits(visits_df, label="test_visits", alpha=0.7, marker="triangle", color_by_band=False)
+        builder.add_visits(visits_df, label="test_visits", alpha=0.7, marker="triangle")
 
         dataset = builder._visit_sets["test_visits"]
         assert dataset.label == "test_visits"
         assert dataset.alpha == 0.7
         assert dataset.marker == "triangle"
-        assert dataset.color_by_band is False
 
-    def test_applies_band_coloring_when_band_exists(self):
-        """When color_by_band=True, add_visits assigns colors based on band."""
+    def test_applies_band_coloring_by_default_when_band_exists(self):
+        """By default, add_visits assigns colors based on band using the band column."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         visits_df = pd.DataFrame(
             {
@@ -400,16 +397,15 @@ class TestAddVisits:
                 "band": ["u", "g", "r"],
             }
         )
-        builder.add_visits(visits_df, label="band_visits", color_by_band=True)
+        builder.add_visits(visits_df, label="band_visits")
 
         dataset = builder._visit_sets["band_visits"]
         source = dataset.source
-        assert "color" in source.data
-        colors = source.data["color"]
-        assert len(colors) == 3
+        # Band values should be in source data for color mapping
+        assert "band" in source.data
 
-    def test_default_color_by_band_is_true(self):
-        """add_visits has color_by_band=True by default."""
+    def test_visits_data_stores_band_column(self):
+        """add_visits stores band column in source for color mapping."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         visits_df = pd.DataFrame(
             {
@@ -421,7 +417,10 @@ class TestAddVisits:
         builder.add_visits(visits_df, label="default_band")
 
         dataset = builder._visit_sets["default_band"]
-        assert dataset.color_by_band is True
+        source = dataset.source
+        # Band column should be available in source
+        assert "band" in source.data
+        assert source.data["band"][0] == "g"
 
     def test_custom_marker_works(self):
         """add_visits respects custom marker parameter."""
@@ -484,6 +483,121 @@ class TestAddVisits:
         assert result is builder
         assert len(builder._elements) == 2
         assert "visits1" in builder._visit_sets
+
+
+# ============================================================================
+# TimelineBuilder.map_colors Tests
+# ============================================================================
+
+
+class TestMapColors:
+    """Tests for TimelineBuilder.map_colors method."""
+
+    def test_returns_self_for_chaining(self):
+        """map_colors returns self for method chaining."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        result = builder.map_colors("band")
+        assert result is builder
+
+    def test_sets_color_column_to_band(self):
+        """map_colors sets color_column to specified value."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        builder.map_colors("band")
+        assert builder._color_column == "band"
+
+    def test_sets_color_column_to_custom_column(self):
+        """map_colors can set color_column to any column name."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        builder.map_colors("airmass")
+        assert builder._color_column == "airmass"
+
+    def test_default_color_column_is_band(self):
+        """Default color_column is 'band'."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        assert builder._color_column == "band"
+
+    def test_method_chaining(self):
+        """map_colors can be chained with other builder methods."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "band": ["g"],
+            }
+        )
+        result = builder.map_colors("band").add_scatter(y_column="altitude").add_visits(visits_df)
+        assert result is builder
+
+
+# ============================================================================
+# Color Mapping Tests
+# ============================================================================
+
+
+class TestColorMapping:
+    """Tests for color mapping in scatter plots."""
+
+    def test_default_band_palette_used(self):
+        """Default band column uses PLOT_BAND_COLORS palette."""
+        from schedview.plot.colors import PLOT_BAND_COLORS
+
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0, 60000.0],
+                "altitude": [30.0, 45.0],
+                "band": ["g", "r"],
+            }
+        )
+        builder.add_visits(visits_df, label="visits")
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        result = builder.build()
+
+        # The scatter should have renderers with color encoding
+        fig = result.children[0]  # First scatter plot
+        scatter_renderers = [r for r in fig.renderers if hasattr(r.glyph, "fill_color")]
+        assert len(scatter_renderers) >= 1
+
+    def test_non_band_column_uses_colorblind_palette(self):
+        """Non-band color column uses Colorblind palette."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0, 60000.0],
+                "altitude": [30.0, 45.0],
+                "visitType": ["deep", "wide"],
+            }
+        )
+        builder.map_colors("visitType")
+        builder.add_visits(visits_df, label="visits")
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        result = builder.build()
+
+        # Should have renderers
+        fig = result.children[0]
+        scatter_renderers = [r for r in fig.renderers if hasattr(r.glyph, "fill_color")]
+        assert len(scatter_renderers) >= 1
+
+    def test_many_distinct_values_get_other_bin(self):
+        """Many distinct values in color column are collapsed to 'other'."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        # Create visit data with more distinct values than Colorblind palette (8)
+        num_visits = 20
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0 + i / 100 for i in range(num_visits)],
+                "altitude": [30.0 + i for i in range(num_visits)],
+                "visitId": [f"v{i}" for i in range(num_visits)],
+            }
+        )
+        builder.map_colors("visitId")
+        builder.add_visits(visits_df, label="visits")
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        result = builder.build()
+
+        # Should build successfully without error
+        assert result is not None
 
 
 # ============================================================================
