@@ -992,6 +992,9 @@ class TimelineBuilder:
         # Apply datetime tick formatter
         fig.xaxis[0].formatter = DatetimeTickFormatter(hours="%H:%M")
 
+        fig.add_tools(HoverTool(tooltips=[("time", "@time{%H:%M}"), (config.name, "@value{0.2f}")],
+                                formatters={"@time": "datetime"}))
+
         return fig
 
 
