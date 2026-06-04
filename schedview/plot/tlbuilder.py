@@ -979,6 +979,26 @@ class TimelineBuilder:
         # Add hover tooltips if specified
         if config.tooltips is not None:
             fig.add_tools(HoverTool(tooltips=list(config.tooltips)))
+        else:
+            # Create default hover tooltip with time, y_column, visit set, and offered columns
+            # The @x and @y refer to the x and y data columns
+            # We'll add @visit_set for the visit set label
+            # And include all offered columns
+            tooltip_fields = [
+                ("time", "@time{%H:%M}"),
+                ("y", f"@{config.y_column}"),
+            ]
+            # Add offered columns to tooltip
+            for col in config.offered_columns:
+                tooltip_fields.append((col, f"@{col}"))
+            # Add visit set if there are visit sets
+            if self._visit_sets:
+                tooltip_fields.append(("visit", "@visit_set"))
+
+            fig.add_tools(HoverTool(
+                tooltips=tooltip_fields,
+                formatters={"@time": "datetime"},
+            ))
 
         color_col_name = self._color_column
 
@@ -986,6 +1006,11 @@ class TimelineBuilder:
         for visit_set in self._visit_sets.values():
             if config.y_column not in visit_set.source.data:
                 continue
+
+            # Add visit_set field for hover tooltip
+            # Store the original length to expand if needed
+            source_len = len(visit_set.source.data.get("time", []))
+            visit_set.source.data["visit_set"] = [visit_set.label] * source_len
 
             # Determine color field based on mapper
             if color_mapper is not None:

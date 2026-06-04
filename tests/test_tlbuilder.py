@@ -2139,15 +2139,21 @@ class TestScatterTooltips:
         assert len(hover_tools) == 1
         assert hover_tools[0].tooltips == tooltips
 
-    def test_figure_has_no_hover_tool_without_tooltips(self):
-        """Figure has no HoverTool when tooltips are not provided."""
+    def test_figure_has_hover_tool_without_explicit_tooltips(self):
+        """Figure has default HoverTool with time, y_column, visit_set, and offered columns."""
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude")
         result = builder.build()
 
         fig = _get_figure(result.children[0])
         hover_tools = [t for t in fig.tools if isinstance(t, HoverTool)]
-        assert len(hover_tools) == 0
+        assert len(hover_tools) == 1
+        # Default tooltips include time (with format), y (using y_column name), and offered_columns
+        # With no visit sets, visit field is not included
+        tooltips = hover_tools[0].tooltips
+        assert ("time", "@time{%H:%M}") in tooltips
+        # The y field uses the actual column name from the scatter plot
+        assert ("y", "@altitude") in tooltips
 
     def test_multiple_scatter_plots_with_tooltips(self):
         """Multiple scatter plots can each have their own tooltips."""
