@@ -26,7 +26,9 @@ from bokeh.models import (
     MultiChoice,
     Plot,
     Range1d,
+    Row,
     Select,
+    Spacer,
 )
 from bokeh.core.enums import MarkerType
 from bokeh.palettes import Colorblind
@@ -638,15 +640,24 @@ class TimelineBuilder:
                 # Create y-axis selector if multiple offered_columns
                 # (placed after figure since figure is needed for callback)
                 y_selector = self._create_scatter_y_selector(element, fig)
+                toolbar = fig.toolbar
+                toolbar.styles = {"flex-direction": "row"}
                 if y_selector is not None:
-                    # Wrap selector and figure in a Column for centering
-                    # Column with sizing_mode='stretch_width' makes children full width
-                    # align='center' centers the selector (which has fixed width)
-                    layout_components.append(
-                        Column(y_selector, fig, sizing_mode="stretch_width", align="center")
+                    # Center the selector by flanking it with spacers; place the
+                    # toolbar at the far right in the same strip.
+                    header = Row(
+                        Spacer(sizing_mode="stretch_width"),
+                        y_selector,
+                        Spacer(sizing_mode="stretch_width"),
+                        toolbar,
+                        sizing_mode="stretch_width",
                     )
                 else:
-                    layout_components.append(fig)
+                    header = Row(
+                        Spacer(sizing_mode="stretch_width"),
+                        toolbar,
+                    )
+                layout_components.append(Column(header, fig, sizing_mode="stretch_width"))
             elif isinstance(element, ColorStripeConfig):
                 # No y-axis selector for stripes
                 fig = self._create_stripe_figure(element)
@@ -878,7 +889,7 @@ class TimelineBuilder:
         fig_kwargs = {
             "width": 1000,
             "x_axis_type": "datetime",
-            "toolbar_location": "above",
+            "toolbar_location": None,
             "min_border_left": _SHARED_MIN_BORDER_LEFT,
             "min_border_right": _SHARED_MIN_BORDER_RIGHT,
         }

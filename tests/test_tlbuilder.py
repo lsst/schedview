@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from astropy.time import Time
-from bokeh.layouts import Column, column
+from bokeh.layouts import Column, Row, column
 from bokeh.models import (
     ColumnDataSource,
     CustomJS,
@@ -36,6 +36,25 @@ from schedview.plot.tlbuilder import (
     TimelineBuilder,
     VisitDataSet,
 )
+
+
+def _get_figure(layout_child):
+    """Extract the Bokeh figure from a layout child, unwrapping Column wrappers."""
+    if isinstance(layout_child, Column):
+        return layout_child.children[-1]
+    return layout_child
+
+
+def _get_selector(layout_child):
+    """Extract the Select widget from a scatter Column wrapper, if present."""
+    if isinstance(layout_child, Column) and layout_child.children:
+        row = layout_child.children[0]
+        if isinstance(row, Row):
+            for child in row.children:
+                if isinstance(child, Select):
+                    return child
+    return None
+
 
 # ============================================================================
 # Dataclass Tests
@@ -555,7 +574,7 @@ class TestColorMapping:
         result = builder.build()
 
         # The scatter should have renderers with color encoding
-        fig = result.children[0]  # First scatter plot
+        fig = _get_figure(result.children[0])  # First scatter plot
         scatter_renderers = [r for r in fig.renderers if hasattr(r.glyph, "fill_color")]
         assert len(scatter_renderers) >= 1
 
@@ -575,7 +594,7 @@ class TestColorMapping:
         result = builder.build()
 
         # Should have renderers
-        fig = result.children[0]
+        fig = _get_figure(result.children[0])
         scatter_renderers = [r for r in fig.renderers if hasattr(r.glyph, "fill_color")]
         assert len(scatter_renderers) >= 1
 
@@ -1042,7 +1061,7 @@ class TestAddVisitVisibilitySelector:
         builder.add_visit_visibility_selector()
         result = builder.build()
 
-        fig = result.children[1]  # Skip selector, get first scatter
+        fig = _get_figure(result.children[1])  # Skip selector, get first scatter
         scatter_renderers = [r for r in fig.renderers if isinstance(r.glyph, Scatter)]
         assert len(scatter_renderers) >= 1
 
@@ -1141,8 +1160,8 @@ class TestVisitVisibilitySelectorCallOrder:
 
         # No selector should be created since no visits have toggle enabled
         assert not isinstance(result.children[0], MultiChoice)
-        # The first child should be the scatter figure
-        assert isinstance(result.children[0], figure)
+        # The first child should be the scatter figure (wrapped in a Column)
+        assert hasattr(_get_figure(result.children[0]), "renderers")
 
 
 # ============================================================================
@@ -1166,7 +1185,7 @@ class TestScatterYAxisSelector:
         first_child = result.children[0]
         assert isinstance(first_child, Column)
         assert len(first_child.children) >= 2
-        assert isinstance(first_child.children[0], Select)
+        assert isinstance(_get_selector(first_child), Select)
 
     def test_no_widget_for_empty_offered_columns(self):
         """No y-axis selector when offered_columns is empty."""
@@ -1195,14 +1214,14 @@ class TestScatterYAxisSelector:
 
         # Each selector+figure pair is wrapped in a Column
         assert len(result.children) == 2
-        # First scatter: Column(Select, Figure)
+        # First scatter: Column(Row(Spacer, Select, Spacer, Toolbar), Figure)
         assert isinstance(result.children[0], Column)
-        assert isinstance(result.children[0].children[0], Select)
-        assert hasattr(result.children[0].children[1], "x_range")
-        # Second scatter: Column(Select, Figure)
+        assert isinstance(_get_selector(result.children[0]), Select)
+        assert hasattr(_get_figure(result.children[0]), "x_range")
+        # Second scatter: Column(Row(Spacer, Select, Spacer, Toolbar), Figure)
         assert isinstance(result.children[1], Column)
-        assert isinstance(result.children[1].children[0], Select)
-        assert hasattr(result.children[1].children[1], "x_range")
+        assert isinstance(_get_selector(result.children[1]), Select)
+        assert hasattr(_get_figure(result.children[1]), "x_range")
 
     def test_selector_updates_y_axis_label(self):
         """Y-axis selector callback updates the y-axis label."""
@@ -1212,7 +1231,7 @@ class TestScatterYAxisSelector:
 
         # Selector is now wrapped in Column above the figure
         assert isinstance(result.children[0], Column)
-        assert isinstance(result.children[0].children[0], Select)
+        assert isinstance(_get_selector(result.children[0]), Select)
 
 
 # ============================================================================
@@ -1245,7 +1264,7 @@ class TestBuild:
         builder.add_scatter(y_column="altitude")
         builder.add_scatter(y_column="HA")
         result = builder.build()
-        x_ranges = [fig.x_range for fig in result.children]
+        x_ranges = [_get_figure(child).x_range for child in result.children]
         assert all(xr is x_ranges[0] for xr in x_ranges)
 
     def test_figure_has_datetime_axis(self):
@@ -1253,7 +1272,7 @@ class TestBuild:
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude")
         result = builder.build()
-        fig = result.children[0]
+        fig = _get_figure(result.children[0])
         assert isinstance(fig.xaxis[0].formatter, DatetimeTickFormatter)
 
     def test_datetime_tick_formatter_applied(self):
@@ -1261,7 +1280,7 @@ class TestBuild:
         builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
         builder.add_scatter(y_column="altitude")
         result = builder.build()
-        fig = result.children[0]
+        fig = _get_figure(result.children[0])
         x_axis = fig.xaxis[0]
         assert isinstance(x_axis.formatter, DatetimeTickFormatter)
         assert x_axis.formatter.hours == "%H:%M"
@@ -1299,7 +1318,7 @@ class TestBuildMixedElements:
         )
         result = builder.build()
         assert len(result.children) == 1
-        assert len(result.children[0].renderers) >= 1
+        assert len(_get_figure(result.children[0]).renderers) >= 1
 
     def test_scatter_and_stripe_combined(self):
         """build handles scatter and color stripe together."""
@@ -1395,7 +1414,8 @@ class TestBuildMixedElements:
         )
         builder.add_color_stripe(pd.Series([1.0, 2.0], index=[59999.0, 60000.0]), name="stripe1")
         result = builder.build()
-        for fig in result.children:
+        for child in result.children:
+            fig = _get_figure(child)
             x_axis = fig.xaxis[0]
             assert isinstance(x_axis.formatter, DatetimeTickFormatter)
 
@@ -1413,7 +1433,7 @@ class TestBuildMixedElements:
             label="visits1",
         )
         result = builder.build()
-        scatter_fig = result.children[0]
+        scatter_fig = _get_figure(result.children[0])
         scatter_renderers = [r for r in scatter_fig.renderers if isinstance(r.glyph, Scatter)]
         assert len(scatter_renderers) >= 1
 
@@ -1481,7 +1501,7 @@ class TestFinalLayoutAssembly:
         assert isinstance(result.children[0], MultiChoice)
         # Y-axis selector is now wrapped with figure in a Column
         assert isinstance(result.children[1], Column)
-        assert isinstance(result.children[1].children[0], Select)
+        assert isinstance(_get_selector(result.children[1]), Select)
 
     def test_all_figures_share_single_range1d_x_range(self):
         """All figures share a single Range1d x-range object."""
@@ -1491,7 +1511,7 @@ class TestFinalLayoutAssembly:
         builder.add_color_stripe(pd.Series([1.0, 2.0], index=[59999.0, 60000.0]), name="stripe1")
         result = builder.build()
 
-        figures = [child for child in result.children if hasattr(child, "x_range")]
+        figures = [_get_figure(child) for child in result.children if hasattr(_get_figure(child), "x_range")]
         x_ranges = [fig.x_range for fig in figures]
         assert all(xr is x_ranges[0] for xr in x_ranges)
 
@@ -1528,7 +1548,7 @@ class TestFinalLayoutAssembly:
         builder.add_scatter(y_column="HA", offered_columns=["HA"], name="third")
         result = builder.build()
 
-        figures = [child for child in result.children if hasattr(child, "x_range")]
+        figures = [_get_figure(child) for child in result.children if hasattr(_get_figure(child), "x_range")]
         assert len(figures) == 3
 
 
@@ -2014,7 +2034,7 @@ class TestScatterPlotRendering:
             label="v1",
         )
         result = builder.build()
-        fig = result.children[0]
+        fig = _get_figure(result.children[0])
         scatter_renderers = [r for r in fig.renderers if isinstance(r.glyph, Scatter)]
         assert len(scatter_renderers) >= 1
 
@@ -2027,7 +2047,7 @@ class TestScatterPlotRendering:
             label="v1",
         )
         result = builder.build()
-        fig = result.children[0]
+        fig = _get_figure(result.children[0])
         scatter_renderer = [r for r in fig.renderers if isinstance(r.glyph, Scatter)][0]
         assert scatter_renderer.glyph.x == "time"
 
@@ -2040,7 +2060,7 @@ class TestScatterPlotRendering:
             label="v1",
         )
         result = builder.build()
-        fig = result.children[0]
+        fig = _get_figure(result.children[0])
         scatter_renderer = [r for r in fig.renderers if isinstance(r.glyph, Scatter)][0]
         assert scatter_renderer.glyph.y == "altitude"
 
@@ -2054,7 +2074,8 @@ class TestScatterPlotRendering:
             label="v1",
         )
         result = builder.build()
-        for fig in result.children:
+        for child in result.children:
+            fig = _get_figure(child)
             scatter_renderer = [r for r in fig.renderers if isinstance(r.glyph, Scatter)][0]
             assert scatter_renderer.glyph.y == "altitude"
 
@@ -2092,7 +2113,7 @@ class TestScatterTooltips:
         builder.add_scatter(y_column="altitude", tooltips=tooltips)
         result = builder.build()
 
-        fig = result.children[0]
+        fig = _get_figure(result.children[0])
         hover_tools = [t for t in fig.tools if isinstance(t, HoverTool)]
         assert len(hover_tools) == 1
         assert hover_tools[0].tooltips == tooltips
@@ -2103,7 +2124,7 @@ class TestScatterTooltips:
         builder.add_scatter(y_column="altitude")
         result = builder.build()
 
-        fig = result.children[0]
+        fig = _get_figure(result.children[0])
         hover_tools = [t for t in fig.tools if isinstance(t, HoverTool)]
         assert len(hover_tools) == 0
 
@@ -2125,8 +2146,9 @@ class TestScatterTooltips:
         # Find HoverTools in the figures
         hover_tools = []
         for child in result.children:
-            if hasattr(child, "tools"):
-                hover_tools.extend([t for t in child.tools if isinstance(t, HoverTool)])
+            fig = _get_figure(child)
+            if hasattr(fig, "tools"):
+                hover_tools.extend([t for t in fig.tools if isinstance(t, HoverTool)])
         assert len(hover_tools) == 2
 
     def test_tooltips_work_with_visit_data(self):
@@ -2142,7 +2164,7 @@ class TestScatterTooltips:
         )
         result = builder.build()
 
-        fig = result.children[0]
+        fig = _get_figure(result.children[0])
         # Should have HoverTool
         hover_tools = [t for t in fig.tools if isinstance(t, HoverTool)]
         assert len(hover_tools) == 1
@@ -2304,7 +2326,7 @@ class TestYSelectorColumnFiltering:
         # Selector is now wrapped in Column with figure
         selector_wrapper = result.children[0]
         assert isinstance(selector_wrapper, Column)
-        selector = selector_wrapper.children[0]
+        selector = _get_selector(selector_wrapper)
         assert isinstance(selector, Select)
         assert "nonexistent" not in selector.options
         assert "altitude" in selector.options
@@ -2328,7 +2350,7 @@ class TestYSelectorColumnFiltering:
         # Selector is now wrapped in Column with figure
         selector_wrapper = result.children[0]
         assert isinstance(selector_wrapper, Column)
-        selector = selector_wrapper.children[0]
+        selector = _get_selector(selector_wrapper)
         assert isinstance(selector, Select)
         # y_column fell back to "altitude" (first available option)
         assert selector.value == "altitude"
