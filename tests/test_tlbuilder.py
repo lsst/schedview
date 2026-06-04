@@ -1754,6 +1754,27 @@ class TestCLI:
         )
         assert result.exit_code == 0
 
+    def test_cli_with_cursor_line_flag(self):
+        """CLI with --cursor-line flag adds vertical cursor line to figures."""
+        from schedview.plot.tlbuilder import main
+
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "--date",
+                "2025-06-15",
+                "--scatter",
+                "altitude",
+                "--visits",
+                "baseline",
+                "--cursor-line",
+                "--output",
+                "/tmp/cli_test_cursor.html",
+            ],
+        )
+        assert result.exit_code == 0
+
     def test_cli_with_num_scatter_option(self):
         """CLI with --num-scatter option creates multiple scatter plots."""
         from schedview.plot.tlbuilder import main
@@ -2791,3 +2812,190 @@ class TestAutoMarkerAssignment:
 
         assert "v1" in legend_labels
         assert "v2" in legend_labels
+
+
+# ============================================================================
+# Cursor Line Tests
+# ============================================================================
+
+
+class TestAddCursorLine:
+    """Tests for add_cursor_line() method."""
+
+    def test_returns_self_for_chaining(self):
+        """add_cursor_line returns self for method chaining."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        result = builder.add_cursor_line()
+        assert result is builder
+
+    def test_sets_needs_cursor_line_flag(self):
+        """add_cursor_line sets the _needs_cursor_line flag."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        builder.add_cursor_line()
+        assert builder._needs_cursor_line is True
+
+    def test_flag_false_by_default(self):
+        """_needs_cursor_line is False by default."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        assert builder._needs_cursor_line is False
+
+    def test_cursor_line_appears_in_build(self):
+        """Cursor span is added to figures when add_cursor_line is called."""
+        from bokeh.models import Span
+
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "band": ["g"],
+            }
+        )
+        builder.add_visits(visits_df, label="visits1")
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        builder.add_cursor_line()
+        result = builder.build()
+
+        # Find the scatter figure (first actual figure in layout)
+        scatter_fig = result.children[0].children[-1]
+
+        # Check that a Span with dimension='height' was added
+        spans = [item for item in scatter_fig.above] + \
+                [item for item in scatter_fig.below] + \
+                [item for item in scatter_fig.left] + \
+                [item for item in scatter_fig.right] + \
+                [item for item in scatter_fig.center]
+
+        # Look for Span in all layout positions
+        span_found = False
+        for pos in [scatter_fig.above, scatter_fig.below, scatter_fig.left, scatter_fig.right, scatter_fig.center]:
+            for item in pos:
+                if hasattr(item, 'dimension') and item.dimension == 'height':
+                    span_found = True
+                    # Verify it's a red line with width 1
+                    assert item.line_color == 'red'
+                    assert item.line_width == 1
+                    break
+            if span_found:
+                break
+
+        assert span_found, "Cursor span should be added to the figure"
+
+    def test_cursor_line_shared_across_figures(self):
+        """Cursor source is shared across all timeline figures."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "band": ["g"],
+            }
+        )
+        builder.add_visits(visits_df, label="visits1")
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        # Add a color stripe
+        stripe_data = pd.Series([1.0, 2.0, 3.0], index=[59999.0, 59999.1, 59999.2])
+        builder.add_color_stripe(stripe_data, name="stripe1")
+        builder.add_cursor_line()
+        result = builder.build()
+
+        # Find all figures
+        figures = []
+        for child in result.children:
+            if hasattr(child, 'children'):
+                # Column wrapper - get the figure from it
+                fig = child.children[-1]
+                if hasattr(fig, 'xaxis'):
+                    figures.append(fig)
+            elif hasattr(child, 'xaxis'):
+                figures.append(child)
+
+        # Each figure should have a cursor span
+        assert len(figures) >= 2, "Should have at least 2 figures (scatter + stripe)"
+
+        # Verify each figure has a cursor span
+        for fig in figures:
+            span_found = False
+            for pos in [fig.above, fig.below, fig.left, fig.right, fig.center]:
+                for item in pos:
+                    if hasattr(item, 'dimension') and item.dimension == 'height':
+                        span_found = True
+                        break
+                if span_found:
+                    break
+            assert span_found, f"Cursor span should be in figure {fig}"
+
+    def test_no_cursor_line_without_add_call(self):
+        """No cursor span is added if add_cursor_line is not called."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "band": ["g"],
+            }
+        )
+        builder.add_visits(visits_df, label="visits1")
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        # No add_cursor_line() call
+        result = builder.build()
+
+        # Find the scatter figure
+        scatter_fig = result.children[0].children[-1]
+
+        # No cursor span should be present
+        span_found = False
+        for pos in [scatter_fig.above, scatter_fig.below, scatter_fig.left, scatter_fig.right, scatter_fig.center]:
+            for item in pos:
+                if hasattr(item, 'dimension') and item.dimension == 'height':
+                    # Check if it's the cursor span (red, width 1)
+                    if item.line_color == 'red' and item.line_width == 1:
+                        span_found = True
+                        break
+            if span_found:
+                break
+
+        assert not span_found, "Cursor span should not be added when add_cursor_line not called"
+
+    def test_method_chaining(self):
+        """add_cursor_line chains fluently with other methods."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "band": ["g"],
+            }
+        )
+        result = (
+            builder.add_visits(visits_df, label="v1")
+            .add_scatter(y_column="altitude")
+            .add_cursor_line()
+            .build()
+        )
+        assert result is not None
+
+    def test_cursor_source_created_in_build(self):
+        """CursorColumnDataSource is created during build with initial None value."""
+        builder = TimelineBuilder(DayObs.from_date("2025-06-15"))
+        visits_df = pd.DataFrame(
+            {
+                "observationStartMJD": [59999.0],
+                "altitude": [30.0],
+                "band": ["g"],
+            }
+        )
+        builder.add_visits(visits_df, label="visits1")
+        builder.add_scatter(y_column="altitude", name="scatter1")
+        builder.add_cursor_line()
+        result = builder.build()
+
+        # Find the scatter figure
+        scatter_fig = result.children[0].children[-1]
+
+        # Verify the cursor span's location is initially None
+        for pos in [scatter_fig.above, scatter_fig.below, scatter_fig.left, scatter_fig.right, scatter_fig.center]:
+            for item in pos:
+                if hasattr(item, 'dimension') and item.dimension == 'height':
+                    assert item.location is None, "Cursor span location should be None initially"
+                    break

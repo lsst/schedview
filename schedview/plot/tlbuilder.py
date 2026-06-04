@@ -29,6 +29,7 @@ from bokeh.models import (
     Row,
     Select,
     Spacer,
+    Span,
 )
 from bokeh.core.enums import MarkerType
 from bokeh.palettes import Colorblind
@@ -181,6 +182,7 @@ class TimelineBuilder:
         self._needs_visit_visibility_selector: bool = False
         self._needs_color_legend: bool = False
         self._needs_marker_legend: bool = False
+        self._needs_cursor_line: bool = False
         self._assigned_markers: list[str] = []
 
     def _get_available_columns(self) -> set[str]:
@@ -501,6 +503,22 @@ class TimelineBuilder:
         self._needs_marker_legend = True
         return self
 
+    def add_cursor_line(self) -> Self:
+        """Add a synchronized vertical cursor line to all timeline figures.
+
+        The cursor line appears as a vertical line in every scatter plot and
+        color stripe figure. All cursor lines move together when the user
+        moves the mouse over any figure. When the mouse leaves a figure or
+        is in an invalid location, the cursor line disappears.
+
+        Returns
+        -------
+        Self
+            Returns self for method chaining.
+        """
+        self._needs_cursor_line = True
+        return self
+
     def _build_color_legend_figure(
         self, color_mapper: CategoricalColorMapper | None
     ) -> Plot | None:
@@ -623,6 +641,8 @@ class TimelineBuilder:
         layout_components = []
         # Track visit renderers for visibility toggling
         visit_renderers: dict[str, list] = {}
+        # Track figures for cursor line if needed
+        timeline_figures: list[Plot] = []
 
         # Assign distinct markers to visit sets that don't have one specified
         self._assign_markers()
@@ -637,6 +657,7 @@ class TimelineBuilder:
                 fig = self._create_scatter_figure(
                     element, color_mapper=color_mapper, visit_renderers=visit_renderers
                 )
+                timeline_figures.append(fig)
                 # Create y-axis selector if multiple offered_columns
                 # (placed after figure since figure is needed for callback)
                 y_selector = self._create_scatter_y_selector(element, fig)
@@ -661,6 +682,7 @@ class TimelineBuilder:
             elif isinstance(element, ColorStripeConfig):
                 # No y-axis selector for stripes
                 fig = self._create_stripe_figure(element)
+                timeline_figures.append(fig)
                 layout_components.append(fig)
 
         # Create visibility selector at build time with current visit sets
@@ -703,6 +725,58 @@ class TimelineBuilder:
 
                 # Add visibility selector to layout (first, before figures)
                 layout_components.insert(0, self._visibility_selector)
+
+        # Add synchronized cursor line if requested
+        if self._needs_cursor_line and timeline_figures:
+            # Create a single shared cursor source with None as initial value
+            cursor_source = ColumnDataSource(data=dict(x=[None]))
+
+            # Create a span for each figure
+            cursor_spans = []
+            for fig in timeline_figures:
+                # Create a Span for the cursor line
+                cursor_span = Span(
+                    location=None,
+                    dimension='height',
+                    line_color='red',
+                    line_width=1,
+                    visible=False,  # Initially hidden until mouse moves
+                )
+                fig.add_layout(cursor_span)
+                cursor_spans.append(cursor_span)
+
+            # Add mousemove event handler to each figure
+            # Each callback updates ALL spans directly
+            mousemove_callback = CustomJS(
+                args=dict(cursor_source=cursor_source, cursor_spans=cursor_spans),
+                code="""
+                const x = cb_obj.x;
+                cursor_source.data.x[0] = x;
+                for (const span of cursor_spans) {
+                    span.location = x;
+                    if (x === null || isNaN(x)) {
+                        span.visible = false;
+                    } else {
+                        span.visible = true;
+                    }
+                }
+                """
+            )
+            for fig in timeline_figures:
+                fig.js_on_event('mousemove', mousemove_callback)
+
+            # Add mouseleave event handler to hide the cursor line on all figures
+            mouseleave_callback = CustomJS(
+                args=dict(cursor_source=cursor_source, cursor_spans=cursor_spans),
+                code="""
+                cursor_source.data.x[0] = null;
+                for (const span of cursor_spans) {
+                    span.visible = false;
+                }
+                """
+            )
+            for fig in timeline_figures:
+                fig.js_on_event('mouseleave', mouseleave_callback)
 
         # Append legend figure (with color and/or marker legend) at the bottom
         legend_fig = self._build_color_legend_figure(color_mapper)
@@ -1122,6 +1196,12 @@ def _sample_body_elevation(body_name: str, dayobs: DayObs) -> pd.Series:
     help="Enable visit set visibility toggle widget.",
 )
 @click.option(
+    "--cursor-line",
+    is_flag=True,
+    default=False,
+    help="Add synchronized vertical cursor line across all timeline figures.",
+)
+@click.option(
     "--num-scatter",
     type=int,
     default=None,
@@ -1152,6 +1232,7 @@ def main(
     background: tuple[str, ...],
     output: str,
     enable_visibility_toggle: bool,
+    cursor_line: bool,
     num_scatter: int | None,
     scatter_height: int | None,
     stripe_height: int | None,
@@ -1233,6 +1314,10 @@ def main(
     # Add visibility toggle if enabled
     if enable_visibility_toggle:
         builder.add_visit_visibility_selector()
+
+    # Add cursor line if enabled
+    if cursor_line:
+        builder.add_cursor_line()
 
     # Always include legends when visits are present
     builder.add_color_legend()
