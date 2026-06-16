@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
+from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 from rubin_scheduler.site_models import Almanac
 
 from schedview.compute.smallsum import (
@@ -16,7 +17,7 @@ from schedview.compute.smallsum import (
 )
 
 SCIENCE_PROGRAMS = ("BLOCK-365", "BLOCK-407")
-ALL_BANDS = tuple("ugrizy")
+ALL_BANDS: tuple[str, ...] = tuple(ModelObservatory(no_sky=True).bandlist)
 
 
 # ---------------------------------------------------------------------------

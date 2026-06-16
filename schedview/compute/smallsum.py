@@ -13,6 +13,7 @@ from datetime import timedelta
 
 import numpy as np
 import pandas as pd
+from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 from rubin_scheduler.site_models import Almanac
 
 from schedview import DayObs
@@ -22,7 +23,7 @@ try:
 except ImportError:
     SCIENCE_PROGRAMS = ()
 
-_BANDS: tuple[str, ...] = tuple("ugrizy")
+_BANDS: tuple[str, ...] = tuple(ModelObservatory(no_sky=True).bandlist)
 
 
 def _unique_targets(target_name_series: pd.Series) -> str:
