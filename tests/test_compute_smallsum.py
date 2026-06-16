@@ -1,5 +1,7 @@
 """Tests for schedview.compute.smallsum module."""
 
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -13,6 +15,9 @@ from schedview.compute.smallsum import (
     compute_tinysum,
 )
 
+SCIENCE_PROGRAMS = ("BLOCK-365", "BLOCK-407")
+ALL_BANDS = tuple("ugrizy")
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -20,7 +25,7 @@ from schedview.compute.smallsum import (
 
 
 @pytest.fixture
-def sample_visits():
+def sample_visits() -> pd.DataFrame:
     """Create a sample visits DataFrame spanning two nights."""
     rng = np.random.default_rng(42)
     n_night1 = 50
@@ -28,9 +33,9 @@ def sample_visits():
     n_total = n_night1 + n_night2
 
     dayobs = np.array([20250601] * n_night1 + [20250602] * n_night2)
-    bands = rng.choice(list("ugrizy"), size=n_total)
+    bands = rng.choice(ALL_BANDS, size=n_total)
     science_programs = rng.choice(
-        ["BLOCK-365", "BLOCK-407", "ENG-001", "CALIB-002"],
+        [*SCIENCE_PROGRAMS, "ENG-001", "CALIB-002"],
         size=n_total,
     )
     target_names = rng.choice(
@@ -47,7 +52,7 @@ def sample_visits():
     base_timestamps_n2 = 60828.0 * 86400 + np.linspace(0, 7 * 3600, n_night2)
     start_timestamps = np.concatenate([base_timestamps_n1, base_timestamps_n2])
 
-    visits = pd.DataFrame(
+    return pd.DataFrame(
         {
             "dayObs": dayobs,
             "observationId": np.arange(n_total),
@@ -62,11 +67,10 @@ def sample_visits():
             "HA": rng.uniform(-4.0, 4.0, size=n_total),
         }
     )
-    return visits
 
 
 @pytest.fixture
-def almanac():
+def almanac() -> Almanac:
     """Create a shared Almanac instance."""
     return Almanac()
 
@@ -77,47 +81,35 @@ def almanac():
 
 
 class TestUniqueTargets:
-    def test_basic(self):
-        series = pd.Series(["COSMOS", "XMM-LSS", "ELAIS"])
-        result = _unique_targets(series)
-        assert "COSMOS" in result
-        assert "XMM-LSS" in result
-        assert "ELAIS" in result
-
-    def test_strips_ddf_prefix(self):
-        series = pd.Series(["ddf_COSMOS", "DDF XMM-LSS"])
-        result = _unique_targets(series)
-        assert "COSMOS" in result
-        assert "XMM-LSS" in result
-        assert "ddf_" not in result
-        assert "DDF " not in result
-
-    def test_splits_multi_target(self):
-        series = pd.Series(["ELAIS, XMM-LSS"])
-        result = _unique_targets(series)
-        assert "ELAIS" in result
-        assert "XMM-LSS" in result
+    @pytest.mark.parametrize(
+        ("values", "expected_in", "expected_out"),
+        [
+            (["COSMOS", "XMM-LSS", "ELAIS"], ["COSMOS", "XMM-LSS", "ELAIS"], []),
+            (["ddf_COSMOS", "DDF XMM-LSS"], ["COSMOS", "XMM-LSS"], ["ddf_", "DDF "]),
+            (["ELAIS, XMM-LSS"], ["ELAIS", "XMM-LSS"], []),
+        ],
+    )
+    def test_content(self, values, expected_in, expected_out):
+        result = _unique_targets(pd.Series(values))
+        for item in expected_in:
+            assert item in result
+        for item in expected_out:
+            assert item not in result
 
     def test_deduplication(self):
-        series = pd.Series(["COSMOS", "COSMOS", "ddf_COSMOS"])
-        result = _unique_targets(series)
-        # Should only appear once
+        result = _unique_targets(pd.Series(["COSMOS", "COSMOS", "ddf_COSMOS"]))
         assert result.count("COSMOS") == 1
 
-    def test_empty_strings_ignored(self):
-        series = pd.Series(["", "", "COSMOS"])
-        result = _unique_targets(series)
-        assert result == "COSMOS"
-
-    def test_nan_handled(self):
-        series = pd.Series([np.nan, None, "COSMOS"])
-        result = _unique_targets(series)
-        assert result == "COSMOS"
-
-    def test_all_empty(self):
-        series = pd.Series(["", ""])
-        result = _unique_targets(series)
-        assert result == ""
+    @pytest.mark.parametrize(
+        ("values", "expected"),
+        [
+            (["", "", "COSMOS"], "COSMOS"),
+            ([np.nan, None, "COSMOS"], "COSMOS"),
+            (["", ""], ""),
+        ],
+    )
+    def test_empty_nan_handling(self, values, expected):
+        assert _unique_targets(pd.Series(values)) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -127,28 +119,27 @@ class TestUniqueTargets:
 
 class TestVisitsSummary:
     def test_basic_output(self, sample_visits):
-        group = sample_visits.iloc[:10]
-        result = _visits_summary(group)
+        result = _visits_summary(sample_visits.iloc[:10])
         assert result["visits"] == 10
-        assert "first" in result.index
-        assert "last" in result.index
-        assert "teff_total" in result.index
-        assert "teff_q1" in result.index
-        assert "teff_median" in result.index
-        assert "teff_q3" in result.index
-        assert "fwhm_median" in result.index
-        assert "airmass_median" in result.index
-        assert "HA_median" in result.index
+        assert {
+            "first",
+            "last",
+            "teff_total",
+            "teff_q1",
+            "teff_median",
+            "teff_q3",
+            "fwhm_median",
+            "airmass_median",
+            "HA_median",
+        }.issubset(set(result.index))
 
     def test_teff_total_equals_mean_times_count(self, sample_visits):
         group = sample_visits.iloc[:20]
         result = _visits_summary(group)
-        expected_total = group["eff_time_median"].mean() * 20
-        assert np.isclose(result["teff_total"], expected_total)
+        assert np.isclose(result["teff_total"], group["eff_time_median"].mean() * len(group))
 
     def test_single_visit(self, sample_visits):
-        group = sample_visits.iloc[:1]
-        result = _visits_summary(group)
+        result = _visits_summary(sample_visits.iloc[:1])
         assert result["visits"] == 1
         assert result["first"] == result["last"]
 
@@ -161,9 +152,8 @@ class TestVisitsSummary:
 class TestComputeTinysum:
     def test_one_row_per_night(self, sample_visits):
         result = compute_tinysum(sample_visits)
-        assert len(result) == 2  # Two nights
-        assert 20250601 in result.index
-        assert 20250602 in result.index
+        assert len(result) == 2
+        assert {20250601, 20250602}.issubset(set(result.index))
 
     def test_total_column(self, sample_visits):
         result = compute_tinysum(sample_visits)
@@ -172,54 +162,42 @@ class TestComputeTinysum:
 
     def test_band_counts_sum_to_total(self, sample_visits):
         result = compute_tinysum(sample_visits)
-        band_cols = [f"# {b}" for b in "ugrizy"]
+        band_cols = [f"# {b}" for b in ALL_BANDS]
         for day in result.index:
             assert result.loc[day, band_cols].sum() == result.loc[day, "Total"]
 
-    def test_band_counts_are_int(self, sample_visits):
+    def test_band_and_science_counts_are_int(self, sample_visits):
         result = compute_tinysum(sample_visits)
-        for b in "ugrizy":
-            assert result[f"# {b}"].dtype == int
-
-    def test_science_count_is_int(self, sample_visits):
-        result = compute_tinysum(sample_visits)
-        assert result["# science"].dtype == int
+        for b in ALL_BANDS:
+            assert pd.api.types.is_integer_dtype(result[f"# {b}"])
+        assert pd.api.types.is_integer_dtype(result["# science"])
 
     def test_science_count_correct(self, sample_visits):
-        science_progs = ("BLOCK-365", "BLOCK-407")
-        result = compute_tinysum(sample_visits, science_programs=science_progs)
+        result = compute_tinysum(sample_visits, science_programs=SCIENCE_PROGRAMS)
         for day in result.index:
             expected = len(
                 sample_visits[
                     (sample_visits["dayObs"] == day)
-                    & (sample_visits["science_program"].isin(science_progs))
+                    & (sample_visits["science_program"].isin(SCIENCE_PROGRAMS))
                 ]
             )
             assert result.loc[day, "# science"] == expected
 
     def test_teff_stats_reasonable(self, sample_visits):
         result = compute_tinysum(sample_visits)
-        # q1 <= median <= q3
         for day in result.index:
-            assert result.loc[day, "teff_q1"] <= result.loc[day, "teff_median"]
-            assert result.loc[day, "teff_median"] <= result.loc[day, "teff_q3"]
+            assert result.loc[day, "teff_q1"] <= result.loc[day, "teff_median"] <= result.loc[day, "teff_q3"]
 
     def test_no_almanac_omits_rate_columns(self, sample_visits):
         result = compute_tinysum(sample_visits, almanac=None)
-        assert "night_hours" not in result.columns
-        assert "visits/hour" not in result.columns
-        assert "teff/minute" not in result.columns
+        assert {"night_hours", "visits/hour", "teff/minute"}.isdisjoint(result.columns)
 
     def test_with_almanac_adds_rate_columns(self, sample_visits, almanac):
         result = compute_tinysum(sample_visits, almanac=almanac)
-        assert "night_hours" in result.columns
-        assert "visits/hour" in result.columns
-        assert "teff/minute" in result.columns
-        # Night hours should be positive
+        assert {"night_hours", "visits/hour", "teff/minute"}.issubset(result.columns)
         assert (result["night_hours"].dropna() > 0).all()
 
     def test_no_science_visits_night(self):
-        """A night with no science visits should have 0 count and empty targets."""
         visits = pd.DataFrame(
             {
                 "dayObs": [20250601] * 5,
@@ -236,7 +214,6 @@ class TestComputeTinysum:
         assert result.loc[20250601, "science targets"] == ""
 
     def test_missing_bands(self):
-        """Nights missing some bands should have 0 for those bands."""
         visits = pd.DataFrame(
             {
                 "dayObs": [20250601] * 3,
@@ -249,10 +226,9 @@ class TestComputeTinysum:
             }
         )
         result = compute_tinysum(visits, science_programs=("BLOCK-365",))
-        assert result.loc[20250601, "# u"] == 0
-        assert result.loc[20250601, "# z"] == 0
-        assert result.loc[20250601, "# y"] == 0
         assert result.loc[20250601, "# g"] == 1
+        for b in ("u", "z", "y"):
+            assert result.loc[20250601, f"# {b}"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -267,66 +243,47 @@ class TestComputeSmallsum:
 
     def test_all_subset_present(self, sample_visits):
         result = compute_smallsum(sample_visits)
-        for day in [20250601, 20250602]:
-            day_subsets = result.loc[day].index.get_level_values("subset")
-            assert "all" in day_subsets
+        for day in (20250601, 20250602):
+            assert "all" in result.loc[day].index.get_level_values("subset")
 
     def test_all_visits_count(self, sample_visits):
         result = compute_smallsum(sample_visits)
         assert result.loc[(20250601, "all"), "visits"] == 50
         assert result.loc[(20250602, "all"), "visits"] == 30
 
-    def test_band_subsets_present(self, sample_visits):
+    def test_band_subsets_present_and_sum(self, sample_visits):
         result = compute_smallsum(sample_visits)
-        # Check that at least some band subsets exist
         all_subsets = result.index.get_level_values("subset").unique()
-        bands_present = [b for b in "ugrizy" if b in all_subsets]
-        assert len(bands_present) > 0
-
-    def test_band_subset_counts_sum(self, sample_visits):
-        result = compute_smallsum(sample_visits)
-        for day in [20250601, 20250602]:
+        bands_present = [b for b in ALL_BANDS if b in all_subsets]
+        assert bands_present
+        for day in (20250601, 20250602):
             day_data = result.loc[day]
-            band_subsets = [b for b in "ugrizy" if b in day_data.index.get_level_values("subset")]
-            band_total = sum(day_data.loc[b, "visits"] for b in band_subsets)
-            all_total = day_data.loc["all", "visits"]
-            assert band_total == all_total
+            day_bands = [b for b in ALL_BANDS if b in day_data.index.get_level_values("subset")]
+            assert sum(day_data.loc[b, "visits"] for b in day_bands) == day_data.loc["all", "visits"]
 
-    def test_science_subsets_present(self, sample_visits):
-        result = compute_smallsum(
-            sample_visits, science_programs=("BLOCK-365", "BLOCK-407")
-        )
+    def test_science_subsets_present_and_sum(self, sample_visits):
+        result = compute_smallsum(sample_visits, science_programs=SCIENCE_PROGRAMS)
         all_subsets = result.index.get_level_values("subset").unique()
-        assert "science" in all_subsets
-        assert "not_science" in all_subsets
-
-    def test_science_counts_sum(self, sample_visits):
-        science_progs = ("BLOCK-365", "BLOCK-407")
-        result = compute_smallsum(sample_visits, science_programs=science_progs)
-        for day in [20250601, 20250602]:
+        assert {"science", "not_science"}.issubset(all_subsets)
+        for day in (20250601, 20250602):
             day_data = result.loc[day]
-            if "science" in day_data.index and "not_science" in day_data.index:
-                sci = day_data.loc["science", "visits"]
-                not_sci = day_data.loc["not_science", "visits"]
-                total = day_data.loc["all", "visits"]
-                assert sci + not_sci == total
+            if {"science", "not_science"}.issubset(day_data.index):
+                assert (
+                    day_data.loc["science", "visits"] + day_data.loc["not_science", "visits"]
+                    == day_data.loc["all", "visits"]
+                )
 
     def test_observation_reason_subsets(self, sample_visits):
         result = compute_smallsum(sample_visits)
         all_subsets = result.index.get_level_values("subset").unique()
-        # At least one observation reason from sample data
-        assert any(
-            r in all_subsets for r in ["survey", "calibration", "engineering"]
-        )
+        assert any(r in all_subsets for r in ("survey", "calibration", "engineering"))
 
     def test_target_name_subsets(self, sample_visits):
         result = compute_smallsum(sample_visits)
         all_subsets = result.index.get_level_values("subset").unique()
-        # At least one target from sample data
-        assert any(t in all_subsets for t in ["COSMOS", "XMM-LSS", "ELAIS"])
+        assert any(t in all_subsets for t in ("COSMOS", "XMM-LSS", "ELAIS"))
 
     def test_empty_target_becomes_no_target_name(self):
-        """Visits with empty target_name should appear under 'no target name'."""
         visits = pd.DataFrame(
             {
                 "dayObs": [20250601] * 3,
@@ -343,12 +300,11 @@ class TestComputeSmallsum:
             }
         )
         result = compute_smallsum(visits, science_programs=("BLOCK-365",))
-        all_subsets = result.loc[20250601].index.get_level_values("subset")
-        assert "no target name" in all_subsets
+        assert "no target name" in result.loc[20250601].index.get_level_values("subset")
 
     def test_output_columns(self, sample_visits):
         result = compute_smallsum(sample_visits)
-        expected_cols = {
+        assert set(result.columns) == {
             "visits",
             "first",
             "last",
@@ -360,7 +316,6 @@ class TestComputeSmallsum:
             "airmass_median",
             "HA_median",
         }
-        assert expected_cols == set(result.columns)
 
     def test_teff_quartile_ordering(self, sample_visits):
         result = compute_smallsum(sample_visits)
@@ -382,11 +337,9 @@ class TestBuildNightHours:
         index = pd.Index([20250601, 20250602])
         result = _build_night_hours(almanac, index)
         assert isinstance(result, pd.Series)
-        assert len(result) == 2
+        assert len(result) == len(index)
 
     def test_positive_hours(self, almanac):
-        index = pd.Index([20250601, 20250602])
-        result = _build_night_hours(almanac, index)
-        # Night hours should be positive and reasonable (4-12 hours)
+        result = _build_night_hours(almanac, pd.Index([20250601, 20250602]))
         for val in result.dropna():
             assert 4.0 < val < 12.0
