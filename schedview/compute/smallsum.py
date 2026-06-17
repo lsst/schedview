@@ -161,6 +161,7 @@ def compute_tinysum(
             }
         )
     )
+    basic_stats["Total"] = basic_stats["Total"].astype("Int64")
 
     teff_stats = (
         visits.groupby("dayObs")["eff_time_median"]
@@ -181,7 +182,7 @@ def compute_tinysum(
         .count()
         .unstack("band", fill_value=0)
         .reindex(columns=_BANDS, fill_value=0)
-        .astype(int)
+        .astype("Int64")
         .rename(columns={b: f"# {b}" for b in _BANDS})
     )
 
@@ -202,7 +203,7 @@ def compute_tinysum(
 
     tinysum = basic_stats.join([teff_stats, science_counts, band_counts, targets])
 
-    tinysum["# science"] = tinysum["# science"].fillna(0).astype(int)
+    tinysum["# science"] = tinysum["# science"].fillna(0).astype("Int64")
     tinysum["science targets"] = tinysum["science targets"].fillna("")
 
     if almanac is not None:

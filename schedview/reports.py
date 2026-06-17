@@ -84,7 +84,7 @@ def find_reports(
     return reports
 
 
-SUMMARY_COLUMNS = [
+INT_SUMMARY_COLUMNS = [
     "Total",
     "# science",
     "# u",
@@ -93,6 +93,9 @@ SUMMARY_COLUMNS = [
     "# i",
     "# z",
     "# y",
+]
+
+SUMMARY_COLUMNS = INT_SUMMARY_COLUMNS + [
     "night_hours",
     "visits/hour",
     "teff/minute",
@@ -151,16 +154,25 @@ def make_report_link_table(
         lsstcam_mask = report_links.index.get_level_values("instrument") == "lsstcam"
         lsstcam_nights = report_links.index[lsstcam_mask].get_level_values("night")
 
-        # Map tinysum by night onto the lsstcam rows
-        summary_for_join = tinysum.reindex(lsstcam_nights)
-        summary_for_join.index = report_links.index[lsstcam_mask]
-
-        # Initialize summary columns and assign values to lsstcam rows only
+        # Map tinysum by night onto the full report_links index, then join.
+        # Reindex to the full index (non-lsstcam rows and missing nights get NA)
+        # so that dtypes (including Int64) are preserved through the assignment.
+        summary_full = tinysum.reindex(
+            report_links.index.get_level_values("night")
+        )
+        summary_full.index = report_links.index
+        # Only lsstcam rows should receive values; blank out the rest
+        summary_full.loc[~lsstcam_mask] = None
         for col in SUMMARY_COLUMNS:
-            report_links[col] = None
-        report_links.loc[lsstcam_mask, SUMMARY_COLUMNS] = summary_for_join.values
+            report_links[col] = summary_full[col]
 
-    report_table_html = report_links.to_html(escape=False)
+    # Convert summary columns to object dtype so fillna("") works uniformly
+    # regardless of whether pandas chose Int64, Float64, etc.
+    summary_cols_present = [c for c in SUMMARY_COLUMNS if c in report_links.columns]
+    for col in summary_cols_present:
+        report_links[col] = report_links[col].astype(object)
+
+    report_table_html = report_links.fillna("").to_html(escape=False)
     return report_table_html
 
 
