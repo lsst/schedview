@@ -30,7 +30,7 @@ dependencies = [
     "hvplot",
     "lsst-efd-client",
     "lsst-resources",
-    "matplotlib",
+    "matplotlib < 3.11.0",
     "numpy",
     "pandas",
     "panel >= 1.1.0",
