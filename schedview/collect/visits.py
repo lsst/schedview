@@ -298,9 +298,9 @@ def cached_read_visits(
 
         logger.debug("Writing visits cache: %s", cache_path)
         cache_dir.mkdir(parents=True, exist_ok=True)
-        all_visits.to_hdf(str(cache_path), key="visits")
+        all_visits.to_hdf(str(cache_path), key="visits", mode="w")
         pd.DataFrame({"class_name": sorted(requested_class_names)}).to_hdf(
-            str(cache_path), key="stackers", append=True
+            str(cache_path), key="stackers", mode="a"
         )
 
     # Filter to the requested day_obs.
