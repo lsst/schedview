@@ -270,14 +270,19 @@ def cached_read_visits(
 
     # Attempt a cache hit.
     if _is_cache_fresh(cache_path):
-        cached_class_names = set(pd.read_hdf(str(cache_path), key="stackers")["class_name"])
-
-        if cached_class_names == requested_class_names:
-            logger.debug("Reading visits from cache: %s", cache_path)
-            all_visits = pd.read_hdf(str(cache_path), key="visits")
-        else:
-            logger.debug("Cache stacker mismatch, regenerating: %s", cache_path)
+        try:
+            cached_class_names = set(pd.read_hdf(str(cache_path), key="stackers")["class_name"])
+        except KeyError:
+            logger.debug("Cache missing 'stackers' key, treating as stale: %s", cache_path)
             all_visits = None
+            cached_class_names = None
+        else:
+            if cached_class_names == requested_class_names:
+                logger.debug("Reading visits from cache: %s", cache_path)
+                all_visits = pd.read_hdf(str(cache_path), key="visits")
+            else:
+                logger.debug("Cache stacker mismatch, regenerating: %s", cache_path)
+                all_visits = None
     else:
         logger.debug("Cache miss or stale, querying source: %s", visit_source)
         all_visits = None
