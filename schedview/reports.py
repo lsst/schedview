@@ -5,6 +5,9 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pandas as pd
+from rubin_scheduler.site_models import Almanac
+
+from schedview.compute.smallsum import compute_tinysum
 
 
 def find_reports(
@@ -81,9 +84,31 @@ def find_reports(
     return reports
 
 
+SUMMARY_COLUMNS = [
+    "Total",
+    "# science",
+    "# u",
+    "# g",
+    "# r",
+    "# i",
+    "# z",
+    "# y",
+    "night_hours",
+    "visits/hour",
+    "teff/minute",
+    "median FWHM",
+    "teff_mean",
+    "teff_q1",
+    "teff_median",
+    "teff_q3",
+    "science targets",
+]
+
+
 def make_report_link_table(
     reports: pd.DataFrame,
     report_columns=("prenight", "multiprenight", "nightsum", "compareprenight", "preprogress"),
+    visits: pd.DataFrame | None = None,
 ) -> str:
     """Generate an html table of links to reports.
 
@@ -93,6 +118,14 @@ def make_report_link_table(
         A DataFrame of report metadata, as returned by `find_reports`.
     report_columns : `tuple`
         A list of names of reports.
+    visits : `pd.DataFrame` or `None`, optional
+        A DataFrame of visits as returned by
+        `schedview.collect.visits.cached_read_visits`. If supplied, a short
+        per-night summary is computed via
+        `schedview.compute.smallsum.compute_tinysum` and the resulting
+        columns are joined onto the ``lsstcam`` rows of the table.
+        Non-``lsstcam`` rows receive ``NA`` for these columns.
+        Defaults to ``None``, in which case no summary columns are added.
 
     Returns
     -------
@@ -107,6 +140,25 @@ def make_report_link_table(
         .fillna("")
         .reindex(columns=list(report_columns))
     )
+
+    if visits is not None:
+        almanac = Almanac()
+        tinysum = compute_tinysum(visits, almanac=almanac)[SUMMARY_COLUMNS]
+        tinysum.index = pd.to_datetime(tinysum.index.astype(str), format="%Y%m%d").date
+        tinysum.index.name = "night"
+
+        # Build a mask for lsstcam rows and extract their nights
+        lsstcam_mask = report_links.index.get_level_values("instrument") == "lsstcam"
+        lsstcam_nights = report_links.index[lsstcam_mask].get_level_values("night")
+
+        # Map tinysum by night onto the lsstcam rows
+        summary_for_join = tinysum.reindex(lsstcam_nights)
+        summary_for_join.index = report_links.index[lsstcam_mask]
+
+        # Initialize summary columns and assign values to lsstcam rows only
+        for col in SUMMARY_COLUMNS:
+            report_links[col] = None
+        report_links.loc[lsstcam_mask, SUMMARY_COLUMNS] = summary_for_join.values
 
     report_table_html = report_links.to_html(escape=False)
     return report_table_html

@@ -3,6 +3,9 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import numpy as np
+import pandas as pd
+
 import schedview.reports
 
 
@@ -40,6 +43,30 @@ class TestReports(unittest.TestCase):
         html_table = schedview.reports.make_report_link_table(reports)
         # Make sure we can parse the result as XML
         ET.fromstring(html_table)
+
+    def test_make_report_link_table_with_visits(self):
+        rng = np.random.default_rng(0)
+        n = 40
+        # Match the dayObs values used for the test reports (2025-06-20, 2025-06-21)
+        dayobs = np.array([20250620] * 20 + [20250621] * 20)
+        visits = pd.DataFrame(
+            {
+                "dayObs": dayobs,
+                "observationId": np.arange(n),
+                "seeingFwhmGeom": rng.uniform(0.6, 1.8, size=n),
+                "eff_time_median": rng.uniform(20.0, 40.0, size=n),
+                "band": rng.choice(list("ugrizy"), size=n),
+                "science_program": rng.choice(["BLOCK-365", "ENG-001"], size=n),
+                "target_name": rng.choice(["COSMOS", "XMM-LSS", ""], size=n),
+            }
+        )
+        reports = schedview.reports.find_reports(self.temp_dir.name)
+        html_table = schedview.reports.make_report_link_table(reports, visits=visits)
+        # Must be parseable as XML
+        ET.fromstring(html_table)
+        # Summary column headers must appear in the output
+        assert "Total" in html_table
+        assert "# science" in html_table
 
     def test_make_report_rss_feed(self):
         reports = schedview.reports.find_reports(self.temp_dir.name)
