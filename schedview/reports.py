@@ -95,7 +95,7 @@ INT_SUMMARY_COLUMNS = [
     "# y",
 ]
 
-SUMMARY_COLUMNS = INT_SUMMARY_COLUMNS + [
+FLOAT_SUMMARY_COLUMNS = [
     "night_hours",
     "visits/hour",
     "teff/minute",
@@ -104,6 +104,9 @@ SUMMARY_COLUMNS = INT_SUMMARY_COLUMNS + [
     "teff_q1",
     "teff_median",
     "teff_q3",
+]
+
+SUMMARY_COLUMNS = INT_SUMMARY_COLUMNS + FLOAT_SUMMARY_COLUMNS + [
     "science targets",
 ]
 
@@ -166,9 +169,13 @@ def make_report_link_table(
         for col in SUMMARY_COLUMNS:
             report_links[col] = summary_full[col]
 
-    # Convert summary columns to object dtype so fillna("") works uniformly
-    # regardless of whether pandas chose Int64, Float64, etc.
+    # Round float columns to 2 decimal places, then convert all summary
+    # columns to object dtype so fillna("") works uniformly regardless of
+    # whether pandas chose Int64, Float64, etc.
     summary_cols_present = [c for c in SUMMARY_COLUMNS if c in report_links.columns]
+    float_cols_present = [c for c in FLOAT_SUMMARY_COLUMNS if c in report_links.columns]
+    for col in float_cols_present:
+        report_links[col] = report_links[col].round(2)
     for col in summary_cols_present:
         report_links[col] = report_links[col].astype(object)
 
