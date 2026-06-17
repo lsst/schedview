@@ -58,12 +58,11 @@ night in two different representations, modeled after physical
 observing tools.</p>
 <ul>
 <li>The map on the left shows the sphere in orthographic projection, with the
-   center point of the projection controlled by the "center alt" and
-   "center az" sliders beneath the plot. A static orthogrophic projection
-   is not an equal-area projection, but playing with the sliders is a helpful
-   way to inform a human's spatial
+   center point of the projection controlled by the sliders beneath the plot.
+   A static orthogrophic projection is not an equal-area projection, but
+   playing with the sliders is a helpful way to inform a human's spatial
    reasoning in three dimensions. Use of this map resembles use of an
-   <a href="https://en.wikipedia.org/wiki/Armillary_sphere">armillare
+   <a href="https://en.wikipedia.org/wiki/Armillary_sphere">armillary
    sphere</a>.</li>
 <li>The map on the right shows the sky in
 <a href="https://en.wikipedia.org/wiki/Lambert_azimuthal_equal-area_projection">Lambert Azimuthal Equal Area
@@ -80,40 +79,33 @@ observing tools.</p>
    <a href="https://en.wikipedia.org/wiki/Planisphere">planisphere</a>.</li>
 </ul>
 <p>Both plots show the footprints of camera pointing taken up to the time set
-by the MJD slider, with the most
+by the "Date and Time" slider, with the most
 recent three pointings outlined in cyan. The fill colors are:</p>
 <ul>
-<li><span style='background-color:{u}'>&nbsp;&nbsp;&nbsp;</span>
-    <span style='color:{u}'> aqua</span>: u band</li>
-<li><span style='background-color:{g}'>&nbsp;&nbsp;&nbsp;</span>
-    <span style='color:{g}'> green</span>: g band</li>
-<li><span style='background-color:{r}'>&nbsp;&nbsp;&nbsp;</span>
-    <span style='color:{r}'> red</span>: r band</li>
-<li><span style='background-color:{i}'>&nbsp;&nbsp;&nbsp;</span>
-    <span style='color:{i}'> blue</span>:
-   i band</li>
-<li><span style='background-color:{z}'>&nbsp;&nbsp;&nbsp;</span>
-    <span style='color:{z}'> purple</span>: z band</li>
-<li><span style='background-color:{y}'>&nbsp;&nbsp;&nbsp;</span>
-    <span style='color:{y}'> black</span>: y band</li>
+<li><span style='background-color:{u}'>&nbsp;&nbsp;&nbsp;</span> u band</li>
+<li><span style='background-color:{g}'>&nbsp;&nbsp;&nbsp;</span> g band</li>
+<li><span style='background-color:{r}'>&nbsp;&nbsp;&nbsp;</span> r band</li>
+<li><span style='background-color:{i}'>&nbsp;&nbsp;&nbsp;</span> i band</li>
+<li><span style='background-color:{z}'>&nbsp;&nbsp;&nbsp;</span> z band</li>
+<li><span style='background-color:{y}'>&nbsp;&nbsp;&nbsp;</span> y band</li>
 </ul>
 <p>Both plots have the following additional annotations:</p>
 <ul>
-<li>The gray background shows the planned final depth of the LSST survey.</li>
+<li>The gray lines outline regions in the LSST survey.</li>
 <li>The orange disk shows the coordinates of the moon.</li>
 <li>The yellow disk shows the coordinates of the sun.</li>
 <li>The green line (oval) shows the ecliptic.</li>
 <li>The sun moves along the ecliptic in the direction of increasing R.A.
     (counter-clockwise in the planisphere figure) such that it makes a full
     revolution in one year.</li>
-<li>The moon moves roughly (within 5.14%deg;) along the ecliptic in the
+<li>The moon moves roughly (within 5.14&deg;) along the ecliptic in the
 direction of increasing R.A. (counter-clockwise in the planisphere figure),
 completing a full revolution in one
 <a href="https://en.wikipedia.org/wiki/Lunar_month#Sidereal_month">sidereal
-month</a> (a bit over 27 days), about 14%deg; per day.</li>
+month</a> (a bit over 27 days), about 14&deg; per day.</li>
 <li>The blue line (oval) shows the plane of the Milky Way.</li>
 <li>The black line shows the horizon at the time set by the MJD slider.</li>
-<li>The red line shows a zenith distince of 70%deg; (airmass=2.9) at the time
+<li>The red line shows a zenith distince of 70& deg; (airmass=2.9) at the time
 set by the MJD slider.</li>
 </ul>
 """

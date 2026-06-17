@@ -65,13 +65,13 @@ DEFAULT_LIGHT_BAND_COLORS: Dict[str, str] = {b: DEFAULT_LIGHT_COLORS[i] for i, b
 PLOT_BAND_COLORS: Dict[str, str]
 try:
     PLOT_BAND_COLORS = get_multiband_plot_colors()
-except NotImplementedError:
+except (NotImplementedError, AttributeError):
     PLOT_BAND_COLORS = DEFAULT_BAND_COLORS
 
 LIGHT_PLOT_BAND_COLORS: Dict[str, str]
 try:
     LIGHT_PLOT_BAND_COLORS = get_multiband_plot_colors(dark_background=True)
-except NotImplementedError:
+except (NotImplementedError, AttributeError):
     LIGHT_PLOT_BAND_COLORS = DEFAULT_LIGHT_BAND_COLORS
 
 EXTRA_COLORS: list[str]
