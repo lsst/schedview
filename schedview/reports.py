@@ -4,10 +4,21 @@ import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from rubin_scheduler.site_models import Almanac
 
 from schedview.compute.smallsum import compute_tinysum
+
+RSS_DESC_FORMAT = """
+Total visits: {total};
+Science visits: {science};
+Median FWHM: {fwhm};
+Mean eff_time/exp_time: {mean_norm_teff};
+Mean visit rate: {visit_rate} visits/hour;
+Mean eff_time rate: {teff_rate}/minute;
+Science targets: {targets}
+"""
 
 
 def find_reports(
@@ -86,34 +97,36 @@ def find_reports(
 
 INT_SUMMARY_COLUMNS = [
     "Total",
-    "# science",
-    "# u",
-    "# g",
-    "# r",
-    "# i",
-    "# z",
-    "# y",
+    "science",
+    #    "# u",
+    #    "# g",
+    #    "# r",
+    #    "# i",
+    #    "# z",
+    #    "# y",
 ]
 
 FLOAT_SUMMARY_COLUMNS = [
     "night_hours",
-    "visits/hour",
-    "teff/minute",
+    #    "visits/hour",
+    #    "teff/minute",
     "median FWHM",
-    "teff_mean",
-    "teff_q1",
-    "teff_median",
-    "teff_q3",
+    #    "mean eff_time",
+    #    "q1 eff_time",
+    #    "median eff_time",
+    #    "q3 eff_time",
+    "mean eff_time/exp_time",
 ]
 
-SUMMARY_COLUMNS = INT_SUMMARY_COLUMNS + FLOAT_SUMMARY_COLUMNS + [
-    "science targets",
-]
+# SUMMARY_COLUMNS = INT_SUMMARY_COLUMNS + FLOAT_SUMMARY_COLUMNS + [
+#    "science targets",
+# ]
+SUMMARY_COLUMNS = INT_SUMMARY_COLUMNS + FLOAT_SUMMARY_COLUMNS
 
 
 def make_report_link_table(
     reports: pd.DataFrame,
-    report_columns=("prenight", "multiprenight", "nightsum", "compareprenight", "preprogress"),
+    report_columns=("prenight", "multiprenight", "nightsum", "compareprenight"),
     visits: pd.DataFrame | None = None,
 ) -> str:
     """Generate an html table of links to reports.
@@ -155,14 +168,13 @@ def make_report_link_table(
 
         # Build a mask for lsstcam rows and extract their nights
         lsstcam_mask = report_links.index.get_level_values("instrument") == "lsstcam"
-        lsstcam_nights = report_links.index[lsstcam_mask].get_level_values("night")
+        _ = report_links.index[lsstcam_mask].get_level_values("night")
 
         # Map tinysum by night onto the full report_links index, then join.
-        # Reindex to the full index (non-lsstcam rows and missing nights get NA)
-        # so that dtypes (including Int64) are preserved through the assignment.
-        summary_full = tinysum.reindex(
-            report_links.index.get_level_values("night")
-        )
+        # Reindex to the full index (non-lsstcam rows and missing nights get
+        # NA) so that dtypes (including Int64) are preserved through
+        # the assignment.
+        summary_full = tinysum.reindex(report_links.index.get_level_values("night"))
         summary_full.index = report_links.index
         # Only lsstcam rows should receive values; blank out the rest
         summary_full.loc[~lsstcam_mask] = None
@@ -184,47 +196,93 @@ def make_report_link_table(
 
 
 def make_report_rss_feed(
-    reports: pd.DataFrame, fname: str | None = None, max_days: int = 7
+    reports: pd.DataFrame,
+    fname: str | None = None,
+    max_days: int = 7,
+    visits: pd.DataFrame | None = None,
+    title: str = "schedview reports",
+    description: str = "Statically generated reports on Rubin Observatory/LSST scheduler status and progress",
 ) -> ET.ElementTree:
     """Generate an rss feed of recent schedview reports.
 
-    Parameters
-    ----------
-    reports : `pd.DataFrame`
-        A DataFrame of report metadata, as returned by `find_reports`.
-    fname : `str` or `None`
-        The file in which to write the RSS, if any. `None` to not write
-        a file at all. Defaults to `None`.
-    max_days : `int`
-        How many days worth of reports to include in the feed.
+     Parameters
+     ----------
+     reports : `pd.DataFrame`
+         A DataFrame of report metadata, as returned by `find_reports`.
+     fname : `str` or `None`
+         The file in which to write the RSS, if any. `None` to not write
+         a file at all. Defaults to `None`.
+     max_days : `int`
+         How many days worth of reports to include in the feed.
+     visits : `pd.DataFrame` or `None`, optional
+         A DataFrame of visits as returned by
+         `schedview.collect.visits.cached_read_visits`. If supplied, a short
+         per-night summary is computed via
+         `schedview.compute.smallsum.compute_tinysum` and the resulting
+         columns are joined onto the ``lsstcam`` rows of the table.
+         Non-``lsstcam`` rows receive ``NA`` for these columns.
+         Defaults to ``None``, in which case no summary columns are added.
+    title: `str`, optional
+         The channel title, defaults to ``schedview reports``
 
-    Returns
-    -------
-    rss : `ET.ElementTree`
-        The RSS XML itself.
+
+     Returns
+     -------
+     rss : `ET.ElementTree`
+         The RSS XML itself.
     """
+    if visits is not None:
+        almanac = Almanac()
+        tinysum = compute_tinysum(visits, almanac=almanac)
+    else:
+        tinysum = None
+
     rss = ET.Element("rss", attrib={"version": "2.0"})
     channel = ET.SubElement(rss, "channel")
     title = ET.SubElement(channel, "title")
-    title.text = "schedview reports"
+    title.text = title
     desc = ET.SubElement(channel, "description")
-    desc.text = "Statically generated reports on Rubin Observatory/LSST scheduler status and progress"
+    desc.text = description
     for row_index, report_row in reports.iterrows():
         if (datetime.date.today() - report_row.night).days > max_days:
             # To make sure we keep the feed a reasonable size,
             # don't include older stuff.
             continue
-        instrument, dayobs = row_index
+        instrument, dayobs_str = row_index
+        dayobs = int(dayobs_str)
+
         item = ET.SubElement(channel, "item")
         title = ET.SubElement(item, "title")
-        title.text = f"{report_row.report} report for {instrument} on {report_row.night}"
+        title.text = f"{report_row.report} for {instrument} on {report_row.night}"
         # It's traditional to put a summary of the content in "description"
         # and we could eventually have things like total numbers
         # of visits in each band, stats on the seeing, etc. here.
         # We can do this when our activities at night are no
         # longer secret.
         desc = ET.SubElement(item, "description")
-        desc.text = f"{report_row.report} report for {instrument} on {report_row.night}"
+        if instrument == "lsstcam" and report_row.report == "nightsum" and tinysum is not None:
+            if dayobs in tinysum.index:
+                try:
+                    teff_rate = np.round(tinysum.loc[dayobs, "teff/minute"], 2)
+                except TypeError:
+                    teff_rate = np.nan
+                desc.text = RSS_DESC_FORMAT.format(
+                    report=report_row.report,
+                    instrument=instrument,
+                    night=report_row.night,
+                    total=tinysum.loc[dayobs, "Total"],
+                    science=tinysum.loc[dayobs, "science"],
+                    fwhm=np.round(tinysum.loc[dayobs, "median FWHM"], 2),
+                    mean_norm_teff=np.round(tinysum.loc[dayobs, "mean eff_time/exp_time"], 2),
+                    visit_rate=np.round(tinysum.loc[dayobs, "visits/hour"], 2),
+                    teff_rate=teff_rate,
+                    targets=tinysum.loc[dayobs, "science targets"],
+                )
+            else:
+                desc.text = "No visits on this night"
+
+        else:
+            desc.text = ""
         link = ET.SubElement(item, "link")
         link.text = report_row.url
         guid = ET.SubElement(item, "guid", attib={"isPermaLink": "false"})

@@ -47,7 +47,7 @@ class TestReports(unittest.TestCase):
     def test_make_report_link_table_with_visits(self):
         rng = np.random.default_rng(0)
         n = 40
-        # Match the dayObs values used for the test reports (2025-06-20, 2025-06-21)
+        # Match dayObs values used for test reports (2025-06-20, 2025-06-21)
         dayobs = np.array([20250620] * 20 + [20250621] * 20)
         visits = pd.DataFrame(
             {

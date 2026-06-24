@@ -76,14 +76,11 @@ def _build_night_hours(almanac: Almanac, dayobs_values: pd.Index) -> pd.Series:
     sunsets = pd.DataFrame(almanac.sunsets)
     night0 = sunsets[sunsets["night"] == 0]
     if night0.empty:
-        raise ValueError(
-            "Almanac.sunsets has no night 0; cannot compute night hours."
-        )
+        raise ValueError("Almanac.sunsets has no night 0; cannot compute night hours.")
     start_date = DayObs.from_time(night0.iloc[0]["sunset"]).date
 
     sunsets["dayObs"] = [
-        int((start_date + timedelta(days=int(n))).strftime("%Y%m%d"))
-        for n in sunsets["night"]
+        int((start_date + timedelta(days=int(n))).strftime("%Y%m%d")) for n in sunsets["night"]
     ]
     sunsets = sunsets.set_index("dayObs")
     night_hours = (sunsets["sun_n12_rising"] - sunsets["sun_n12_setting"]) * 24.0
@@ -152,12 +149,21 @@ def compute_tinysum(
     """
     basic_stats = (
         visits.groupby("dayObs")
-        .agg({"observationId": "count", "seeingFwhmGeom": "median"})
+        .agg(
+            {
+                "observationId": "count",
+                "seeingFwhmGeom": "median",
+                "exp_time": "sum",
+                "eff_time_median": "sum",
+            }
+        )
         .sort_index()
         .rename(
             columns={
                 "observationId": "Total",
                 "seeingFwhmGeom": "median FWHM",
+                "exp_time": "total exp_time",
+                "eff_time_median": "total eff_time",
             }
         )
     )
@@ -169,10 +175,10 @@ def compute_tinysum(
         .loc[:, ["mean", "25%", "50%", "75%"]]
         .rename(
             columns={
-                "mean": "teff_mean",
-                "25%": "teff_q1",
-                "50%": "teff_median",
-                "75%": "teff_q3",
+                "mean": "mean eff_time",
+                "25%": "q1 eff_time",
+                "50%": "median eff_time",
+                "75%": "q3 eff_time",
             }
         )
     )
@@ -187,12 +193,7 @@ def compute_tinysum(
     )
 
     science_visits = visits.loc[visits["science_program"].isin(science_programs), :]
-    science_counts = (
-        science_visits.groupby("dayObs")["observationId"]
-        .count()
-        .rename("# science")
-        .to_frame()
-    )
+    science_counts = science_visits.groupby("dayObs")["observationId"].count().rename("science").to_frame()
 
     targets = (
         science_visits.groupby("dayObs")["target_name"]
@@ -203,16 +204,16 @@ def compute_tinysum(
 
     tinysum = basic_stats.join([teff_stats, science_counts, band_counts, targets])
 
-    tinysum["# science"] = tinysum["# science"].fillna(0).astype("Int64")
+    tinysum["mean eff_time/exp_time"] = tinysum["total eff_time"] / tinysum["total exp_time"]
+
+    tinysum["science"] = tinysum["science"].fillna(0).astype("Int64")
     tinysum["science targets"] = tinysum["science targets"].fillna("")
 
     if almanac is not None:
         night_hours = _build_night_hours(almanac, tinysum.index)
         tinysum["night_hours"] = night_hours
         tinysum["visits/hour"] = tinysum["Total"] / tinysum["night_hours"]
-        tinysum["teff/minute"] = (
-            tinysum["visits/hour"] * tinysum["teff_mean"] / 60.0
-        )
+        tinysum["teff/minute"] = tinysum["visits/hour"] * tinysum["mean eff_time"] / 60.0
 
     return tinysum
 
@@ -243,15 +244,11 @@ def compute_smallsum(
     smallsum : `pandas.DataFrame`
         DataFrame with a two-level index (``dayObs``, ``subset``).
     """
-    fullnight = visits.groupby("dayObs").apply(
-        _visits_summary, include_groups=False
-    )
+    fullnight = visits.groupby("dayObs").apply(_visits_summary, include_groups=False)
     fullnight["subset"] = "all"
     fullnight = fullnight.reset_index().set_index(["dayObs", "subset"])
 
-    byband = visits.groupby(["dayObs", "band"]).apply(
-        _visits_summary, include_groups=False
-    )
+    byband = visits.groupby(["dayObs", "band"]).apply(_visits_summary, include_groups=False)
     byband = byband.rename_axis(index={"band": "subset"})
 
     visits_with_science = visits.copy()
@@ -265,9 +262,7 @@ def compute_smallsum(
     )
     byscience = byscience.rename_axis(index={"_science": "subset"})
 
-    byreason = visits.groupby(["dayObs", "observation_reason"]).apply(
-        _visits_summary, include_groups=False
-    )
+    byreason = visits.groupby(["dayObs", "observation_reason"]).apply(_visits_summary, include_groups=False)
     byreason = byreason.rename_axis(index={"observation_reason": "subset"})
 
     visits_with_targets = visits.copy()
@@ -277,9 +272,7 @@ def compute_smallsum(
     bytarget = visits_with_targets.explode("_target_names")
     bytarget["_target_names"] = bytarget["_target_names"].fillna("").str.strip()
     bytarget.loc[bytarget["_target_names"] == "", "_target_names"] = "no target name"
-    bytarget = bytarget.groupby(["dayObs", "_target_names"]).apply(
-        _visits_summary, include_groups=False
-    )
+    bytarget = bytarget.groupby(["dayObs", "_target_names"]).apply(_visits_summary, include_groups=False)
     bytarget = bytarget.rename_axis(index={"_target_names": "subset"})
 
     smallsum = pd.concat([fullnight, byscience, byband, byreason, bytarget])
