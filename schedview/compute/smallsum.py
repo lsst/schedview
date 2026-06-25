@@ -204,7 +204,7 @@ def compute_tinysum(
 
     tinysum = basic_stats.join([teff_stats, science_counts, band_counts, targets])
 
-    tinysum["mean eff_time/exp_time"] = tinysum["total eff_time"] / tinysum["total exp_time"]
+    tinysum["total eff_time/exp_time"] = tinysum["total eff_time"] / tinysum["total exp_time"]
 
     tinysum["science"] = tinysum["science"].fillna(0).astype("Int64")
     tinysum["science targets"] = tinysum["science targets"].fillna("")

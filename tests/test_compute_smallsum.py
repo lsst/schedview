@@ -199,7 +199,7 @@ class TestComputeTinysum:
         for day in result.index:
             day_visits = sample_visits[sample_visits["dayObs"] == day]
             expected = day_visits["eff_time_median"].sum() / day_visits["exp_time"].sum()
-            assert np.isclose(result.loc[day, "mean eff_time/exp_time"], expected)
+            assert np.isclose(result.loc[day, "total eff_time/exp_time"], expected)
 
     def test_no_almanac_omits_rate_columns(self, sample_visits):
         result = compute_tinysum(sample_visits, almanac=None)

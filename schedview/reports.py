@@ -14,7 +14,7 @@ RSS_DESC_FORMAT = """
 Total visits: {total};
 Science visits: {science};
 Median FWHM: {fwhm};
-Mean eff_time/exp_time: {mean_norm_teff};
+Total eff_time/exp_time: {mean_norm_teff};
 Mean visit rate: {visit_rate} visits/hour;
 Mean eff_time rate: {teff_rate}/minute;
 Science targets: {targets}
@@ -115,7 +115,7 @@ FLOAT_SUMMARY_COLUMNS = [
     #    "q1 eff_time",
     #    "median eff_time",
     #    "q3 eff_time",
-    "mean eff_time/exp_time",
+    "total eff_time/exp_time",
 ]
 
 # SUMMARY_COLUMNS = INT_SUMMARY_COLUMNS + FLOAT_SUMMARY_COLUMNS + [
@@ -273,7 +273,7 @@ def make_report_rss_feed(
                     total=tinysum.loc[dayobs, "Total"],
                     science=tinysum.loc[dayobs, "science"],
                     fwhm=np.round(tinysum.loc[dayobs, "median FWHM"], 2),
-                    mean_norm_teff=np.round(tinysum.loc[dayobs, "mean eff_time/exp_time"], 2),
+                    mean_norm_teff=np.round(tinysum.loc[dayobs, "total eff_time/exp_time"], 2),
                     visit_rate=np.round(tinysum.loc[dayobs, "visits/hour"], 2),
                     teff_rate=teff_rate,
                     targets=tinysum.loc[dayobs, "science targets"],

@@ -67,7 +67,7 @@ A `pd.DataFrame` indexed by `dayObs` (int, YYYYMMDD format), with one row per ni
 | `# z` | Int64 | Number of visits in z band (nullable integer) |
 | `# y` | Int64 | Number of visits in y band (nullable integer) |
 | `science targets` | str | Comma-separated unique target names from science visits (with `ddf_`/`DDF ` prefixes stripped; multi-target values split on `, `) |
-| `mean eff_time/exp_time` | float | `total eff_time / total exp_time` (normalized effective time) |
+| `total eff_time/exp_time` | float | `total eff_time / total exp_time` (normalized effective time) |
 | `night_hours` | float | Duration of the night in hours (sun at -12° setting to sun at -12° rising) |
 | `visits/hour` | float | `Total / night_hours` |
 | `teff/minute` | float | `(visits/hour * mean eff_time) / 60` |
@@ -93,7 +93,7 @@ A `pd.DataFrame` indexed by `dayObs` (int, YYYYMMDD format), with one row per ni
 
 6. **Join all** intermediate DataFrames on the `dayObs` index. Fill NaN in `science` with 0 (cast to `Int64`) and in `science targets` with empty string.
 
-7. **Normalized effective time**: Compute `mean eff_time/exp_time` = `total eff_time / total exp_time`.
+7. **Normalized effective time**: Compute `total eff_time/exp_time` = `total eff_time / total exp_time`.
 
 8. **Night hours** (only if `almanac` is not `None`): Build a mapping from `dayObs` → night duration in hours using the Almanac's `sunsets` array:
    - Convert `night` index to `dayObs` (YYYYMMDD int)
@@ -212,4 +212,4 @@ Used by `compute_tinysum` to aggregate target names per night. Logic:
 - The `dayObs` column is expected to be an integer in YYYYMMDD format (as produced by `DayObsStacker`).
 - The Almanac is only needed by `compute_tinysum` for the `night_hours` and rate columns. If these columns are not needed, the Almanac parameter can be set to `None` and those columns will be omitted.
 - Integer count columns (`Total`, `science`, band counts) use pandas nullable `Int64` dtype to avoid float conversion when NaN values are present from joins.
-- The `exp_time` column is required by `compute_tinysum` for the `mean eff_time/exp_time` normalized efficiency metric.
+- The `exp_time` column is required by `compute_tinysum` for the `total eff_time/exp_time` normalized efficiency metric.
