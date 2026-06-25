@@ -2,99 +2,68 @@
 
 ## Goal
 
-Add a local file cache layer to `schedview.collect.visits.read_visits` (and `read_ddf_visits`) so that expensive consdb queries can be avoided on repeated calls for the same data. The cache is optional and fully backward-compatible: when no cache directory is specified, the functions behave exactly as they do today.
+Add a local file cache layer for expensive consdb queries so they can be avoided on repeated calls for the same data. The cache is implemented as a standalone `cached_read_visits` function that wraps `read_visits`/`read_ddf_visits`.
 
 ## Source Context
 
 - **Reference notebook:** `notebooks/smallsum.ipynb` — contains the prototype `cached_read_visits` function that this design formalizes.
-- **Target module:** `schedview/collect/visits.py` — contains the existing `read_visits` and `read_ddf_visits` functions.
-- **Compatibility note:** The final implementation must be backward compatible with the existing `schedview.collect.visits` API, but need not exactly replicate the notebook's implementation. The notebook is a prototype; this design is the authoritative specification.
+- **Target module:** `schedview/collect/visits.py` — contains the existing `read_visits` and `read_ddf_visits` functions, plus the new `cached_read_visits` and `_is_cache_fresh` helpers.
 
 ## Overview
 
-The notebook's `cached_read_visits` function:
-1. Constructs a cache file path based on instrument and whether it's DDF.
-2. Checks whether the cache file is "fresh enough" (modified after yesterday's sunrise and before today's sunset).
-3. If fresh, reads from the cache; otherwise queries the real source, then writes the result back to the cache.
-4. Filters the returned DataFrame down to visits on or before the requested `day_obs`.
-
-The design below incorporates that logic into the existing module in a clean, testable, backward-compatible way.
+The `cached_read_visits` function:
+1. Validates the source is a known consdb instrument (raises `ValueError` otherwise).
+2. Constructs a cache file path based on instrument and whether it's DDF.
+3. Checks whether the cache file is "fresh enough" (modified after yesterday's sunrise and before today's sunset) **and** was built with the same set of stackers.
+4. On a cache hit, reads from the HDF5 cache; on a cache miss, queries the real source via `read_visits`/`read_ddf_visits`, writes the result back to the cache.
+5. Filters the returned DataFrame down to visits on or before the requested `day_obs`.
 
 ---
 
 ## Detailed Design
 
-### 1. Module-level configuration variables
-
-Add module-level variables that control caching behavior:
+### 1. New public function: `cached_read_visits`
 
 ```python
-VISITS_CACHE_DIR: str | Path | None = None
-VISITS_CACHE_FORMAT: str = "parquet"  # "parquet" or "hdf5"
-```
-
-When `VISITS_CACHE_DIR` is `None`, caching is disabled by default (preserving backward compatibility). Users or deployment configurations can set these once at startup:
-
-```python
-import schedview.collect.visits
-schedview.collect.visits.VISITS_CACHE_DIR = "/path/to/cache"
-schedview.collect.visits.VISITS_CACHE_FORMAT = "parquet"  # or "hdf5"
-```
-
-`VISITS_CACHE_FORMAT` controls the serialization format for cache files. Supported values are:
-- `"parquet"` — Apache Parquet format via `pd.read_parquet`/`pd.to_parquet`. Default. Faster, smaller files, no `pytables` dependency required.
-- `"hdf5"` — HDF5 format via `pd.read_hdf`/`pd.to_hdf` with key `"visits"`. Consistent with existing caching elsewhere in schedview (e.g., rewards caching). Requires `pytables`.
-
-### 2. New parameter on `read_visits` (and propagated through `read_ddf_visits`)
-
-Add an optional `cache_dir` parameter that defaults to the module-level variable:
-
-```python
-def read_visits(
+def cached_read_visits(
     day_obs: str | int | DayObs,
     visit_source: str,
-    stackers: list[...] = ...,
-    num_nights: int = 1,
-    cache_dir: str | Path | None = VISITS_CACHE_DIR,   # <-- NEW
-    **kwargs,
+    cache_dir: str | Path,
+    stackers: list | None = None,
+    ddf: bool = False,
 ) -> pd.DataFrame:
 ```
 
-Because `VISITS_CACHE_DIR` is `None` by default, callers who never set it get identical behavior to today. Callers who set the module-level variable get caching everywhere automatically, and can still override per-call with an explicit `cache_dir=` argument.
+#### Parameters
 
-**Implementation note:** To pick up runtime changes to `VISITS_CACHE_DIR`, use a sentinel default rather than binding at function-definition time:
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `day_obs` | `str \| int \| DayObs` | The night of observing. Visits up to and including this night are returned. |
+| `visit_source` | `str` | A consdb instrument name (e.g. `"lsstcam"`, `"latiss"`). Only sources in `KNOWN_INSTRUMENTS` are supported; raises `ValueError` otherwise. |
+| `cache_dir` | `str \| Path` | Directory where cache files are stored. Created automatically if it does not exist. |
+| `stackers` | `list \| None` | Stacker instances to apply. If `None`, defaults to `NIGHT_STACKERS` (when `ddf=False`) or `DDF_STACKERS + [maf.stackers.DayObsStacker()]` (when `ddf=True`). |
+| `ddf` | `bool` | If `True`, use `read_ddf_visits` instead of `read_visits` and use DDF-appropriate stackers. |
 
-```python
-_USE_MODULE_DEFAULT = object()
+#### Returns
 
-def read_visits(..., cache_dir=_USE_MODULE_DEFAULT, ...):
-    if cache_dir is _USE_MODULE_DEFAULT:
-        cache_dir = VISITS_CACHE_DIR
-    ...
-```
+A `pd.DataFrame` of visits for nights up to and including `day_obs`.
 
-### 3. New private helper: `_resolve_cache_path`
+#### Raises
 
-```python
-def _resolve_cache_path(
-    cache_dir: Path,
-    visit_source: str,
-    ddf: bool = False,
-) -> Path | None:
-```
+- `ValueError` if `visit_source` is not a known consdb instrument.
 
-**Purpose:** Determine the cache file path for a given source/mode, or return `None` if caching is not applicable (e.g. the source is an opsim file, not a consdb instrument).
+### 2. Cache File Format
 
-**Logic:**
-- Only cache when `visit_source` is a known consdb instrument (i.e., `visit_source in KNOWN_INSTRUMENTS`). The known instruments are imported from `rubin_scheduler.utils.consdb.KNOWN_INSTRUMENTS` and currently include `"lsstcam"` and `"latiss"`. Opsim/baseline/file sources are already local and fast; caching them would be confusing.
-- File naming depends on `VISITS_CACHE_FORMAT`:
-  - If `"parquet"`: `visits_{visit_source}.parquet` or `visits_{visit_source}_ddf.parquet`
-  - If `"hdf5"`: `visits_{visit_source}.h5` or `visits_{visit_source}_ddf.h5`
-- Returns `cache_dir / <filename>`.
+The cache file is an **HDF5** file (`.h5` extension) with two keys:
 
-**Notebook reference:** The notebook checks `visit_origin in ("lsstcam", "latiss")` — this design generalizes that by using `KNOWN_INSTRUMENTS` which is already imported in the module.
+- `"visits"` — the full visits `DataFrame` (all nights up to the query date).
+- `"stackers"` — a single-column `DataFrame` (column `"class_name"`) recording the fully-qualified class name of each stacker used to produce the cached data. Used to detect stale caches caused by a change in the requested stacker set.
 
-### 4. New private helper: `_is_cache_fresh`
+**File naming:**
+- Non-DDF: `visits_{visit_source}.h5` (e.g. `visits_lsstcam.h5`)
+- DDF: `visits_{visit_source}_ddf.h5` (e.g. `visits_lsstcam_ddf.h5`)
+
+### 3. Private helper: `_is_cache_fresh`
 
 ```python
 def _is_cache_fresh(cache_path: Path) -> bool:
@@ -114,154 +83,79 @@ def _is_cache_fresh(cache_path: Path) -> bool:
 
 **Rationale:** The cache represents "all visits through last night." If it was written between yesterday's sunrise (after last night ended) and today's sunset (before tonight starts), it should be complete and not yet stale.
 
-### 5. New private helper: `_read_cache` and `_write_cache`
-
-```python
-def _read_cache(cache_path: Path) -> pd.DataFrame:
-    """Read a visits DataFrame from the cache file.
-
-    Dispatches based on file extension (.parquet or .h5).
-    """
-    if cache_path.suffix == ".parquet":
-        return pd.read_parquet(cache_path)
-    else:
-        return pd.read_hdf(str(cache_path), key="visits")
-
-
-def _write_cache(visits: pd.DataFrame, cache_path: Path) -> None:
-    """Write a visits DataFrame to the cache file.
-
-    Dispatches based on file extension (.parquet or .h5).
-    """
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    if cache_path.suffix == ".parquet":
-        visits.to_parquet(cache_path, compression="zstd")
-    else:
-        visits.to_hdf(str(cache_path), key="visits")
-```
-
-**Format dispatch:** `_read_cache` and `_write_cache` dispatch on the file extension of `cache_path` (which is set by `_resolve_cache_path` based on `VISITS_CACHE_FORMAT`). This means the format decision is made in one place (`_resolve_cache_path`) and the read/write helpers are format-agnostic beyond checking the extension.
-
-**Format notes:**
-- **Parquet** — requires `pyarrow` (already a transitive dependency via pandas in most environments). Produces smaller files, faster reads, and does not require `pytables`. Uses Zstd compression for an excellent balance of compression ratio and speed. Handles most pandas column types well, but note that columns with mixed types or complex Python objects may need care.
-- **HDF5** — requires `pytables` (already available in the schedview environment). Consistent with existing caching elsewhere in schedview (e.g., rewards caching). More tolerant of exotic column dtypes.
-
-**Migration/coexistence:** If a user changes `VISITS_CACHE_FORMAT` after a cache was already written, the old cache file (with the previous extension) will simply not be found by `_resolve_cache_path` (since the filename extension will differ). The next call will be a cache miss, re-query, and write a new file in the new format. The old file is left in place (not automatically deleted). This is safe and simple.
-
-### 6. Modified `read_visits` logic
-
-The body of `read_visits` changes to:
+### 4. Cache hit/miss logic
 
 ```
-1. If cache_dir is not None:
-   a. cache_path = _resolve_cache_path(cache_dir, visit_source, ddf=False)
-   b. If cache_path is not None and _is_cache_fresh(cache_path):
-      - visits = _read_cache(cache_path)
-      - Filter to visits with dayObs <= requested day_obs
-      - Return visits
+1. Validate visit_source is in KNOWN_INSTRUMENTS (raise ValueError if not).
 
-2. (Existing logic) Query consdb or read from opsim as before.
+2. Resolve default stackers based on ddf flag.
 
-3. If cache_dir is not None and cache_path is not None:
-   - _write_cache(visits, cache_path)
+3. Construct cache_path:
+   - cache_dir / f"visits_{visit_source}{suffix}.h5"
+   - where suffix = "_ddf" if ddf else ""
 
-4. Return visits
+4. Compute requested_class_names = set of fully-qualified class names from stackers.
+
+5. If _is_cache_fresh(cache_path):
+   a. Try to read the "stackers" key from the HDF5 file.
+   b. If the key is missing, treat as a stale cache → cache miss.
+   c. If cached_class_names == requested_class_names → cache hit:
+      - Read "visits" key from HDF5.
+   d. If class names don't match → cache miss (stacker mismatch).
+
+6. On cache miss:
+   a. Query source using read_visits or read_ddf_visits with:
+      - day_obs = DayObs.from_date("today")
+      - num_nights = 365 * 20  (fetch all available history)
+      - stackers = resolved stackers
+   b. Create cache_dir if it doesn't exist.
+   c. Write visits to HDF5 under key "visits" (mode="w").
+   d. Write stacker class names to HDF5 under key "stackers" (mode="a").
+
+7. Filter to requested day_obs:
+   - If "dayObs" column exists: return visits where dayObs <= day_obs_obj.yyyymmdd
+   - If "dayObs" column is absent: warn and return unfiltered data.
 ```
 
-Note: Step 1b includes a filtering step so that the cache (which stores *all* visits up to the last completed night) can serve requests for any day_obs up to that point without re-querying. This requires that `dayObs` is a column in the cached DataFrame. The existing consdb path (via `DayObsStacker`) and opsim path (via `DayObsStacker` in `NIGHT_STACKERS`) both provide this column when the standard stackers are used.
+### 5. Logging
 
-**Important:** The filtering in step 1b requires a `dayObs` column. If this column is not present in the cached data (because non-standard stackers were used), skip the filtering and return the full cached DataFrame. This avoids breaking callers who use custom stacker lists.
-
-**Cache population strategy (from notebook):** When populating the cache on a miss, the query should fetch *all* visits up to today (using `num_nights=365*20` or an equivalently large window and `day_obs=DayObs.from_date('today')`), not just the visits for the originally-requested `day_obs`/`num_nights` range. This ensures the cache is comprehensive and can serve future requests for any historical day_obs without re-querying. The `day_obs` and `num_nights` parameters from the original call are only used for the final filtering step, not for the cache-populating query.
-
-**Filtering detail:** The notebook filters using `all_visits.loc[all_visits.dayObs <= day_obs.yyyymmdd, :]`, where `dayObs` is an integer column in `YYYYMMDD` format (produced by `maf.stackers.DayObsStacker()`). The `day_obs` comparison value should be converted via `DayObs.from_date(day_obs).yyyymmdd` (an integer). Additionally, when `num_nights > 1`, the filter should also enforce a lower bound: `dayObs > (requested_day_obs - num_nights)` to match the semantics of the non-cached path.
-
-### 7. Modified `read_ddf_visits` logic
-
-`read_ddf_visits` already delegates to `read_visits`. It simply needs to:
-- Accept `cache_dir` and pass it through to `read_visits`.
-- Use a distinct cache file name. This is handled by adding a `_ddf` parameter or by constructing the cache path before calling `read_visits`.
-
-**Approach:** Add a private `_cache_suffix` parameter to `read_visits` (defaulting to `""`) that `read_ddf_visits` sets to `"_ddf"`. This avoids duplicating caching logic. Alternatively, `read_ddf_visits` can manage its own cache path and pass `cache_dir=None` to `read_visits` (managing caching entirely at the `read_ddf_visits` level).
-
-**Chosen approach:** `read_ddf_visits` manages its own caching independently. It will:
-1. Check for a fresh DDF cache file (named with `_ddf` suffix).
-2. If fresh, read from cache.
-3. Otherwise, call `read_visits(..., cache_dir=None)` to get fresh data (no double-caching), then do its DDF field filtering, then write its own cache.
-
-This keeps the two caching paths independent and avoids confusion.
-
-**Notebook reference:** The notebook's `cached_read_visits` function uses the `ddf` boolean parameter to switch between calling `schedview.collect.visits.read_ddf_visits` (with `DDF_STACKERS + [maf.stackers.DayObsStacker()]`) and `schedview.collect.visits.read_visits` (with `NIGHT_STACKERS`). In this design, both `read_visits` and `read_ddf_visits` handle their own caching, so callers do not need a separate `cached_read_visits` wrapper.
-
-**DDF stacker note:** The notebook adds `maf.stackers.DayObsStacker()` to `DDF_STACKERS` when populating the DDF cache. The current `DDF_STACKERS` list does not include `DayObsStacker`. For the cache filtering (by `dayObs` column) to work in `read_ddf_visits`, `DayObsStacker` must be included in the stackers used for the cache-populating query. The implementation should ensure this stacker is added when building the cache, even if the caller did not include it. Alternatively, `DDF_STACKERS` could be updated to include `DayObsStacker()` at the module level (this would be a minor behavior change but harmless since the stacker only adds a column).
-
-### 8. Logging
-
-Add `logging.getLogger(__name__)` at the top of the module. Log at `debug` level:
-- "Reading visits from cache: {cache_path}"
-- "Cache miss or stale, querying source: {visit_source}"
-- "Writing visits cache: {cache_path}"
+Uses `logging.getLogger(__name__)` at the module level. Logs at `debug` level:
+- `"Reading visits from cache: {cache_path}"`
+- `"Cache miss or stale, querying source: {visit_source}"`
+- `"Cache missing 'stackers' key, treating as stale: {cache_path}"`
+- `"Cache stacker mismatch, regenerating: {cache_path}"`
+- `"Writing visits cache: {cache_path}"`
 
 ---
 
 ## Backward Compatibility
 
-- `VISITS_CACHE_DIR` is `None` by default, so `cache_dir` defaults to `None` → no caching → identical to current behavior.
-- No new required dependencies. Parquet support via `pyarrow` is already a transitive dependency; HDF5 support via `pytables` is already used elsewhere in schedview.
-- The function signatures only gain an optional keyword argument.
-- The `__init__.py` exports do not change (though `VISITS_CACHE_DIR` may optionally be added to `__all__` for discoverability).
+- `read_visits` and `read_ddf_visits` signatures are **unchanged**. Caching is provided only through the new `cached_read_visits` function.
+- `cached_read_visits` is exported from `schedview.collect` via `__init__.py`.
+- No new required dependencies. HDF5 support via `pytables` is already used elsewhere in schedview.
 
 ## File Changes Summary
 
 | File | Change |
 |------|--------|
-| `schedview/collect/visits.py` | Add `VISITS_CACHE_DIR` and `VISITS_CACHE_FORMAT` module-level variables; add `cache_dir` param to `read_visits` and `read_ddf_visits`; add `_resolve_cache_path`, `_is_cache_fresh`, `_read_cache`, `_write_cache` helpers; add sentinel-based default resolution; add caching logic; add logger. |
-
-No changes needed to `__init__.py`, `consdb.py`, `opsim.py`, or any other module.
+| `schedview/collect/visits.py` | Add `_is_cache_fresh` helper and `cached_read_visits` function; add logger. |
+| `schedview/collect/__init__.py` | Add `cached_read_visits` to imports and `__all__`. |
 
 ## Testing Notes
 
-- Unit tests for `_is_cache_fresh` can mock file mtime and `DayObs.from_date`.
-- Unit tests for `_resolve_cache_path` verify path construction and `None` return for non-instrument sources.
-- Integration tests for `read_visits` with `cache_dir` can use a temp directory and a simulated opsim source (since opsim sources won't actually cache, test the "cache not applicable" path), or mock `read_consdb` to verify the cache-hit path.
-- Test that calling `read_visits` twice with the same `cache_dir` produces the same result, and the second call reads from the file (mock `read_consdb` to verify it's not called twice).
-
-## Existing Module Structure Reference
-
-The current `schedview/collect/visits.py` module has these key elements that the implementation must integrate with:
-
-```python
-# Imports already present:
-from rubin_scheduler.utils.consdb import KNOWN_INSTRUMENTS  # used to detect consdb instruments
-from schedview import DayObs  # day_obs handling
-
-# Module constants already present:
-NIGHT_STACKERS = [...]   # includes DayObsStacker
-DDF_STACKERS = [...]     # does NOT include DayObsStacker (see DDF stacker note above)
-
-# New module constants to add:
-VISITS_CACHE_DIR: str | Path | None = None
-VISITS_CACHE_FORMAT: str = "parquet"  # "parquet" or "hdf5"
-
-# read_visits signature:
-def read_visits(
-    day_obs: str | int | DayObs,
-    visit_source: str,
-    stackers: list[...] = [maf.stackers.ObservationStartTimestampStacker()],
-    num_nights: int = 1,
-    **kwargs,
-) -> pd.DataFrame:
-
-# read_ddf_visits signature:
-def read_ddf_visits(*args, **kwargs) -> pd.DataFrame:
-    # Sets default stackers to DDF_STACKERS if not provided
-    # Calls read_visits(*args, **kwargs) internally
-    # Filters results to DDF fields using target_name/scheduler_note columns
-```
+- Unit tests for `_is_cache_fresh` mock file mtime and `DayObs.from_date`.
+- Tests for `cached_read_visits`:
+  - Raises `ValueError` for non-instrument sources.
+  - On cache miss: calls `read_visits`, writes HDF5 with both keys.
+  - On cache hit: does NOT call `read_visits`; reads from HDF5.
+  - Stacker mismatch: regenerates cache.
+  - DDF mode: uses `_ddf` suffix in filename, calls `read_ddf_visits`.
+  - Default stackers: `NIGHT_STACKERS` for non-DDF, `DDF_STACKERS + [DayObsStacker()]` for DDF.
+  - Creates `cache_dir` if absent.
+  - Warns when `dayObs` column is missing from data.
 
 ## Development Environment
 
 - Virtual environment: `/home/neilsen/devel/schedview/.venv`
 - Package manager: `uv`
 - The `pytables` dependency (for HDF5 I/O via `pd.read_hdf`/`pd.to_hdf`) is already available in the environment.
-- The `pyarrow` dependency (for Parquet I/O via `pd.read_parquet`/`pd.to_parquet`) is already available in the environment.

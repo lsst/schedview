@@ -9,7 +9,6 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 from astropy.time import Time
 
-from schedview import DayObs
 from schedview.collect.visits import (
     DDF_STACKERS,
     NIGHT_STACKERS,
@@ -31,19 +30,20 @@ class TestIsCacheFresh(unittest.TestCase):
         self.assertFalse(_is_cache_fresh(path))
 
     def test_fresh_file_returns_true(self):
-        """A file whose mtime falls between yesterday's sunrise and today's sunset is fresh."""
+        """A file whose mtime is between sunrise and sunset is fresh."""
         with tempfile.TemporaryDirectory() as tmpdir:
             cache_path = Path(tmpdir) / "visits_lsstcam.h5"
             cache_path.write_bytes(b"fake")
-
-            mock_stat = MagicMock()
-            mock_stat.st_mtime = Time.now().unix
 
             yesterday_dayobs = MagicMock()
             yesterday_dayobs.sunrise = Time("2026-06-16 10:00:00", scale="utc")
 
             today_dayobs = MagicMock()
             today_dayobs.sunset = Time("2026-06-18 01:00:00", scale="utc")
+
+            # Use a time that falls within the freshness window
+            mock_stat = MagicMock()
+            mock_stat.st_mtime = Time("2026-06-17 12:00:00", scale="utc").unix
 
             with (
                 patch("pathlib.Path.stat", return_value=mock_stat),
@@ -106,7 +106,7 @@ class TestCachedReadVisits(unittest.TestCase):
             cached_read_visits(20260614, "/path/to/sim.db", cache_dir="/tmp/cache")
 
     def test_cache_miss_calls_read_visits_and_writes_cache(self):
-        """On a cache miss, read_visits is called and both HDF5 keys are written."""
+        """On a miss, read_visits is called and both keys are written."""
         from rubin_sim import maf
 
         fake_visits = self._make_fake_visits()
@@ -134,7 +134,7 @@ class TestCachedReadVisits(unittest.TestCase):
             self.assertTrue(all(result["dayObs"] <= 20260612))
 
     def test_cache_hit_does_not_call_read_visits(self):
-        """On a valid cache hit (fresh + matching stackers), read_visits is not called."""
+        """On a valid cache hit, read_visits is not called."""
         from rubin_sim import maf
 
         fake_visits = self._make_fake_visits()
@@ -150,8 +150,7 @@ class TestCachedReadVisits(unittest.TestCase):
             with (
                 patch("schedview.collect.visits._is_cache_fresh", return_value=True),
                 patch("schedview.collect.visits.read_visits") as mock_rv,
-                patch("schedview.collect.visits.DayObs.from_date",
-                      return_value=self._day_obs_mock(20260612)),
+                patch("schedview.collect.visits.DayObs.from_date", return_value=self._day_obs_mock(20260612)),
             ):
                 result = cached_read_visits(20260612, "lsstcam", cache_dir=tmpdir, stackers=stackers)
 
@@ -188,7 +187,7 @@ class TestCachedReadVisits(unittest.TestCase):
             self.assertEqual(new_names, _class_names(stackers_requested))
 
     def test_ddf_uses_ddf_suffix_in_filename(self):
-        """DDF cache files use the _ddf suffix and read_ddf_visits is called."""
+        """DDF cache files use the _ddf suffix."""
         fake_visits = self._make_fake_visits()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -224,7 +223,7 @@ class TestCachedReadVisits(unittest.TestCase):
             self.assertEqual(_class_names(call_kwargs["stackers"]), _class_names(NIGHT_STACKERS))
 
     def test_default_stackers_ddf(self):
-        """When stackers=None and ddf=True, DDF_STACKERS + DayObsStacker are used."""
+        """When stackers=None and ddf=True, DDF_STACKERS + DayObs used."""
         from rubin_sim import maf
 
         fake_visits = self._make_fake_visits()
@@ -265,7 +264,7 @@ class TestCachedReadVisits(unittest.TestCase):
             self.assertTrue(new_cache_dir.exists())
 
     def test_warns_when_no_dayobs_column(self):
-        """A warning is issued and unfiltered data returned if dayObs column is absent."""
+        """A warning is issued if dayObs column is absent."""
         fake_visits = pd.DataFrame({"observationId": [1, 2, 3]})
 
         with tempfile.TemporaryDirectory() as tmpdir:

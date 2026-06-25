@@ -59,6 +59,7 @@ def sample_visits() -> pd.DataFrame:
             "observationId": np.arange(n_total),
             "seeingFwhmGeom": rng.uniform(0.6, 1.8, size=n_total),
             "eff_time_median": rng.uniform(20.0, 40.0, size=n_total),
+            "exp_time": rng.uniform(25.0, 35.0, size=n_total),
             "band": bands,
             "science_program": science_programs,
             "target_name": target_names,
@@ -171,7 +172,7 @@ class TestComputeTinysum:
         result = compute_tinysum(sample_visits)
         for b in ALL_BANDS:
             assert pd.api.types.is_integer_dtype(result[f"# {b}"])
-        assert pd.api.types.is_integer_dtype(result["# science"])
+        assert pd.api.types.is_integer_dtype(result["science"])
 
     def test_science_count_correct(self, sample_visits):
         result = compute_tinysum(sample_visits, science_programs=SCIENCE_PROGRAMS)
@@ -182,12 +183,23 @@ class TestComputeTinysum:
                     & (sample_visits["science_program"].isin(SCIENCE_PROGRAMS))
                 ]
             )
-            assert result.loc[day, "# science"] == expected
+            assert result.loc[day, "science"] == expected
 
     def test_teff_stats_reasonable(self, sample_visits):
         result = compute_tinysum(sample_visits)
         for day in result.index:
-            assert result.loc[day, "teff_q1"] <= result.loc[day, "teff_median"] <= result.loc[day, "teff_q3"]
+            assert (
+                result.loc[day, "q1 eff_time"]
+                <= result.loc[day, "median eff_time"]
+                <= result.loc[day, "q3 eff_time"]
+            )
+
+    def test_mean_eff_time_over_exp_time(self, sample_visits):
+        result = compute_tinysum(sample_visits)
+        for day in result.index:
+            day_visits = sample_visits[sample_visits["dayObs"] == day]
+            expected = day_visits["eff_time_median"].sum() / day_visits["exp_time"].sum()
+            assert np.isclose(result.loc[day, "mean eff_time/exp_time"], expected)
 
     def test_no_almanac_omits_rate_columns(self, sample_visits):
         result = compute_tinysum(sample_visits, almanac=None)
@@ -205,13 +217,14 @@ class TestComputeTinysum:
                 "observationId": range(5),
                 "seeingFwhmGeom": [1.0] * 5,
                 "eff_time_median": [30.0] * 5,
+                "exp_time": [30.0] * 5,
                 "band": list("grriz"),
                 "science_program": ["ENG-001"] * 5,
                 "target_name": ["test"] * 5,
             }
         )
         result = compute_tinysum(visits, science_programs=("BLOCK-365",))
-        assert result.loc[20250601, "# science"] == 0
+        assert result.loc[20250601, "science"] == 0
         assert result.loc[20250601, "science targets"] == ""
 
     def test_missing_bands(self):
@@ -221,6 +234,7 @@ class TestComputeTinysum:
                 "observationId": range(3),
                 "seeingFwhmGeom": [1.0] * 3,
                 "eff_time_median": [30.0] * 3,
+                "exp_time": [30.0] * 3,
                 "band": ["g", "r", "i"],
                 "science_program": ["BLOCK-365"] * 3,
                 "target_name": ["COSMOS"] * 3,

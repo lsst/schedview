@@ -55,6 +55,7 @@ class TestReports(unittest.TestCase):
                 "observationId": np.arange(n),
                 "seeingFwhmGeom": rng.uniform(0.6, 1.8, size=n),
                 "eff_time_median": rng.uniform(20.0, 40.0, size=n),
+                "exp_time": rng.uniform(25.0, 35.0, size=n),
                 "band": rng.choice(list("ugrizy"), size=n),
                 "science_program": rng.choice(["BLOCK-365", "ENG-001"], size=n),
                 "target_name": rng.choice(["COSMOS", "XMM-LSS", ""], size=n),
@@ -66,7 +67,7 @@ class TestReports(unittest.TestCase):
         ET.fromstring(html_table)
         # Summary column headers must appear in the output
         assert "Total" in html_table
-        assert "# science" in html_table
+        assert "science" in html_table
 
     def test_make_report_rss_feed(self):
         reports = schedview.reports.find_reports(self.temp_dir.name)
