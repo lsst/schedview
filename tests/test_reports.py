@@ -76,3 +76,17 @@ class TestReports(unittest.TestCase):
         assert isinstance(rss_tree, ET.ElementTree)
         # See if we can parse the result as XML
         ET.parse(str(test_file))
+
+    def test_make_report_rss_feed_uses_title_parameter(self):
+        reports = schedview.reports.find_reports(self.temp_dir.name)
+        channel_title = "Custom Schedview Reports"
+        rss_tree = schedview.reports.make_report_rss_feed(
+            reports,
+            fname=None,
+            max_days=99999,
+            title=channel_title,
+        )
+        root = rss_tree.getroot()
+        title_elem = root.find("channel/title")
+        assert title_elem is not None
+        assert title_elem.text == channel_title

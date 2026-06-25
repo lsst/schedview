@@ -275,6 +275,6 @@ def compute_smallsum(
     bytarget = bytarget.groupby(["dayObs", "_target_names"]).apply(_visits_summary, include_groups=False)
     bytarget = bytarget.rename_axis(index={"_target_names": "subset"})
 
-    smallsum = pd.concat([fullnight, byscience, byband, byreason, bytarget])
+    smallsum = pd.concat([fullnight, byband, byscience, byreason, bytarget])
     smallsum = smallsum.sort_index(level="dayObs", sort_remaining=False)
     return smallsum

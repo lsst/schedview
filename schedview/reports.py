@@ -239,8 +239,8 @@ def make_report_rss_feed(
 
     rss = ET.Element("rss", attrib={"version": "2.0"})
     channel = ET.SubElement(rss, "channel")
-    title = ET.SubElement(channel, "title")
-    title.text = title
+    channel_title_elem = ET.SubElement(channel, "title")
+    channel_title_elem.text = title
     desc = ET.SubElement(channel, "description")
     desc.text = description
     for row_index, report_row in reports.iterrows():
@@ -252,8 +252,8 @@ def make_report_rss_feed(
         dayobs = int(dayobs_str)
 
         item = ET.SubElement(channel, "item")
-        title = ET.SubElement(item, "title")
-        title.text = f"{report_row.report} for {instrument} on {report_row.night}"
+        item_title_elem = ET.SubElement(item, "title")
+        item_title_elem.text = f"{report_row.report} for {instrument} on {report_row.night}"
         # It's traditional to put a summary of the content in "description"
         # and we could eventually have things like total numbers
         # of visits in each band, stats on the seeing, etc. here.
@@ -286,7 +286,7 @@ def make_report_rss_feed(
         link = ET.SubElement(item, "link")
         link.text = report_row.url
         guid = ET.SubElement(item, "guid", attib={"isPermaLink": "false"})
-        guid.text = title.text + f", generated {report_row.report_time}"
+        guid.text = item_title_elem.text + f", generated {report_row.report_time}"
         category = ET.SubElement(item, "category")
         category.text = f"{instrument}_{report_row.report}"
         pubdate = ET.SubElement(item, "pubDate")

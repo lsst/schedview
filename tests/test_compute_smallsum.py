@@ -341,6 +341,18 @@ class TestComputeSmallsum:
         result = compute_smallsum(sample_visits)
         assert (result["first"] <= result["last"]).all()
 
+    def test_subset_order_matches_contract(self, sample_visits):
+        result = compute_smallsum(sample_visits, science_programs=SCIENCE_PROGRAMS)
+        day = result.index.get_level_values("dayObs")[0]
+        subsets = list(result.loc[day].index)
+
+        assert subsets[0] == "all"
+
+        first_band_pos = min(subsets.index(b) for b in ALL_BANDS if b in subsets)
+        first_science_pos = min(subsets.index(s) for s in ("science", "not_science") if s in subsets)
+
+        assert first_band_pos < first_science_pos
+
 
 # ---------------------------------------------------------------------------
 # Tests for _build_night_hours helper
