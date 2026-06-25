@@ -1,3 +1,5 @@
+"""Black-box tests for schedview.reports public API."""
+
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -23,9 +25,13 @@ class TestReports(unittest.TestCase):
         for report in cls.reports:
             for instrument in cls.instruments:
                 for day in cls.days:
-                    test_dir = Path(cls.temp_dir.name).joinpath(report, instrument, year, month, day)
+                    test_dir = Path(cls.temp_dir.name).joinpath(
+                        report, instrument, year, month, day
+                    )
                     test_dir.mkdir(parents=True)
-                    test_file = test_dir.joinpath(f"{report}_{year}-{month}-{day}.html")
+                    test_file = test_dir.joinpath(
+                        f"{report}_{year}-{month}-{day}.html"
+                    )
                     cls.test_report_fnames.append(test_file)
                     open(test_file, "a").close()
 
@@ -35,7 +41,14 @@ class TestReports(unittest.TestCase):
 
     def test_find_reports(self):
         reports = schedview.reports.find_reports(self.temp_dir.name)
-        assert set(reports.columns) == {"report", "fname", "report_time", "night", "link", "url"}
+        assert set(reports.columns) == {
+            "report",
+            "fname",
+            "report_time",
+            "night",
+            "link",
+            "url",
+        }
         assert len(reports) == len(self.test_report_fnames)
 
     def test_make_report_link_table(self):
@@ -47,7 +60,7 @@ class TestReports(unittest.TestCase):
     def test_make_report_link_table_with_visits(self):
         rng = np.random.default_rng(0)
         n = 40
-        # Match dayObs values used for test reports (2025-06-20, 2025-06-21)
+        # Match dayObs values used for test reports
         dayobs = np.array([20250620] * 20 + [20250621] * 20)
         visits = pd.DataFrame(
             {
@@ -57,12 +70,18 @@ class TestReports(unittest.TestCase):
                 "eff_time_median": rng.uniform(20.0, 40.0, size=n),
                 "exp_time": rng.uniform(25.0, 35.0, size=n),
                 "band": rng.choice(list("ugrizy"), size=n),
-                "science_program": rng.choice(["BLOCK-365", "ENG-001"], size=n),
-                "target_name": rng.choice(["COSMOS", "XMM-LSS", ""], size=n),
+                "science_program": rng.choice(
+                    ["BLOCK-365", "ENG-001"], size=n
+                ),
+                "target_name": rng.choice(
+                    ["COSMOS", "XMM-LSS", ""], size=n
+                ),
             }
         )
         reports = schedview.reports.find_reports(self.temp_dir.name)
-        html_table = schedview.reports.make_report_link_table(reports, visits=visits)
+        html_table = schedview.reports.make_report_link_table(
+            reports, visits=visits
+        )
         # Must be parseable as XML
         ET.fromstring(html_table)
         # Summary column headers must appear in the output
@@ -72,7 +91,9 @@ class TestReports(unittest.TestCase):
     def test_make_report_rss_feed(self):
         reports = schedview.reports.find_reports(self.temp_dir.name)
         test_file = Path(self.temp_dir.name).joinpath("test.rss")
-        rss_tree = schedview.reports.make_report_rss_feed(reports, str(test_file), 99999)
+        rss_tree = schedview.reports.make_report_rss_feed(
+            reports, str(test_file), 99999
+        )
         assert isinstance(rss_tree, ET.ElementTree)
         # See if we can parse the result as XML
         ET.parse(str(test_file))
