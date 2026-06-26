@@ -200,7 +200,7 @@ def cached_read_visits(
     stackers: list | None = None,
     ddf: bool = False,
 ) -> pd.DataFrame:
-    """Read visits from a consdb source, using a local HDF5 cache when possible.
+    """Read visits from consdb, using a local HDF5 cache when possible.
 
     On a cache hit (the cache file exists, is fresh, and was built with the
     same set of stackers), the cached data is read from disk and filtered to
