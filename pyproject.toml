@@ -76,6 +76,9 @@ where = [ "" ]
 addopts = "--ignore-glob=*/version.py --ignore-glob=*data_dir/*"
 testpaths = "."
 asyncio_default_fixture_loop_scope="function"
+markers = [
+    "design: tests for RST design documents (skipped by default)",
+]
 
 [tool.black]
 line-length = 110
