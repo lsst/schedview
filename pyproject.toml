@@ -51,12 +51,17 @@ test = [
     "isort",
     "ruff",
     "pytest-cov",
+    "pytest-asyncio",
     "geckodriver",
     "playwright",
     "pre-commit"
 ]
 dev = [
   "documenteer[guide]",
+]
+dashboard = [
+    "boto3>=1.43.36",
+    "botocore>=1.43.36",
 ]
 
 [project.scripts]
