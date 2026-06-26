@@ -87,13 +87,13 @@ Used by ``compute_tinysum`` to aggregate target names per night.
 Logic:
 
 - Iterate over each value in the series
-- Strip leading ``ddf_`` or ``DDF `` prefix (exactly 4 characters)
+- Strip leading ``ddf_`` or ``DDF`` + space prefix (exactly 4 characters)
 - Split on ``', '`` to handle multi-target entries
 - Collect all non-empty unique targets (preserving first-seen order)
 - Return as a comma-separated string
 
-**Prefix stripping**: The ``ddf_`` and ``DDF `` prefixes are removed so that
-DDF targets are identified by their field name alone:
+**Prefix stripping**: The ``ddf_`` and ``DDF`` + space prefixes are removed so
+that DDF targets are identified by their field name alone:
 
 >>> import numpy as np
 >>> import pandas as pd
