@@ -35,6 +35,28 @@ class TestCachedReadVisitsAPI(unittest.TestCase):
         m.yyyymmdd = yyyymmdd
         return m
 
+    def _from_date_side_effect(self, day_obs_value):
+        """Return a side_effect callable for DayObs.from_date mocks.
+
+        Parameters
+        ----------
+        day_obs_value : `int`
+            The yyyymmdd value to return for any argument that is not
+            ``"today"``.
+
+        Returns
+        -------
+        side_effect : `callable`
+            A function that returns a `~unittest.mock.MagicMock` when
+            called with ``"today"`` and a day-obs mock otherwise.
+        """
+        def side_effect(arg):
+            if arg == "today":
+                return MagicMock()
+            return self._day_obs_mock(day_obs_value)
+
+        return side_effect
+
     def test_raises_for_non_instrument_source(self):
         with self.assertRaises(ValueError):
             cached_read_visits(
@@ -65,11 +87,7 @@ class TestCachedReadVisitsAPI(unittest.TestCase):
                     "schedview.collect.visits.DayObs.from_date",
                 ) as mock_from_date,
             ):
-                mock_from_date.side_effect = lambda arg: (
-                    MagicMock()
-                    if arg == "today"
-                    else self._day_obs_mock(20260612)
-                )
+                mock_from_date.side_effect = self._from_date_side_effect(20260612)
                 result = cached_read_visits(
                     20260612, "lsstcam", cache_dir=tmpdir
                 )
@@ -94,11 +112,7 @@ class TestCachedReadVisitsAPI(unittest.TestCase):
                     "schedview.collect.visits.DayObs.from_date",
                 ) as mock_from_date,
             ):
-                mock_from_date.side_effect = lambda arg: (
-                    MagicMock()
-                    if arg == "today"
-                    else self._day_obs_mock(20260614)
-                )
+                mock_from_date.side_effect = self._from_date_side_effect(20260614)
                 with warnings.catch_warnings(record=True) as w:
                     warnings.simplefilter("always")
                     result = cached_read_visits(
@@ -131,11 +145,7 @@ class TestCachedReadVisitsAPI(unittest.TestCase):
                     "schedview.collect.visits.DayObs.from_date",
                 ) as mock_from_date,
             ):
-                mock_from_date.side_effect = lambda arg: (
-                    MagicMock()
-                    if arg == "today"
-                    else self._day_obs_mock(20260614)
-                )
+                mock_from_date.side_effect = self._from_date_side_effect(20260614)
                 cached_read_visits(
                     20260614, "lsstcam", cache_dir=new_cache_dir
                 )
@@ -163,11 +173,7 @@ class TestCachedReadVisitsAPI(unittest.TestCase):
                     "schedview.collect.visits.DayObs.from_date",
                 ) as mock_from_date,
             ):
-                mock_from_date.side_effect = lambda arg: (
-                    MagicMock()
-                    if arg == "today"
-                    else self._day_obs_mock(20260614)
-                )
+                mock_from_date.side_effect = self._from_date_side_effect(20260614)
                 result1 = cached_read_visits(
                     20260614,
                     "lsstcam",
