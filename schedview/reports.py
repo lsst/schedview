@@ -198,7 +198,7 @@ def make_report_link_table(
 def make_report_rss_feed(
     reports: pd.DataFrame,
     fname: str | None = None,
-    max_days: int = 7,
+    max_days: int = 1,
     visits: pd.DataFrame | None = None,
     title: str = "schedview reports",
     description: str = "Statically generated reports on Rubin Observatory/LSST scheduler status and progress",
