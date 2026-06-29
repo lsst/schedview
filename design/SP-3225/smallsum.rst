@@ -322,6 +322,9 @@ Signature
         visits: pd.DataFrame,
         science_programs: tuple[str, ...] = SCIENCE_PROGRAMS,
         almanac: Almanac | None = None,
+        eff_time_column: str = "eff_time_median",
+        exp_time_column: str = "exp_time",
+        all_science: bool = False,
     ) -> pd.DataFrame:
 
 Parameters
@@ -329,7 +332,8 @@ Parameters
 
 ``visits`` : ``pd.DataFrame``
     A DataFrame of visits.  Must contain columns: ``dayObs`` (int, YYYYMMDD),
-    ``observationId``, ``seeingFwhmGeom``, ``eff_time_median``, ``exp_time``,
+    ``observationId``, ``seeingFwhmGeom``, the effective-time column named by
+    ``eff_time_column``, the exposure-time column named by ``exp_time_column``,
     ``band``, ``science_program``, ``target_name``.
 
 ``science_programs`` : ``tuple[str, ...]``
@@ -339,6 +343,57 @@ Parameters
 ``almanac`` : ``Almanac`` or ``None``
     A ``rubin_scheduler.site_models.Almanac`` instance.  Pass ``None`` to omit
     the ``night_hours``, ``visits/hour``, and ``teff/minute`` columns.
+
+``eff_time_column`` : ``str``
+    Name of the per-visit effective-time column in ``visits``.  Defaults to
+    ``"eff_time_median"`` (the consdb/production name).  Prenight-simulation
+    visits carry the same statistic under the name ``"t_eff"``; pass that to
+    summarize a prenight simulation without renaming its columns.
+
+``exp_time_column`` : ``str``
+    Name of the per-visit exposure-time column in ``visits``.  Defaults to
+    ``"exp_time"`` (the consdb/production name).  Prenight-simulation visits
+    use ``"visitExposureTime"``.
+
+``all_science`` : ``bool``
+    If ``True``, every visit is treated as a science visit regardless of its
+    ``science_program``, so the ``science`` count and ``# {band} science``
+    columns equal the totals.  Defaults to ``False``.  Pass ``True`` for
+    prenight-simulation visits, which contain only science visits.
+
+The output column names are independent of these two parameters: regardless of
+the input names, the summed columns are always labelled ``total eff_time`` and
+``total exp_time`` (and the quartile columns ``mean eff_time`` etc.).  This
+lets visits from the production database (``eff_time_median``/``exp_time``) and
+from prenight simulations (``t_eff``/``visitExposureTime``) be summarized into
+identically-shaped tables.
+
+**Custom column names**: passing the simulator column names produces the same
+result as the production names on equivalent data:
+
+>>> import numpy as np
+>>> import pandas as pd
+>>> from schedview.compute.smallsum import compute_tinysum
+>>> prod = pd.DataFrame({
+...     "dayObs": [20250601] * 4,
+...     "observationId": [1, 2, 3, 4],
+...     "seeingFwhmGeom": [0.8, 0.9, 1.0, 1.1],
+...     "eff_time_median": [30.0, 25.0, 35.0, 28.0],
+...     "exp_time": [30.0, 30.0, 30.0, 30.0],
+...     "band": ["g", "g", "r", "i"],
+...     "science_program": ["", "", "", ""],
+...     "target_name": ["", "", "", ""],
+... })
+>>> sim = prod.rename(columns={
+...     "eff_time_median": "t_eff", "exp_time": "visitExposureTime"})
+>>> a = compute_tinysum(prod)
+>>> b = compute_tinysum(
+...     sim, eff_time_column="t_eff", exp_time_column="visitExposureTime")
+>>> bool(np.isclose(a.loc[20250601, "total eff_time"],
+...                  b.loc[20250601, "total eff_time"]))
+True
+>>> bool(a.loc[20250601, "Total"] == b.loc[20250601, "Total"])
+True
 
 Returns
 ~~~~~~~
@@ -409,11 +464,11 @@ Implementation Steps
 
    - Count of ``observationId`` → ``Total`` (cast to ``Int64``)
    - Median of ``seeingFwhmGeom`` → ``median FWHM``
-   - Sum of ``exp_time`` → ``total exp_time``
-   - Sum of ``eff_time_median`` → ``total eff_time``
+   - Sum of the ``exp_time_column`` → ``total exp_time``
+   - Sum of the ``eff_time_column`` → ``total eff_time``
 
-2. **Effective time stats**: Group by ``dayObs``, call ``.describe()`` on
-   ``eff_time_median``, extract ``mean``, ``25%``, ``50%``, ``75%`` and rename
+2. **Effective time stats**: Group by ``dayObs``, call ``.describe()`` on the
+   ``eff_time_column``, extract ``mean``, ``25%``, ``50%``, ``75%`` and rename
    to ``mean eff_time``, ``q1 eff_time``, ``median eff_time``,
    ``q3 eff_time``.
 
@@ -421,8 +476,9 @@ Implementation Steps
    unstack so bands become columns, fill NaN with 0, cast to ``Int64``.
    Rename to ``# u``, ``# g``, etc.
 
-4. **Science counts**: Filter visits where ``science_program`` is in
-   ``science_programs``, group by ``dayObs``, count → ``science``.
+4. **Science counts**: Select the science visits — every visit when
+   ``all_science`` is ``True``, otherwise those whose ``science_program`` is in
+   ``science_programs`` — group by ``dayObs``, count → ``science``.
 
 5. **Science band counts**: From the same science-visit subset, group by
    ``['dayObs', 'band']``, count ``observationId``, unstack, reindex to all
@@ -586,5 +642,10 @@ Notes
 - Integer count columns (``Total``, ``science``, band counts) use pandas
   nullable ``Int64`` dtype to avoid float conversion when NaN values are
   present from joins.
-- The ``exp_time`` column is required by ``compute_tinysum`` for the
-  ``total eff_time/exp_time`` normalized efficiency metric.
+- The exposure-time column (``exp_time_column``, default ``exp_time``) is
+  required by ``compute_tinysum`` for the ``total eff_time/exp_time``
+  normalized efficiency metric.
+- The ``eff_time_column`` and ``exp_time_column`` parameters exist so that
+  prenight-simulation visits (which name these ``t_eff`` and
+  ``visitExposureTime``) can be summarized without renaming.  They affect only
+  which input columns are read; the output column names are fixed.

@@ -156,6 +156,9 @@ def compute_tinysum(
     visits: pd.DataFrame,
     science_programs: tuple[str, ...] = SCIENCE_PROGRAMS,
     almanac: Almanac | None = None,
+    eff_time_column: str = "eff_time_median",
+    exp_time_column: str = "exp_time",
+    all_science: bool = False,
 ) -> pd.DataFrame:
     """Create a one-row-per-night summary DataFrame from visits.
 
@@ -163,9 +166,10 @@ def compute_tinysum(
     ----------
     visits : `pandas.DataFrame`
         DataFrame of visits. Must contain columns: ``dayObs`` (int,
-        YYYYMMDD), ``observationId``, ``seeingFwhmGeom``,
-        ``eff_time_median``, ``band``, ``science_program``,
-        ``target_name``.
+        YYYYMMDD), ``observationId``, ``seeingFwhmGeom``, the
+        effective-time column named by ``eff_time_column``, the
+        exposure-time column named by ``exp_time_column``, ``band``,
+        ``science_program``, ``target_name``.
     science_programs : `tuple` [`str`], optional
         Tuple of ``science_program`` values considered science.
         Defaults to ``SCIENCE_PROGRAMS`` from
@@ -175,6 +179,20 @@ def compute_tinysum(
         compute night duration.
         Pass ``None`` to omit the ``night_hours``, ``visits/hour``,
         and ``teff/minute`` columns.
+    eff_time_column : `str`, optional
+        Name of the per-visit effective-time column in ``visits``.
+        Defaults to ``"eff_time_median"`` (the consdb/production name).
+        Pass ``"t_eff"`` for prenight-simulation visits, which carry the
+        same statistic under a different name.
+    exp_time_column : `str`, optional
+        Name of the per-visit exposure-time column in ``visits``.
+        Defaults to ``"exp_time"`` (the consdb/production name). Pass
+        ``"visitExposureTime"`` for prenight-simulation visits.
+    all_science : `bool`, optional
+        If ``True``, treat every visit as a science visit regardless of
+        its ``science_program``, so the science counts equal the totals.
+        Defaults to ``False``.  Pass ``True`` for prenight-simulation
+        visits, which contain only science visits.
 
     Returns
     -------
@@ -187,8 +205,8 @@ def compute_tinysum(
             {
                 "observationId": "count",
                 "seeingFwhmGeom": "median",
-                "exp_time": "sum",
-                "eff_time_median": "sum",
+                exp_time_column: "sum",
+                eff_time_column: "sum",
             }
         )
         .sort_index()
@@ -196,15 +214,15 @@ def compute_tinysum(
             columns={
                 "observationId": "Total",
                 "seeingFwhmGeom": "median FWHM",
-                "exp_time": "total exp_time",
-                "eff_time_median": "total eff_time",
+                exp_time_column: "total exp_time",
+                eff_time_column: "total eff_time",
             }
         )
     )
     basic_stats["Total"] = basic_stats["Total"].astype("Int64")
 
     teff_stats = (
-        visits.groupby("dayObs")["eff_time_median"]
+        visits.groupby("dayObs")[eff_time_column]
         .describe()
         .loc[:, ["mean", "25%", "50%", "75%"]]
         .rename(
@@ -226,7 +244,10 @@ def compute_tinysum(
         .rename(columns={b: f"# {b}" for b in _BANDS})
     )
 
-    science_visits = visits.loc[visits["science_program"].isin(science_programs), :]
+    if all_science:
+        science_visits = visits
+    else:
+        science_visits = visits.loc[visits["science_program"].isin(science_programs), :]
     science_counts = science_visits.groupby("dayObs")["observationId"].count().rename("science").to_frame()
 
     science_band_counts = (

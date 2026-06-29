@@ -147,6 +147,31 @@ class TestComputeTinysum:
             expected = day_visits["eff_time_median"].sum() / day_visits["exp_time"].sum()
             assert np.isclose(result.loc[day, "total eff_time/exp_time"], expected)
 
+    def test_custom_column_names(self, sample_visits):
+        # Prenight-simulation visits carry the same statistics under
+        # different names: t_eff and visitExposureTime.
+        renamed = sample_visits.rename(columns={"eff_time_median": "t_eff", "exp_time": "visitExposureTime"})
+        result = compute_tinysum(
+            renamed,
+            eff_time_column="t_eff",
+            exp_time_column="visitExposureTime",
+        )
+        # Output column names are unchanged regardless of input names.
+        baseline = compute_tinysum(sample_visits)
+        for col in ("total eff_time", "total exp_time", "mean eff_time", "total eff_time/exp_time"):
+            assert col in result.columns
+            for day in result.index:
+                assert np.isclose(result.loc[day, col], baseline.loc[day, col])
+
+    def test_all_science_counts_equal_totals(self, sample_visits):
+        # Prenight simulations contain only science visits, so all_science
+        # makes the science count and science band counts equal the totals.
+        result = compute_tinysum(sample_visits, all_science=True)
+        for day in result.index:
+            assert result.loc[day, "science"] == result.loc[day, "Total"]
+            for b in ALL_BANDS:
+                assert result.loc[day, f"# {b} science"] == result.loc[day, f"# {b}"]
+
     def test_no_almanac_omits_rate_columns(self, sample_visits):
         result = compute_tinysum(sample_visits, almanac=None)
         assert {"night_hours", "visits/hour", "teff/minute"}.isdisjoint(result.columns)

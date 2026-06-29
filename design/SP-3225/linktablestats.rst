@@ -20,6 +20,15 @@ When a ``visits`` DataFrame is provided:
   total visits, science visits, seeing, effective-time metrics, and science
   targets.
 
+When a ``prenight_visits`` DataFrame is provided:
+
+- ``make_report_rss_feed`` populates the ``<description>`` element of
+  ``lsstcam`` ``prenight`` items with the same formatted summary string, but
+  computed from the **prenight simulation** of the night rather than from
+  completed visits.  A prenight night with no matching simulation visits gets
+  a completely blank description (unlike ``nightsum``, which falls back to
+  ``"No visits on this night"``).
+
 Additionally, numeric presentation is improved: float columns are rounded
 to 2 decimal places and NaN/None values are rendered as empty strings.
 
@@ -204,6 +213,7 @@ Signature
         visits: pd.DataFrame | None = None,
         title: str = "schedview reports",
         description: str = "Statically generated reports on Rubin Observatory/LSST scheduler status and progress",
+        prenight_visits: pd.DataFrame | None = None,
     ) -> ET.ElementTree:
 
 Parameters
@@ -228,6 +238,18 @@ Parameters
 ``description`` : ``str``
     The ``<description>`` text for the RSS channel.
 
+``prenight_visits`` : ``pd.DataFrame`` or ``None``
+    A visits DataFrame for the **prenight simulation** of the night.  If
+    provided, lsstcam ``prenight`` items receive a formatted summary
+    description computed from these visits.  These simulation visits carry the
+    columns ``t_eff`` and ``visitExposureTime`` (rather than
+    ``eff_time_median``/``exp_time``); those names are passed through to
+    ``compute_tinysum`` via its ``eff_time_column``/``exp_time_column``
+    parameters, so the visits should be supplied **unmodified**.  All prenight
+    visits are counted as science (via ``all_science=True``), since the
+    simulator only simulates science visits.  See "Obtaining prenight visits"
+    below.
+
 Returns
 ~~~~~~~
 
@@ -238,7 +260,12 @@ Implementation Steps
 ~~~~~~~~~~~~~~~~~~~~
 
 1. **Compute tinysum** (only if ``visits`` is not ``None``): instantiate
-   ``Almanac`` and call ``compute_tinysum``.
+   ``Almanac`` and call ``compute_tinysum`` on ``visits`` (the nightsum
+   summary).  If ``prenight_visits`` is not ``None``, also call
+   ``compute_tinysum`` on it, passing ``eff_time_column="t_eff"``,
+   ``exp_time_column="visitExposureTime"``, and ``all_science=True`` (the
+   prenight summary; the simulator only simulates science visits, so all of
+   them count as science).  A single ``Almanac`` instance is shared.
 
 2. **Build RSS skeleton**: Create ``<rss>`` root with ``version="2.0"``,
    add ``<channel>`` with ``<title>`` and ``<description>`` elements using
@@ -250,20 +277,58 @@ Implementation Steps
 
    a. Create ``<item>`` with ``<title>`` =
       ``"{report} for {instrument} on {night}"``.
-   b. **Description logic**:
+   b. **Description logic** (the formatting of a populated description is
+      factored into the private helper ``_format_summary_desc``, shared by the
+      nightsum and prenight branches):
 
-      - If ``instrument == "lsstcam"`` and ``report == "nightsum"`` and
-        tinysum is available and the dayobs exists in tinysum's index:
-        format ``RSS_DESC_FORMAT`` with values from tinysum (rounding
-        floats to 2 decimal places; handling ``TypeError`` on
-        ``teff/minute`` by falling back to ``NaN``).
-      - If the dayobs is missing from tinysum: ``"No visits on this night"``.
+      - If ``instrument == "lsstcam"`` and ``report == "nightsum"`` and the
+        nightsum tinysum is available: format the summary when the dayobs is
+        in its index, else ``"No visits on this night"``.
+      - If ``instrument == "lsstcam"`` and ``report == "prenight"`` and the
+        prenight tinysum is available: format the summary when the dayobs is
+        in its index, else an **empty string** (no fallback text).
       - Otherwise: empty string.
 
    c. Add ``<link>``, ``<guid>``, ``<category>``, and ``<pubDate>``
       elements.
 
 5. **Indent** the XML tree and optionally write to file.
+
+
+Obtaining prenight visits (caller responsibility)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``make_report_rss_feed`` does **not** fetch prenight-simulation visits itself;
+it only formats whatever the caller passes via ``prenight_visits``.  schedview
+deliberately provides no helper for this step yet — that functionality may
+eventually live in ``rubin_sim.sim_archive``.  The caller (e.g. the
+``schedview_reports_toc`` Times Square notebook) is responsible for selecting
+and reading the appropriate simulation for the night.  The procedure, using
+``rubin_sim.sim_archive``:
+
+.. code-block:: python
+
+    from rubin_sim.sim_archive.prenightindex import (
+        get_prenight_index, select_latest_prenight_sim)
+    from rubin_sim.sim_archive import vseqarchive
+    from schedview.collect.visits import NIGHT_STACKERS
+    from schedview import DayObs
+
+    day_obs = DayObs.from_date("today")
+    # lsstcam is mounted on simonyi; latiss on auxtel.
+    sims = get_prenight_index(day_obs.date, telescope="simonyi")
+    sim = select_latest_prenight_sim(sims)  # dict or None
+    if sim is not None:
+        prenight_visits = vseqarchive.get_visits(
+            sim["visitseq_url"],
+            query=f"floor(observationStartMJD-0.5)=={day_obs.mjd}",
+            stackers=NIGHT_STACKERS,
+        )
+
+The returned visits carry ``t_eff`` and ``visitExposureTime`` columns and are
+passed to ``make_report_rss_feed`` unmodified.
+``schedview.collect.multisim.read_multiple_prenights`` is a working example of
+this same ``get_prenight_index`` → ``vseqarchive.get_visits`` sequence.
 
 
 **Basic RSS generation (no visits):**
@@ -306,6 +371,37 @@ True
 >>> tree.getroot().find("channel/description").text
 'Custom description'
 
+**Prenight visits populate the prenight item description:** the simulation
+visits use ``t_eff`` and ``visitExposureTime`` and are passed unmodified.
+
+>>> import numpy as np
+>>> prenight_reports = pd.DataFrame([
+...     {"night": datetime.date.today(), "dayobs": "20250620",
+...      "report": "prenight", "instrument": "lsstcam",
+...      "url": "http://example.com/pn",
+...      "link": '<a href="#">prenight</a>',
+...      "report_time": "2025-06-20T12:00:00+00:00", "fname": "pn.html"},
+... ]).set_index(["instrument", "dayobs"]).sort_values("night", ascending=False)
+>>> rng = np.random.default_rng(0)
+>>> n = 20
+>>> prenight_visits = pd.DataFrame({
+...     "dayObs": np.full(n, 20250620),
+...     "observationId": np.arange(n),
+...     "seeingFwhmGeom": rng.uniform(0.6, 1.8, size=n),
+...     "t_eff": rng.uniform(20.0, 40.0, size=n),
+...     "visitExposureTime": rng.uniform(25.0, 35.0, size=n),
+...     "band": rng.choice(list("ugrizy"), size=n),
+...     "science_program": rng.choice(["BLOCK-365", "ENG-001"], size=n),
+...     "target_name": rng.choice(["COSMOS", "XMM-LSS", ""], size=n),
+... })
+>>> tree = make_report_rss_feed(
+...     prenight_reports, fname=None, max_days=99999,
+...     prenight_visits=prenight_visits,
+... )
+>>> desc = tree.getroot().find("channel/item/description").text
+>>> "Total visits:" in desc
+True
+
 
 Display Formatting
 ------------------
@@ -331,16 +427,21 @@ Changes from ``main``
 
 1. **New parameter on ``make_report_link_table``**: ``visits`` (optional).
 2. **New parameters on ``make_report_rss_feed``**: ``visits``, ``title``,
-   ``description``.
-3. **Removed** ``"preprogress"`` from the default ``report_columns`` tuple
+   ``description``, ``prenight_visits``.
+3. **New private helper** ``_format_summary_desc`` in ``schedview.reports``,
+   shared by the nightsum and prenight description branches.
+4. **Prenight descriptions**: lsstcam ``prenight`` items get a formatted
+   summary from ``prenight_visits`` (a prenight simulation), or a blank
+   description when no simulation visits match the night.
+5. **Removed** ``"preprogress"`` from the default ``report_columns`` tuple
    in ``make_report_link_table``.
-4. **New constants**: ``RSS_DESC_FORMAT``, ``INT_SUMMARY_COLUMNS``,
+6. **New constants**: ``RSS_DESC_FORMAT``, ``INT_SUMMARY_COLUMNS``,
    ``FLOAT_SUMMARY_COLUMNS``, ``SUMMARY_COLUMNS``.
-5. **New imports**: ``numpy``, ``rubin_scheduler.site_models.Almanac``,
+7. **New imports**: ``numpy``, ``rubin_scheduler.site_models.Almanac``,
    ``schedview.compute.smallsum.compute_tinysum``.
-6. **RSS item titles** changed from ``"{report} report for ..."`` to
+8. **RSS item titles** changed from ``"{report} report for ..."`` to
    ``"{report} for ..."``.
-7. **Variable naming** in ``make_report_rss_feed`` changed to avoid
+9. **Variable naming** in ``make_report_rss_feed`` changed to avoid
    shadowing the ``title`` parameter (``title`` → ``channel_title_elem``,
    etc.).
 
@@ -371,6 +472,16 @@ Tests are in ``tests/test_reports.py``.
 ``test_make_report_rss_feed_uses_title_parameter``
     Passes a custom ``title`` string and verifies the ``<channel><title>``
     element contains exactly that text.
+
+``test_make_report_rss_feed_prenight_description``
+    Passes a synthetic ``prenight_visits`` DataFrame (using the simulator
+    ``t_eff``/``visitExposureTime`` columns) whose dayObs match the report
+    fixtures, and verifies the ``lsstcam`` ``prenight`` item descriptions carry
+    a populated ``Total visits: N (...)`` summary with a band breakdown.
+
+``test_make_report_rss_feed_prenight_blank_when_no_visits``
+    Passes ``prenight_visits`` whose dayObs match no report night, and verifies
+    every ``prenight`` item description is empty (no fallback text).
 
 Pre-existing tests (``test_find_reports``, ``test_make_report_link_table``,
 ``test_make_report_rss_feed``) continue to pass and verify backward

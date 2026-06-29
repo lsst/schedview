@@ -118,6 +118,74 @@ class TestReports(unittest.TestCase):
         if re.search(r"Science visits: [1-9]", joined):
             assert re.search(r"Science visits: \d+ \(\d+[ugrizy]", joined)
 
+    def test_make_report_rss_feed_prenight_description(self):
+        import re
+
+        rng = np.random.default_rng(0)
+        n = 40
+        # Match dayObs values used for test reports. Prenight-simulation
+        # visits carry t_eff and visitExposureTime rather than
+        # eff_time_median and exp_time.
+        dayobs = np.array([20250620] * 20 + [20250621] * 20)
+        prenight_visits = pd.DataFrame(
+            {
+                "dayObs": dayobs,
+                "observationId": np.arange(n),
+                "seeingFwhmGeom": rng.uniform(0.6, 1.8, size=n),
+                "t_eff": rng.uniform(20.0, 40.0, size=n),
+                "visitExposureTime": rng.uniform(25.0, 35.0, size=n),
+                "band": rng.choice(list("ugrizy"), size=n),
+                "science_program": rng.choice(["BLOCK-365", "ENG-001"], size=n),
+                "target_name": rng.choice(["COSMOS", "XMM-LSS", ""], size=n),
+            }
+        )
+        reports = schedview.reports.find_reports(self.temp_dir.name)
+        rss_tree = schedview.reports.make_report_rss_feed(
+            reports, fname=None, max_days=99999, prenight_visits=prenight_visits
+        )
+        root = rss_tree.getroot()
+        # Collect descriptions for prenight items only (via category).
+        prenight_descs = []
+        for item in root.iterfind("channel/item"):
+            category = item.findtext("category") or ""
+            if category == "lsstcam_prenight":
+                prenight_descs.append(item.findtext("description") or "")
+        joined = "\n".join(prenight_descs)
+        # The prenight items must carry a populated summary description.
+        assert re.search(r"Total visits: \d+ \(\d+[ugrizy]", joined)
+        # All prenight visits count as science, so the science line is
+        # populated with its own band breakdown (not zero).
+        assert re.search(r"Science visits: \d+ \(\d+[ugrizy]", joined)
+
+    def test_make_report_rss_feed_prenight_blank_when_no_visits(self):
+        rng = np.random.default_rng(0)
+        n = 40
+        # dayObs that do NOT match any test report night (2025-06-20/21).
+        dayobs = np.array([20250101] * n)
+        prenight_visits = pd.DataFrame(
+            {
+                "dayObs": dayobs,
+                "observationId": np.arange(n),
+                "seeingFwhmGeom": rng.uniform(0.6, 1.8, size=n),
+                "t_eff": rng.uniform(20.0, 40.0, size=n),
+                "visitExposureTime": rng.uniform(25.0, 35.0, size=n),
+                "band": rng.choice(list("ugrizy"), size=n),
+                "science_program": rng.choice(["BLOCK-365", "ENG-001"], size=n),
+                "target_name": rng.choice(["COSMOS", "XMM-LSS", ""], size=n),
+            }
+        )
+        reports = schedview.reports.find_reports(self.temp_dir.name)
+        rss_tree = schedview.reports.make_report_rss_feed(
+            reports, fname=None, max_days=99999, prenight_visits=prenight_visits
+        )
+        root = rss_tree.getroot()
+        # Prenight items with no matching simulation visits get a completely
+        # blank description (no "No visits on this night" fallback).
+        for item in root.iterfind("channel/item"):
+            category = item.findtext("category") or ""
+            if category == "lsstcam_prenight":
+                assert (item.findtext("description") or "") == ""
+
     def test_make_report_rss_feed_uses_title_parameter(self):
         reports = schedview.reports.find_reports(self.temp_dir.name)
         channel_title = "Custom Schedview Reports"

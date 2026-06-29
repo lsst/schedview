@@ -196,6 +196,51 @@ def make_report_link_table(
     return report_table_html
 
 
+def _format_summary_desc(tinysum: pd.DataFrame, dayobs: int, report: str, instrument: str, night) -> str:
+    """Format an RSS item description from a ``compute_tinysum`` row.
+
+    Parameters
+    ----------
+    tinysum : `pandas.DataFrame`
+        Per-night summary as returned by
+        `schedview.compute.smallsum.compute_tinysum`.
+    dayobs : `int`
+        The dayobs (YYYYMMDD) of the night, used to index ``tinysum``.
+    report : `str`
+        The report name (e.g. ``"nightsum"`` or ``"prenight"``).
+    instrument : `str`
+        The instrument name.
+    night : `datetime.date`
+        The local calendar date of the night start.
+
+    Returns
+    -------
+    desc : `str`
+        The formatted ``RSS_DESC_FORMAT`` text for the night.
+    """
+    try:
+        teff_rate = np.round(tinysum.loc[dayobs, "teff/minute"], 2)
+    except TypeError:
+        teff_rate = np.nan
+    row = tinysum.loc[dayobs]
+    total_bands = format_band_breakdown(row, suffix="")
+    science_bands = format_band_breakdown(row, suffix=" science")
+    total_str = f"{row['Total']}" + (f" ({total_bands})" if total_bands else "")
+    science_str = f"{row['science']}" + (f" ({science_bands})" if science_bands else "")
+    return RSS_DESC_FORMAT.format(
+        report=report,
+        instrument=instrument,
+        night=night,
+        total=total_str,
+        science=science_str,
+        fwhm=np.round(tinysum.loc[dayobs, "median FWHM"], 2),
+        mean_norm_teff=np.round(tinysum.loc[dayobs, "total eff_time/exp_time"], 2),
+        visit_rate=np.round(tinysum.loc[dayobs, "visits/hour"], 2),
+        teff_rate=teff_rate,
+        targets=tinysum.loc[dayobs, "science targets"],
+    )
+
+
 def make_report_rss_feed(
     reports: pd.DataFrame,
     fname: str | None = None,
@@ -203,6 +248,7 @@ def make_report_rss_feed(
     visits: pd.DataFrame | None = None,
     title: str = "schedview reports",
     description: str = "Statically generated reports on Rubin Observatory/LSST scheduler status and progress",
+    prenight_visits: pd.DataFrame | None = None,
 ) -> ET.ElementTree:
     """Generate an rss feed of recent schedview reports.
 
@@ -219,12 +265,41 @@ def make_report_rss_feed(
          A DataFrame of visits as returned by
          `schedview.collect.visits.cached_read_visits`. If supplied, a short
          per-night summary is computed via
-         `schedview.compute.smallsum.compute_tinysum` and the resulting
-         columns are joined onto the ``lsstcam`` rows of the table.
-         Non-``lsstcam`` rows receive ``NA`` for these columns.
-         Defaults to ``None``, in which case no summary columns are added.
+         `schedview.compute.smallsum.compute_tinysum` and used to populate the
+         ``<description>`` of ``lsstcam`` ``nightsum`` items.
+         Defaults to ``None``, in which case nightsum descriptions are blank.
     title: `str`, optional
          The channel title, defaults to ``schedview reports``
+     prenight_visits : `pd.DataFrame` or `None`, optional
+         A DataFrame of visits from the **prenight simulation** of the night,
+         used to populate the ``<description>`` of ``lsstcam`` ``prenight``
+         items.  No schedview helper fetches these; the caller is responsible
+         for selecting and reading the appropriate simulation, e.g. via
+         ``rubin_sim.sim_archive``::
+
+             from rubin_sim.sim_archive.prenightindex import (
+                 get_prenight_index, select_latest_prenight_sim)
+             from rubin_sim.sim_archive import vseqarchive
+             from schedview.collect.visits import NIGHT_STACKERS
+
+             sims = get_prenight_index(day_obs, telescope="simonyi")
+             sim = select_latest_prenight_sim(sims)
+             prenight_visits = vseqarchive.get_visits(
+                 sim["visitseq_url"],
+                 query=f"floor(observationStartMJD-0.5)=={day_obs_mjd}",
+                 stackers=NIGHT_STACKERS,
+             )
+
+         (See ``schedview.collect.multisim.read_multiple_prenights`` for a
+         working example of this sequence.)  These simulation visits carry the
+         columns ``t_eff`` and ``visitExposureTime`` rather than
+         ``eff_time_median``/``exp_time``; those names are passed through to
+         ``compute_tinysum``, so the visits should be supplied **unmodified**.
+         All prenight visits are counted as science visits (the simulator only
+         simulates science visits), so the science counts equal the totals.
+         If the supplied visits contain no visits for a given night, that
+         night's ``prenight`` description is left completely blank.
+         Defaults to ``None``, in which case prenight descriptions are blank.
 
 
      Returns
@@ -232,11 +307,19 @@ def make_report_rss_feed(
      rss : `ET.ElementTree`
          The RSS XML itself.
     """
-    if visits is not None:
-        almanac = Almanac()
-        tinysum = compute_tinysum(visits, almanac=almanac)
-    else:
-        tinysum = None
+    almanac = Almanac() if (visits is not None or prenight_visits is not None) else None
+    tinysum = compute_tinysum(visits, almanac=almanac) if visits is not None else None
+    prenight_tinysum = (
+        compute_tinysum(
+            prenight_visits,
+            almanac=almanac,
+            eff_time_column="t_eff",
+            exp_time_column="visitExposureTime",
+            all_science=True,
+        )
+        if prenight_visits is not None
+        else None
+    )
 
     rss = ET.Element("rss", attrib={"version": "2.0"})
     channel = ET.SubElement(rss, "channel")
@@ -263,30 +346,20 @@ def make_report_rss_feed(
         desc = ET.SubElement(item, "description")
         if instrument == "lsstcam" and report_row.report == "nightsum" and tinysum is not None:
             if dayobs in tinysum.index:
-                try:
-                    teff_rate = np.round(tinysum.loc[dayobs, "teff/minute"], 2)
-                except TypeError:
-                    teff_rate = np.nan
-                row = tinysum.loc[dayobs]
-                total_bands = format_band_breakdown(row, suffix="")
-                science_bands = format_band_breakdown(row, suffix=" science")
-                total_str = f"{row['Total']}" + (f" ({total_bands})" if total_bands else "")
-                science_str = f"{row['science']}" + (f" ({science_bands})" if science_bands else "")
-                desc.text = RSS_DESC_FORMAT.format(
-                    report=report_row.report,
-                    instrument=instrument,
-                    night=report_row.night,
-                    total=total_str,
-                    science=science_str,
-                    fwhm=np.round(tinysum.loc[dayobs, "median FWHM"], 2),
-                    mean_norm_teff=np.round(tinysum.loc[dayobs, "total eff_time/exp_time"], 2),
-                    visit_rate=np.round(tinysum.loc[dayobs, "visits/hour"], 2),
-                    teff_rate=teff_rate,
-                    targets=tinysum.loc[dayobs, "science targets"],
+                desc.text = _format_summary_desc(
+                    tinysum, dayobs, report_row.report, instrument, report_row.night
                 )
             else:
                 desc.text = "No visits on this night"
-
+        elif instrument == "lsstcam" and report_row.report == "prenight" and prenight_tinysum is not None:
+            # Unlike nightsum, a prenight night with no matching simulation
+            # visits gets a completely blank description (no fallback text).
+            if dayobs in prenight_tinysum.index:
+                desc.text = _format_summary_desc(
+                    prenight_tinysum, dayobs, report_row.report, instrument, report_row.night
+                )
+            else:
+                desc.text = ""
         else:
             desc.text = ""
         link = ET.SubElement(item, "link")
