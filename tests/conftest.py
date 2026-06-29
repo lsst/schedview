@@ -67,9 +67,7 @@ def pytest_configure(config: pytest.Config) -> None:
 def pytest_collection_modifyitems(config, items):
     """Skip design-doc tests unless an explicit marker expression is given."""
     if not config.getoption("-m"):
-        skip_design = pytest.mark.skip(
-            reason="design tests not selected (use -m design)"
-        )
+        skip_design = pytest.mark.skip(reason="design tests not selected (use -m design)")
         for item in items:
             if "design" in item.keywords:
                 item.add_marker(skip_design)

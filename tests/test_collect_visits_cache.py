@@ -50,6 +50,7 @@ class TestCachedReadVisitsAPI(unittest.TestCase):
             A function that returns a `~unittest.mock.MagicMock` when
             called with ``"today"`` and a day-obs mock otherwise.
         """
+
         def side_effect(arg):
             if arg == "today":
                 return MagicMock()
@@ -59,15 +60,11 @@ class TestCachedReadVisitsAPI(unittest.TestCase):
 
     def test_raises_for_non_instrument_source(self):
         with self.assertRaises(ValueError):
-            cached_read_visits(
-                20260614, "baseline", cache_dir="/tmp/cache"
-            )
+            cached_read_visits(20260614, "baseline", cache_dir="/tmp/cache")
 
     def test_raises_for_opsim_file_source(self):
         with self.assertRaises(ValueError):
-            cached_read_visits(
-                20260614, "/path/to/sim.db", cache_dir="/tmp/cache"
-            )
+            cached_read_visits(20260614, "/path/to/sim.db", cache_dir="/tmp/cache")
 
     def test_filters_to_requested_day_obs(self):
         """Results contain only visits up to the requested day_obs."""
@@ -88,9 +85,7 @@ class TestCachedReadVisitsAPI(unittest.TestCase):
                 ) as mock_from_date,
             ):
                 mock_from_date.side_effect = self._from_date_side_effect(20260612)
-                result = cached_read_visits(
-                    20260612, "lsstcam", cache_dir=tmpdir
-                )
+                result = cached_read_visits(20260612, "lsstcam", cache_dir=tmpdir)
 
             self.assertTrue(all(result["dayObs"] <= 20260612))
 
@@ -115,14 +110,10 @@ class TestCachedReadVisitsAPI(unittest.TestCase):
                 mock_from_date.side_effect = self._from_date_side_effect(20260614)
                 with warnings.catch_warnings(record=True) as w:
                     warnings.simplefilter("always")
-                    result = cached_read_visits(
-                        20260614, "lsstcam", cache_dir=tmpdir
-                    )
+                    result = cached_read_visits(20260614, "lsstcam", cache_dir=tmpdir)
 
             self.assertEqual(len(result), 3)
-            self.assertTrue(
-                any("dayObs" in str(warning.message) for warning in w)
-            )
+            self.assertTrue(any("dayObs" in str(warning.message) for warning in w))
 
     def test_cache_dir_created_if_absent(self):
         """cache_dir is created automatically when absent."""
@@ -146,9 +137,7 @@ class TestCachedReadVisitsAPI(unittest.TestCase):
                 ) as mock_from_date,
             ):
                 mock_from_date.side_effect = self._from_date_side_effect(20260614)
-                cached_read_visits(
-                    20260614, "lsstcam", cache_dir=new_cache_dir
-                )
+                cached_read_visits(20260614, "lsstcam", cache_dir=new_cache_dir)
 
             self.assertTrue(new_cache_dir.exists())
 

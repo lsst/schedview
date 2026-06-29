@@ -24,9 +24,7 @@ def test_rst_valid(rst_file):
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 0, (
-        f"RST validation failed for {rst_file.name}:\n{result.stderr}"
-    )
+    assert result.returncode == 0, f"RST validation failed for {rst_file.name}:\n{result.stderr}"
 
 
 @pytest.mark.design
@@ -39,6 +37,5 @@ def test_rst_doctests(rst_file):
         text=True,
     )
     assert result.returncode == 0, (
-        f"Doctests failed for {rst_file.name}:\n"
-        f"{result.stdout}\n{result.stderr}"
+        f"Doctests failed for {rst_file.name}:\n" f"{result.stdout}\n{result.stderr}"
     )
