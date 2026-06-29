@@ -1,5 +1,6 @@
 import datetime
 import email.utils
+import hashlib
 import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -286,7 +287,7 @@ def make_report_rss_feed(
         link = ET.SubElement(item, "link")
         link.text = report_row.url
         guid = ET.SubElement(item, "guid", attib={"isPermaLink": "false"})
-        guid.text = item_title_elem.text + f", generated {report_row.report_time}"
+        guid.text = item_title_elem.text +  hashlib.sha1(desc.text.encode("utf-8")).hexdigest()[:6]
         category = ET.SubElement(item, "category")
         category.text = f"{instrument}_{report_row.report}"
         pubdate = ET.SubElement(item, "pubDate")
