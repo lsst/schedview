@@ -28,7 +28,7 @@ dependencies = [
     "healpy",
     "holoviews",
     "hvplot",
-    "lsst-efd-client",
+    "lsst-efd-client>=0.12.0",
     "lsst-resources",
     "matplotlib < 3.11.0",
     "numpy",
