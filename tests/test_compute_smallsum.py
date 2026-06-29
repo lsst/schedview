@@ -8,7 +8,7 @@ import pytest
 from rubin_scheduler.scheduler.model_observatory import ModelObservatory
 from rubin_scheduler.site_models import Almanac
 
-from schedview.compute.smallsum import compute_smallsum, compute_tinysum
+from schedview.compute.smallsum import compute_smallsum, compute_tinysum, format_band_breakdown
 
 SCIENCE_PROGRAMS = ("BLOCK-365", "BLOCK-407")
 ALL_BANDS: tuple[str, ...] = tuple(ModelObservatory(no_sky=True).bandlist)
@@ -110,6 +110,27 @@ class TestComputeTinysum:
             )
             assert result.loc[day, "science"] == expected
 
+    def test_science_band_columns_present_and_int(self, sample_visits):
+        result = compute_tinysum(sample_visits, science_programs=SCIENCE_PROGRAMS)
+        for b in ALL_BANDS:
+            col = f"# {b} science"
+            assert col in result.columns
+            assert pd.api.types.is_integer_dtype(result[col])
+
+    def test_science_band_counts_sum_to_science(self, sample_visits):
+        result = compute_tinysum(sample_visits, science_programs=SCIENCE_PROGRAMS)
+        sci_cols = [f"# {b} science" for b in ALL_BANDS]
+        for day in result.index:
+            assert result.loc[day, sci_cols].sum() == result.loc[day, "science"]
+
+    def test_science_band_counts_correct(self, sample_visits):
+        result = compute_tinysum(sample_visits, science_programs=SCIENCE_PROGRAMS)
+        sci = sample_visits[sample_visits["science_program"].isin(SCIENCE_PROGRAMS)]
+        for day in result.index:
+            for b in ALL_BANDS:
+                expected = len(sci[(sci["dayObs"] == day) & (sci["band"] == b)])
+                assert result.loc[day, f"# {b} science"] == expected
+
     def test_teff_stats_reasonable(self, sample_visits):
         result = compute_tinysum(sample_visits)
         for day in result.index:
@@ -151,6 +172,8 @@ class TestComputeTinysum:
         result = compute_tinysum(visits, science_programs=("BLOCK-365",))
         assert result.loc[20250601, "science"] == 0
         assert result.loc[20250601, "science targets"] == ""
+        for b in ALL_BANDS:
+            assert result.loc[20250601, f"# {b} science"] == 0
 
     def test_missing_bands(self):
         visits = pd.DataFrame(
@@ -277,3 +300,27 @@ class TestComputeSmallsum:
         first_science_pos = min(subsets.index(s) for s in ("science", "not_science") if s in subsets)
 
         assert first_band_pos < first_science_pos
+
+
+# ---------------------------------------------------------------------------
+# Tests for format_band_breakdown
+# ---------------------------------------------------------------------------
+
+
+class TestFormatBandBreakdown:
+    def test_total_breakdown(self):
+        row = pd.Series({"# u": 0, "# g": 500, "# r": 170, "# i": 6, "# z": 0, "# y": 0})
+        assert format_band_breakdown(row) == "500g, 170r, 6i"
+
+    def test_science_suffix(self):
+        row = pd.Series({"# g science": 400, "# r science": 85, "# i science": 5})
+        assert format_band_breakdown(row, suffix=" science") == "400g, 85r, 5i"
+
+    def test_all_zero_returns_empty(self):
+        row = pd.Series({f"# {b}": 0 for b in ALL_BANDS})
+        assert format_band_breakdown(row) == ""
+
+    def test_band_order_independent_of_input_order(self):
+        # Series built out of band order; output must follow _BANDS order.
+        row = pd.Series({"# i": 6, "# g": 500, "# r": 170})
+        assert format_band_breakdown(row) == "500g, 170r, 6i"

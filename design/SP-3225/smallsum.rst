@@ -70,6 +70,14 @@ Three private helpers factor out reusable logic:
     its night duration in hours.  Used by ``compute_tinysum`` to derive the
     rate columns (``visits/hour``, ``teff/minute``).
 
+In addition, one **public** helper is exported alongside the two main
+functions:
+
+``format_band_breakdown(row, prefix="# ", suffix="")``
+    Renders a per-band visit-count breakdown string (e.g. ``500g, 170r, 6i``)
+    from a single ``compute_tinysum`` row.  Used by
+    ``schedview.reports.make_report_rss_feed`` for the RSS feed description.
+
 The sections below document each helper's contract and verify it with
 embedded doctests, followed by the full specifications of the two public
 functions.
@@ -264,6 +272,44 @@ fall between roughly 4 and 12 hours depending on season:
 True
 
 
+Helper: ``format_band_breakdown``
+---------------------------------
+
+.. code-block:: python
+
+    def format_band_breakdown(row: pd.Series, prefix: str = "# ", suffix: str = "") -> str
+
+A **public** helper (exported in ``__all__``) that renders a per-band
+visit-count breakdown string such as ``500g, 170r, 6i`` from a single
+``compute_tinysum`` row.  It is used by
+``schedview.reports.make_report_rss_feed`` to add the parenthetical band
+breakdown to the ``Total visits`` and ``Science visits`` lines of the RSS
+feed description.
+
+Logic:
+
+- For each band ``b`` in ``_BANDS`` order, read the count from
+  ``row[f"{prefix}{b}{suffix}"]``.
+- Skip bands whose column is absent, ``NA``, or zero.
+- Emit ``{count}{band}`` for each remaining band, joined by ``", "``.
+
+The ``prefix``/``suffix`` parameters select which column family to read:
+the defaults (``prefix="# "``, ``suffix=""``) read the total band columns
+(``# g`` …); passing ``suffix=" science"`` reads the science band columns
+(``# g science`` …).  Returns ``""`` when every count is zero (the caller is
+responsible for deciding whether to wrap the result in parentheses).
+
+>>> from schedview.compute.smallsum import format_band_breakdown
+>>> row = pd.Series({"# u": 0, "# g": 500, "# r": 170, "# i": 6, "# z": 0, "# y": 0})
+>>> format_band_breakdown(row)
+'500g, 170r, 6i'
+>>> sci = pd.Series({"# g science": 400, "# r science": 85, "# i science": 5})
+>>> format_band_breakdown(sci, suffix=" science")
+'400g, 85r, 5i'
+>>> format_band_breakdown(pd.Series({"# u": 0, "# g": 0}))
+''
+
+
 Function 1: ``compute_tinysum``
 -------------------------------
 
@@ -336,6 +382,10 @@ per night.  Columns:
    * - ``# u`` through ``# y``
      - Int64
      - Number of visits in each band (nullable integer)
+   * - ``# u science`` through ``# y science``
+     - Int64
+     - Number of science visits in each band (visits with
+       ``science_program`` in ``science_programs``), zero filled, ``Int64``
    * - ``science targets``
      - str
      - Comma-separated unique target names from science visits
@@ -374,20 +424,26 @@ Implementation Steps
 4. **Science counts**: Filter visits where ``science_program`` is in
    ``science_programs``, group by ``dayObs``, count → ``science``.
 
-5. **Science targets**: From science visits, group by ``dayObs``, aggregate
+5. **Science band counts**: From the same science-visit subset, group by
+   ``['dayObs', 'band']``, count ``observationId``, unstack, reindex to all
+   bands, cast to ``Int64``.  Rename to ``# u science``, ``# g science``, etc.
+   (same pattern as the total band counts in step 3).
+
+6. **Science targets**: From science visits, group by ``dayObs``, aggregate
    ``target_name`` using ``_unique_targets``.
 
-6. **Join all** intermediate DataFrames on the ``dayObs`` index.  Fill NaN in
+7. **Join all** intermediate DataFrames on the ``dayObs`` index.  Fill NaN in
    ``science`` with 0 (cast to ``Int64``) and in ``science targets`` with
-   empty string.
+   empty string.  Fill NaN in the ``# {band} science`` columns (nights with no
+   science visits) with 0 and cast to ``Int64``.
 
-7. **Normalized effective time**: Compute
+8. **Normalized effective time**: Compute
    ``total eff_time/exp_time = total eff_time / total exp_time``.
 
-8. **Night hours** (only if ``almanac`` is not ``None``): Build a mapping from
+9. **Night hours** (only if ``almanac`` is not ``None``): Build a mapping from
    ``dayObs`` → night duration via ``_build_night_hours``.
 
-9. **Derived rates** (only if ``almanac`` is not ``None``):
+10. **Derived rates** (only if ``almanac`` is not ``None``):
 
    - ``visits/hour = Total / night_hours``
    - ``teff/minute = visits/hour * mean eff_time / 60``

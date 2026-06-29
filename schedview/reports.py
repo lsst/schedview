@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from rubin_scheduler.site_models import Almanac
 
-from schedview.compute.smallsum import compute_tinysum
+from schedview.compute.smallsum import compute_tinysum, format_band_breakdown
 
 RSS_DESC_FORMAT = """
 Total visits: {total};
@@ -267,12 +267,17 @@ def make_report_rss_feed(
                     teff_rate = np.round(tinysum.loc[dayobs, "teff/minute"], 2)
                 except TypeError:
                     teff_rate = np.nan
+                row = tinysum.loc[dayobs]
+                total_bands = format_band_breakdown(row, suffix="")
+                science_bands = format_band_breakdown(row, suffix=" science")
+                total_str = f"{row['Total']}" + (f" ({total_bands})" if total_bands else "")
+                science_str = f"{row['science']}" + (f" ({science_bands})" if science_bands else "")
                 desc.text = RSS_DESC_FORMAT.format(
                     report=report_row.report,
                     instrument=instrument,
                     night=report_row.night,
-                    total=tinysum.loc[dayobs, "Total"],
-                    science=tinysum.loc[dayobs, "science"],
+                    total=total_str,
+                    science=science_str,
                     fwhm=np.round(tinysum.loc[dayobs, "median FWHM"], 2),
                     mean_norm_teff=np.round(tinysum.loc[dayobs, "total eff_time/exp_time"], 2),
                     visit_rate=np.round(tinysum.loc[dayobs, "visits/hour"], 2),

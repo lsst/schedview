@@ -86,6 +86,38 @@ class TestReports(unittest.TestCase):
         # See if we can parse the result as XML
         ET.parse(str(test_file))
 
+    def test_make_report_rss_feed_has_band_breakdown(self):
+        import re
+
+        rng = np.random.default_rng(0)
+        n = 40
+        # Match dayObs values used for test reports
+        dayobs = np.array([20250620] * 20 + [20250621] * 20)
+        visits = pd.DataFrame(
+            {
+                "dayObs": dayobs,
+                "observationId": np.arange(n),
+                "seeingFwhmGeom": rng.uniform(0.6, 1.8, size=n),
+                "eff_time_median": rng.uniform(20.0, 40.0, size=n),
+                "exp_time": rng.uniform(25.0, 35.0, size=n),
+                "band": rng.choice(list("ugrizy"), size=n),
+                "science_program": rng.choice(["BLOCK-365", "ENG-001"], size=n),
+                "target_name": rng.choice(["COSMOS", "XMM-LSS", ""], size=n),
+            }
+        )
+        reports = schedview.reports.find_reports(self.temp_dir.name)
+        rss_tree = schedview.reports.make_report_rss_feed(reports, fname=None, max_days=99999, visits=visits)
+        descriptions = [d.text or "" for d in rss_tree.getroot().iterfind("channel/item/description")]
+        joined = "\n".join(descriptions)
+        # The total visit line must carry a parenthetical band breakdown.
+        assert re.search(r"Total visits: \d+ \(\d+[ugrizy]", joined)
+        # The science line carries a band breakdown only when there are science
+        # visits. Whether a program counts as science depends on the default
+        # SCIENCE_PROGRAMS, which is empty unless rubin_nights is installed, so
+        # only assert the breakdown format when science visits are present.
+        if re.search(r"Science visits: [1-9]", joined):
+            assert re.search(r"Science visits: \d+ \(\d+[ugrizy]", joined)
+
     def test_make_report_rss_feed_uses_title_parameter(self):
         reports = schedview.reports.find_reports(self.temp_dir.name)
         channel_title = "Custom Schedview Reports"

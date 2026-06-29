@@ -7,7 +7,7 @@ This module provides two functions:
   (band, science/not-science, observation_reason, target name).
 """
 
-__all__ = ["compute_tinysum", "compute_smallsum"]
+__all__ = ["compute_tinysum", "compute_smallsum", "format_band_breakdown"]
 
 from datetime import timedelta
 
@@ -85,6 +85,40 @@ def _build_night_hours(almanac: Almanac, dayobs_values: pd.Index) -> pd.Series:
     sunsets = sunsets.set_index("dayObs")
     night_hours = (sunsets["sun_n12_rising"] - sunsets["sun_n12_setting"]) * 24.0
     return night_hours.reindex(dayobs_values)
+
+
+def format_band_breakdown(row: pd.Series, prefix: str = "# ", suffix: str = "") -> str:
+    """Format a per-band visit-count breakdown like ``500g, 170r, 6i``.
+
+    Parameters
+    ----------
+    row : `pandas.Series`
+        A single ``compute_tinysum`` row (e.g. ``tinysum.loc[dayobs]``).
+    prefix : `str`, optional
+        Text before the band name in the column label. Defaults to ``"# "``.
+    suffix : `str`, optional
+        Text after the band name in the column label. The count for band
+        ``b`` is read from ``row[f"{prefix}{b}{suffix}"]``. The defaults
+        select the total band columns (``# g`` ...); pass ``suffix=" science"``
+        to select the science band columns (``# g science`` ...).
+
+    Returns
+    -------
+    breakdown : `str`
+        Comma-separated ``{count}{band}`` pairs for bands with a nonzero
+        count, in ``_BANDS`` order. Empty string if every count is zero or
+        absent.
+    """
+    parts = []
+    for band in _BANDS:
+        column = f"{prefix}{band}{suffix}"
+        if column not in row.index:
+            continue
+        count = row[column]
+        if pd.isna(count) or int(count) == 0:
+            continue
+        parts.append(f"{int(count)}{band}")
+    return ", ".join(parts)
 
 
 def _visits_summary(visits_group: pd.DataFrame) -> pd.Series:
@@ -195,6 +229,15 @@ def compute_tinysum(
     science_visits = visits.loc[visits["science_program"].isin(science_programs), :]
     science_counts = science_visits.groupby("dayObs")["observationId"].count().rename("science").to_frame()
 
+    science_band_counts = (
+        science_visits.groupby(["dayObs", "band"])["observationId"]
+        .count()
+        .unstack("band", fill_value=0)
+        .reindex(columns=_BANDS, fill_value=0)
+        .astype("Int64")
+        .rename(columns={b: f"# {b} science" for b in _BANDS})
+    )
+
     targets = (
         science_visits.groupby("dayObs")["target_name"]
         .apply(_unique_targets)
@@ -202,11 +245,13 @@ def compute_tinysum(
         .to_frame()
     )
 
-    tinysum = basic_stats.join([teff_stats, science_counts, band_counts, targets])
+    tinysum = basic_stats.join([teff_stats, science_counts, band_counts, science_band_counts, targets])
 
     tinysum["total eff_time/exp_time"] = tinysum["total eff_time"] / tinysum["total exp_time"]
 
     tinysum["science"] = tinysum["science"].fillna(0).astype("Int64")
+    science_band_cols = [f"# {b} science" for b in _BANDS]
+    tinysum[science_band_cols] = tinysum[science_band_cols].fillna(0).astype("Int64")
     tinysum["science targets"] = tinysum["science targets"].fillna("")
 
     if almanac is not None:
