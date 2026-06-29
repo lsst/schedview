@@ -14,7 +14,7 @@ RSS_DESC_FORMAT = """
 Total visits: {total};
 Science visits: {science};
 Median FWHM: {fwhm};
-Total eff_time/exp_time: {mean_norm_teff};
+Total eff_time/ total exp_time: {mean_norm_teff};
 Mean visit rate: {visit_rate} visits/hour;
 Mean eff_time rate: {teff_rate}/minute;
 Science targets: {targets}
