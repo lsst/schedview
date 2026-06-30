@@ -178,7 +178,7 @@ def compute_tinysum(
         A ``rubin_scheduler.site_models.Almanac`` instance used to
         compute night duration.
         Pass ``None`` to omit the ``night_hours``, ``visits/hour``,
-        and ``teff/minute`` columns.
+        and ``teff/night duration`` columns.
     eff_time_column : `str`, optional
         Name of the per-visit effective-time column in ``visits``.
         Defaults to ``"eff_time_median"`` (the consdb/production name).
@@ -268,7 +268,7 @@ def compute_tinysum(
 
     tinysum = basic_stats.join([teff_stats, science_counts, band_counts, science_band_counts, targets])
 
-    tinysum["total eff_time/exp_time"] = tinysum["total eff_time"] / tinysum["total exp_time"]
+    tinysum["total eff_time/total exp_time"] = tinysum["total eff_time"] / tinysum["total exp_time"]
 
     tinysum["science"] = tinysum["science"].fillna(0).astype("Int64")
     science_band_cols = [f"# {b} science" for b in _BANDS]
@@ -279,7 +279,7 @@ def compute_tinysum(
         night_hours = _build_night_hours(almanac, tinysum.index)
         tinysum["night_hours"] = night_hours
         tinysum["visits/hour"] = tinysum["Total"] / tinysum["night_hours"]
-        tinysum["teff/minute"] = tinysum["visits/hour"] * tinysum["mean eff_time"] / 60.0
+        tinysum["teff/night duration"] = tinysum["total eff_time"] / (tinysum["night_hours"] * 60 * 60)
 
     return tinysum
 

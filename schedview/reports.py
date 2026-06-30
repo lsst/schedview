@@ -15,9 +15,9 @@ RSS_DESC_FORMAT = """
 Total visits: {total};
 Science visits: {science};
 Median FWHM: {fwhm};
-Total eff_time/ total exp_time: {mean_norm_teff};
 Mean visit rate: {visit_rate} visits/hour;
-Mean eff_time rate: {teff_rate}/minute;
+Total eff_time / total exp_time: {mean_norm_teff};
+Total eff_time / total night time: {teff_rate};
 Science targets: {targets}
 """
 
@@ -99,29 +99,14 @@ def find_reports(
 INT_SUMMARY_COLUMNS = [
     "Total",
     "science",
-    #    "# u",
-    #    "# g",
-    #    "# r",
-    #    "# i",
-    #    "# z",
-    #    "# y",
 ]
 
 FLOAT_SUMMARY_COLUMNS = [
     "night_hours",
-    #    "visits/hour",
-    #    "teff/minute",
     "median FWHM",
-    #    "mean eff_time",
-    #    "q1 eff_time",
-    #    "median eff_time",
-    #    "q3 eff_time",
-    "total eff_time/exp_time",
+    "total eff_time/total exp_time",
 ]
 
-# SUMMARY_COLUMNS = INT_SUMMARY_COLUMNS + FLOAT_SUMMARY_COLUMNS + [
-#    "science targets",
-# ]
 SUMMARY_COLUMNS = INT_SUMMARY_COLUMNS + FLOAT_SUMMARY_COLUMNS
 
 
@@ -219,7 +204,7 @@ def _format_summary_desc(tinysum: pd.DataFrame, dayobs: int, report: str, instru
         The formatted ``RSS_DESC_FORMAT`` text for the night.
     """
     try:
-        teff_rate = np.round(tinysum.loc[dayobs, "teff/minute"], 2)
+        teff_rate = np.round(tinysum.loc[dayobs, "teff/night duration"], 2)
     except TypeError:
         teff_rate = np.nan
     row = tinysum.loc[dayobs]
@@ -234,8 +219,8 @@ def _format_summary_desc(tinysum: pd.DataFrame, dayobs: int, report: str, instru
         total=total_str,
         science=science_str,
         fwhm=np.round(tinysum.loc[dayobs, "median FWHM"], 2),
-        mean_norm_teff=np.round(tinysum.loc[dayobs, "total eff_time/exp_time"], 2),
         visit_rate=np.round(tinysum.loc[dayobs, "visits/hour"], 2),
+        mean_norm_teff=np.round(tinysum.loc[dayobs, "total eff_time/total exp_time"], 2),
         teff_rate=teff_rate,
         targets=tinysum.loc[dayobs, "science targets"],
     )
