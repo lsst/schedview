@@ -447,6 +447,18 @@ per night.  Columns:
    * - ``total eff_time/total exp_time``
      - float
      - ``total eff_time / total exp_time`` (normalized effective time)
+   * - ``eff_time_psf_scale``
+     - float
+     - Exposure-time-weighted mean of ``eff_time_psf_sigma_scale_median``
+       (only if column present in ``visits``)
+   * - ``eff_time_zp_scale``
+     - float
+     - Exposure-time-weighted mean of ``eff_time_zero_point_scale_median``
+       (only if column present in ``visits``)
+   * - ``eff_time_skybg_scale``
+     - float
+     - Exposure-time-weighted mean of ``eff_time_sky_bg_scale_median``
+       (only if column present in ``visits``)
    * - ``night_hours``
      - float
      - Duration of night in hours (only if almanac provided)
@@ -496,10 +508,32 @@ Implementation Steps
 8. **Normalized effective time**: Compute
    ``total eff_time/total exp_time = total eff_time / total exp_time``.
 
-9. **Night hours** (only if ``almanac`` is not ``None``): Build a mapping from
-   ``dayObs`` → night duration via ``_build_night_hours``.
+9. **Effective-time breakdown factors** (only if all three columns
+   ``eff_time_psf_sigma_scale_median``, ``eff_time_zero_point_scale_median``,
+   and ``eff_time_sky_bg_scale_median`` are present in ``visits``):
 
-10. **Derived rates** (only if ``almanac`` is not ``None``):
+   For each factor column, compute the per-night exposure-time-weighted mean:
+
+   .. code-block:: python
+
+       weighted = (visits[factor_col] * visits[exp_time_column])
+       numerator = weighted.groupby(visits["dayObs"]).sum()
+       denominator = visits[exp_time_column].groupby(visits["dayObs"]).sum()
+       tinysum[output_col] = numerator / denominator
+
+   The mapping from input column to output column is:
+
+   - ``eff_time_psf_sigma_scale_median`` → ``eff_time_psf_scale``
+   - ``eff_time_zero_point_scale_median`` → ``eff_time_zp_scale``
+   - ``eff_time_sky_bg_scale_median`` → ``eff_time_skybg_scale``
+
+   If any of the three input columns is absent, all three output columns are
+   omitted.
+
+10. **Night hours** (only if ``almanac`` is not ``None``): Build a mapping
+    from ``dayObs`` → night duration via ``_build_night_hours``.
+
+11. **Derived rates** (only if ``almanac`` is not ``None``):
 
    - ``visits/hour = Total / night_hours``
    - ``teff/night duration = total eff_time / (night_hours * 60 * 60)``

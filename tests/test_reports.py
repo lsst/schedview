@@ -186,6 +186,57 @@ class TestReports(unittest.TestCase):
             if category == "lsstcam_prenight":
                 assert (item.findtext("description") or "") == ""
 
+    def test_make_report_rss_feed_eff_time_breakdown(self):
+        import re
+
+        rng = np.random.default_rng(0)
+        n = 40
+        dayobs = np.array([20250620] * 20 + [20250621] * 20)
+        visits = pd.DataFrame(
+            {
+                "dayObs": dayobs,
+                "observationId": np.arange(n),
+                "seeingFwhmGeom": rng.uniform(0.6, 1.8, size=n),
+                "eff_time_median": rng.uniform(20.0, 40.0, size=n),
+                "exp_time": rng.uniform(25.0, 35.0, size=n),
+                "band": rng.choice(list("ugrizy"), size=n),
+                "science_program": rng.choice(["BLOCK-365", "ENG-001"], size=n),
+                "target_name": rng.choice(["COSMOS", "XMM-LSS", ""], size=n),
+                "eff_time_psf_sigma_scale_median": rng.uniform(0.3, 1.0, size=n),
+                "eff_time_zero_point_scale_median": rng.uniform(0.5, 1.0, size=n),
+                "eff_time_sky_bg_scale_median": rng.uniform(0.4, 1.0, size=n),
+            }
+        )
+        reports = schedview.reports.find_reports(self.temp_dir.name)
+        rss_tree = schedview.reports.make_report_rss_feed(reports, fname=None, max_days=99999, visits=visits)
+        descriptions = [d.text or "" for d in rss_tree.getroot().iterfind("channel/item/description")]
+        joined = "\n".join(descriptions)
+        # The breakdown must appear in the format [X PSF, Y transparency, Z sky background]
+        assert re.search(r"\[\d+\.\d+ PSF, \d+\.\d+ transparency, \d+\.\d+ sky background\]", joined)
+
+    def test_make_report_rss_feed_no_breakdown_without_columns(self):
+        rng = np.random.default_rng(0)
+        n = 40
+        dayobs = np.array([20250620] * 20 + [20250621] * 20)
+        visits = pd.DataFrame(
+            {
+                "dayObs": dayobs,
+                "observationId": np.arange(n),
+                "seeingFwhmGeom": rng.uniform(0.6, 1.8, size=n),
+                "eff_time_median": rng.uniform(20.0, 40.0, size=n),
+                "exp_time": rng.uniform(25.0, 35.0, size=n),
+                "band": rng.choice(list("ugrizy"), size=n),
+                "science_program": rng.choice(["BLOCK-365", "ENG-001"], size=n),
+                "target_name": rng.choice(["COSMOS", "XMM-LSS", ""], size=n),
+            }
+        )
+        reports = schedview.reports.find_reports(self.temp_dir.name)
+        rss_tree = schedview.reports.make_report_rss_feed(reports, fname=None, max_days=99999, visits=visits)
+        descriptions = [d.text or "" for d in rss_tree.getroot().iterfind("channel/item/description")]
+        joined = "\n".join(descriptions)
+        # The breakdown must NOT appear when the columns are absent
+        assert "[" not in joined or "PSF" not in joined
+
     def test_make_report_rss_feed_uses_title_parameter(self):
         reports = schedview.reports.find_reports(self.temp_dir.name)
         channel_title = "Custom Schedview Reports"

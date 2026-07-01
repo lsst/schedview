@@ -11,6 +11,8 @@ from rubin_scheduler.site_models import Almanac
 
 from schedview.compute.smallsum import compute_tinysum, format_band_breakdown
 
+EFF_TIME_BREAKDOWN_COLS = ("eff_time_psf_scale", "eff_time_zp_scale", "eff_time_skybg_scale")
+
 RSS_DESC_FORMAT = """
 Total visits: {total};
 Science visits: {science};
@@ -212,6 +214,17 @@ def _format_summary_desc(tinysum: pd.DataFrame, dayobs: int, report: str, instru
     science_bands = format_band_breakdown(row, suffix=" science")
     total_str = f"{row['Total']}" + (f" ({total_bands})" if total_bands else "")
     science_str = f"{row['science']}" + (f" ({science_bands})" if science_bands else "")
+
+    # Format normalized effective time, with optional breakdown
+    norm_teff = np.round(tinysum.loc[dayobs, "total eff_time/total exp_time"], 2)
+    if all(col in row.index and not pd.isna(row[col]) for col in EFF_TIME_BREAKDOWN_COLS):
+        psf = np.round(row["eff_time_psf_scale"], 2)
+        zp = np.round(row["eff_time_zp_scale"], 2)
+        skybg = np.round(row["eff_time_skybg_scale"], 2)
+        mean_norm_teff_str = f"{norm_teff} [{psf} PSF, {zp} transparency, {skybg} sky background]"
+    else:
+        mean_norm_teff_str = f"{norm_teff}"
+
     return RSS_DESC_FORMAT.format(
         report=report,
         instrument=instrument,
@@ -220,7 +233,7 @@ def _format_summary_desc(tinysum: pd.DataFrame, dayobs: int, report: str, instru
         science=science_str,
         fwhm=np.round(tinysum.loc[dayobs, "median FWHM"], 2),
         visit_rate=np.round(tinysum.loc[dayobs, "visits/hour"], 2),
-        mean_norm_teff=np.round(tinysum.loc[dayobs, "total eff_time/total exp_time"], 2),
+        mean_norm_teff=mean_norm_teff_str,
         teff_rate=teff_rate,
         targets=tinysum.loc[dayobs, "science targets"],
     )

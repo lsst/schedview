@@ -53,6 +53,13 @@ New Module-Level Constants
     ``science``, ``fwhm``, ``mean_norm_teff``, ``visit_rate``, ``teff_rate``,
     ``targets``.
 
+``EFF_TIME_BREAKDOWN_COLS``
+    A tuple of the three ``compute_tinysum`` output column names that carry
+    the effective-time breakdown factors:
+    ``("eff_time_psf_scale", "eff_time_zp_scale", "eff_time_skybg_scale")``.
+    Used by ``_format_summary_desc`` to detect whether breakdown data is
+    available.
+
 ``INT_SUMMARY_COLUMNS``
     A list of column names from ``compute_tinysum`` output that should be
     displayed as integers in the link table: ``["Total", "science"]``.
@@ -295,6 +302,24 @@ Implementation Steps
 5. **Indent** the XML tree and optionally write to file.
 
 
+Helper: ``_format_summary_desc`` – effective-time breakdown
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Within ``_format_summary_desc``, the ``{mean_norm_teff}`` placeholder is
+populated conditionally:
+
+- If all three columns in ``EFF_TIME_BREAKDOWN_COLS`` are present in the
+  tinysum row **and** are not NaN, the value is formatted as::
+
+      0.29 [0.5 PSF, 0.8 transparency, 0.7 sky background]
+
+  where each number is the rounded (2 decimal places) per-night
+  exposure-time-weighted mean of the corresponding factor column.
+
+- If any of the three columns is absent or NaN, the value is formatted as
+  before (just the ratio, e.g. ``0.29``).
+
+
 Obtaining prenight visits (caller responsibility)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -436,7 +461,8 @@ Changes from ``main``
 5. **Removed** ``"preprogress"`` from the default ``report_columns`` tuple
    in ``make_report_link_table``.
 6. **New constants**: ``RSS_DESC_FORMAT``, ``INT_SUMMARY_COLUMNS``,
-   ``FLOAT_SUMMARY_COLUMNS``, ``SUMMARY_COLUMNS``.
+   ``FLOAT_SUMMARY_COLUMNS``, ``SUMMARY_COLUMNS``,
+   ``EFF_TIME_BREAKDOWN_COLS``.
 7. **New imports**: ``hashlib``, ``numpy``,
    ``rubin_scheduler.site_models.Almanac``,
    ``schedview.compute.smallsum.compute_tinysum``,
@@ -450,6 +476,13 @@ Changes from ``main``
     (truncated to 6 hex characters) appended to the title, rather than the
     ``report_time``.  This ensures the GUID remains stable when the
     description content hasn't changed.
+11. **Effective-time breakdown** in RSS descriptions: when the visits
+    DataFrame contains ``eff_time_psf_sigma_scale_median``,
+    ``eff_time_zero_point_scale_median``, and
+    ``eff_time_sky_bg_scale_median``, the ``Total eff_time / total exp_time``
+    line includes a bracketed breakdown of PSF, transparency, and sky
+    background factors.  When any column is absent, the line retains its
+    original format.
 
 
 Dependencies
@@ -488,6 +521,20 @@ Tests are in ``tests/test_reports.py``.
 ``test_make_report_rss_feed_prenight_blank_when_no_visits``
     Passes ``prenight_visits`` whose dayObs match no report night, and verifies
     every ``prenight`` item description is empty (no fallback text).
+
+``test_make_report_rss_feed_eff_time_breakdown``
+    Passes a synthetic visits DataFrame that includes the three breakdown
+    columns (``eff_time_psf_sigma_scale_median``,
+    ``eff_time_zero_point_scale_median``, ``eff_time_sky_bg_scale_median``),
+    and verifies that the ``lsstcam`` ``nightsum`` item description contains
+    the bracketed breakdown (``[... PSF, ... transparency, ... sky
+    background]``).
+
+``test_make_report_rss_feed_no_breakdown_without_columns``
+    Passes a synthetic visits DataFrame that does **not** include the
+    breakdown columns, and verifies that the ``Total eff_time / total
+    exp_time`` line does **not** contain a bracketed breakdown (i.e. the
+    existing format is preserved).
 
 Pre-existing tests (``test_find_reports``, ``test_make_report_link_table``,
 ``test_make_report_rss_feed``) continue to pass and verify backward

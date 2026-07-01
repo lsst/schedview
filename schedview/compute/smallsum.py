@@ -269,6 +269,18 @@ def compute_tinysum(
 
     tinysum["total eff_time/total exp_time"] = tinysum["total eff_time"] / tinysum["total exp_time"]
 
+    # Effective-time breakdown factors (only if all three columns present)
+    _EFF_TIME_FACTOR_MAP = {
+        "eff_time_psf_sigma_scale_median": "eff_time_psf_scale",
+        "eff_time_zero_point_scale_median": "eff_time_zp_scale",
+        "eff_time_sky_bg_scale_median": "eff_time_skybg_scale",
+    }
+    if all(col in visits.columns for col in _EFF_TIME_FACTOR_MAP):
+        exp_by_night = visits[exp_time_column].groupby(visits["dayObs"]).sum()
+        for input_col, output_col in _EFF_TIME_FACTOR_MAP.items():
+            weighted = (visits[input_col] * visits[exp_time_column]).groupby(visits["dayObs"]).sum()
+            tinysum[output_col] = weighted / exp_by_night
+
     tinysum["science"] = tinysum["science"].fillna(0).astype("Int64")
     science_band_cols = [f"# {b} science" for b in _BANDS]
     tinysum[science_band_cols] = tinysum[science_band_cols].fillna(0).astype("Int64")
