@@ -60,7 +60,7 @@ New Module-Level Constants
 ``FLOAT_SUMMARY_COLUMNS``
     A list of column names from ``compute_tinysum`` output that should be
     displayed as rounded floats: ``["night_hours", "median FWHM",
-    "total eff_time/exp_time"]``.
+    "total eff_time/total exp_time"]``.
 
 ``SUMMARY_COLUMNS``
     The concatenation of ``INT_SUMMARY_COLUMNS + FLOAT_SUMMARY_COLUMNS``,
@@ -209,7 +209,7 @@ Signature
     def make_report_rss_feed(
         reports: pd.DataFrame,
         fname: str | None = None,
-        max_days: int = 7,
+        max_days: int = 1,
         visits: pd.DataFrame | None = None,
         title: str = "schedview reports",
         description: str = "Statically generated reports on Rubin Observatory/LSST scheduler status and progress",
@@ -437,13 +437,19 @@ Changes from ``main``
    in ``make_report_link_table``.
 6. **New constants**: ``RSS_DESC_FORMAT``, ``INT_SUMMARY_COLUMNS``,
    ``FLOAT_SUMMARY_COLUMNS``, ``SUMMARY_COLUMNS``.
-7. **New imports**: ``numpy``, ``rubin_scheduler.site_models.Almanac``,
-   ``schedview.compute.smallsum.compute_tinysum``.
+7. **New imports**: ``hashlib``, ``numpy``,
+   ``rubin_scheduler.site_models.Almanac``,
+   ``schedview.compute.smallsum.compute_tinysum``,
+   ``schedview.compute.smallsum.format_band_breakdown``.
 8. **RSS item titles** changed from ``"{report} report for ..."`` to
    ``"{report} for ..."``.
 9. **Variable naming** in ``make_report_rss_feed`` changed to avoid
    shadowing the ``title`` parameter (``title`` → ``channel_title_elem``,
    etc.).
+10. **GUID generation** now uses a SHA-1 hash of the description text
+    (truncated to 6 hex characters) appended to the title, rather than the
+    ``report_time``.  This ensures the GUID remains stable when the
+    description content hasn't changed.
 
 
 Dependencies

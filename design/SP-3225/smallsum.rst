@@ -68,7 +68,7 @@ Three private helpers factor out reusable logic:
 ``_build_night_hours(almanac, dayobs_values)``
     Converts an ``Almanac`` instance into a Series mapping each ``dayObs`` to
     its night duration in hours.  Used by ``compute_tinysum`` to derive the
-    rate columns (``visits/hour``, ``teff/minute``).
+    rate columns (``visits/hour``, ``teff/night duration``).
 
 In addition, one **public** helper is exported alongside the two main
 functions:
@@ -342,7 +342,7 @@ Parameters
 
 ``almanac`` : ``Almanac`` or ``None``
     A ``rubin_scheduler.site_models.Almanac`` instance.  Pass ``None`` to omit
-    the ``night_hours``, ``visits/hour``, and ``teff/minute`` columns.
+    the ``night_hours``, ``visits/hour``, and ``teff/night duration`` columns.
 
 ``eff_time_column`` : ``str``
     Name of the per-visit effective-time column in ``visits``.  Defaults to
@@ -444,7 +444,7 @@ per night.  Columns:
    * - ``science targets``
      - str
      - Comma-separated unique target names from science visits
-   * - ``total eff_time/exp_time``
+   * - ``total eff_time/total exp_time``
      - float
      - ``total eff_time / total exp_time`` (normalized effective time)
    * - ``night_hours``
@@ -453,9 +453,9 @@ per night.  Columns:
    * - ``visits/hour``
      - float
      - ``Total / night_hours`` (only if almanac provided)
-   * - ``teff/minute``
+   * - ``teff/night duration``
      - float
-     - ``(visits/hour * mean eff_time) / 60`` (only if almanac provided)
+     - ``total eff_time / (night_hours * 60 * 60)`` (only if almanac provided)
 
 Implementation Steps
 ~~~~~~~~~~~~~~~~~~~~
@@ -494,7 +494,7 @@ Implementation Steps
    science visits) with 0 and cast to ``Int64``.
 
 8. **Normalized effective time**: Compute
-   ``total eff_time/exp_time = total eff_time / total exp_time``.
+   ``total eff_time/total exp_time = total eff_time / total exp_time``.
 
 9. **Night hours** (only if ``almanac`` is not ``None``): Build a mapping from
    ``dayObs`` → night duration via ``_build_night_hours``.
@@ -502,7 +502,7 @@ Implementation Steps
 10. **Derived rates** (only if ``almanac`` is not ``None``):
 
    - ``visits/hour = Total / night_hours``
-   - ``teff/minute = visits/hour * mean eff_time / 60``
+   - ``teff/night duration = total eff_time / (night_hours * 60 * 60)``
 
 
 Function 2: ``compute_smallsum``
@@ -643,7 +643,7 @@ Notes
   nullable ``Int64`` dtype to avoid float conversion when NaN values are
   present from joins.
 - The exposure-time column (``exp_time_column``, default ``exp_time``) is
-  required by ``compute_tinysum`` for the ``total eff_time/exp_time``
+  required by ``compute_tinysum`` for the ``total eff_time/total exp_time``
   normalized efficiency metric.
 - The ``eff_time_column`` and ``exp_time_column`` parameters exist so that
   prenight-simulation visits (which name these ``t_eff`` and

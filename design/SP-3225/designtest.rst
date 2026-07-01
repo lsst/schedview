@@ -209,21 +209,24 @@ When design tests are skipped (default):
 
 .. code-block:: text
 
+    tests/test_design_docs.py::test_rst_valid[SP-3225/designtest.rst] SKIPPED
+    tests/test_design_docs.py::test_rst_valid[SP-3225/linktablestats.rst] SKIPPED
     tests/test_design_docs.py::test_rst_valid[SP-3225/smallsum.rst] SKIPPED
     tests/test_design_docs.py::test_rst_valid[SP-3225/visitcache.rst] SKIPPED
-    tests/test_design_docs.py::test_rst_valid[SP-3225/linktablestats.rst] SKIPPED
     ...
 
 When design tests are selected:
 
 .. code-block:: text
 
+    tests/test_design_docs.py::test_rst_valid[SP-3225/designtest.rst] PASSED
+    tests/test_design_docs.py::test_rst_valid[SP-3225/linktablestats.rst] PASSED
     tests/test_design_docs.py::test_rst_valid[SP-3225/smallsum.rst] PASSED
     tests/test_design_docs.py::test_rst_valid[SP-3225/visitcache.rst] PASSED
-    tests/test_design_docs.py::test_rst_valid[SP-3225/linktablestats.rst] PASSED
+    tests/test_design_docs.py::test_rst_doctests[SP-3225/designtest.rst] PASSED
+    tests/test_design_docs.py::test_rst_doctests[SP-3225/linktablestats.rst] PASSED
     tests/test_design_docs.py::test_rst_doctests[SP-3225/smallsum.rst] PASSED
     tests/test_design_docs.py::test_rst_doctests[SP-3225/visitcache.rst] PASSED
-    tests/test_design_docs.py::test_rst_doctests[SP-3225/linktablestats.rst] PASSED
 
 
 Dependencies
