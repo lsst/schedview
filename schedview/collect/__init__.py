@@ -19,6 +19,7 @@ __all__ = [
     "read_visits",
     "sample_pickle",
     "sync_query_efd_topic_for_night",
+    "get_observatory_status_summary",
 ]
 
 
@@ -67,6 +68,7 @@ except ModuleNotFoundError as missing_module:
 
 
 from .nightreport import get_night_narrative, get_night_report
+from .observatory_state import get_observatory_status_summary
 from .opsim import read_ddf_visits, read_opsim
 from .resources import find_file_resources
 from .rewards import read_rewards
