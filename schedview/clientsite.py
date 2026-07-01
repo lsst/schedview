@@ -47,7 +47,7 @@ def guess_site() -> str:
         elif hostname == "htcondor.cp.lsst.org":
             site = "summit"
         else:
-            warn(f"Could not deterime site from HOSTNAME {hostname}.")
+            warn(f"Could not determine site from HOSTNAME {hostname}.")
 
     if site is None:
         site = "local"
