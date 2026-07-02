@@ -141,11 +141,44 @@ class TestComputeTinysum:
             )
 
     def test_total_eff_time_over_exp_time(self, sample_visits):
-        result = compute_tinysum(sample_visits)
+        result = compute_tinysum(sample_visits, science_programs=SCIENCE_PROGRAMS)
         for day in result.index:
-            day_visits = sample_visits[sample_visits["dayObs"] == day]
-            expected = day_visits["eff_time_median"].sum() / day_visits["exp_time"].sum()
+            sci_visits = sample_visits[
+                (sample_visits["dayObs"] == day)
+                & (sample_visits["science_program"].isin(SCIENCE_PROGRAMS))
+            ]
+            expected = sci_visits["eff_time_median"].sum() / sci_visits["exp_time"].sum()
             assert np.isclose(result.loc[day, "total eff_time/total exp_time"], expected)
+
+    def test_science_only_stats(self, sample_visits):
+        """Verify that median FWHM, total eff_time, total exp_time are computed
+        from science visits only, not all visits."""
+        result = compute_tinysum(sample_visits, science_programs=SCIENCE_PROGRAMS)
+        for day in result.index:
+            sci_visits = sample_visits[
+                (sample_visits["dayObs"] == day)
+                & (sample_visits["science_program"].isin(SCIENCE_PROGRAMS))
+            ]
+            assert np.isclose(result.loc[day, "median FWHM"], sci_visits["seeingFwhmGeom"].median())
+            assert np.isclose(result.loc[day, "total eff_time"], sci_visits["eff_time_median"].sum())
+            assert np.isclose(result.loc[day, "total exp_time"], sci_visits["exp_time"].sum())
+
+    def test_teff_stats_from_science_only(self, sample_visits):
+        """Verify mean/q1/median/q3 eff_time are computed from science visits."""
+        result = compute_tinysum(sample_visits, science_programs=SCIENCE_PROGRAMS)
+        for day in result.index:
+            sci_visits = sample_visits[
+                (sample_visits["dayObs"] == day)
+                & (sample_visits["science_program"].isin(SCIENCE_PROGRAMS))
+            ]
+            expected_mean = sci_visits["eff_time_median"].mean()
+            expected_median = sci_visits["eff_time_median"].median()
+            expected_q1 = sci_visits["eff_time_median"].quantile(0.25)
+            expected_q3 = sci_visits["eff_time_median"].quantile(0.75)
+            assert np.isclose(result.loc[day, "mean eff_time"], expected_mean)
+            assert np.isclose(result.loc[day, "median eff_time"], expected_median)
+            assert np.isclose(result.loc[day, "q1 eff_time"], expected_q1)
+            assert np.isclose(result.loc[day, "q3 eff_time"], expected_q3)
 
     def test_custom_column_names(self, sample_visits):
         # Prenight-simulation visits carry the same statistics under

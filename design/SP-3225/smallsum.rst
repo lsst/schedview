@@ -386,9 +386,10 @@ result as the production names on equivalent data:
 ... })
 >>> sim = prod.rename(columns={
 ...     "eff_time_median": "t_eff", "exp_time": "visitExposureTime"})
->>> a = compute_tinysum(prod)
+>>> a = compute_tinysum(prod, all_science=True)
 >>> b = compute_tinysum(
-...     sim, eff_time_column="t_eff", exp_time_column="visitExposureTime")
+...     sim, eff_time_column="t_eff", exp_time_column="visitExposureTime",
+...     all_science=True)
 >>> bool(np.isclose(a.loc[20250601, "total eff_time"],
 ...                  b.loc[20250601, "total eff_time"]))
 True
@@ -412,25 +413,25 @@ per night.  Columns:
      - Total number of visits that night (nullable integer)
    * - ``median FWHM``
      - float
-     - Median ``seeingFwhmGeom`` across all visits that night
+     - Median ``seeingFwhmGeom`` across science visits that night
    * - ``total exp_time``
      - float
-     - Sum of ``exp_time`` values for the night
+     - Sum of ``exp_time`` values for science visits that night
    * - ``total eff_time``
      - float
-     - Sum of ``eff_time_median`` values for the night
+     - Sum of ``eff_time_median`` values for science visits that night
    * - ``mean eff_time``
      - float
-     - Mean of ``eff_time_median`` across all visits that night
+     - Mean of ``eff_time_median`` across science visits that night
    * - ``q1 eff_time``
      - float
-     - 25th percentile of ``eff_time_median``
+     - 25th percentile of ``eff_time_median`` (science visits)
    * - ``median eff_time``
      - float
-     - 50th percentile of ``eff_time_median``
+     - 50th percentile of ``eff_time_median`` (science visits)
    * - ``q3 eff_time``
      - float
-     - 75th percentile of ``eff_time_median``
+     - 75th percentile of ``eff_time_median`` (science visits)
    * - ``science``
      - Int64
      - Number of visits with ``science_program`` in ``science_programs``
@@ -446,19 +447,20 @@ per night.  Columns:
      - Comma-separated unique target names from science visits
    * - ``total eff_time/total exp_time``
      - float
-     - ``total eff_time / total exp_time`` (normalized effective time)
+     - ``total eff_time / total exp_time`` (normalized effective time,
+       computed from science visits)
    * - ``eff_time_psf_scale``
      - float
      - Exposure-time-weighted mean of ``eff_time_psf_sigma_scale_median``
-       (only if column present in ``visits``)
+       over science visits (only if column present in ``visits``)
    * - ``eff_time_zp_scale``
      - float
      - Exposure-time-weighted mean of ``eff_time_zero_point_scale_median``
-       (only if column present in ``visits``)
+       over science visits (only if column present in ``visits``)
    * - ``eff_time_skybg_scale``
      - float
      - Exposure-time-weighted mean of ``eff_time_sky_bg_scale_median``
-       (only if column present in ``visits``)
+       over science visits (only if column present in ``visits``)
    * - ``night_hours``
      - float
      - Duration of night in hours (only if almanac provided)
@@ -467,76 +469,81 @@ per night.  Columns:
      - ``Total / night_hours`` (only if almanac provided)
    * - ``teff/night duration``
      - float
-     - ``total eff_time / (night_hours * 60 * 60)`` (only if almanac provided)
+     - ``total eff_time / (night_hours * 60 * 60)`` where ``total eff_time``
+       is from science visits (only if almanac provided)
 
 Implementation Steps
 ~~~~~~~~~~~~~~~~~~~~
 
-1. **Basic stats**: Group ``visits`` by ``dayObs``, aggregate:
+1. **Basic stats**: Group ``visits`` by ``dayObs``, aggregate count of
+   ``observationId`` → ``Total`` (cast to ``Int64``).
 
-   - Count of ``observationId`` → ``Total`` (cast to ``Int64``)
+2. **Band counts**: Group all visits by ``['dayObs', 'band']``, count
+   ``observationId``, unstack so bands become columns, fill NaN with 0,
+   cast to ``Int64``.  Rename to ``# u``, ``# g``, etc.
+
+3. **Define science visits**: Select the science-visit subset — every visit
+   when ``all_science`` is ``True``, otherwise those whose
+   ``science_program`` is in ``science_programs``.
+
+4. **Science stats**: From science visits, group by ``dayObs``, aggregate:
+
+   - Count of ``observationId`` → ``science``
    - Median of ``seeingFwhmGeom`` → ``median FWHM``
    - Sum of the ``exp_time_column`` → ``total exp_time``
    - Sum of the ``eff_time_column`` → ``total eff_time``
 
-2. **Effective time stats**: Group by ``dayObs``, call ``.describe()`` on the
-   ``eff_time_column``, extract ``mean``, ``25%``, ``50%``, ``75%`` and rename
-   to ``mean eff_time``, ``q1 eff_time``, ``median eff_time``,
-   ``q3 eff_time``.
-
-3. **Band counts**: Group by ``['dayObs', 'band']``, count ``observationId``,
-   unstack so bands become columns, fill NaN with 0, cast to ``Int64``.
-   Rename to ``# u``, ``# g``, etc.
-
-4. **Science counts**: Select the science visits — every visit when
-   ``all_science`` is ``True``, otherwise those whose ``science_program`` is in
-   ``science_programs`` — group by ``dayObs``, count → ``science``.
-
-5. **Science band counts**: From the same science-visit subset, group by
+5. **Science band counts**: From the science-visit subset, group by
    ``['dayObs', 'band']``, count ``observationId``, unstack, reindex to all
    bands, cast to ``Int64``.  Rename to ``# u science``, ``# g science``, etc.
-   (same pattern as the total band counts in step 3).
 
-6. **Science targets**: From science visits, group by ``dayObs``, aggregate
+6. **Effective time stats**: From science visits, group by ``dayObs``, call
+   ``.describe()`` on the ``eff_time_column``, extract ``mean``, ``25%``,
+   ``50%``, ``75%`` and rename to ``mean eff_time``, ``q1 eff_time``,
+   ``median eff_time``, ``q3 eff_time``.
+
+7. **Science targets**: From science visits, group by ``dayObs``, aggregate
    ``target_name`` using ``_unique_targets``.
 
-7. **Join all** intermediate DataFrames on the ``dayObs`` index.  Fill NaN in
+8. **Join all** intermediate DataFrames on the ``dayObs`` index.  Fill NaN in
    ``science`` with 0 (cast to ``Int64``) and in ``science targets`` with
    empty string.  Fill NaN in the ``# {band} science`` columns (nights with no
    science visits) with 0 and cast to ``Int64``.
 
-8. **Normalized effective time**: Compute
-   ``total eff_time/total exp_time = total eff_time / total exp_time``.
+9. **Normalized effective time**: Compute
+   ``total eff_time/total exp_time = total eff_time / total exp_time``
+   (both numerator and denominator are from science visits).
 
-9. **Effective-time breakdown factors** (only if all three columns
-   ``eff_time_psf_sigma_scale_median``, ``eff_time_zero_point_scale_median``,
-   and ``eff_time_sky_bg_scale_median`` are present in ``visits``):
+10. **Effective-time breakdown factors** (only if all three columns
+    ``eff_time_psf_sigma_scale_median``, ``eff_time_zero_point_scale_median``,
+    and ``eff_time_sky_bg_scale_median`` are present in the science visits):
 
-   For each factor column, compute the per-night exposure-time-weighted mean:
+    For each factor column, compute the per-night exposure-time-weighted mean
+    over **science visits**:
 
-   .. code-block:: python
+    .. code-block:: python
 
-       weighted = (visits[factor_col] * visits[exp_time_column])
-       numerator = weighted.groupby(visits["dayObs"]).sum()
-       denominator = visits[exp_time_column].groupby(visits["dayObs"]).sum()
-       tinysum[output_col] = numerator / denominator
+        weighted = (science_visits[factor_col] * science_visits[exp_time_column])
+        numerator = weighted.groupby(science_visits["dayObs"]).sum()
+        denominator = science_visits[exp_time_column].groupby(science_visits["dayObs"]).sum()
+        tinysum[output_col] = numerator / denominator
 
-   The mapping from input column to output column is:
+    The mapping from input column to output column is:
 
-   - ``eff_time_psf_sigma_scale_median`` → ``eff_time_psf_scale``
-   - ``eff_time_zero_point_scale_median`` → ``eff_time_zp_scale``
-   - ``eff_time_sky_bg_scale_median`` → ``eff_time_skybg_scale``
+    - ``eff_time_psf_sigma_scale_median`` → ``eff_time_psf_scale``
+    - ``eff_time_zero_point_scale_median`` → ``eff_time_zp_scale``
+    - ``eff_time_sky_bg_scale_median`` → ``eff_time_skybg_scale``
 
-   If any of the three input columns is absent, all three output columns are
-   omitted.
+    If any of the three input columns is absent, all three output columns are
+    omitted.
 
-10. **Night hours** (only if ``almanac`` is not ``None``): Build a mapping
+11. **Night hours** (only if ``almanac`` is not ``None``): Build a mapping
     from ``dayObs`` → night duration via ``_build_night_hours``.
 
-11. **Derived rates** (only if ``almanac`` is not ``None``):
+12. **Derived rates** (only if ``almanac`` is not ``None``):
 
-   - ``visits/hour = Total / night_hours``
-   - ``teff/night duration = total eff_time / (night_hours * 60 * 60)``
+    - ``visits/hour = Total / night_hours``
+    - ``teff/night duration = total eff_time / (night_hours * 60 * 60)``
 
 
 Function 2: ``compute_smallsum``

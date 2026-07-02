@@ -20,6 +20,12 @@ When a ``visits`` DataFrame is provided:
   total visits, science visits, seeing, effective-time metrics, and science
   targets.
 
+Note that the statistics displayed (median FWHM, effective-time metrics,
+exposure-time totals) are computed from **science visits only** — see
+``compute_tinysum`` in ``schedview.compute.smallsum`` for details.  The
+``Total`` visit count and per-band counts (``# g``, etc.) still reflect all
+visits.
+
 When a ``prenight_visits`` DataFrame is provided:
 
 - ``make_report_rss_feed`` populates the ``<description>`` element of

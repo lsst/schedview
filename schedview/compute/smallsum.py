@@ -199,7 +199,27 @@ def compute_tinysum(
         DataFrame indexed by ``dayObs`` with one row per night.
     """
     basic_stats = (
-        visits.groupby("dayObs")
+        visits.groupby("dayObs", as_index=True)
+        .agg(Total=("observationId", "count"))
+        .sort_index()
+        .astype({"Total": "Int64"})
+    )
+
+    band_counts = (
+        visits.groupby(["dayObs", "band"])["observationId"]
+        .count()
+        .unstack("band", fill_value=0)
+        .reindex(columns=_BANDS, fill_value=0)
+        .astype("Int64")
+        .rename(columns={b: f"# {b}" for b in _BANDS})
+    )
+
+    science_visits = (
+        visits if all_science else visits.loc[visits["science_program"].isin(science_programs), :]
+    )
+
+    science_stats = (
+        science_visits.groupby("dayObs")
         .agg(
             {
                 "observationId": "count",
@@ -211,17 +231,25 @@ def compute_tinysum(
         .sort_index()
         .rename(
             columns={
-                "observationId": "Total",
+                "observationId": "science",
                 "seeingFwhmGeom": "median FWHM",
                 exp_time_column: "total exp_time",
                 eff_time_column: "total eff_time",
             }
         )
     )
-    basic_stats["Total"] = basic_stats["Total"].astype("Int64")
+
+    science_band_counts = (
+        science_visits.groupby(["dayObs", "band"])["observationId"]
+        .count()
+        .unstack("band", fill_value=0)
+        .reindex(columns=_BANDS, fill_value=0)
+        .astype("Int64")
+        .rename(columns={b: f"# {b} science" for b in _BANDS})
+    )
 
     teff_stats = (
-        visits.groupby("dayObs")[eff_time_column]
+        science_visits.groupby("dayObs")[eff_time_column]
         .describe()
         .loc[:, ["mean", "25%", "50%", "75%"]]
         .rename(
@@ -234,30 +262,6 @@ def compute_tinysum(
         )
     )
 
-    band_counts = (
-        visits.groupby(["dayObs", "band"])["observationId"]
-        .count()
-        .unstack("band", fill_value=0)
-        .reindex(columns=_BANDS, fill_value=0)
-        .astype("Int64")
-        .rename(columns={b: f"# {b}" for b in _BANDS})
-    )
-
-    if all_science:
-        science_visits = visits
-    else:
-        science_visits = visits.loc[visits["science_program"].isin(science_programs), :]
-    science_counts = science_visits.groupby("dayObs")["observationId"].count().rename("science").to_frame()
-
-    science_band_counts = (
-        science_visits.groupby(["dayObs", "band"])["observationId"]
-        .count()
-        .unstack("band", fill_value=0)
-        .reindex(columns=_BANDS, fill_value=0)
-        .astype("Int64")
-        .rename(columns={b: f"# {b} science" for b in _BANDS})
-    )
-
     targets = (
         science_visits.groupby("dayObs")["target_name"]
         .apply(_unique_targets)
@@ -265,7 +269,7 @@ def compute_tinysum(
         .to_frame()
     )
 
-    tinysum = basic_stats.join([teff_stats, science_counts, band_counts, science_band_counts, targets])
+    tinysum = basic_stats.join([science_stats, teff_stats, band_counts, science_band_counts, targets])
 
     tinysum["total eff_time/total exp_time"] = tinysum["total eff_time"] / tinysum["total exp_time"]
 
@@ -275,10 +279,14 @@ def compute_tinysum(
         "eff_time_zero_point_scale_median": "eff_time_zp_scale",
         "eff_time_sky_bg_scale_median": "eff_time_skybg_scale",
     }
-    if all(col in visits.columns for col in _EFF_TIME_FACTOR_MAP):
-        exp_by_night = visits[exp_time_column].groupby(visits["dayObs"]).sum()
+    if all(col in science_visits.columns for col in _EFF_TIME_FACTOR_MAP):
+        exp_by_night = science_visits[exp_time_column].groupby(visits["dayObs"]).sum()
         for input_col, output_col in _EFF_TIME_FACTOR_MAP.items():
-            weighted = (visits[input_col] * visits[exp_time_column]).groupby(visits["dayObs"]).sum()
+            weighted = (
+                (science_visits[input_col] * science_visits[exp_time_column])
+                .groupby(science_visits["dayObs"])
+                .sum()
+            )
             tinysum[output_col] = weighted / exp_by_night
 
     tinysum["science"] = tinysum["science"].fillna(0).astype("Int64")
