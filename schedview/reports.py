@@ -16,10 +16,10 @@ EFF_TIME_BREAKDOWN_COLS = ("eff_time_psf_scale", "eff_time_zp_scale", "eff_time_
 RSS_DESC_FORMAT = """
 Total visits: {total};
 Science visits: {science};
-Median FWHM: {fwhm};
-Mean visit rate: {visit_rate} visits/hour;
-Total eff_time / total exp_time: {mean_norm_teff};
-Total eff_time / total night time: {teff_rate};
+Median FWHM (science visits): {fwhm};
+Mean visit rate (all visits on sky): {visit_rate} visits/hour;
+Total eff_time / total exp_time (science visits): {mean_norm_teff};
+Total eff_time / total night time (science visits): {teff_rate};
 Science targets: {targets}
 """
 
