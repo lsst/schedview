@@ -307,7 +307,11 @@ def make_report_rss_feed(
         The RSS XML itself.
     """
     almanac = Almanac() if (visits is not None or prenight_visits is not None) else None
-    tinysum = compute_tinysum(visits, almanac=almanac, science_programs=science_programs) if visits is not None else None
+    tinysum = (
+        compute_tinysum(visits, almanac=almanac, science_programs=science_programs)
+        if visits is not None
+        else None
+    )
     prenight_tinysum = (
         compute_tinysum(
             prenight_visits,
