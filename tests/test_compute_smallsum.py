@@ -132,7 +132,7 @@ class TestComputeTinysum:
                 assert result.loc[day, f"# {b} science"] == expected
 
     def test_teff_stats_reasonable(self, sample_visits):
-        result = compute_tinysum(sample_visits)
+        result = compute_tinysum(sample_visits, science_programs=SCIENCE_PROGRAMS)
         for day in result.index:
             assert (
                 result.loc[day, "q1 eff_time"]
@@ -185,9 +185,10 @@ class TestComputeTinysum:
             renamed,
             eff_time_column="t_eff",
             exp_time_column="visitExposureTime",
+            all_science=True,
         )
         # Output column names are unchanged regardless of input names.
-        baseline = compute_tinysum(sample_visits)
+        baseline = compute_tinysum(sample_visits, all_science=True)
         for col in ("total eff_time", "total exp_time", "mean eff_time", "total eff_time/total exp_time"):
             assert col in result.columns
             for day in result.index:

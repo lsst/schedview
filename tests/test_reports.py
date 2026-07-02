@@ -208,7 +208,9 @@ class TestReports(unittest.TestCase):
             }
         )
         reports = schedview.reports.find_reports(self.temp_dir.name)
-        rss_tree = schedview.reports.make_report_rss_feed(reports, fname=None, max_days=99999, visits=visits)
+        rss_tree = schedview.reports.make_report_rss_feed(
+            reports, fname=None, max_days=99999, visits=visits, science_programs=("BLOCK-365",)
+        )
         descriptions = [d.text or "" for d in rss_tree.getroot().iterfind("channel/item/description")]
         joined = "\n".join(descriptions)
         # The breakdown must appear in the format

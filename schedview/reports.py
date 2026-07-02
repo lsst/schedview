@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from rubin_scheduler.site_models import Almanac
 
-from schedview.compute.smallsum import compute_tinysum, format_band_breakdown
+from schedview.compute.smallsum import SCIENCE_PROGRAMS, compute_tinysum, format_band_breakdown
 
 EFF_TIME_BREAKDOWN_COLS = ("eff_time_psf_scale", "eff_time_zp_scale", "eff_time_skybg_scale")
 
@@ -247,6 +247,7 @@ def make_report_rss_feed(
     title: str = "schedview reports",
     description: str = "Statically generated reports on Rubin Observatory/LSST scheduler status and progress",
     prenight_visits: pd.DataFrame | None = None,
+    science_programs: tuple[str, ...] = SCIENCE_PROGRAMS,
 ) -> ET.ElementTree:
     """Generate an rss feed of recent schedview reports.
 
@@ -306,7 +307,7 @@ def make_report_rss_feed(
         The RSS XML itself.
     """
     almanac = Almanac() if (visits is not None or prenight_visits is not None) else None
-    tinysum = compute_tinysum(visits, almanac=almanac) if visits is not None else None
+    tinysum = compute_tinysum(visits, almanac=almanac, science_programs=science_programs) if visits is not None else None
     prenight_tinysum = (
         compute_tinysum(
             prenight_visits,
