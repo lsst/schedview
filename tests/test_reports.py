@@ -211,7 +211,8 @@ class TestReports(unittest.TestCase):
         rss_tree = schedview.reports.make_report_rss_feed(reports, fname=None, max_days=99999, visits=visits)
         descriptions = [d.text or "" for d in rss_tree.getroot().iterfind("channel/item/description")]
         joined = "\n".join(descriptions)
-        # The breakdown must appear in the format [X PSF, Y transparency, Z sky background]
+        # The breakdown must appear in the format
+        # [X PSF, Y transparency, Z sky background]
         assert re.search(r"\[\d+\.\d+ PSF, \d+\.\d+ transparency, \d+\.\d+ sky background\]", joined)
 
     def test_make_report_rss_feed_no_breakdown_without_columns(self):

@@ -144,8 +144,7 @@ class TestComputeTinysum:
         result = compute_tinysum(sample_visits, science_programs=SCIENCE_PROGRAMS)
         for day in result.index:
             sci_visits = sample_visits[
-                (sample_visits["dayObs"] == day)
-                & (sample_visits["science_program"].isin(SCIENCE_PROGRAMS))
+                (sample_visits["dayObs"] == day) & (sample_visits["science_program"].isin(SCIENCE_PROGRAMS))
             ]
             expected = sci_visits["eff_time_median"].sum() / sci_visits["exp_time"].sum()
             assert np.isclose(result.loc[day, "total eff_time/total exp_time"], expected)
@@ -156,20 +155,18 @@ class TestComputeTinysum:
         result = compute_tinysum(sample_visits, science_programs=SCIENCE_PROGRAMS)
         for day in result.index:
             sci_visits = sample_visits[
-                (sample_visits["dayObs"] == day)
-                & (sample_visits["science_program"].isin(SCIENCE_PROGRAMS))
+                (sample_visits["dayObs"] == day) & (sample_visits["science_program"].isin(SCIENCE_PROGRAMS))
             ]
             assert np.isclose(result.loc[day, "median FWHM"], sci_visits["seeingFwhmGeom"].median())
             assert np.isclose(result.loc[day, "total eff_time"], sci_visits["eff_time_median"].sum())
             assert np.isclose(result.loc[day, "total exp_time"], sci_visits["exp_time"].sum())
 
     def test_teff_stats_from_science_only(self, sample_visits):
-        """Verify mean/q1/median/q3 eff_time are computed from science visits."""
+        """Verify mean/q1/median/q3 eff_time computed from science visits."""
         result = compute_tinysum(sample_visits, science_programs=SCIENCE_PROGRAMS)
         for day in result.index:
             sci_visits = sample_visits[
-                (sample_visits["dayObs"] == day)
-                & (sample_visits["science_program"].isin(SCIENCE_PROGRAMS))
+                (sample_visits["dayObs"] == day) & (sample_visits["science_program"].isin(SCIENCE_PROGRAMS))
             ]
             expected_mean = sci_visits["eff_time_median"].mean()
             expected_median = sci_visits["eff_time_median"].median()
