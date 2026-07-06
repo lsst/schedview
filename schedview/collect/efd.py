@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import re
 import threading
 from collections import defaultdict
@@ -55,6 +56,16 @@ def make_efd_client(efd_name: str | None = None, *args, **kwargs):
         efd_name = schedview.clientsite.EFD_NAME
 
     assert isinstance(efd_name, str)
+
+    # schedview always consumes EFD results as pandas DataFrames, so
+    # request the "dataframe" output mode explicitly. Older lsst-efd-client
+    # (0.12.0) hardcodes this and has no ``output_mode`` parameter, while
+    # newer versions (>=0.14, 1.x) default it to None, which aioinflux
+    # rejects with "Invalid output format". Only pass the kwarg when the
+    # installed EfdClient accepts it.
+    if "output_mode" in inspect.signature(EfdClient.__init__).parameters and "output_mode" not in kwargs:
+        kwargs["output_mode"] = "dataframe"
+
     return EfdClient(efd_name, *args, **kwargs)
 
 

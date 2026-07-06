@@ -2,22 +2,43 @@ import os
 import unittest
 from datetime import datetime
 
+import pandas as pd
 import pytest
 
 # Objects to test instances against.
 from rubin_scheduler.scheduler.features.conditions import Conditions
 from rubin_scheduler.scheduler.schedulers.core_scheduler import CoreScheduler
 
+import schedview.collect.efd
 from schedview.app.scheduler_dashboard.scheduler_dashboard_app import LFASchedulerSnapshotDashboard
 
 
+class _StubEfdClient:
+    """A minimal stand-in for ``lsst_efd_client.EfdClient``.
+
+    It ducktypes the query methods used by the snapshot-list code path and
+    returns empty DataFrames, so the test does not depend on a real EFD
+    connection, network access, or the installed ``lsst-efd-client`` version.
+    """
+
+    async def select_top_n(self, *args, **kwargs):
+        return pd.DataFrame()
+
+    async def select_time_series(self, *args, **kwargs):
+        return pd.DataFrame()
+
+
 @pytest.mark.asyncio
-async def test_get_scheduler_list():
+async def test_get_scheduler_list(monkeypatch):
+    # Avoid constructing a real EfdClient (which reaches out to segwarides for
+    # credentials and to InfluxDB for a health check).
+    monkeypatch.setattr(schedview.collect.efd, "make_efd_client", lambda *a, **k: _StubEfdClient())
+
     scheduler = LFASchedulerSnapshotDashboard()
     scheduler.telescope = None
     await scheduler._async_get_scheduler_list()
-    # No snapshots should be retreived if it isn't an LFA environment
-    # the dropdown has one empty option
+    # No snapshots are retrieved from the stub client, so the dropdown keeps
+    # its single empty default option.
     assert len(scheduler.param.scheduler_fname.objects) >= 1
 
 

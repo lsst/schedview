@@ -26,6 +26,8 @@ __all__ = [
     "munge_sim_archive_metadata",
     "find_nearest_pointing_ids",
     "combine_completed_with_sims",
+    "compute_tinysum",
+    "compute_smallsum",
 ]
 
 from .astro import compute_sun_moon_positions, convert_evening_date_to_night_of_survey, night_events
@@ -52,6 +54,7 @@ from .scheduler import (
     replay_visits,
 )
 from .sim_archive import munge_sim_archive_metadata
+from .smallsum import compute_smallsum, compute_tinysum
 from .survey import compute_maps, make_survey_reward_df
 
 try:

@@ -91,6 +91,17 @@ class FileSelectorWithEmptyOption(param.FileSelector):
     Like param.FileSelector, but allows None to be deliberately selected.
     """
 
+    def __init__(self, default=Undefined, *, path=Undefined, allow_None=True, **kwargs):
+        super().__init__(default=default, path=path, allow_None=allow_None, **kwargs)
+        # param >=2.4 consumes ``allow_None`` in ``FileSelector.__init__``
+        # without forwarding it to the base ``Parameter``, leaving it falsy.
+        # Set it explicitly so a deliberate ``None`` (the "empty option")
+        # stays a valid default and selection. Without this, param's
+        # class-creation re-validation of the default (triggered because the
+        # parent class types this parameter as a ``param.String``) rejects
+        # ``None``.
+        self.allow_None = bool(allow_None)
+
     def update(self, path=Undefined):
         if path is Undefined:
             path = self.path

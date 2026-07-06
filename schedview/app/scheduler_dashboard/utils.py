@@ -68,7 +68,7 @@ def mock_schedulers_df():
 
     df = pd.DataFrame(data, columns=["time", "url"])
     df = df.sort_index(ascending=False)
-    df["url"] = df["url"].apply(lambda x: localize_scheduler_url(x))
+    df["url"] = df["url"].apply(localize_scheduler_url)
     return df["url"]
 
 
