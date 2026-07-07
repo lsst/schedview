@@ -9,6 +9,7 @@ __all__ = [
     "get_night_narrative",
     "get_night_report",
     "load_bright_stars",
+    "load_maf_summary",
     "make_efd_client",
     "query_efd_topic_for_night",
     "read_consdb",
@@ -74,3 +75,6 @@ from .rewards import read_rewards
 from .scheduler_pickle import read_scheduler, sample_pickle
 from .stars import load_bright_stars
 from .visits import NIGHT_STACKERS, cached_read_visits, read_visits
+
+# MAF summary module (does not vary by site)
+from .maf_summary import load_maf_summary
