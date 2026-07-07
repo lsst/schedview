@@ -148,107 +148,140 @@ the CLI is invoked via ``python -m schedview.examples.summary_metric_plotter``.
 Collect: ``schedview.collect.maf_summary``
 ------------------------------------------
 
-Complete module implementation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Module structure
+~~~~~~~~~~~~~~~~
 
-.. code-block:: python
+The module contains:
 
-    """Load MAF summary metrics from a ResultsDb SQLite database."""
+- One **private helper** (``_extract_transition_date``) for defensive date
+  parsing from run names.
+- One **public function** (``load_maf_summary``) that queries the database
+  and returns normalized DataFrames.
 
-    __all__ = ["load_maf_summary"]
+The module is importable from ``schedview.collect``:
 
-    import sqlite3
-    from datetime import datetime
+>>> from schedview.collect.maf_summary import load_maf_summary
+>>> load_maf_summary.__module__
+'schedview.collect.maf_summary'
 
-    import pandas as pd
+
+Private helper: ``_extract_transition_date``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Extracts a ``datetime.date`` from a run_name by matching an 8-digit
+YYYYMMDD pattern at the end of the string.  Returns ``None`` if parsing
+fails.
+
+>>> from schedview.collect.maf_summary import _extract_transition_date
+>>> from datetime import date
+
+**Normal chimera run names**:
+
+>>> _extract_transition_date("chimera_20251031")
+datetime.date(2025, 10, 31)
+
+**Multi-underscore prefixes**:
+
+>>> _extract_transition_date("some_long_prefix_20260101")
+datetime.date(2026, 1, 1)
+
+**No valid date suffix** — returns ``None``:
+
+>>> _extract_transition_date("badname") is None
+True
+>>> _extract_transition_date("chimera_notadate") is None
+True
+
+**Invalid date digits** (e.g. month 13) — returns ``None``:
+
+>>> _extract_transition_date("chimera_20251301") is None
+True
 
 
-    def load_maf_summary(
-        db_path: str,
-        run_name_pattern: str = "chimera_%",
-    ) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """Load and preprocess MAF summary data from a ResultsDb database.
+Public function: ``load_maf_summary``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-        Queries the database for all runs matching ``run_name_pattern`` and
-        returns a DataFrame with one row per metric per run, plus a
-        deduplicated DataFrame of unique metric labels for selector dropdowns.
+Queries the ResultsDb SQLite database for runs matching
+``run_name_pattern`` and returns two DataFrames: the full summary data
+and a deduplicated table of unique metric labels.
 
-        Parameters
-        ----------
-        db_path : str
-            Path to the resultsDb_sqlite.db file.
-        run_name_pattern : str, optional
-            SQL LIKE pattern to filter ``run_name`` values.  Defaults to
-            ``"chimera_%"`` to select chimera runs.
+**Signature and return types**:
 
-        Returns
-        -------
-        summary_df : pd.DataFrame
-            DataFrame with columns: run_name, metric_name, slicer_name,
-            metric_info_label, summary_metric, summary_value,
-            transition_dayobs, transition_date.
-        unique_metrics : pd.DataFrame
-            Deduplicated and sorted DataFrame of unique (metric_name,
-            slicer_name, metric_info_label, summary_metric) combinations.
+>>> import inspect
+>>> sig = inspect.signature(load_maf_summary)
+>>> sorted(sig.parameters.keys())
+['db_path', 'run_name_pattern']
+>>> sig.parameters['run_name_pattern'].default
+'chimera_%'
 
-        Raises
-        ------
-        sqlite3.OperationalError
-            If the database file does not exist or cannot be opened.
-        """
-        conn = sqlite3.connect(db_path)
-        query = """
-        SELECT
-            m.run_name,
-            m.metric_name,
-            m.slicer_name,
-            m.metric_info_label,
-            ss.summary_name AS summary_metric,
-            ss.summary_value
-        FROM metrics m
-        JOIN summarystats ss ON m.metric_id = ss.metric_id
-        WHERE m.run_name LIKE ?
-        ORDER BY m.run_name, m.metric_name, m.slicer_name,
-                 m.metric_info_label, ss.summary_name
-        """
-        df = pd.read_sql_query(query, conn, params=(run_name_pattern,))
-        conn.close()
+**Functional test with a fixture database**:
 
-        # Extract transition_dayobs from run_name.
-        # For "chimera_20251031" this yields 20251031.
-        # Uses the portion after the last underscore.
-        df["transition_dayobs"] = df["run_name"].apply(
-            lambda x: int(x.rsplit("_", 1)[1])
-        )
-        df["transition_date"] = df["transition_dayobs"].apply(
-            lambda d: datetime.strptime(str(d), "%Y%m%d").date()
-        )
+>>> import sqlite3, tempfile, os
+>>> tmpdir = tempfile.mkdtemp()
+>>> db_path = os.path.join(tmpdir, "test.db")
+>>> conn = sqlite3.connect(db_path)
+>>> _ = conn.execute(
+...     "CREATE TABLE metrics (metric_id INTEGER PRIMARY KEY,"
+...     " run_name TEXT, metric_name TEXT,"
+...     " slicer_name TEXT, metric_info_label TEXT)")
+>>> _ = conn.execute(
+...     "CREATE TABLE summarystats (stat_id INTEGER PRIMARY KEY,"
+...     " metric_id INTEGER, summary_name TEXT,"
+...     " summary_value REAL)")
+>>> _ = conn.execute(
+...     "INSERT INTO metrics VALUES"
+...     " (1,'chimera_20251031','fO','HealpixSlicer','')")
+>>> _ = conn.execute(
+...     "INSERT INTO metrics VALUES"
+...     " (2,'chimera_20251130','fO','HealpixSlicer','')")
+>>> _ = conn.execute(
+...     "INSERT INTO summarystats VALUES (1,1,'fOArea',100.0)")
+>>> _ = conn.execute(
+...     "INSERT INTO summarystats VALUES (2,2,'fOArea',150.0)")
+>>> conn.commit()
+>>> conn.close()
+>>> summary_df, unique_metrics = load_maf_summary(db_path)
 
-        # Deduplicated unique metrics for dropdown options
-        unique_metrics = (
-            df.drop_duplicates(
-                subset=[
-                    "metric_name",
-                    "slicer_name",
-                    "metric_info_label",
-                    "summary_metric",
-                ]
-            )
-            .sort_values(
-                ["metric_name", "slicer_name", "metric_info_label", "summary_metric"]
-            )
-            .reset_index(drop=True)
-        )
+**Output columns**:
 
-        return df, unique_metrics
+>>> sorted(summary_df.columns)
+['metric_info_label', 'metric_name', 'run_name', 'slicer_name', 'summary_metric', 'summary_value', 'transition_date', 'transition_dayobs']
 
-Implementation notes:
+**Date parsing produces ``datetime.date`` objects**:
 
-- Uses a parameterized query (``?`` placeholder) to pass
-  ``run_name_pattern``, avoiding SQL injection.
-- ``rsplit("_", 1)[1]`` extracts the date portion after the last underscore,
-  making it work for any prefix pattern (e.g. ``"chimera_"``, ``"sim_"``).
-- The ``transition_date`` is a ``datetime.date`` object, not a ``datetime``.
+>>> from datetime import date
+>>> summary_df["transition_date"].iloc[0] == date(2025, 10, 31)
+True
+>>> int(summary_df["transition_dayobs"].iloc[0])
+20251031
+
+**Unique metrics are deduplicated**:
+
+>>> len(unique_metrics)
+1
+>>> unique_metrics["metric_name"].iloc[0]
+'fO'
+
+**Malformed run names raise ``ValueError`` when all rows are bad**:
+
+>>> conn = sqlite3.connect(db_path)
+>>> _ = conn.execute("DELETE FROM metrics")
+>>> _ = conn.execute("DELETE FROM summarystats")
+>>> _ = conn.execute(
+...     "INSERT INTO metrics VALUES"
+...     " (10,'badname','fO','Slicer','')")
+>>> _ = conn.execute(
+...     "INSERT INTO summarystats VALUES (10,10,'fOArea',99.0)")
+>>> conn.commit()
+>>> conn.close()
+>>> try:
+...     load_maf_summary(db_path, run_name_pattern="%")
+... except ValueError as e:
+...     "No rows with parseable transition dates" in str(e)
+True
+
+>>> import shutil
+>>> shutil.rmtree(tmpdir)
 
 
 Plot: ``schedview.plot.maf_summary``
@@ -259,613 +292,359 @@ Module structure
 
 The module contains:
 
-- Two **private helpers** (``_build_data_dict``, ``_build_cascading_maps``)
-  that build the internal data structures.
+- Two **data-prep private helpers** (``_build_data_dict``,
+  ``_build_cascading_maps``) that build the internal data structures.
+- Three **plot-construction private helpers**
+  (``_create_metric_selectors``, ``_preallocate_sources_and_renderers``,
+  ``_create_combined_legend``) that decompose the Bokeh plot setup.
+- One **module-level constant** (``_CALLBACK_CODE``) containing the
+  CustomJS callback JavaScript with a contract comment.
 - Two **public functions** (``make_metric_selector_plot``,
   ``save_metric_data_json``).
 - One **private class** (``_NumpyEncoder``) for JSON serialization.
 
-.. code-block:: python
+The public API is importable from ``schedview.plot``:
 
-    """Interactive Bokeh plot for exploring MAF summary metrics."""
-
-    __all__ = ["make_metric_selector_plot", "save_metric_data_json"]
-
-    import json
-    import re
-    from datetime import datetime
-
-    import bokeh.core.enums
-    import bokeh.events
-    import bokeh.io
-    import bokeh.layouts
-    import bokeh.models
-    import bokeh.palettes
-    import bokeh.plotting
-    import numpy as np
-    import pandas as pd
+>>> from schedview.plot.maf_summary import (
+...     make_metric_selector_plot, save_metric_data_json)
+>>> make_metric_selector_plot.__module__
+'schedview.plot.maf_summary'
+>>> save_metric_data_json.__module__
+'schedview.plot.maf_summary'
 
 
 Private helper: ``_build_data_dict``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: python
+Groups ``summary_df`` by (metric_name, metric_info_label,
+summary_metric) and returns a dictionary mapping pipe-delimited keys
+to data arrays.  Empty info labels are normalized to ``"<none>"``.
 
-    def _build_data_dict(summary_df: pd.DataFrame) -> dict:
-        """Build the metric data dictionary for JavaScript consumption.
+>>> from schedview.plot.maf_summary import _build_data_dict
+>>> from datetime import date
+>>> import pandas as pd
+>>> summary_df = pd.DataFrame({
+...     "run_name": ["chimera_20251031", "chimera_20251130"],
+...     "metric_name": ["fO", "fO"],
+...     "slicer_name": ["HealpixSlicer", "HealpixSlicer"],
+...     "metric_info_label": ["", ""],
+...     "summary_metric": ["fOArea", "fOArea"],
+...     "summary_value": [100.0, 150.0],
+...     "transition_dayobs": [20251031, 20251130],
+...     "transition_date": [date(2025, 10, 31), date(2025, 11, 30)],
+... })
+>>> data_dict = _build_data_dict(summary_df)
 
-        Groups summary_df by (metric_name, metric_info_label, summary_metric)
-        and returns a dictionary mapping pipe-delimited keys to data arrays.
+**Key format** — empty info labels become ``<none>``:
 
-        Keys have the format "metric_name|info_label|summary_metric" where
-        empty info labels are normalized to "<none>".
+>>> sorted(data_dict.keys())
+['fO|<none>|fOArea']
 
-        Each value is a dict with keys:
-        - "transition_date": list of float (ms since epoch)
-        - "transition_date_labels": list of str ("YYYY-MM-DD")
-        - "summary_value": list of float (may contain None for NaN)
-        - "run_name": list of str
-        """
+**Value structure** — each entry has timestamp, label, value, run arrays:
 
-Logic:
+>>> sorted(data_dict["fO|<none>|fOArea"].keys())
+['run_name', 'summary_value', 'transition_date', 'transition_date_labels']
+>>> data_dict["fO|<none>|fOArea"]["summary_value"]
+[100.0, 150.0]
+>>> data_dict["fO|<none>|fOArea"]["transition_date_labels"]
+['2025-10-31', '2025-11-30']
+>>> data_dict["fO|<none>|fOArea"]["run_name"]
+['chimera_20251031', 'chimera_20251130']
 
-1. Group ``summary_df`` by ``["metric_name", "metric_info_label",
-   "summary_metric"]``.
-2. For each group, build a key: normalize empty/NaN info_label to
-   ``"<none>"``, then join with ``"|"``.
-3. Convert ``transition_date`` values to milliseconds since epoch:
-   ``datetime.combine(d, datetime.min.time()).timestamp() * 1000``.
-4. Convert ``transition_date`` values to ISO strings for hover labels.
-5. Convert ``summary_value`` to a Python list (calling ``.tolist()`` on the
-   numpy array).  NaN values will become ``float('nan')`` in the list; the
-   JSON serialization step converts them to ``null``.
-6. Convert ``run_name`` to a Python list.
+**Timestamps are milliseconds since epoch** (floats):
+
+>>> all(isinstance(t, float)
+...     for t in data_dict["fO|<none>|fOArea"]["transition_date"])
+True
+
+**Non-empty info labels are preserved**:
+
+>>> df2 = summary_df.copy()
+>>> df2["metric_info_label"] = ["g band", "g band"]
+>>> d2 = _build_data_dict(df2)
+>>> sorted(d2.keys())
+['fO|g band|fOArea']
 
 
 Private helper: ``_build_cascading_maps``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: python
+Builds cascading dropdown mappings: ``metric_to_info`` maps each
+metric_name to its sorted list of info labels, and
+``metric_info_to_summary`` maps each ``"metric|info"`` key to its
+sorted list of summary metrics.
 
-    def _build_cascading_maps(
-        unique_metrics: pd.DataFrame,
-    ) -> tuple[dict, dict]:
-        """Build cascading dropdown mappings.
+>>> from schedview.plot.maf_summary import _build_cascading_maps
+>>> unique_metrics = pd.DataFrame({
+...     "run_name": ["chimera_20251031"] * 3,
+...     "metric_name": ["fO", "fO", "SNR"],
+...     "slicer_name": ["HealpixSlicer"] * 3,
+...     "metric_info_label": ["", "g band", ""],
+...     "summary_metric": ["fOArea", "fOArea", "Median"],
+... })
+>>> metric_to_info, metric_info_to_summary = (
+...     _build_cascading_maps(unique_metrics))
 
-        Returns
-        -------
-        metric_to_info : dict
-            Maps metric_name -> sorted list of normalized info labels.
-        metric_info_to_summary : dict
-            Maps "metric_name|info_label" -> sorted list of summary metrics.
-        """
+**metric_to_info** — sorted info labels per metric:
 
-Logic:
+>>> metric_to_info["fO"]
+['<none>', 'g band']
+>>> metric_to_info["SNR"]
+['<none>']
 
-1. Iterate over rows of ``unique_metrics``.
-2. For each row, normalize ``metric_info_label`` (empty/NaN → ``"<none>"``).
-3. Build ``metric_to_info``: accumulate info labels into sets per
-   metric_name, then sort each set into a list.
-4. Build ``metric_info_to_summary``: accumulate summary metrics into sets
-   per ``"metric_name|info_label"`` key, then sort each set into a list.
+**metric_info_to_summary** — summary metrics per metric|info key:
+
+>>> metric_info_to_summary["fO|<none>"]
+['fOArea']
+>>> metric_info_to_summary["fO|g band"]
+['fOArea']
+>>> metric_info_to_summary["SNR|<none>"]
+['Median']
+
+
+Private helper: ``_create_metric_selectors``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Creates the three Bokeh selector widgets and determines initial
+selections from the cascading maps.
+
+>>> from schedview.plot.maf_summary import _create_metric_selectors
+>>> import bokeh.models
+>>> result = _create_metric_selectors(
+...     metric_to_info, metric_info_to_summary)
+>>> len(result)
+6
+
+**Returns a Select and two MultiSelects**:
+
+>>> (metric_name_sel, info_sel, summary_sel,
+...  init_info, init_summary, default_name) = result
+>>> isinstance(metric_name_sel, bokeh.models.Select)
+True
+>>> isinstance(info_sel, bokeh.models.MultiSelect)
+True
+>>> isinstance(summary_sel, bokeh.models.MultiSelect)
+True
+
+**Default metric is first alphabetically**:
+
+>>> default_name
+'SNR'
+
+
+Private helper: ``_preallocate_sources_and_renderers``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Pre-creates a ``sources[color_idx][linestyle_idx]`` nested list of
+``ColumnDataSource`` objects, each with scatter + line renderers.
+
+>>> from schedview.plot.maf_summary import (
+...     _preallocate_sources_and_renderers)
+>>> import bokeh.plotting
+>>> p = bokeh.plotting.figure(width=400, height=200)
+>>> sources = _preallocate_sources_and_renderers(
+...     p, ["red", "blue"], ["solid", "dashed"])
+>>> len(sources)
+2
+>>> len(sources[0])
+2
+>>> isinstance(sources[0][0], bokeh.models.ColumnDataSource)
+True
+
+**Each source has the expected columns**:
+
+>>> sorted(sources[0][0].data.keys())
+['info_label', 'run_name', 'summary_metric', 'summary_value', 'transition_date', 'transition_date_labels']
+
+
+Private helper: ``_create_combined_legend``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Creates the combined legend with invisible reference renderers for
+color-coding (info labels) and line-style coding (summary metrics).
+
+>>> from schedview.plot.maf_summary import _create_combined_legend
+>>> p2 = bokeh.plotting.figure(width=400, height=200)
+>>> legend, info_rend, summary_rend = _create_combined_legend(
+...     p2, ["red", "blue"], ["solid", "dashed"],
+...     [1000.0, 2000.0], ["label_a"], ["stat_1"])
+>>> isinstance(legend, bokeh.models.Legend)
+True
+>>> len(info_rend)
+2
+>>> len(summary_rend)
+2
+
+**Legend items**: first N entries are for info labels (by color),
+next M entries are for summary metrics (by line style):
+
+>>> len(legend.items)
+4
+>>> legend.items[0].label.value
+'label_a'
+>>> legend.items[0].visible
+True
+>>> legend.items[1].visible
+False
 
 
 Public function: ``make_metric_selector_plot``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: python
+Creates the complete interactive Bokeh layout with selector widgets,
+figure, legend, and CustomJS callbacks.
 
-    def make_metric_selector_plot(
-        summary_df: pd.DataFrame,
-        unique_metrics: pd.DataFrame,
-        build_date: str | None = None,
-        line_colors: list[str] | None = None,
-        line_styles: list[str] | None = None,
-        data_json_url: str | None = None,
-    ) -> bokeh.layouts.Column:
-        """Create an interactive Bokeh plot with metric selector widgets.
+>>> from schedview.plot.maf_summary import make_metric_selector_plot
+>>> import bokeh.layouts
+>>> plot = make_metric_selector_plot(summary_df, unique_metrics)
+>>> isinstance(plot, bokeh.layouts.Column)
+True
 
-        Parameters
-        ----------
-        summary_df : pd.DataFrame
-            DataFrame from ``load_maf_summary`` containing all metric values.
-        unique_metrics : pd.DataFrame
-            DataFrame of unique metric labels for the selector dropdowns.
-        build_date : str or None, optional
-            Build date string to show in a heading above the plot.
-        line_colors : list of str or None, optional
-            Color values for info label differentiation.  Defaults to
-            ``bokeh.palettes.Colorblind8``.
-        line_styles : list of str or None, optional
-            Line dash names for summary metric differentiation.  Defaults to
-            ``list(bokeh.core.enums.LineDash)``.
-        data_json_url : str or None, optional
-            URL to external JSON data file.  When set, data is fetched at
-            runtime via fetch().  When None, data is embedded inline.
+**Without build_date**: layout has 2 children (selectors row + figure):
 
-        Returns
-        -------
-        layout : bokeh.layouts.Column
-            Complete Bokeh layout ready for display or saving.
-        """
+>>> len(plot.children)
+2
+>>> isinstance(plot.children[0], bokeh.layouts.Row)
+True
 
-Implementation Steps (in order)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**With build_date**: layout has 3 children (heading + selectors + figure):
 
-1. **Set up palettes**:
+>>> plot2 = make_metric_selector_plot(
+...     summary_df, unique_metrics, build_date="2026-07-07")
+>>> len(plot2.children)
+3
+>>> isinstance(plot2.children[0], bokeh.models.PreText)
+True
+>>> "2026-07-07" in plot2.children[0].text
+True
 
-   .. code-block:: python
+**Selectors row contains 3 widgets**:
 
-       line_colors = line_colors or list(bokeh.palettes.Colorblind8)
-       line_styles = line_styles or list(bokeh.core.enums.LineDash)
+>>> selectors = plot.children[0]
+>>> len(selectors.children)
+3
+>>> isinstance(selectors.children[0], bokeh.models.Select)
+True
+>>> isinstance(selectors.children[1], bokeh.models.MultiSelect)
+True
+>>> isinstance(selectors.children[2], bokeh.models.MultiSelect)
+True
 
-2. **Build internal data structures** by calling ``_build_data_dict`` and
-   ``_build_cascading_maps``.
+**External JSON URL mode** (data not embedded inline):
 
-3. **Compute ticker dates**: get sorted unique ``transition_date`` values
-   from ``summary_df``, convert to ISO strings and millisecond timestamps.
-
-4. **Determine initial selections**:
-
-   - ``metric_names``: sorted list of keys from ``metric_to_info``.
-   - ``default_metric_name``: ``metric_names[0]``.
-   - ``default_info_labels``: ``metric_to_info[default_metric_name]``.
-   - ``initial_info_selection``: first 2 info labels (or fewer if limited).
-   - ``default_summary_metrics``: looked up via
-     ``metric_info_to_summary[default_metric_name + "|" + initial_info_selection[0]]``.
-   - ``initial_summary_selection``: first 2 summary metrics (or fewer).
-
-5. **Create widgets**:
-
-   - ``metric_name_selector``: ``bokeh.models.Select(value=..., options=metric_names, width=250)``
-   - ``metric_info_selector``: ``bokeh.models.MultiSelect(value=initial_info_selection, options=default_info_labels, width=300, title="Metric Info Labels (select multiple to overplot):")``
-   - ``summary_metric_selector``: ``bokeh.models.MultiSelect(value=initial_summary_selection, options=default_summary_metrics, width=300, title="Summary Metrics (select multiple to overplot):")``
-
-6. **Create figure**:
-
-   .. code-block:: python
-
-       p = bokeh.plotting.figure(
-           width=800,
-           height=400,
-           sizing_mode="stretch_width",
-           x_axis_type="datetime",
-           x_axis_label="Transition Date",
-           y_axis_label="Summary Value",
-           title=f"{default_metric_name} | {', '.join(initial_summary_selection)}",
-           tools="pan,wheel_zoom,box_zoom,reset,hover,crosshair",
-       )
-
-7. **Set x-axis ticks**: use ``bokeh.models.FixedTicker(ticks=ticker_dates)``
-   and ``p.xaxis.major_label_overrides`` to map timestamps to ISO strings.
-   Set ``p.x_range = bokeh.models.Range1d(min(ticker_dates), max(ticker_dates))``.
-
-8. **Pre-create sources**: nested list ``sources[color_idx][linestyle_idx]``.
-   For each (color_idx, linestyle_idx) pair:
-
-   - Create a ``ColumnDataSource`` with empty columns:
-     ``transition_date``, ``transition_date_labels``, ``summary_value``,
-     ``run_name``, ``info_label``, ``summary_metric``.
-   - Add a ``p.scatter(...)`` renderer with the corresponding color and
-     ``line_dash``.
-   - Add a ``p.line(...)`` renderer with the corresponding color and
-     ``line_dash``.
-
-9. **Populate initial data**: for each (info_idx, summary_idx) in the
-   initial selections, look up the data from ``data_dict`` using the key
-   ``f"{default_metric_name}|{info_label}|{summary_metric}"`` and assign
-   to ``sources[info_idx][summary_idx].data``.
-
-10. **Configure hover tool**:
-
-    .. code-block:: python
-
-        p.hover.tooltips = [
-            ("Date", "@transition_date_labels"),
-            ("Value", "@summary_value{0.000}"),
-            ("Run", "@run_name"),
-            ("Info", "@info_label"),
-            ("Summary Metric", "@summary_metric"),
-        ]
-
-11. **Create legend**: pre-create LegendItems for all possible colors (one
-    per info label slot) and all possible line styles (one per summary metric
-    slot).  Set initial labels and visibility based on the initial
-    selections.  Add the legend to the figure with
-    ``p.add_layout(legend, "below")``.
-
-    For info label legend items, create invisible reference scatter
-    renderers (single-point sources at ``ticker_dates[0]``, y=0) with the
-    corresponding color.
-
-    For summary metric legend items, create invisible reference line
-    renderers with the corresponding line_dash in black.
-
-12. **Build CustomJS callback**: pass all necessary references as ``args``.
-    The JavaScript code handles:
-
-    - Cascading dropdown updates when ``metric_name`` changes.
-    - Data assignment to the correct sources based on current selections.
-    - Clearing unused sources.
-    - Updating legend item labels and visibility.
-    - Updating the plot title.
-
-    When ``data_json_url`` is ``None``, pass the full ``data_dict`` as
-    inline data.  When set, pass ``null`` for ``data_dict`` and use
-    ``fetch()`` with ``window._chimera_data`` caching.
-
-13. **Attach callbacks**: call ``js_on_change("value", callback)`` on all
-    three selectors.
-
-14. **Pre-fetch on DocumentReady** (only when ``data_json_url`` is set):
-
-    .. code-block:: python
-
-        prefetch_cb = bokeh.models.CustomJS(
-            args={"data_json_url": data_json_url},
-            code="""
-                fetch(data_json_url)
-                    .then(r => r.json())
-                    .then(json => {
-                        window._chimera_data = json.data_dict;
-                        console.log('Pre-fetched metric data');
-                    });
-            """,
-        )
-        p.js_on_event(bokeh.events.DocumentReady, prefetch_cb)
-
-15. **Assemble layout**:
-
-    .. code-block:: python
-
-        layout_elements = []
-        if build_date:
-            heading = bokeh.models.PreText(
-                text=f"Summary Metric Explorer (built: {build_date})",
-                sizing_mode="stretch_width",
-                height=30,
-            )
-            layout_elements.append(heading)
-
-        selectors_row = bokeh.layouts.row(
-            metric_name_selector,
-            metric_info_selector,
-            summary_metric_selector,
-            sizing_mode="stretch_width",
-        )
-        layout_elements.append(selectors_row)
-        layout_elements.append(p)
-
-        return bokeh.layouts.column(*layout_elements, sizing_mode="stretch_width")
+>>> plot3 = make_metric_selector_plot(
+...     summary_df, unique_metrics, data_json_url="data.json")
+>>> isinstance(plot3, bokeh.layouts.Column)
+True
 
 
-CustomJS Callback (JavaScript)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+CustomJS Callback (``_CALLBACK_CODE``)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The callback code must be a single string.  It is invoked whenever any of
-the three selectors changes.  The full JavaScript logic:
+The callback JavaScript is stored as a module-level string constant
+``_CALLBACK_CODE``.  It is invoked whenever any of the three selectors
+changes.
 
-.. code-block:: javascript
+>>> from schedview.plot.maf_summary import _CALLBACK_CODE
+>>> isinstance(_CALLBACK_CODE, str)
+True
 
-    const changed = cb_obj;
-    const metric_name = selector_name.value;
-    const selectedSummaryMetrics = selector_summary.value;
-    const selectedInfoLabels = selector_info.value;
+**Core callback logic is present**:
 
-    // If metric_name changed, update the cascading dropdowns
-    if (changed === selector_name) {
-        const newInfoOptions = metric_to_info[metric_name];
-        if (newInfoOptions && newInfoOptions.length > 0) {
-            selector_info.options = newInfoOptions;
+>>> "performUpdate" in _CALLBACK_CODE
+True
+>>> "source.change.emit()" in _CALLBACK_CODE
+True
 
-            // Keep current selections if still valid, else reset
-            let hasValidSelection = false;
-            for (const sel of selectedInfoLabels) {
-                if (newInfoOptions.includes(sel)) {
-                    hasValidSelection = true;
-                    break;
-                }
-            }
-            if (!hasValidSelection) {
-                selector_info.value = newInfoOptions.slice(0, Math.min(2, newInfoOptions.length));
-            }
+**Error handling** — fetch calls include ``.catch()``:
 
-            // Update summary metrics for the first info label
-            const firstInfoLabel = selector_info.value[0] || newInfoOptions[0];
-            const summaryKey = metric_name + '|' + firstInfoLabel;
-            const newSummaryOptions = metric_info_to_summary[summaryKey];
-            if (newSummaryOptions && newSummaryOptions.length > 0) {
-                selector_summary.options = newSummaryOptions;
+>>> ".catch(" in _CALLBACK_CODE
+True
 
-                const newSummarySelection = [];
-                for (const sm of selectedSummaryMetrics) {
-                    if (newSummaryOptions.includes(sm) && newSummarySelection.length < 2) {
-                        newSummarySelection.push(sm);
-                    }
-                }
-                if (newSummarySelection.length === 0) {
-                    newSummarySelection.push(newSummaryOptions[0]);
-                }
-                selector_summary.value = newSummarySelection;
-            }
-        }
-    }
+**Key data structures referenced in JS**:
 
-    // Update plot title
-    plot.title.text = metric_name + ' | ' + selector_summary.value.join(', ');
-
-    function performUpdate(theDataDict) {
-        const curInfoLabels = selector_info.value;
-        const curSummaryMetrics = selector_summary.value;
-        const numInfoLabels = curInfoLabels.length;
-        const numSummaryMetrics = curSummaryMetrics.length;
-
-        for (let colorIdx = 0; colorIdx < num_colors; colorIdx++) {
-            for (let linestyleIdx = 0; linestyleIdx < num_styles; linestyleIdx++) {
-                const source = sources[colorIdx][linestyleIdx];
-
-                if (colorIdx < numInfoLabels && linestyleIdx < numSummaryMetrics) {
-                    const assignedInfoLabel = curInfoLabels[colorIdx];
-                    const assignedSummaryMetric = curSummaryMetrics[linestyleIdx];
-                    const infoKey = (assignedInfoLabel === '' || assignedInfoLabel === '<none>')
-                        ? '<none>' : assignedInfoLabel;
-                    const dataKey = metric_name + '|' + infoKey + '|' + assignedSummaryMetric;
-                    const newData = theDataDict[dataKey];
-
-                    if (newData) {
-                        source.data = {
-                            transition_date: newData.transition_date,
-                            transition_date_labels: newData.transition_date_labels,
-                            summary_value: newData.summary_value,
-                            run_name: newData.run_name,
-                            info_label: Array(newData.transition_date.length).fill(assignedInfoLabel),
-                            summary_metric: Array(newData.transition_date.length).fill(assignedSummaryMetric),
-                        };
-                    } else {
-                        source.data = {
-                            transition_date: [], transition_date_labels: [],
-                            summary_value: [], run_name: [],
-                            info_label: [], summary_metric: [],
-                        };
-                    }
-                } else {
-                    source.data = {
-                        transition_date: [], transition_date_labels: [],
-                        summary_value: [], run_name: [],
-                        info_label: [], summary_metric: [],
-                    };
-                }
-                source.change.emit();
-            }
-        }
-
-        // Update legend items: first num_colors items are info labels,
-        // next num_styles items are summary metrics
-        for (let i = 0; i < num_colors; i++) {
-            const legendItem = combinedLegend.items[i];
-            if (i < curInfoLabels.length) {
-                legendItem.label = curInfoLabels[i];
-                legendItem.visible = true;
-            } else {
-                legendItem.visible = false;
-            }
-        }
-        for (let i = 0; i < num_styles; i++) {
-            const legendItem = combinedLegend.items[num_colors + i];
-            if (i < curSummaryMetrics.length) {
-                legendItem.label = curSummaryMetrics[i];
-                legendItem.visible = true;
-            } else {
-                legendItem.visible = false;
-            }
-        }
-    }
-
-    // Dispatch: inline data, cached fetch data, or fetch from URL
-    if (data_dict !== null) {
-        performUpdate(data_dict);
-    } else if (window._chimera_data) {
-        performUpdate(window._chimera_data);
-    } else {
-        fetch(data_json_url)
-            .then(r => r.json())
-            .then(json => {
-                window._chimera_data = json.data_dict;
-                performUpdate(window._chimera_data);
-            });
-    }
-
-The ``args`` dict passed to ``CustomJS`` must include:
-
-.. code-block:: python
-
-    args = {
-        "selector_name": metric_name_selector,
-        "selector_summary": summary_metric_selector,
-        "selector_info": metric_info_selector,
-        "plot": p,
-        "sources": sources,  # nested list [color_idx][linestyle_idx]
-        "num_colors": len(line_colors),
-        "num_styles": len(line_styles),
-        "data_dict": data_dict if data_json_url is None else None,
-        "data_json_url": data_json_url,
-        "metric_to_info": metric_to_info,
-        "metric_info_to_summary": metric_info_to_summary,
-        "combinedLegend": combined_legend,
-    }
-
-Note: Bokeh serializes Python ``None`` as JavaScript ``null``, nested Python
-lists as JavaScript arrays, and Python dicts as JavaScript objects.  This is
-why passing ``sources`` as a nested list works — Bokeh resolves the
-ColumnDataSource references within the nested structure.
+>>> "metric_to_info" in _CALLBACK_CODE
+True
+>>> "metric_info_to_summary" in _CALLBACK_CODE
+True
+>>> "window._chimera_data" in _CALLBACK_CODE
+True
 
 
 Public function: ``save_metric_data_json``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: python
+Serializes the data dictionary and cascading maps to a JSON file that
+the HTML plot loads at runtime.
 
-    def save_metric_data_json(
-        summary_df: pd.DataFrame,
-        unique_metrics: pd.DataFrame,
-        json_path: str,
-    ) -> None:
-        """Save metric data and cascading dropdown mappings to a JSON file.
+>>> import json, tempfile, os
+>>> from schedview.plot.maf_summary import save_metric_data_json
+>>> tmpdir = tempfile.mkdtemp()
+>>> json_path = os.path.join(tmpdir, "test_data.json")
+>>> save_metric_data_json(summary_df, unique_metrics, json_path)
 
-        The output file is loaded at runtime by the HTML visualization when
-        ``data_json_url`` is set in ``make_metric_selector_plot``.
+**Output is valid JSON with expected top-level keys**:
 
-        Parameters
-        ----------
-        summary_df : pd.DataFrame
-            DataFrame from ``load_maf_summary`` containing all metric values.
-        unique_metrics : pd.DataFrame
-            DataFrame of unique metrics for building cascading mappings.
-        json_path : str
-            Path where the JSON file will be written.
-        """
-        data_dict = _build_data_dict(summary_df)
-        metric_to_info, metric_info_to_summary = _build_cascading_maps(unique_metrics)
+>>> with open(json_path) as f:
+...     data = json.load(f)
+>>> sorted(data.keys())
+['data_dict', 'metric_info_to_summary', 'metric_to_info']
 
-        output = {
-            "data_dict": data_dict,
-            "metric_to_info": metric_to_info,
-            "metric_info_to_summary": metric_info_to_summary,
-        }
+**Data dict keys use pipe-delimited format**:
 
-        raw = json.dumps(output, cls=_NumpyEncoder)
-        # json.dumps writes Python float('nan') as bare NaN, which is
-        # invalid JSON.  Replace with null.
-        raw = re.sub(r"\bNaN\b", "null", raw)
-        with open(json_path, "w") as f:
-            f.write(raw)
+>>> all("|" in k for k in data["data_dict"].keys())
+True
 
+**NaN values are serialized as JSON null** (not bare ``NaN``):
 
-Private class: ``_NumpyEncoder``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+>>> import math
+>>> df_nan = summary_df.copy()
+>>> df_nan.loc[0, "summary_value"] = float("nan")
+>>> nan_path = os.path.join(tmpdir, "nan_test.json")
+>>> unique_nan = df_nan.drop_duplicates(
+...     subset=["metric_name", "slicer_name",
+...             "metric_info_label", "summary_metric"])
+>>> save_metric_data_json(df_nan, unique_nan, nan_path)
+>>> with open(nan_path) as f:
+...     content = f.read()
+>>> "NaN" not in content
+True
+>>> with open(nan_path) as f:
+...     nan_data = json.load(f)
+>>> nan_data["data_dict"]["fO|<none>|fOArea"]["summary_value"][0] is None
+True
 
-.. code-block:: python
-
-    class _NumpyEncoder(json.JSONEncoder):
-        """JSON encoder that handles numpy types."""
-
-        def default(self, obj):
-            if isinstance(obj, np.integer):
-                return int(obj)
-            if isinstance(obj, np.floating):
-                return float(obj)
-            if isinstance(obj, np.ndarray):
-                return obj.tolist()
-            return super().default(obj)
+>>> import shutil
+>>> shutil.rmtree(tmpdir)
 
 
 Report: ``schedview.examples.summary_metric_plotter``
 -----------------------------------------------------
 
 This module provides the command-line executable that drives the full
-workflow.
+workflow: collect → save JSON → plot → report HTML.
 
-Complete module implementation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+>>> from schedview.examples.summary_metric_plotter import (
+...     make_summary_metric_plot, main)
+>>> make_summary_metric_plot.__module__
+'schedview.examples.summary_metric_plotter'
 
-.. code-block:: python
+**Signature**:
 
-    """Command-line tool to generate a Summary Metric Explorer HTML file.
+>>> import inspect
+>>> sig = inspect.signature(make_summary_metric_plot)
+>>> sorted(sig.parameters.keys())
+['build_date', 'db_path', 'output_html', 'run_name_pattern', 'title']
+>>> sig.parameters['title'].default
+'Summary Metric Explorer'
+>>> sig.parameters['run_name_pattern'].default
+'chimera_%'
 
-    Usage::
+**CLI entry point is a click command**:
 
-        python -m schedview.examples.summary_metric_plotter \\
-            /path/to/resultsDb_sqlite.db output.html
-    """
-
-    import os
-    from datetime import datetime
-
-    import bokeh.io
-    import click
-
-    from schedview.collect.maf_summary import load_maf_summary
-    from schedview.plot.maf_summary import make_metric_selector_plot, save_metric_data_json
-
-
-    def make_summary_metric_plot(
-        db_path: str,
-        output_html: str,
-        build_date: str | None = None,
-        title: str = "Summary Metric Explorer",
-        run_name_pattern: str = "chimera_%",
-    ) -> None:
-        """Generate an interactive Summary Metric Explorer HTML file.
-
-        Parameters
-        ----------
-        db_path : str
-            Path to the ResultsDb SQLite database file.
-        output_html : str
-            Path for the output HTML file.
-        build_date : str or None, optional
-            Build date string for the heading.  If None, uses current datetime.
-        title : str, optional
-            HTML page title.
-        run_name_pattern : str, optional
-            SQL LIKE pattern to filter run names.
-        """
-        if build_date is None:
-            build_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        # Collect
-        summary_df, unique_metrics = load_maf_summary(db_path, run_name_pattern)
-
-        # Derive JSON path from HTML path
-        if output_html.endswith(".html"):
-            json_path = output_html[:-5] + "_data.json"
-        else:
-            json_path = output_html + "_data.json"
-
-        # Save JSON data file
-        save_metric_data_json(summary_df, unique_metrics, json_path)
-
-        # Plot
-        data_json_url = os.path.basename(json_path)
-        plot = make_metric_selector_plot(
-            summary_df, unique_metrics, build_date, data_json_url=data_json_url
-        )
-
-        # Report
-        bokeh.io.output_file(filename=output_html, title=f"{title} (built: {build_date})")
-        bokeh.io.save(plot)
-
-        print(f"Saved to {output_html}")
-        print(f"Data written to {json_path}")
-
-
-    @click.command()
-    @click.argument("db_path", type=click.Path(exists=True))
-    @click.argument("output_html", type=click.Path())
-    @click.option(
-        "--build-date", "-d", default=None,
-        help="Build date string for heading. Defaults to current datetime.",
-    )
-    @click.option(
-        "--title", "-t", default="Summary Metric Explorer",
-        help="HTML page title.",
-    )
-    @click.option(
-        "--run-name-pattern", "-p", default="chimera_%",
-        help="SQL LIKE pattern to filter run names.",
-    )
-    def main(db_path, output_html, build_date, title, run_name_pattern):
-        """Generate an interactive Summary Metric Explorer HTML file.
-
-        DB_PATH is the path to a ResultsDb SQLite database.
-        OUTPUT_HTML is the path where the output HTML file will be written.
-        A companion JSON data file is written alongside the HTML file.
-        """
-        make_summary_metric_plot(db_path, output_html, build_date, title, run_name_pattern)
-
-
-    if __name__ == "__main__":
-        main()
+>>> import click
+>>> isinstance(main, click.Command)
+True
 
 
 Data Flow
@@ -981,11 +760,15 @@ Testability
 
 - **Isolated I/O**: ``load_maf_summary`` performs only a database read and
   can be tested against a fixture database or mocked.
+- **Defensive parsing**: malformed run names are handled gracefully (logged
+  and dropped), testable with a fixture DB containing bad rows.
 - **Structural verification**: the Bokeh layout returned by
   ``make_metric_selector_plot`` can be inspected programmatically for
   expected widget types, renderer count, and legend structure.
 - **JSON round-trip**: ``save_metric_data_json`` output can be verified by
   loading with ``json.load`` and checking structure and types.
+- **Fixture-based integration tests**: all tests use in-memory SQLite
+  fixture databases rather than hardcoded file paths.
 
 Performance
 ~~~~~~~~~~~
@@ -1002,6 +785,14 @@ Maintainability
 
 - Follows the ``schedview`` architecture (collect/plot/report), omitting the
   compute phase where it would add no reuse value.
+- ``make_metric_selector_plot`` is decomposed into private helpers
+  (``_create_metric_selectors``, ``_preallocate_sources_and_renderers``,
+  ``_create_combined_legend``) to keep the main function under ~220 lines.
+- The CustomJS callback is stored as a module-level constant
+  (``_CALLBACK_CODE``) with a contract comment documenting the Python/JS
+  interface, making it easy to locate and maintain.
+- Fetch calls in the JavaScript include ``.catch()`` error handlers for
+  user-visible feedback when the JSON data file is missing.
 - Type hints on all function signatures.
 - NumPyDoc-style docstrings.
 - Line length compatible with black (88 characters).
@@ -1018,6 +809,8 @@ Dependencies
 - ``json`` (standard library)
 - ``datetime`` (standard library)
 - ``os`` (standard library)
+- ``re`` (standard library)
+- ``logging`` (standard library)
 
 
 Changes from Prototype
@@ -1065,12 +858,27 @@ This table shows where each prototype function ends up:
    * - ``load_chimera_summary``
      - ``schedview.collect.maf_summary``
      - ``load_maf_summary``
+   * - (inline date parsing in ``load_chimera_summary``)
+     - ``schedview.collect.maf_summary``
+     - ``_extract_transition_date`` (private)
    * - ``get_all_metric_data_dict``
      - ``schedview.plot.maf_summary``
      - ``_build_data_dict`` (private)
    * - ``make_metric_selector_plot``
      - ``schedview.plot.maf_summary``
      - ``make_metric_selector_plot``
+   * - (inline widget creation in ``make_metric_selector_plot``)
+     - ``schedview.plot.maf_summary``
+     - ``_create_metric_selectors`` (private)
+   * - (inline source allocation in ``make_metric_selector_plot``)
+     - ``schedview.plot.maf_summary``
+     - ``_preallocate_sources_and_renderers`` (private)
+   * - (inline legend creation in ``make_metric_selector_plot``)
+     - ``schedview.plot.maf_summary``
+     - ``_create_combined_legend`` (private)
+   * - (inline JS callback string in ``make_metric_selector_plot``)
+     - ``schedview.plot.maf_summary``
+     - ``_CALLBACK_CODE`` (module-level constant)
    * - ``save_metric_data_json``
      - ``schedview.plot.maf_summary``
      - ``save_metric_data_json``
