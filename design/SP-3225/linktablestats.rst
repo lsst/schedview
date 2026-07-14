@@ -59,6 +59,20 @@ New Module-Level Constants
     ``science``, ``fwhm``, ``mean_norm_teff``, ``visit_rate``, ``teff_rate``,
     ``targets``.
 
+``RSS_PRENIGHT_DESC_FORMAT``
+    A format string template used to populate RSS item descriptions for
+    ``lsstcam`` ``prenight`` entries.  Uses distinct labels from
+    ``RSS_DESC_FORMAT`` to make it clear the data comes from a simulation
+    rather than actual observations:
+
+    - "Simulated (science) visits" instead of "Total visits" (all prenight
+      visits are science, so no separate "Science visits" line is needed).
+    - Metric labels omit the "(science visits)" qualifier (redundant).
+    - "Mean visit rate" omits "(all visits on sky)" (redundant).
+
+    Contains placeholders for: ``total``, ``fwhm``, ``visit_rate``,
+    ``mean_norm_teff``, ``teff_rate``, ``targets``.
+
 ``EFF_TIME_BREAKDOWN_COLS``
     A tuple of the three ``compute_tinysum`` output column names that carry
     the effective-time breakdown factors:
@@ -308,10 +322,33 @@ Implementation Steps
 5. **Indent** the XML tree and optionally write to file.
 
 
-Helper: ``_format_summary_desc`` – effective-time breakdown
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Helper: ``_format_summary_desc``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Within ``_format_summary_desc``, the ``{mean_norm_teff}`` placeholder is
+.. code-block:: python
+
+    def _format_summary_desc(
+        tinysum: pd.DataFrame,
+        dayobs: int,
+        report: str,
+        instrument: str,
+        night: datetime.date,
+        desc_format: str = None,
+    ) -> str:
+
+``desc_format`` : ``str`` or ``None``
+    The format string to use for the description.  ``None`` defaults to
+    ``RSS_DESC_FORMAT``.  Pass ``RSS_PRENIGHT_DESC_FORMAT`` for prenight
+    items.
+
+The function passes all computed keyword arguments (``report``,
+``instrument``, ``night``, ``total``, ``science``, ``fwhm``,
+``visit_rate``, ``mean_norm_teff``, ``teff_rate``, ``targets``) to
+``desc_format.format()``.  Format strings that use only a subset of these
+keywords are valid — unused keywords are silently ignored by
+``str.format()``.
+
+**Effective-time breakdown**: The ``{mean_norm_teff}`` placeholder is
 populated conditionally:
 
 - If all three columns in ``EFF_TIME_BREAKDOWN_COLS`` are present in the
@@ -430,7 +467,7 @@ visits use ``t_eff`` and ``visitExposureTime`` and are passed unmodified.
 ...     prenight_visits=prenight_visits,
 ... )
 >>> desc = tree.getroot().find("channel/item/description").text
->>> "Total visits:" in desc
+>>> "Simulated (science) visits:" in desc
 True
 
 
@@ -466,8 +503,8 @@ Changes from ``main``
    description when no simulation visits match the night.
 5. **Removed** ``"preprogress"`` from the default ``report_columns`` tuple
    in ``make_report_link_table``.
-6. **New constants**: ``RSS_DESC_FORMAT``, ``INT_SUMMARY_COLUMNS``,
-   ``FLOAT_SUMMARY_COLUMNS``, ``SUMMARY_COLUMNS``,
+6. **New constants**: ``RSS_DESC_FORMAT``, ``RSS_PRENIGHT_DESC_FORMAT``,
+   ``INT_SUMMARY_COLUMNS``, ``FLOAT_SUMMARY_COLUMNS``, ``SUMMARY_COLUMNS``,
    ``EFF_TIME_BREAKDOWN_COLS``.
 7. **New imports**: ``hashlib``, ``numpy``,
    ``rubin_scheduler.site_models.Almanac``,
@@ -489,6 +526,11 @@ Changes from ``main``
     line includes a bracketed breakdown of PSF, transparency, and sky
     background factors.  When any column is absent, the line retains its
     original format.
+12. **Distinct prenight RSS format**: ``_format_summary_desc`` now accepts a
+    ``desc_format`` parameter (default ``None`` → ``RSS_DESC_FORMAT``).  The
+    prenight branch passes ``RSS_PRENIGHT_DESC_FORMAT``, which uses
+    "Simulated (science) visits" instead of "Total visits" and omits the
+    separate "Science visits" line and redundant qualifier text.
 
 
 Dependencies
@@ -522,7 +564,8 @@ Tests are in ``tests/test_reports.py``.
     Passes a synthetic ``prenight_visits`` DataFrame (using the simulator
     ``t_eff``/``visitExposureTime`` columns) whose dayObs match the report
     fixtures, and verifies the ``lsstcam`` ``prenight`` item descriptions carry
-    a populated ``Total visits: N (...)`` summary with a band breakdown.
+    a populated ``Simulated (science) visits: N (...)`` summary with a band
+    breakdown (using the distinct ``RSS_PRENIGHT_DESC_FORMAT``).
 
 ``test_make_report_rss_feed_prenight_blank_when_no_visits``
     Passes ``prenight_visits`` whose dayObs match no report night, and verifies
