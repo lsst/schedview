@@ -23,6 +23,15 @@ Total eff_time / total night time (science visits): {teff_rate};
 Science targets: {targets}
 """
 
+RSS_PRENIGHT_DESC_FORMAT = """
+Simulated (science) visits: {total};
+Median FWHM: {fwhm};
+Mean visit rate: {visit_rate} visits/hour;
+Total eff_time / total exp_time: {mean_norm_teff};
+Total eff_time / total night time: {teff_rate};
+Science targets: {targets}
+"""
+
 
 def find_reports(
     report_dir: str = "/sdf/data/rubin/shared/scheduler/reports",
@@ -183,7 +192,14 @@ def make_report_link_table(
     return report_table_html
 
 
-def _format_summary_desc(tinysum: pd.DataFrame, dayobs: int, report: str, instrument: str, night) -> str:
+def _format_summary_desc(
+    tinysum: pd.DataFrame,
+    dayobs: int,
+    report: str,
+    instrument: str,
+    night: datetime.date,
+    desc_format: str = None,
+) -> str:
     """Format an RSS item description from a ``compute_tinysum`` row.
 
     Parameters
@@ -199,11 +215,14 @@ def _format_summary_desc(tinysum: pd.DataFrame, dayobs: int, report: str, instru
         The instrument name.
     night : `datetime.date`
         The local calendar date of the night start.
+    desc_format: `str` or `None`
+        Format for the description field. None defaults
+        to ``RSS_DESC_FORMAT``.
 
     Returns
     -------
     desc : `str`
-        The formatted ``RSS_DESC_FORMAT`` text for the night.
+        The formatted text for the night.
     """
     try:
         teff_rate = np.round(tinysum.loc[dayobs, "teff/night duration"], 2)
@@ -225,7 +244,10 @@ def _format_summary_desc(tinysum: pd.DataFrame, dayobs: int, report: str, instru
     else:
         mean_norm_teff_str = f"{norm_teff}"
 
-    return RSS_DESC_FORMAT.format(
+    if desc_format is None:
+        desc_format = RSS_DESC_FORMAT
+
+    return desc_format.format(
         report=report,
         instrument=instrument,
         night=night,
@@ -359,7 +381,12 @@ def make_report_rss_feed(
             # visits gets a completely blank description (no fallback text).
             if dayobs in prenight_tinysum.index:
                 desc.text = _format_summary_desc(
-                    prenight_tinysum, dayobs, report_row.report, instrument, report_row.night
+                    prenight_tinysum,
+                    dayobs,
+                    report_row.report,
+                    instrument,
+                    report_row.night,
+                    desc_format=RSS_PRENIGHT_DESC_FORMAT,
                 )
             else:
                 desc.text = ""
