@@ -151,11 +151,10 @@ class TestReports(unittest.TestCase):
             if category == "lsstcam_prenight":
                 prenight_descs.append(item.findtext("description") or "")
         joined = "\n".join(prenight_descs)
-        # The prenight items must carry a populated summary description.
-        assert re.search(r"Total visits: \d+ \(\d+[ugrizy]", joined)
-        # All prenight visits count as science, so the science line is
-        # populated with its own band breakdown (not zero).
-        assert re.search(r"Science visits: \d+ \(\d+[ugrizy]", joined)
+        # The prenight items must carry a populated summary description
+        # using the distinct prenight format (no separate "Science visits"
+        # line since all prenight visits are science).
+        assert re.search(r"Simulated \(science\) visits: \d+ \(\d+[ugrizy]", joined)
 
     def test_make_report_rss_feed_prenight_blank_when_no_visits(self):
         rng = np.random.default_rng(0)
