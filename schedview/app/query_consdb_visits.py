@@ -10,6 +10,9 @@ TELESCOPE_MAP = {
 }
 
 
+NUM_NIGHTS = 1
+
+
 def _clean_visits_for_parquet(visits):
     """Clean a visits DataFrame for writing to parquet.
 
@@ -73,6 +76,12 @@ def query_consdb_visits_cli():
         type=str,
         help="Output directory for the parquet file.",
     )
+    parser.add_argument(
+        "--nights",
+        type=int,
+        default=1,
+        help="Number of nights to query.",
+    )
 
     args = parser.parse_args()
 
@@ -82,8 +91,21 @@ def query_consdb_visits_cli():
         args.dayobs,
         visit_source,
         NIGHT_STACKERS,
-        num_nights=1,
+        num_nights=args.nights,
     )
+
+    # If the reader of the parquet file can use the index
+    # make it the visit_id so that it is meaningful, but
+    # also make sure the visit_id column is there
+    # so that readers that do not read the axis can have
+    # access to it.
+    # Take the name off of the index so there will not be
+    # name ambiguity in pandas.
+    if "visit_id" in visits.columns:
+        visits = visits.set_index("visit_id", drop=False).rename_axis(index=None)
+
+    if "index" in visits.columns:
+        del visits["index"]
 
     cleaned_visits = _clean_visits_for_parquet(visits)
 
@@ -92,7 +114,7 @@ def query_consdb_visits_cli():
     output_dir = Path(args.dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{iso_date}.parquet"
-    cleaned_visits.to_parquet(output_path)
+    cleaned_visits.to_parquet(output_path, index=True)
 
 
 if __name__ == "__main__":
