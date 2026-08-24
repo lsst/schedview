@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
+import schedview.collect.visits as visits_module
 from schedview.collect.visits import cached_read_visits
 
 
@@ -189,6 +190,102 @@ class TestCachedReadVisitsAPI(unittest.TestCase):
                 )
 
             pd.testing.assert_frame_equal(result1, result2)
+
+    def test_parquet_cache_second_call_returns_same_data(self):
+        """Parquet format: two calls with same params return equivalent results."""
+        from rubin_sim import maf
+
+        fake_visits = self._make_fake_visits()
+        stackers = [maf.stackers.DayObsStacker()]
+
+        original_format = visits_module.VISIT_CACHE_FORMAT
+        try:
+            visits_module.VISIT_CACHE_FORMAT = "parquet"
+            with tempfile.TemporaryDirectory() as tmpdir:
+                with (
+                    patch(
+                        "schedview.collect.visits._is_cache_fresh",
+                        return_value=False,
+                    ),
+                    patch(
+                        "schedview.collect.visits.read_visits",
+                        return_value=fake_visits,
+                    ),
+                    patch(
+                        "schedview.collect.visits.DayObs.from_date",
+                    ) as mock_from_date,
+                ):
+                    mock_from_date.side_effect = self._from_date_side_effect(20260614)
+                    result1 = cached_read_visits(
+                        20260614,
+                        "lsstcam",
+                        cache_dir=tmpdir,
+                        stackers=stackers,
+                    )
+
+                # Second call with cache now populated
+                with (
+                    patch(
+                        "schedview.collect.visits._is_cache_fresh",
+                        return_value=True,
+                    ),
+                    patch(
+                        "schedview.collect.visits.DayObs.from_date",
+                        return_value=self._day_obs_mock(20260614),
+                    ),
+                ):
+                    result2 = cached_read_visits(
+                        20260614,
+                        "lsstcam",
+                        cache_dir=tmpdir,
+                        stackers=stackers,
+                    )
+
+                pd.testing.assert_frame_equal(result1, result2)
+        finally:
+            visits_module.VISIT_CACHE_FORMAT = original_format
+
+    def test_invalid_cache_format_raises(self):
+        """An unrecognised VISIT_CACHE_FORMAT raises ValueError."""
+        original_format = visits_module.VISIT_CACHE_FORMAT
+        try:
+            visits_module.VISIT_CACHE_FORMAT = "csv"
+            with self.assertRaises(ValueError):
+                cached_read_visits(20260614, "lsstcam", cache_dir="/tmp/cache")
+        finally:
+            visits_module.VISIT_CACHE_FORMAT = original_format
+
+    def test_parquet_cache_file_has_parquet_extension(self):
+        """Parquet format writes a .parquet file, not .h5."""
+        from pathlib import Path
+
+        fake_visits = self._make_fake_visits()
+
+        original_format = visits_module.VISIT_CACHE_FORMAT
+        try:
+            visits_module.VISIT_CACHE_FORMAT = "parquet"
+            with tempfile.TemporaryDirectory() as tmpdir:
+                with (
+                    patch(
+                        "schedview.collect.visits._is_cache_fresh",
+                        return_value=False,
+                    ),
+                    patch(
+                        "schedview.collect.visits.read_visits",
+                        return_value=fake_visits,
+                    ),
+                    patch(
+                        "schedview.collect.visits.DayObs.from_date",
+                    ) as mock_from_date,
+                ):
+                    mock_from_date.side_effect = self._from_date_side_effect(20260614)
+                    cached_read_visits(20260614, "lsstcam", cache_dir=tmpdir)
+
+                cache_files = list(Path(tmpdir).iterdir())
+                self.assertEqual(len(cache_files), 1)
+                self.assertEqual(cache_files[0].suffix, ".parquet")
+        finally:
+            visits_module.VISIT_CACHE_FORMAT = original_format
 
 
 if __name__ == "__main__":
