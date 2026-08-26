@@ -16,6 +16,7 @@ import bokeh.plotting
 import numpy as np
 import pandas as pd
 from astropy.time import Time
+from rubin_scheduler.skybrightness_pre.sky_model_pre import SkyModelPre
 from rubin_scheduler.utils import SURVEY_START_MJD
 from rubin_sim.data import get_baseline
 
@@ -185,7 +186,11 @@ class TestTimelinePlotters(TestCase):
         assert is_plottable_bokeh(plotter.plot)
 
     def test_model_sky_timeline_plotter(self):
-        median_model_sky = get_median_model_sky(DayObs.from_date("2025-11-21"))
+        # Get a test date for which there is sky brightness data
+        sky_model = SkyModelPre()
+        mjd_with_sky_data = (sky_model.mjd_left.min() + sky_model.mjd_right.max()) / 2
+
+        median_model_sky = get_median_model_sky(DayObs.from_time(mjd_with_sky_data))
         plotter = ModelSkyTimelinePlotter(median_model_sky)
         assert is_plottable_bokeh(plotter.plot)
 
