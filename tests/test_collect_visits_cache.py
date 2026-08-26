@@ -192,7 +192,7 @@ class TestCachedReadVisitsAPI(unittest.TestCase):
             pd.testing.assert_frame_equal(result1, result2)
 
     def test_parquet_cache_second_call_returns_same_data(self):
-        """Parquet format: two calls with same params return equivalent results."""
+        """Parquet format: 2 calls w/ same params return same results."""
         from rubin_sim import maf
 
         fake_visits = self._make_fake_visits()
