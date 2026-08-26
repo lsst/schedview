@@ -281,9 +281,7 @@ def cached_read_visits(
         )
 
     if VISIT_CACHE_FORMAT not in ("hdf5", "parquet"):
-        raise ValueError(
-            f"VISIT_CACHE_FORMAT must be 'hdf5' or 'parquet', got {VISIT_CACHE_FORMAT!r}."
-        )
+        raise ValueError(f"VISIT_CACHE_FORMAT must be 'hdf5' or 'parquet', got {VISIT_CACHE_FORMAT!r}.")
 
     # Resolve default stackers.
     if stackers is None:
