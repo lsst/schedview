@@ -70,6 +70,7 @@ scheduler_dashboard = "schedview.app.scheduler_dashboard.scheduler_dashboard_app
 obs_version_at_time = "schedview.app.obs_version_at_time:version_at_time_cli"
 scheduler_config_at_time = "schedview.app.scheduler_config_at_time:scheduler_config_at_time_cli"
 prenight_inventory = "schedview.app.prenight_inventory:prenight_inventory_cli"
+query_consdb_visits = "schedview.app.query_consdb_visits:query_consdb_visits_cli"
 
 [tool.setuptools.dynamic]
 version = { attr = "setuptools_scm.get_version" }

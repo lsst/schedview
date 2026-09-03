@@ -1,6 +1,7 @@
 __all__ = [
     "NIGHT_STACKERS",
     "SAL_INDEX_GUESSES",
+    "VISIT_CACHE_FORMAT",
     "cached_read_visits",
     "find_file_resources",
     "get_footprint",
@@ -73,4 +74,4 @@ from .resources import find_file_resources
 from .rewards import read_rewards
 from .scheduler_pickle import read_scheduler, sample_pickle
 from .stars import load_bright_stars
-from .visits import NIGHT_STACKERS, cached_read_visits, read_visits
+from .visits import NIGHT_STACKERS, VISIT_CACHE_FORMAT, cached_read_visits, read_visits
