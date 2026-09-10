@@ -39,6 +39,7 @@ dependencies = [
     "pytz",
     "skyproj",
     "tabulate",
+    "rubin-nights >= 0.18.2",
     "rubin-scheduler >= 3.22.0",
     "rubin-sim >= 2.6.1",
     "uranography >= 1.5.0 ",
