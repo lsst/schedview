@@ -10,6 +10,7 @@ from rubin_scheduler.utils import ddf_locations
 from rubin_scheduler.utils.consdb import KNOWN_INSTRUMENTS
 from rubin_sim import maf
 from rubin_sim.data import get_baseline
+from rubin_sim.maf.utils.opsim_utils import get_visit_data, save_visits_as_parquet
 
 from schedview import DayObs
 
@@ -48,6 +49,23 @@ OLD_DDF_STACKERS = [
     maf.stackers.TeffStacker(filter_col="filter"),
     maf.stackers.DayObsISOStacker(),
 ]
+
+VISIT_CACHE_FORMAT = "parquet"
+"""Format used by `cached_read_visits` to store the local visits cache.
+
+Supported values:
+
+``"hdf5"``
+    Cache is written as an HDF5 file (``*.h5``) with two keys:
+    ``"observations"`` (the visits `~pandas.DataFrame`) and ``"stackers"``
+    (informational record of the stacker class names used when the cache was
+    last written).
+``"parquet"``
+    Cache is written as a Parquet file (``*.parquet``).  The parquet format
+    does not support storing stacker metadata, so all required stackers must
+    always be supplied explicitly when using this format; they will be applied
+    to the cached data on every read via `get_visit_data`.
+"""
 
 
 def read_visits(
@@ -202,21 +220,29 @@ def cached_read_visits(
 ) -> pd.DataFrame:
     """Read visits from consdb, using a local HDF5 cache when possible.
 
-    On a cache hit (the cache file exists, is fresh, and was built with the
-    same set of stackers), the cached data is read from disk and filtered to
-    the requested ``day_obs``.  On a cache miss (file absent, stale, or built
-    with different stackers), a full query is issued via
-    `read_visits` / `read_ddf_visits`, the result is written back to the
-    cache, and the filtered data is returned.
+    On a cache hit (the cache file exists and is fresh), the cached data is
+    read from disk using `get_visit_data`, which applies any missing stackers
+    on the fly.  On a cache miss (file absent or stale), a full query is
+    issued via `read_visits` / `read_ddf_visits`, the result is written back
+    to the cache, and the filtered data is returned.
 
-    The cache file is an HDF5 file with two keys:
+    The cache format is controlled by the module-level variable
+    `VISIT_CACHE_FORMAT`.  Two formats are supported:
 
-    - ``"visits"`` — the full visits `~pandas.DataFrame` (all nights up to
-      the query date).
-    - ``"stackers"`` — a single-column `~pandas.DataFrame` (column
-      ``"class_name"``) recording the fully-qualified class name of each
-      stacker used to produce the cached data.  Used to detect stale caches
-      caused by a change in the requested stacker set.
+    **HDF5** (``VISIT_CACHE_FORMAT = "hdf5"``, default):
+        The cache is an HDF5 file with two keys:
+
+        - ``"observations"`` — the full visits `~pandas.DataFrame`.
+        - ``"stackers"`` — a single-column `~pandas.DataFrame` (column
+          ``"class_name"``) recording the fully-qualified class name of each
+          stacker used to produce the cached data.  Informational only; not
+          used for cache-validity decisions.
+
+    **Parquet** (``VISIT_CACHE_FORMAT = "parquet"``):
+        The cache is a Parquet file written via `save_visits_as_parquet`.
+        Parquet does not support storing stacker metadata, so all required
+        stackers must be supplied explicitly; they will be applied to the
+        cached data on every read via `get_visit_data`.
 
     Parameters
     ----------
@@ -254,6 +280,9 @@ def cached_read_visits(
             f"({', '.join(sorted(KNOWN_INSTRUMENTS))}), got {visit_source!r}."
         )
 
+    if VISIT_CACHE_FORMAT not in ("hdf5", "parquet"):
+        raise ValueError(f"VISIT_CACHE_FORMAT must be 'hdf5' or 'parquet', got {VISIT_CACHE_FORMAT!r}.")
+
     # Resolve default stackers.
     if stackers is None:
         if ddf:
@@ -263,26 +292,26 @@ def cached_read_visits(
 
     cache_dir = Path(cache_dir)
     suffix = "_ddf" if ddf else ""
-    cache_path = cache_dir / f"visits_{visit_source}{suffix}.h5"
+    extension = "parquet" if VISIT_CACHE_FORMAT == "parquet" else "h5"
+    cache_path = cache_dir / f"visits_{visit_source}{suffix}.{extension}"
 
-    requested_class_names = {type(s).__module__ + "." + type(s).__qualname__ for s in stackers}
     day_obs_obj = DayObs.from_date(day_obs)
 
     # Attempt a cache hit.
     if _is_cache_fresh(cache_path):
         try:
-            cached_class_names = set(pd.read_hdf(str(cache_path), key="stackers")["class_name"])
-        except KeyError:
-            logger.debug("Cache missing 'stackers' key, treating as stale: %s", cache_path)
+            logger.debug("Reading visits from cache: %s", cache_path)
+            read_kwargs = {}
+            if VISIT_CACHE_FORMAT == "hdf5":
+                read_kwargs["table_name"] = "observations"
+            all_visits = get_visit_data(
+                str(cache_path),
+                stackers=stackers,
+                **read_kwargs,
+            )
+        except (KeyError, ValueError):
+            logger.debug("Cache has incompatible format, regenerating: %s", cache_path)
             all_visits = None
-            cached_class_names = None
-        else:
-            if cached_class_names == requested_class_names:
-                logger.debug("Reading visits from cache: %s", cache_path)
-                all_visits = pd.read_hdf(str(cache_path), key="visits")
-            else:
-                logger.debug("Cache stacker mismatch, regenerating: %s", cache_path)
-                all_visits = None
     else:
         logger.debug("Cache miss or stale, querying source: %s", visit_source)
         all_visits = None
@@ -298,10 +327,14 @@ def cached_read_visits(
 
         logger.debug("Writing visits cache: %s", cache_path)
         cache_dir.mkdir(parents=True, exist_ok=True)
-        all_visits.to_hdf(str(cache_path), key="visits", mode="w")
-        pd.DataFrame({"class_name": sorted(requested_class_names)}).to_hdf(
-            str(cache_path), key="stackers", mode="a"
-        )
+        if VISIT_CACHE_FORMAT == "parquet":
+            save_visits_as_parquet(all_visits, cache_path)
+        else:
+            all_visits.to_hdf(str(cache_path), key="observations", mode="w")
+            requested_class_names = {type(s).__module__ + "." + type(s).__qualname__ for s in stackers}
+            pd.DataFrame({"class_name": sorted(requested_class_names)}).to_hdf(
+                str(cache_path), key="stackers", mode="a"
+            )
 
     # Filter to the requested day_obs.
     if "dayObs" not in all_visits.columns:
