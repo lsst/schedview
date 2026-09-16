@@ -8,6 +8,7 @@ configuration methods, and ultimately produces a `bokeh.models.UIElement`
 that can be displayed in a report, dashboard, or other interface.
 """
 
+import functools
 import warnings
 from types import MethodType
 from typing import Any, Callable, Dict, List, Optional, Self, Sequence, SupportsFloat, Tuple, cast
@@ -962,8 +963,13 @@ class VisitMapBuilder:
         return self
 
     @staticmethod
-    def _compute_footprint_outlines(footprint: np.ndarray) -> pd.DataFrame:
-        footprint_regions = footprint.copy()
+    @functools.lru_cache(maxsize=2)
+    def _trace_footprint_outlines(
+        footprint_bytes: bytes, dtype_str: str, shape: Tuple[int, ...]
+    ) -> pd.DataFrame:
+        """Trace footprint outlines, keyed on the contents of the footprint as
+        bytes so that the tracing can be cached."""
+        footprint_regions = np.frombuffer(footprint_bytes, dtype=dtype_str).reshape(shape).copy()
         footprint_regions[np.isin(footprint_regions, ["bulgy", "lowdust"])] = "WFD"
         footprint_regions[
             np.isin(footprint_regions, ["LMC_SMC", "dusty_plane", "euclid_overlap", "nes", "scp", "virgo"])
@@ -974,6 +980,13 @@ class VisitMapBuilder:
         tiny_loops = footprint_outline.groupby(["region", "loop"]).count().query("RA<10").index
         footprint_outline = footprint_outline.drop(tiny_loops)
         return footprint_outline
+
+    @staticmethod
+    def _compute_footprint_outlines(footprint: np.ndarray) -> pd.DataFrame:
+        footprint_outline = VisitMapBuilder._trace_footprint_outlines(
+            footprint.tobytes(), footprint.dtype.str, footprint.shape
+        )
+        return footprint_outline.copy()
 
     def add_footprint_outlines(
         self,

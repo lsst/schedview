@@ -5,6 +5,8 @@ import tempfile
 
 import bokeh.io
 import bokeh.models
+import healpy as hp
+import numpy as np
 import pandas as pd
 from rubin_scheduler.scheduler.utils import get_current_footprint
 from uranography.api import ArmillarySphere, Planisphere
@@ -50,6 +52,55 @@ TEST_ALT_VISITS = pd.DataFrame(
 )
 
 FOOTPRINT_NSIDE = 16
+
+# Tracing outlines is slow, so use a coarse map for the outline tests.
+OUTLINE_TEST_NSIDE = 4
+
+
+def _make_outline_test_footprint() -> np.ndarray:
+    """
+    Build a small footprint map holding a region of each kind handled by
+    ``VisitMapBuilder._compute_footprint_outlines``.
+
+    Returns
+    -------
+    footprint: np.ndarray
+        A HEALPix map of region names, with a "lowdust" band (grouped into
+        "WFD"), an "nes" band (grouped into "other"), and one isolated
+        "virgo" pixel, whose outline is too small to keep.
+    """
+    npix = hp.nside2npix(OUTLINE_TEST_NSIDE)
+    decl = hp.pix2ang(OUTLINE_TEST_NSIDE, np.arange(npix), lonlat=True)[1]
+    footprint = np.full(npix, "", dtype="<U20")
+    footprint[(decl > -40) & (decl < -20)] = "lowdust"
+    footprint[(decl > 10) & (decl < 30)] = "nes"
+    footprint[0] = "virgo"
+    return footprint
+
+
+def _select_footprint_outline_renderers(viewable: bokeh.models.UIElement) -> list:
+    """
+    Collect the footprint outline renderers in a built viewable.
+
+    Parameters
+    ----------
+    viewable: bokeh.models.UIElement
+        The Bokeh object returned by ``VisitMapBuilder.build()``.
+
+    Returns
+    -------
+    outline_renderers: list
+        The renderers drawing footprint outlines.
+    """
+    # Bokeh does not support pattern matching in selection by name,
+    # so iterate over all renderers and check their names explicitly.
+    outline_renderers = []
+    for renderer in viewable.select({"type": bokeh.models.GlyphRenderer}):
+        assert isinstance(renderer.name, str)
+        if renderer.name.startswith("footprint_outline"):
+            outline_renderers.append(renderer)
+
+    return outline_renderers
 
 
 def _save_and_check_viewable_html(
@@ -245,17 +296,97 @@ def test_add_footprint_outlines():
     builder.add_footprint_outlines(footprint_regions)
     viewable = builder.build()
 
-    # Bokeh does not support pattern matching in selection by name,
-    # so iterate over all renderers and check their names explicitly.
-    outline_renderers = []
-    for renderer in viewable.select({"type": bokeh.models.GlyphRenderer}):
-        assert isinstance(renderer.name, str)
-        if renderer.name.startswith("footprint_outline"):
-            outline_renderers.append(renderer)
-
-    assert len(outline_renderers) > 0
+    assert len(_select_footprint_outline_renderers(viewable)) > 0
 
     _save_and_check_viewable_html(viewable)
+
+
+def test_compute_footprint_outlines():
+    """Test that region names are grouped and tiny loops discarded."""
+    footprint = _make_outline_test_footprint()
+    outlines = VisitMapBuilder._compute_footprint_outlines(footprint)
+
+    assert isinstance(outlines, pd.DataFrame)
+    assert list(outlines.index.names) == ["region", "loop"]
+    assert {"RA", "decl"}.issubset(outlines.columns)
+
+    # "lowdust" is grouped into "WFD", and "nes" and "virgo" into "other".
+    assert set(outlines.index.get_level_values("region")) == {"WFD", "other"}
+
+    # The isolated "virgo" pixel traces a loop of only a handful of
+    # vertices, which should have been dropped.
+    assert outlines.groupby(["region", "loop"]).size().min() >= 10
+
+
+def test_compute_footprint_outlines_does_not_modify_footprint():
+    """Test that computing outlines leaves the footprint passed in alone."""
+    footprint = _make_outline_test_footprint()
+    original_footprint = footprint.copy()
+
+    VisitMapBuilder._compute_footprint_outlines(footprint)
+
+    assert np.array_equal(footprint, original_footprint)
+
+
+def test_compute_footprint_outlines_caches_tracing():
+    """Test that footprints with equal contents share a cached tracing."""
+    VisitMapBuilder._trace_footprint_outlines.cache_clear()
+    footprint = _make_outline_test_footprint()
+
+    outlines = VisitMapBuilder._compute_footprint_outlines(footprint)
+    assert VisitMapBuilder._trace_footprint_outlines.cache_info().misses == 1
+
+    # An equal footprint in a different array still hits the cache.
+    equal_outlines = VisitMapBuilder._compute_footprint_outlines(footprint.copy())
+    cache_info = VisitMapBuilder._trace_footprint_outlines.cache_info()
+    assert cache_info.misses == 1
+    assert cache_info.hits == 1
+    pd.testing.assert_frame_equal(outlines, equal_outlines)
+
+    # A footprint with different contents must be traced afresh.
+    different_footprint = footprint.copy()
+    different_footprint[1] = "lowdust"
+    VisitMapBuilder._compute_footprint_outlines(different_footprint)
+    assert VisitMapBuilder._trace_footprint_outlines.cache_info().misses == 2
+
+
+def test_compute_footprint_outlines_returns_independent_outlines():
+    """Test that modifying returned outlines does not corrupt the cache."""
+    footprint = _make_outline_test_footprint()
+
+    outlines = VisitMapBuilder._compute_footprint_outlines(footprint)
+    original_ra = outlines["RA"].copy()
+    outlines["RA"] = np.nan
+
+    fresh_outlines = VisitMapBuilder._compute_footprint_outlines(footprint)
+
+    assert fresh_outlines is not outlines
+    pd.testing.assert_series_equal(fresh_outlines["RA"], original_ra)
+
+
+def test_add_footprint_outlines_reuses_cached_tracing():
+    """Test that maps built from one footprint only trace it once."""
+    VisitMapBuilder._trace_footprint_outlines.cache_clear()
+    footprint = _make_outline_test_footprint()
+
+    first_builder = VisitMapBuilder(TEST_VISITS)
+    first_builder.add_footprint_outlines(footprint)
+    assert VisitMapBuilder._trace_footprint_outlines.cache_info().misses == 1
+
+    second_builder = VisitMapBuilder(TEST_VISITS)
+    second_builder.add_footprint_outlines(footprint)
+    cache_info = VisitMapBuilder._trace_footprint_outlines.cache_info()
+    assert cache_info.misses == 1
+    assert cache_info.hits == 1
+
+    # Reusing the tracing must still draw the outlines on each map.
+    first_renderers = _select_footprint_outline_renderers(first_builder.build())
+    second_viewable = second_builder.build()
+    second_renderers = _select_footprint_outline_renderers(second_viewable)
+    assert len(first_renderers) > 0
+    assert len(second_renderers) == len(first_renderers)
+
+    _save_and_check_viewable_html(second_viewable)
 
 
 def test_add_alt_visit_patches():
