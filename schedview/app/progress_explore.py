@@ -1,82 +1,103 @@
-"""Interactive exploration tools for chimera summary metrics.
+"""Standalone summary-progress reports and independent records JSON export.
 
-This module provides functions to:
-- Load chimera summary data from a ResultsDb SQLite database
-- Create interactive Bokeh plots showing metric values vs transition date
-- Allow metric selection via dropdown widgets with multiple info label and
-  summary metric selection (overplotted with different colors and linestyles)
-
-Example usage in a Jupyter notebook:
-    %aimport chimera_explore
-    import bokeh.io
-    bokeh.io.output_notebook()
-    from bokeh.plotting import show
-
-    # Load summary data
-    db_path = '/workspace/tmp/chimera_2026-05-21/resultsDb_sqlite.db'
-    summary_df, unique_metrics = chimera_explore.load_chimera_summary(db_path)
-
-    # Create interactive plot
-    plot = chimera_explore.make_metric_selector_plot(summary_df, unique_metrics)
-
-    # Display using bokeh.plotting.show()
-    show(plot)
-
-Note: dayObs values (YYYYMMDD format) are converted to datetime objects for
-proper time-based plotting, since dayObs is not a linear integer.
+The plot command embeds data from local SQLite databases. HTTP(S) URLs and
+page-relative paths ending in ``.json`` remain external: serve the page and
+JSON over HTTP(S), with appropriate CORS permissions for cross-origin data.
+External data change only on browser reload. Use ``--input-kind`` to override
+suffix-based classification, for example for a database named ``results.json``
+or a JSON endpoint without a suffix. Bokeh resources use the CDN.
 """
 
-import json
-import os
-import re as re_module
-
-import bokeh.core.enums
-import bokeh.events
-import bokeh.io
-import bokeh.layouts
-import bokeh.models
-import bokeh.palettes
-import bokeh.plotting
-import click
-import numpy as np
-import pandas as pd
 import sqlite3
-from datetime import datetime
+from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
-from schedview.collect.progress import load_chimera_summary
-from schedview.plot.progress import make_metric_selector_plot, save_metric_data_json
+import click
+from bokeh.embed import file_html
+from bokeh.resources import CDN
 
-@click.command()
-@click.argument("db_path", type=click.Path(exists=True))
-@click.argument("output_html", type=click.Path())
-@click.option("--build-date", "-d", default=None, help="Build date string for heading. Defaults to current datetime.")
-@click.option("--title", "-t", default="Chimera Metric Explorer", help="HTML page title.")
-def main(db_path, output_html, build_date, title):
-    """Generate an interactive Chimera Metric Explorer HTML file.
+from schedview.collect.progress import load_summary_metrics, validate_summary_metrics
+from schedview.plot.progress import make_summary_progress_plot
 
-    DB_PATH is the path to a ResultsDb SQLite database containing chimera runs.
-    OUTPUT_HTML is the path where the output HTML file will be written.
-    A companion JSON data file is written alongside the HTML file.
+
+def _check_output_path(input_path: str | Path, output_path: str) -> None:
+    original = Path(input_path).expanduser()
+    destination = Path(output_path)
+    if destination.resolve() == original.resolve() or (
+        destination.exists() and original.exists() and destination.samefile(original)
+    ):
+        raise ValueError(f"Output {output_path!r} refers to the input data; refusing to overwrite it")
+
+
+@click.command(name="make_summary_progress_data")
+@click.argument("db_path", type=click.Path(exists=True, dir_okay=False, readable=True))
+@click.argument("json_path", type=click.Path(dir_okay=False))
+def make_summary_progress_data(db_path: str, json_path: str) -> None:
+    """Write validated summary records from DB_PATH to JSON_PATH.
+
+    Dates are calendar midnight in epoch milliseconds. Missing and nonfinite
+    measurements become JSON null; finite scalars use pandas' maximum supported
+    precision (15 decimal places). No selector catalog or envelope is written.
     """
-    if build_date is None:
-        build_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    summary_df, unique_metrics = load_chimera_summary(db_path)
-
-    if output_html.endswith('.html'):
-        json_path = output_html[:-5] + '_data.json'
-    else:
-        json_path = output_html + '_data.json'
-
-    save_metric_data_json(summary_df, unique_metrics, json_path)
-
-    data_json_url = os.path.basename(json_path)
-    plot = make_metric_selector_plot(summary_df, unique_metrics, build_date, data_json_url=data_json_url)
-    bokeh.io.output_file(filename=output_html, title=f"{title} (built: {build_date})")
-    bokeh.io.save(plot)
-    click.echo(f"Saved to {output_html}")
+    try:
+        _check_output_path(db_path, json_path)
+        summary_metrics = load_summary_metrics(db_path)
+        validate_summary_metrics(summary_metrics)
+        records = summary_metrics.copy()
+        records["summary_value"] = records["summary_value"].replace(
+            [float("inf"), float("-inf")], float("nan")
+        )
+        records.to_json(json_path, orient="records", date_format="epoch", date_unit="ms", double_precision=15)
+    except (OSError, ValueError, TypeError, sqlite3.Error) as error:
+        raise click.ClickException(f"Cannot export {db_path!r} to {json_path!r}: {error}") from error
     click.echo(f"Data written to {json_path}")
 
 
+@click.command(name="make_summary_progress_plot")
+@click.argument("summary_metrics")
+@click.argument("page_path", type=click.Path(dir_okay=False))
+@click.option(
+    "--input-kind",
+    type=click.Choice(["auto", "database", "json-url"]),
+    default="auto",
+    show_default=True,
+    help="Auto: HTTP(S) and page-relative .json paths are URLs; other paths are databases.",
+)
+@click.option(
+    "--title", "-t", default="Summary Progress Explorer", show_default=True, help="HTML page title."
+)
+def make_summary_progress_plot_cli(summary_metrics: str, page_path: str, input_kind: str, title: str) -> None:
+    """Write a standalone progress page to PAGE_PATH from SUMMARY_METRICS.
+
+    SUMMARY_METRICS is a local SQLite database or external JSON URL. URLs are
+    passed through unchanged without reading them on this machine. Local path
+    collisions are checked to avoid overwriting page-relative JSON inputs.
+    Relative URLs resolve against the served page, not the current directory.
+    Database input embeds records and does not create a companion JSON file.
+    """
+    try:
+        if input_kind == "auto":
+            parsed = urlsplit(summary_metrics)
+            is_url = parsed.scheme.lower() in {"http", "https"} or (
+                not parsed.scheme and parsed.path.lower().endswith(".json")
+            )
+        else:
+            is_url = input_kind == "json-url"
+        if not is_url:
+            _check_output_path(summary_metrics, page_path)
+        else:
+            parsed = urlsplit(summary_metrics)
+            if not parsed.scheme and not parsed.netloc:
+                _check_output_path(Path(page_path).parent / unquote(parsed.path), page_path)
+        records = summary_metrics if is_url else load_summary_metrics(summary_metrics)
+        plot = make_summary_progress_plot(records)
+        Path(page_path).write_text(file_html(plot, CDN, title=title), encoding="utf-8")
+    except (OSError, ValueError, TypeError, sqlite3.Error) as error:
+        raise click.ClickException(
+            f"Cannot create {page_path!r} from {summary_metrics!r}: {error}"
+        ) from error
+    click.echo(f"Saved to {page_path}")
+
+
 if __name__ == "__main__":
-    main()
+    make_summary_progress_plot_cli()
