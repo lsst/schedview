@@ -125,10 +125,12 @@ def make_band_cmap(
     assigned_colors, assigned_bands = list(band_colors.values()), list(band_colors.keys())
 
     # Go through any we miss and assign extra colors to extra bands.
-    for extra_index, band in enumerate(set(bands)):
+    extra_index = len(band_colors)
+    for band in dict.fromkeys(bands):
         if band not in assigned_bands:
             assigned_bands.append(band)
             assigned_colors.append(extra_colors[extra_index % len(extra_colors)])
+            extra_index += 1
 
     cmap = bokeh.transform.factor_cmap(field_name, tuple(assigned_colors), tuple(assigned_bands))
     return cmap
