@@ -20,7 +20,7 @@ __all__ = ["make_metric_line_plots", "make_summary_progress_plot"]
 
 SNAPSHOT_SCALAR_METRIC_FIGURE_NAME = "snapshot_scalar_metric_figure"
 EXTRAPOLATED_SCALAR_METRIC_FIGURE_NAME = "extrapolated_scalar_metric_figure"
-SOURCE_STYLES = {"consdb": (1, 1.0), "chimera": (2, 0.8), "baseline": (3, 0.6)}
+SOURCE_STYLES = {"consdb": (1, 1.0), "chimera": (3, 0.6), "baseline": (5, 0.3)}
 
 
 # Bokeh omits underscore-prefixed classes from notebook resource bundles.
@@ -299,6 +299,15 @@ export default async function(args, changed) {
         }
         state.previousSummaries = [...summary.value];
         for (const name of slots.keys()) if (!summary.value.includes(name)) slots.delete(name);
+        // Preferred summaries take precedence over an existing occupant of their slot.
+        for (const [name, dash] of [["Mean", "solid"], ["Median", "dashed"]]) {
+            if (!summary.value.includes(name)) continue;
+            const preferred = dashes.indexOf(dash);
+            for (const [other, slot] of slots) {
+                if (other !== name && slot === preferred) slots.delete(other);
+            }
+            slots.set(name, preferred);
+        }
         for (const name of summary.value) {
             if (!slots.has(name)) {
                 const used = new Set(slots.values());

@@ -341,7 +341,10 @@ Hover retains the original label.
 Every summary option remains available, but simultaneous selection is capped
 at the number of named styles in Bokeh's ``LineDash`` enumeration. A visible
 limit message explains how to deselect and replace summaries. A summary keeps
-its dash slot while selected; freed slots can be reused. The cap applies to
+its dash slot while selected; freed slots can be reused. The exceptions are
+``Mean`` and ``Median``, which always use solid and dashed lines respectively
+when selected. Adding either reassigns any summary occupying its required slot;
+other surviving summaries retain their styles. The cap applies to
 selected summaries, not to the number of records or series.
 
 Each ``(metric_name, metric_info_label, summary_metric, visit_source)`` group
@@ -360,12 +363,12 @@ Visible points keep isolated dates interpretable.
    * - ``consdb``
      - 1
      - 1.0
-   * - ``chimera``
-     - 2
-     - 0.8
-   * - ``baseline``
-     - 3
-     - 0.6
+    * - ``chimera``
+      - 3
+      - 0.6
+    * - ``baseline``
+      - 5
+      - 0.3
 
 Band colors come from ``schedview.plot.colors.make_band_cmap`` with all six
 bands followed by ``all``, so ``all`` uses the helper's next assigned color.
