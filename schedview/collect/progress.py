@@ -189,6 +189,8 @@ def load_summary_metrics(db_path: str | Path) -> SummaryMetrics:
     missing/NaN, or share the same signed infinity. The highest ``stat_id``
     retains its associated provenance. Retained missing/non-finite measurements
     are preserved and counted in a warning, not converted to zero or JSON null.
+    Returned numeric columns use int64 for metric_id, stat_id, and dayobs, and
+    float64 for summary_value (SQL NULL becomes NaN), including empty results.
     """
     path = Path(db_path).expanduser().resolve()
 
@@ -266,6 +268,9 @@ def load_summary_metrics(db_path: str | Path) -> SummaryMetrics:
             if previous is None or row.stat_id > frame.iloc[previous].stat_id:
                 retained[key] = position
         frame = frame.iloc[sorted(retained.values())].reset_index(drop=True)
+        # Cast only validated, deduplicated values; preserve exact ID ordering
+        # and duplicate comparisons before normalizing SQL NULL scalars to NaN.
+        frame = frame.astype({"metric_id": "int64", "stat_id": "int64", "summary_value": "float64"})
         validate_summary_metrics(frame)
     except ValueError as exc:
         raise ValueError(f"Database {path}: {exc}") from exc

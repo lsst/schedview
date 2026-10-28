@@ -115,6 +115,12 @@ def test_all_rows_excluded_returns_valid_empty_schema(database):
         result = load_summary_metrics(path)
     assert result.empty
     assert tuple(result.columns) == SUMMARY_COLUMNS
+    assert result[["metric_id", "stat_id", "dayobs", "summary_value"]].dtypes.tolist() == [
+        np.dtype("int64"),
+        np.dtype("int64"),
+        np.dtype("int64"),
+        np.dtype("float64"),
+    ]
     validate_summary_metrics(result)
 
 
@@ -191,7 +197,51 @@ def test_empty_frame(database):
     result = load_summary_metrics(database())
     assert result.empty
     assert tuple(result.columns) == SUMMARY_COLUMNS
+    assert result[["metric_id", "stat_id", "dayobs", "summary_value"]].dtypes.tolist() == [
+        np.dtype("int64"),
+        np.dtype("int64"),
+        np.dtype("int64"),
+        np.dtype("float64"),
+    ]
     validate_summary_metrics(pd.DataFrame(columns=SUMMARY_COLUMNS))
+
+
+def test_collected_numeric_dtypes_and_exact_identifiers(database):
+    largest_id = 2**63 - 1
+    values = [1.25, 0, None, np.inf, -np.inf]
+    path = database(
+        [
+            {
+                "metric_id": largest_id - index,
+                "stat_id": largest_id - index,
+                "summary_metric": str(index),
+                "summary_value": value,
+                "metric_info_label": None,
+                "sql_constraint": None,
+            }
+            for index, value in enumerate(values)
+        ]
+    )
+    with pytest.warns(UserWarning, match="retained 3 missing/non-finite"):
+        result = load_summary_metrics(path)
+    assert result[["metric_id", "stat_id", "dayobs", "summary_value"]].dtypes.tolist() == [
+        np.dtype("int64"),
+        np.dtype("int64"),
+        np.dtype("int64"),
+        np.dtype("float64"),
+    ]
+    assert result.metric_id.tolist() == result.stat_id.tolist() == [largest_id - i for i in range(5)]
+    np.testing.assert_equal(result.summary_value.to_numpy(), [1.25, 0.0, np.nan, np.inf, -np.inf])
+    assert all(value is None for value in result.metric_info_label)
+    assert all(value is None for value in result.sql_constraint)
+    assert result.loc[:1, "summary_value"].mean() == 0.625
+
+
+def test_invalid_database_scalar_is_not_coerced(database):
+    path = database([{"summary_value": "not numeric"}])
+    with pytest.raises(ValueError, match="summary_value must be a real scalar") as error:
+        load_summary_metrics(path)
+    assert str(path) in str(error.value)
 
 
 @pytest.mark.parametrize("values", [(1.5, 1.5), (None, np.nan), (np.inf, np.inf), (-np.inf, -np.inf)])

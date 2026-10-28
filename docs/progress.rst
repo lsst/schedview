@@ -77,6 +77,11 @@ URL accessible from the notebook page, not merely from the kernel filesystem.
 SQLite results database read-only, joins ``metrics`` and ``summarystats`` on
 ``metric_id``, derives source/band/date fields, removes identical reruns,
 validates, and returns deterministically ordered records.
+Collected ``metric_id``, ``stat_id``, and ``dayobs`` columns use ``int64``;
+``summary_value`` uses ``float64``, with SQL NULL measurements represented by
+NaN and signed infinities preserved. These dtypes also apply to empty results.
+Conversion follows validation and duplicate comparison; original labels and
+constraints retain their strings or SQL NULL values.
 ``validate_summary_metrics(summary_metrics) -> None`` validates without
 mutating, sorting, or removing duplicates. It accepts filtered copies with
 arbitrary indices and harmless extra columns, and rejects duplicate records
@@ -382,11 +387,10 @@ click-to-hide and introduce no reference data.
 Selection changes recompute ranges from selected finite measurements. Normal
 ranges have 5 percent padding; a single date gets one day on either side and
 a constant scalar gets ``max(abs(value) * 0.05, 1)`` padding. Calendar-aware
-automatic ticks label the date axis. For extreme finite scalars, padded bounds
-are clamped to finite JavaScript numeric limits rather than overflowing.
-An overflow-safe linear scale preserves distinct screen positions when the
-difference between finite opposite-sign bounds would overflow; data and hover
-values are not rescaled or replaced.
+automatic ticks label the date axis. The plot uses Bokeh's standard linear
+scale, without custom-model compilation or a Node.js requirement. Rendering
+scalar spans or padded bounds that overflow JavaScript floating-point arithmetic
+is not supported; measurements are not clamped or rescaled.
 Reset restores the current selection's limits, not the original dataset's
 limits. Manual pan/zoom persists only
 between selection changes. Empty inputs or selections with no finite values
@@ -405,6 +409,10 @@ crash recovery. The root ``ai/implementation_plan.org`` records recovery points.
 
 * Environment: Python 3.14.4, aarch64, pandas 3.1.0, Bokeh 3.10.1 (confirmed
   current on PyPI), ``OPENBLAS_CORETYPE=ARMV8``, and reused sample artifacts.
+* The results below describe the historical implementation. On 2026-10-28,
+  review follow-up removed the custom scale and extreme-value browser cases;
+  notebook-bundle coverage now uses ordinary scalars. Current follow-up results
+  are recorded in the workspace's ``ai/implementation_plan.org``.
 * Installed JSON-export command smoke check against the representative
   ``data/resultsDb_sqlite.db`` succeeded and produced 1736 records. This count
   describes that sample, not a schema requirement.

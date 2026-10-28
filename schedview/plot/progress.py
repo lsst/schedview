@@ -12,7 +12,6 @@ import bokeh.models
 import bokeh.plotting
 import numpy as np
 import pandas as pd
-from bokeh.util.compiler import JavaScript
 
 from schedview.collect.progress import SummaryMetrics, validate_summary_metrics
 from schedview.plot.colors import make_band_cmap
@@ -27,39 +26,6 @@ SOURCE_STYLES: dict[str, tuple[int, float]] = {
     "baseline": (5, 0.3),
 }
 """Source -> (width in pixels, alpha), shared by lines and legend swatches."""
-
-
-# Bokeh omits underscore-prefixed classes from notebook resource bundles.
-class ProgressLinearScale(bokeh.models.LinearScale):
-    """Map finite extremes without rescaling the recorded values."""
-
-    __implementation__ = JavaScript("""
-import {LinearScale} from "models/scales/linear_scale"
-
-export class ProgressLinearScale extends LinearScale {
-    static __name__ = "ProgressLinearScale";
-
-    // Opposite finite extremes can have an infinite difference. Halve before
-    // subtracting so screen coordinates remain distinct without altering data.
-    get s_compute() {
-        const {source_range: source, target_range: target} = this;
-        if (Number.isFinite(source.end - source.start)) return super.s_compute;
-        const start = source.start / 2;
-        const span = source.end / 2 - start;
-        return x => target.start + ((x / 2 - start) / span) * (target.end - target.start);
-    }
-
-    // A weighted sum avoids reconstructing the overflowing full source span.
-    get s_invert() {
-        const {source_range: source, target_range: target} = this;
-        if (Number.isFinite(source.end - source.start)) return super.s_invert;
-        return sx => {
-            const fraction = (sx - target.start) / (target.end - target.start);
-            return (1 - fraction) * source.start + fraction * source.end;
-        };
-    }
-}
-""")
 
 
 def make_metric_line_plots(
@@ -187,7 +153,6 @@ def make_summary_progress_plot(summary_metrics: SummaryMetrics | str) -> bokeh.m
         y_range=bokeh.models.Range1d(0, 1),
         name="summary_progress_figure",
     )
-    plot.y_scale = ProgressLinearScale()
     plot.multi_line(
         xs="xs",
         ys="ys",
@@ -416,14 +381,13 @@ export default async function(args, changed) {
         points.data = pointData;
 
         // Ranges use only finite measurements, not legend swatches or gap dates.
-        // Multiply endpoints before subtraction to avoid overflowing extreme spans;
-        // clamp padded bounds and give empty/singleton selections usable ranges.
+        // Pad ordinary spans and give empty/singleton selections usable ranges.
         const extent = (values, fallback, singleton) => {
             if (!values.length) return fallback;
             let low = Infinity, high = -Infinity;
             for (const value of values) {low = Math.min(low, value); high = Math.max(high, value);}
-            const pad = low === high ? singleton(low) : high * 0.05 - low * 0.05;
-            return [Math.max(-Number.MAX_VALUE, low - pad), Math.min(Number.MAX_VALUE, high + pad)];
+            const pad = low === high ? singleton(low) : (high - low) * 0.05;
+            return [low - pad, high + pad];
         };
         for (const [range, bounds] of [
             [plot.x_range, extent(pointData.date, [0, 86400000], () => 86400000)],
