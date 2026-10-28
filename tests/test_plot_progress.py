@@ -135,7 +135,7 @@ def test_url_is_not_read_in_python_and_palette_is_deterministic():
     assert (
         callback.args["styles"]
         == SOURCE_STYLES
-        == {"consdb": (1, 1.0), "chimera": (2, 0.8), "baseline": (3, 0.6)}
+        == {"consdb": (1, 1.0), "chimera": (3, 0.6), "baseline": (5, 0.3)}
     )
     bands = ("u", "g", "r", "i", "z", "y", "all")
     first = make_band_cmap(bands=bands)["transform"]
@@ -331,6 +331,52 @@ def test_browser_cascade_union_retention_fallback_and_explicit_empty(browser, se
         page.close()
 
 
+def test_browser_mean_and_median_preferred_dashes(browser, served):
+    names = ["A", "B", "C", "Mean", "Median"]
+    page = open_plot(browser, served, records(*[{"summary_metric": name} for name in names]))
+    try:
+
+        def styles():
+            current = state(page)
+            return dict(zip(current["points"]["summary_metric"], current["lines"]["dash"]))
+
+        initial = styles()
+        assert initial["Mean"] == "solid"
+        assert initial["Median"] == "dashed"
+        assert len(set(initial.values())) == len(names)
+        legend = state(page)["legends"][2]
+        assert 'stroke-dasharray=""/></svg> Mean' in legend
+        assert 'stroke-dasharray="3 2"/></svg> Median' in legend
+
+        select(page, 3, [])
+        select(page, 3, ["A", "B", "C"])
+        before = styles()
+        assert before["A"] == "solid"
+        assert before["B"] == "dashed"
+        select(page, 3, ["A", "B", "C", "Median"])
+        after_median = styles()
+        assert after_median["Median"] == "dashed"
+        assert after_median["A"] == before["A"]
+        assert after_median["C"] == before["C"]
+        assert len(set(after_median.values())) == 4
+
+        select(page, 3, names)
+        after_mean = styles()
+        assert after_mean["Mean"] == "solid"
+        assert after_mean["Median"] == "dashed"
+        assert after_mean["B"] == after_median["B"]
+        assert after_mean["C"] == after_median["C"]
+        assert len(set(after_mean.values())) == len(names)
+        select(page, 3, ["Median", "Mean"])
+        assert styles() == {"Mean": "solid", "Median": "dashed"}
+        select(page, 3, ["Median"])
+        assert styles() == {"Median": "dashed"}
+        select(page, 3, ["Mean"])
+        assert styles() == {"Mean": "solid"}
+    finally:
+        page.close()
+
+
 def test_browser_cap_replacement_and_stable_style_slots(browser, served):
     capacity = len(bokeh.core.enums.LineDash)
     names = [f"S{index:02}" for index in range(capacity + 2)]
@@ -385,8 +431,8 @@ def test_browser_gaps_styles_finite_ranges_calendar_and_reset(browser, served, t
         assert sequence[0] == 10 and np.isnan(sequence[1]) and sequence[2] == 20
         assert sorted(zip(current["lines"]["width"], current["lines"]["alpha"])) == [
             (1, 1.0),
-            (2, 0.8),
             (3, 0.6),
+            (5, 0.3),
         ]
         assert current["points"]["date"] == [1767225600000, 1767830400000]
         assert current["ranges"][2:] == [9.5, 20.5]
