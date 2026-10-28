@@ -141,7 +141,14 @@ The browser fetches once per page load with ``cache: "no-store"``. Selecting
 metrics uses the already loaded records; there is no polling, manual refresh
 control, or automatic update of an open page. On browser reload, current JSON
 rebuilds selectors, series, legends, and ranges, including newly added metrics,
-sources, labels, summaries, and dates, without regenerating HTML. Loading and
+sources, labels, summaries, and dates, without regenerating HTML. Data
+initialization begins at Bokeh document readiness, not when the figure
+first obtains a visible width. Plots in initially inactive tabs load before
+being revealed; revealing or resizing them does not refetch data or reset
+selections or manual zoom. A document-local dispatcher starts each plot
+independently and only initializes plots belonging to that output, including
+when a notebook renders separate outputs.
+Loading and
 source-specific fetch/HTTP/JSON-parsing errors appear near the plot. Failed
 loads clear the plot rather than presenting old data as refreshed.
 

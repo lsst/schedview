@@ -7,11 +7,13 @@ from types import MappingProxyType
 from typing import Any
 
 import bokeh.core.enums
+import bokeh.io
 import bokeh.layouts
 import bokeh.models
 import bokeh.plotting
 import numpy as np
 import pandas as pd
+from bokeh.events import DocumentReady
 
 from schedview.collect.progress import SummaryMetrics, validate_summary_metrics
 from schedview.plot.colors import make_band_cmap
@@ -26,6 +28,24 @@ SOURCE_STYLES: dict[str, tuple[int, float]] = {
     "baseline": (5, 0.3),
 }
 """Source -> (width in pixels, alpha), shared by lines and legend swatches."""
+
+_PROGRESS_STARTUP = "schedview-progress-startup"
+
+_PROGRESS_DOCUMENT_READY = """
+export default function(args, document) {
+    const visited = new Set();
+    for (const root of document.roots()) {
+        for (const model of root.references()) {
+            if (visited.has(model) || !model.tags.includes("schedview-progress-startup")) continue;
+            visited.add(model);
+            for (const callback of model.js_event_callbacks.document_ready ?? []) {
+                // Start every plot independently, without waiting for another fetch.
+                void callback.execute(document);
+            }
+        }
+    }
+}
+"""
 
 
 def make_metric_line_plots(
@@ -216,9 +236,19 @@ def make_summary_progress_plot(summary_metrics: SummaryMetrics | str) -> bokeh.m
     for control in (metric, source, label, summary):
         control.js_on_change("value", callback)
 
-    # DocumentReady is a document event, not dispatched to figure callbacks.
-    # The first layout starts loading; later resizes cannot refetch.
-    plot.js_on_change("inner_width", callback)
+    # Notebook embedding copies curdoc callbacks into temporary documents.
+    # A single generic dispatcher must discover only that output's models;
+    # capturing each plot in document callback args would leak other outputs.
+    status.tags.append(_PROGRESS_STARTUP)
+    status.js_on_event(DocumentReady, callback)
+    document = bokeh.io.curdoc()
+    if not any(
+        existing.name == _PROGRESS_STARTUP
+        for existing in document.callbacks.js_event_callbacks.get(DocumentReady.event_name, [])
+    ):
+        document.js_on_event(
+            DocumentReady, bokeh.models.CustomJS(name=_PROGRESS_STARTUP, code=_PROGRESS_DOCUMENT_READY)
+        )
     return bokeh.layouts.column(
         bokeh.layouts.row(metric, source, label, summary, sizing_mode="stretch_width"),
         status,
@@ -254,9 +284,9 @@ export default async function(args, changed) {
     const slots = state.slots;
     const selectionKey = () => JSON.stringify([metric.value, source.value, label.value, summary.value]);
 
-    // Our setters also queue callbacks. Ignore duplicates and resizes so they do
+    // Our setters also queue callbacks. Ignore duplicate selections so they do
     // not overwrite explicit user clearing or reset zoom between selections.
-    if (state.started && (changed === plot || selectionKey() === state.selection)) return;
+    if (state.started && selectionKey() === state.selection) return;
     if (state.busy) return;
     state.busy = true;
     try {

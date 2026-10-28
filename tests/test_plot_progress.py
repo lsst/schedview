@@ -13,6 +13,7 @@ import pytest
 from bokeh.embed import file_html
 from bokeh.embed.bundle import bundle_for_objs_and_resources
 from bokeh.embed.notebook import notebook_content
+from bokeh.events import DocumentReady
 from bokeh.resources import INLINE
 
 from schedview.collect.progress import SUMMARY_COLUMNS
@@ -79,6 +80,8 @@ def test_models_validation_serialization_and_layout(monkeypatch):
     assert callback.args["records"][0]["harmless"] == "extra"
     figure = model(layout, "summary_progress_figure")
     assert type(figure.y_scale) is bokeh.models.LinearScale
+    assert "change:inner_width" not in figure.js_property_callbacks
+    assert model(layout, "progress_status").js_event_callbacks[DocumentReady.event_name] == [callback]
     assert len(figure.renderers) == 2
     assert isinstance(figure.renderers[0].glyph, bokeh.models.MultiLine)
     scatter = figure.renderers[1].glyph
@@ -166,6 +169,26 @@ def test_legacy_metric_line_plots_remains_separate():
     ray = layout.children[1].renderers[0]
     assert isinstance(ray.glyph, bokeh.models.Ray)
     assert ray.glyph.y == 2.0
+
+
+def test_document_startup_registration_is_idempotent_and_generic(monkeypatch):
+    from bokeh.document import Document
+
+    document = Document()
+    monkeypatch.setattr("bokeh.io.curdoc", lambda: document)
+    first = make_summary_progress_plot("./first.json")
+    second = make_summary_progress_plot("./second.json")
+    callbacks = document.callbacks.js_event_callbacks[DocumentReady.event_name]
+    assert len(callbacks) == 1
+    assert callbacks[0].args == {}
+    document.add_root(bokeh.layouts.column(first, second))
+    assert callbacks[0].name in file_html(document, INLINE)
+    for layout in (first, second):
+        _, _, notebook_document = notebook_content(layout)
+        assert notebook_document.callbacks.js_event_callbacks[DocumentReady.event_name] == callbacks
+        assert model(layout, "progress_status").id in notebook_document.models
+        other = second if layout is first else first
+        assert model(other, "progress_status").id not in notebook_document.models
 
 
 @pytest.fixture(scope="module")
@@ -625,7 +648,7 @@ def test_browser_startup_concurrent_compilation_fetches_once(browser, served):
         status._startup_done = Promise.all(Array.from({length: 8}, () => callback.execute(plot)));
         """,
     )
-    plot.js_property_callbacks["change:inner_width"].insert(0, startup)
+    status.js_event_callbacks[DocumentReady.event_name].insert(0, startup)
     content, _, origin = served
     content["/pages/plot.html"] = file_html(layout, INLINE)
     page = browser.new_page()
@@ -686,6 +709,135 @@ def test_browser_notebook_bundle(browser, served):
             "id => Bokeh.documents[0].get_model_by_id(id).data.summary_value",
             model(layout, "progress_points").id,
         ) == [-10, 10]
+    finally:
+        page.close()
+
+
+@pytest.mark.parametrize("external", [False, True])
+@pytest.mark.parametrize("notebook", [False, True])
+def test_browser_inactive_tab_initializes_before_reveal(browser, served, external, notebook):
+    content, requests, origin = served
+    frame = records({"summary_value": 2}, {"date": pd.Timestamp("2026-01-02"), "summary_value": 4})
+    content["/data.json"] = json_records(frame)
+    layout = make_summary_progress_plot("./data.json" if external else frame)
+    tabs = bokeh.models.Tabs(
+        tabs=[
+            bokeh.models.TabPanel(title="Other", child=bokeh.models.Div(text="Other tab")),
+            bokeh.models.TabPanel(title="Progress", child=layout),
+        ],
+        name="progress_tabs",
+    )
+    if notebook:
+        script, div, _ = notebook_content(tabs)
+        content["/tab.html"] = (
+            bundle_for_objs_and_resources(None, INLINE).scripts(tag=True)
+            + div
+            + (f"<script>{script}</script>")
+        )
+    else:
+        content["/tab.html"] = file_html(tabs, INLINE)
+    page = browser.new_page()
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    try:
+        page.goto(origin + "/tab.html")
+        before = state(page)
+        assert before["points"]["summary_value"] == [2, 4]
+        assert page.evaluate("Bokeh.documents[0].get_model_by_name('progress_tabs').active") == 0
+        assert requests.count("/data.json") == int(external)
+        page.get_by_text("Progress", exact=True).click()
+        page.wait_for_function("Bokeh.documents[0].get_model_by_name('progress_tabs').active === 1")
+        page.wait_for_function("""() => {
+            const doc = Bokeh.documents[0];
+            const view = doc.views_manager.find_one(doc.get_model_by_name('summary_progress_figure'));
+            const y = view?.renderer_views.get(view.model.renderers[1])?.glyph.sy;
+            return y?.length === 2 && y.every(Number.isFinite) && y[0] > y[1];
+        }""")
+        assert state(page) == before
+        select(page, 3, [])
+        cleared = state(page)
+        page.get_by_text("Other", exact=True).click()
+        page.get_by_text("Progress", exact=True).click()
+        assert state(page) == cleared
+        select(page, 3, ["Mean"])
+        zoom(page)
+        zoomed = state(page)
+        page.set_viewport_size({"width": 1100, "height": 800})
+        page.get_by_text("Other", exact=True).click()
+        page.get_by_text("Progress", exact=True).click()
+        assert state(page) == zoomed
+        assert requests.count("/data.json") == int(external)
+        assert errors == []
+    finally:
+        page.close()
+
+
+def test_browser_separate_notebook_outputs_do_not_capture_other_plots(browser, served):
+    content, requests, origin = served
+    layouts = [make_summary_progress_plot(f"./data{index}.json") for index in range(2)]
+    for index in range(2):
+        content[f"/data{index}.json"] = json_records(records({"summary_value": index + 1}))
+    bundle = bundle_for_objs_and_resources(None, INLINE).scripts(tag=True)
+    for index, layout in enumerate([*layouts, bokeh.models.Div(text="Unrelated output")]):
+        script, div, _ = notebook_content(layout)
+        content[f"/output{index}.html"] = bundle + div + f"<script>{script}</script>"
+        page = browser.new_page()
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        try:
+            page.goto(origin + f"/output{index}.html")
+            if index < 2:
+                assert state(page)["points"]["summary_value"] == [index + 1]
+                assert page.evaluate(
+                    "id => Bokeh.documents[0].get_model_by_id(id) == null",
+                    model(layouts[1 - index], "progress_status").id,
+                )
+            else:
+                page.wait_for_function("() => Bokeh.documents[0]?.is_idle")
+                assert page.evaluate("Bokeh.documents[0].get_model_by_name('progress_status') == null")
+            assert requests.count("/data0.json") == 1
+            assert requests.count("/data1.json") == int(index > 0)
+            assert errors == []
+        finally:
+            page.close()
+
+
+@pytest.mark.parametrize("notebook", [False, True])
+def test_browser_document_startup_does_not_wait_for_another_plot_fetch(browser, served, notebook):
+    first = make_summary_progress_plot("./first.json")
+    second = make_summary_progress_plot("./second.json")
+    root = bokeh.layouts.column(first, second)
+    content, requests, origin = served
+    content["/second.json"] = json_records(records({"summary_value": 29}))
+    if notebook:
+        script, div, _ = notebook_content(root)
+        content["/two.html"] = (
+            bundle_for_objs_and_resources(None, INLINE).scripts(tag=True)
+            + div
+            + (f"<script>{script}</script>")
+        )
+    else:
+        content["/two.html"] = file_html(root, INLINE)
+    page = browser.new_page()
+    pending = []
+    page.route("**/first.json", lambda route: pending.append(route))
+    try:
+        page.goto(origin + "/two.html")
+        page.wait_for_function("""() => {
+            const [first, second] = Bokeh.documents[0].roots()[0].children;
+            return first.select_one('progress_status').text === 'Loading ./first.json...' &&
+                second.select_one('progress_points').data.summary_value[0] === 29;
+        }""")
+        assert len(pending) == requests.count("/second.json") == 1
+        pending.pop().fulfill(
+            content_type="application/json", body=json_records(records({"summary_value": 13}))
+        )
+        page.wait_for_function("""() => Bokeh.documents[0].roots()[0].children.every(layout =>
+            layout.select_one('progress_status')._progress_state?.selection != null &&
+            !layout.select_one('progress_status')._progress_state.busy)""")
+        assert page.evaluate("""() => Bokeh.documents[0].roots()[0].children.map(layout =>
+            layout.select_one('progress_points').data.summary_value)""") == [[13], [29]]
+        assert pending == [] and requests.count("/second.json") == 1
     finally:
         page.close()
 
