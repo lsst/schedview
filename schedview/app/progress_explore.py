@@ -16,13 +16,15 @@ import click
 from bokeh.embed import file_html
 from bokeh.resources import CDN
 
-from schedview.collect.progress import load_summary_metrics, validate_summary_metrics
+from schedview.collect.progress import SummaryMetrics, load_summary_metrics, validate_summary_metrics
 from schedview.plot.progress import make_summary_progress_plot
 
 
 def _check_output_path(input_path: str | Path, output_path: str) -> None:
+    """Protect input from output overwrites, including filesystem aliases."""
     original = Path(input_path).expanduser()
     destination = Path(output_path)
+    # resolve handles path/symlink aliases; samefile also detects hard links.
     if destination.resolve() == original.resolve() or (
         destination.exists() and original.exists() and destination.samefile(original)
     ):
@@ -40,9 +42,13 @@ def make_summary_progress_data(db_path: str, json_path: str) -> None:
     precision (15 decimal places). No selector catalog or envelope is written.
     """
     try:
+        # Protect provenance before reading; enforce the export boundary.
         _check_output_path(db_path, json_path)
         summary_metrics = load_summary_metrics(db_path)
         validate_summary_metrics(summary_metrics)
+
+        # Normalize a copy after duplicate comparison, where signed infinities
+        # and missing values still differ. Pandas writes JSON null.
         records = summary_metrics.copy()
         records["summary_value"] = records["summary_value"].replace(
             [float("inf"), float("-inf")], float("nan")
@@ -76,6 +82,8 @@ def make_summary_progress_plot_cli(summary_metrics: str, page_path: str, input_k
     Database input embeds records and does not create a companion JSON file.
     """
     try:
+        # Classify before filesystem access; external data must remain
+        # browser-fetched even when an identically named local file exists.
         if input_kind == "auto":
             parsed = urlsplit(summary_metrics)
             is_url = parsed.scheme.lower() in {"http", "https"} or (
@@ -83,13 +91,18 @@ def make_summary_progress_plot_cli(summary_metrics: str, page_path: str, input_k
             )
         else:
             is_url = input_kind == "json-url"
+
+        # Relative JSON belongs beside the output page, not the CLI's cwd.
+        # Check aliases without opening it; remote URLs have no local identity.
         if not is_url:
             _check_output_path(summary_metrics, page_path)
         else:
             parsed = urlsplit(summary_metrics)
             if not parsed.scheme and not parsed.netloc:
                 _check_output_path(Path(page_path).parent / unquote(parsed.path), page_path)
-        records = summary_metrics if is_url else load_summary_metrics(summary_metrics)
+
+        # Plot construction owns neither output files nor report assembly.
+        records: SummaryMetrics | str = summary_metrics if is_url else load_summary_metrics(summary_metrics)
         plot = make_summary_progress_plot(records)
         Path(page_path).write_text(file_html(plot, CDN, title=title), encoding="utf-8")
     except (OSError, ValueError, TypeError, sqlite3.Error) as error:

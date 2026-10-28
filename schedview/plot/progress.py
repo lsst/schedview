@@ -4,6 +4,7 @@ import json
 import warnings
 from collections.abc import Mapping
 from types import MappingProxyType
+from typing import Any
 
 import bokeh.core.enums
 import bokeh.layouts
@@ -20,7 +21,12 @@ __all__ = ["make_metric_line_plots", "make_summary_progress_plot"]
 
 SNAPSHOT_SCALAR_METRIC_FIGURE_NAME = "snapshot_scalar_metric_figure"
 EXTRAPOLATED_SCALAR_METRIC_FIGURE_NAME = "extrapolated_scalar_metric_figure"
-SOURCE_STYLES = {"consdb": (1, 1.0), "chimera": (3, 0.6), "baseline": (5, 0.3)}
+SOURCE_STYLES: dict[str, tuple[int, float]] = {
+    "consdb": (1, 1.0),
+    "chimera": (3, 0.6),
+    "baseline": (5, 0.3),
+}
+"""Source -> (width in pixels, alpha), shared by lines and legend swatches."""
 
 
 # Bokeh omits underscore-prefixed classes from notebook resource bundles.
@@ -32,6 +38,9 @@ import {LinearScale} from "models/scales/linear_scale"
 
 export class ProgressLinearScale extends LinearScale {
     static __name__ = "ProgressLinearScale";
+
+    // Opposite finite extremes can have an infinite difference. Halve before
+    // subtracting so screen coordinates remain distinct without altering data.
     get s_compute() {
         const {source_range: source, target_range: target} = this;
         if (Number.isFinite(source.end - source.start)) return super.s_compute;
@@ -39,6 +48,8 @@ export class ProgressLinearScale extends LinearScale {
         const span = source.end / 2 - start;
         return x => target.start + ((x / 2 - start) / span) * (target.end - target.start);
     }
+
+    // A weighted sum avoids reconstructing the overflowing full source span.
     get s_invert() {
         const {source_range: source, target_range: target} = this;
         if (Number.isFinite(source.end - source.start)) return super.s_invert;
@@ -66,6 +77,7 @@ def make_metric_line_plots(
     This older API takes computed baseline/snapshot/chimera columns, not MAF
     summary records. The interactive summary API does not use its baseline ray.
     """
+    # Keep the older computed-column API separate from summary records.
     metric_values_ds = bokeh.models.ColumnDataSource(metric_values)
     metric_at_date_fig = bokeh.plotting.figure(
         title=f"{metric_name} at date",
@@ -77,6 +89,8 @@ def make_metric_line_plots(
     metric_at_date_fig.line(x="date", y="baseline", source=metric_values_ds, **baseline_line_kwargs)
     metric_at_date_fig.line(x="date", y="snapshot", source=metric_values_ds, **snapshot_line_kwargs)
     metric_at_date_fig.scatter(x="date", y="snapshot", source=metric_values_ds, **snapshot_scatter_kwargs)
+
+    # The reference ray belongs to the older API, not the summary plot.
     baseline_final_depth = metric_values.loc[metric_values.index.max(), "baseline"]
     chimera_metric_fig = bokeh.plotting.figure(
         title=f"{metric_name} extrapolated from date to end with baseline",
@@ -109,6 +123,13 @@ def make_summary_progress_plot(summary_metrics: SummaryMetrics | str) -> bokeh.m
         Four cascading selectors, status, figure, and three informational
         legends. Embedded records require no companion data file or server.
     """
+    records: list[dict[str, Any]] | None
+    """JSON-compatible rows with epoch-ms dates; None means browser fetch."""
+    url: str | None
+    """Unchanged external URL, or None for embedded records."""
+
+    # Share a browser update path. Never read an external URL in Python or
+    # embed a generation-time selector catalog that can become stale.
     if isinstance(summary_metrics, str):
         records, url = None, summary_metrics
     else:
@@ -129,11 +150,15 @@ def make_summary_progress_plot(summary_metrics: SummaryMetrics | str) -> bokeh.m
         )
         url = None
 
+    # Start empty: only loaded records determine valid selector options.
     metric = bokeh.models.Select(title="Metric", options=[], value="", name="progress_metric")
     source = bokeh.models.MultiSelect(title="Source", options=[], value=[], name="progress_source")
     label = bokeh.models.MultiSelect(title="Metric info label", options=[], value=[], name="progress_label")
     summary = bokeh.models.MultiSelect(title="Summary metric", options=[], value=[], name="progress_summary")
     status = bokeh.models.Div(text="Loading summary metrics...", name="progress_status")
+
+    # One multi_line source fits a variable number of sequences. Finite points
+    # preserve isolated measurements and supply original hover data.
     lines = bokeh.models.ColumnDataSource(
         dict(xs=[], ys=[], color=[], width=[], alpha=[], dash=[]), name="progress_lines"
     )
@@ -149,6 +174,8 @@ def make_summary_progress_plot(summary_metrics: SummaryMetrics | str) -> bokeh.m
         ),
         name="progress_points",
     )
+
+    # Explicit ranges let selections update visible and Reset bounds together.
     plot = bokeh.plotting.figure(
         height=440,
         sizing_mode="stretch_width",
@@ -180,6 +207,8 @@ def make_summary_progress_plot(summary_metrics: SummaryMetrics | str) -> bokeh.m
         hover_color="black",
         hover_alpha=1.0,
     )
+
+    # Hover targets measurements, not interpolated line positions.
     plot.add_tools(
         bokeh.models.HoverTool(
             renderers=[scatter],
@@ -193,10 +222,13 @@ def make_summary_progress_plot(summary_metrics: SummaryMetrics | str) -> bokeh.m
         )
     )
     plot.xaxis.formatter = bokeh.models.DatetimeTickFormatter(days="%Y-%m-%d", months="%Y-%m", years="%Y")
+
     # Informational HTML legends never introduce reference data.
     legends = [bokeh.models.Div(name=f"progress_{kind}_legend") for kind in ("source", "band", "summary")]
     cmap = make_band_cmap(bands=("u", "g", "r", "i", "z", "y", "all"))["transform"]
     colors = dict(zip(cmap.factors, cmap.palette))
+
+    # Explicit model/policy arguments keep separate plots isolated.
     callback = bokeh.models.CustomJS(
         args=dict(
             metric=metric,
@@ -218,7 +250,9 @@ def make_summary_progress_plot(summary_metrics: SummaryMetrics | str) -> bokeh.m
     )
     for control in (metric, source, label, summary):
         control.js_on_change("value", callback)
+
     # DocumentReady is a document event, not dispatched to figure callbacks.
+    # The first layout starts loading; later resizes cannot refetch.
     plot.js_on_change("inner_width", callback)
     return bokeh.layouts.column(
         bokeh.layouts.row(metric, source, label, summary, sizing_mode="stretch_width"),
@@ -229,28 +263,40 @@ def make_summary_progress_plot(summary_metrics: SummaryMetrics | str) -> bokeh.m
     )
 
 
-_PROGRESS_CALLBACK = r"""
+_PROGRESS_CALLBACK: str = r"""
+// Null and empty labels share a logical identity, but original hover text stays
+// untouched. JSON keys prevent real label text from colliding with a sentinel.
 const canonical = value => value == null || value === "" ? "" : value;
 const labelKey = value => JSON.stringify(canonical(value));
 const sorted = values => [...new Set(values)].sort();
+
+// Labels and external URLs are data, never trusted HTML in status/legend markup.
 const escape = value => String(value).replace(/[&<>"']/g, c =>
     ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"})[c]);
 
 export default async function(args, changed) {
     const {metric, source, label, summary, status, lines, points, plot, legends,
            records, url, colors, styles, dashes} = args;
+
     // Concurrent CustomJS compilation can yield multiple module instances.
     // The model survives all of them; claim initialization before any await.
+    // State belongs to this plot's status model, not a page-global/module cache.
     const state = status._progress_state ??= {
         data: null, busy: false, started: false, slots: new Map(),
         previousSummaries: [], selection: null,
     };
+    // Map summary name -> index into Bokeh's named dash list, retained across updates.
     const slots = state.slots;
     const selectionKey = () => JSON.stringify([metric.value, source.value, label.value, summary.value]);
+
+    // Our setters also queue callbacks. Ignore duplicates and resizes so they do
+    // not overwrite explicit user clearing or reset zoom between selections.
     if (state.started && (changed === plot || selectionKey() === state.selection)) return;
     if (state.busy) return;
     state.busy = true;
     try {
+        // Claim startup before fetch yields control: concurrent callbacks cannot
+        // issue a second request. Subsequent selections reuse the loaded records.
         let initial = false;
         if (!state.started) {
             state.started = true;
@@ -265,6 +311,10 @@ export default async function(args, changed) {
         }
         const data = state.data;
         if (data === null) return;
+
+        // Cascade from upstream selections using unions of matching records.
+        // Preserve surviving choices; only startup/upstream changes get fallback
+        // selections. Clearing the control itself must remain an empty selection.
         const metrics = sorted(data.map(row => row.metric_name));
         metric.options = metrics;
         if (initial) metric.value = metrics[0] ?? "";
@@ -280,6 +330,9 @@ export default async function(args, changed) {
         };
         cascade(source, sorted(rows.map(row => row.visit_source)), changed === metric);
         rows = rows.filter(row => source.value.includes(row.visit_source));
+
+        // Label option values are JSON identities. Quoted display text distinguishes
+        // a literal '(no label)' string from the null/empty-label presentation.
         const labels = sorted(rows.map(row => labelKey(row.metric_info_label)));
         const validLabels = label.value.filter(value => labels.includes(value));
         label.options = labels.map(key => [key, JSON.parse(key) === "" ? "(no label)" : key]);
@@ -288,8 +341,12 @@ export default async function(args, changed) {
             label.value = validLabels.length ? validLabels : labels;
         }
         rows = rows.filter(row => label.value.includes(labelKey(row.metric_info_label)));
+
         cascade(summary, sorted(rows.map(row => row.summary_metric)),
                 changed === metric || changed === source || changed === label, dashes.length);
+
+        // Reject only excess additions; a full selection can still be replaced.
+        // Existing choices take priority over new ones when the user exceeds cap.
         let limited = false;
         if (summary.value.length > dashes.length) {
             const survivors = state.previousSummaries.filter(value => summary.value.includes(value));
@@ -298,6 +355,9 @@ export default async function(args, changed) {
             limited = true;
         }
         state.previousSummaries = [...summary.value];
+
+        // Release deselected slots before allocating replacements. Preferred
+        // summaries may displace an occupant, but all other survivors stay stable.
         for (const name of slots.keys()) if (!summary.value.includes(name)) slots.delete(name);
         // Preferred summaries take precedence over an existing occupant of their slot.
         for (const [name, dash] of [["Mean", "solid"], ["Median", "dashed"]]) {
@@ -315,6 +375,9 @@ export default async function(args, changed) {
             }
         }
         rows = rows.filter(row => summary.value.includes(row.summary_metric));
+
+        // Keep source and original-label sequences separate even with equal band
+        // colors. JSON tuple keys avoid collisions from delimiters in real labels.
         const groups = new Map();
         for (const row of rows) {
             const key = JSON.stringify([canonical(row.metric_name), canonical(row.metric_info_label),
@@ -322,6 +385,10 @@ export default async function(args, changed) {
             if (!groups.has(key)) groups.set(key, []);
             groups.get(key).push(row);
         }
+
+        // multi_line columns contain one array/style per sequence; point columns
+        // contain one scalar per finite measurement. NaN breaks a line at an
+        // explicit gap without inventing missing dates or interpolated points.
         const lineData = {xs: [], ys: [], color: [], width: [], alpha: [], dash: []};
         const pointData = {date: [], summary_value: [], run_name: [], metric_name: [],
                            metric_info_label: [], summary_metric: [], color: []};
@@ -342,8 +409,15 @@ export default async function(args, changed) {
                 }
             }
         }
+
+        // Replace whole sources together after building them, avoiding partial data
+        // updates while selectors and their queued callbacks are being reconciled.
         lines.data = lineData;
         points.data = pointData;
+
+        // Ranges use only finite measurements, not legend swatches or gap dates.
+        // Multiply endpoints before subtraction to avoid overflowing extreme spans;
+        // clamp padded bounds and give empty/singleton selections usable ranges.
         const extent = (values, fallback, singleton) => {
             if (!values.length) return fallback;
             let low = Infinity, high = -Infinity;
@@ -357,9 +431,13 @@ export default async function(args, changed) {
                                  value => Math.max(Math.abs(value)*0.05, 1))]
         ]) {
             [range.start, range.end] = bounds;
+            // Reset should fit this selection, not the document's initial records.
             [range.reset_start, range.reset_end] = bounds;
         }
         plot.title.text = metric.value || "Summary progress";
+
+        // HTML/SVG legends are informational only: they cannot add synthetic data
+        // to ranges or hide series independently of the selection controls.
         const swatch = (text, color, width = 2, alpha = 1, dash = "solid") =>
             `<span style="display:inline-block;margin-right:18px"><svg width="38" height="14">` +
             `<line x1="0" y1="7" x2="38" y2="7" stroke="${color}" stroke-width="${width}" ` +
@@ -371,6 +449,9 @@ export default async function(args, changed) {
             .map(name => swatch(name, colors[name])).join("");
         legends[2].text = "<b>Summary</b> " + summary.value
             .map(name => swatch(name, "black", 2, 1, dashes[slots.get(name)])).join("");
+
+        // Report successful loading separately from an empty or all-gap selection.
+        // Keep cap/gap diagnostics visible rather than relying on browser console.
         const noData = !pointData.date.length;
         const limitText = `Select at most ${dashes.length} summaries; deselect one to replace it.`;
         const countText = noData ? "No finite data for the current selection." :
@@ -381,6 +462,7 @@ export default async function(args, changed) {
             (summary.options.length > dashes.length && !limited ? ` ${limitText}` : "") +
             (url !== null ? ` Source: ${escape(url)}` : "");
     } catch (error) {
+        // A failed load must not look like a successful plot of stale records.
         lines.data = {xs: [], ys: [], color: [], width: [], alpha: [], dash: []};
         points.data = {date: [], summary_value: [], run_name: [], metric_name: [],
                        metric_info_label: [], summary_metric: [], color: []};
@@ -394,4 +476,9 @@ export default async function(args, changed) {
         state.busy = false;
     }
 }
+"""
+"""Plot-local load/update transaction shared by startup and selectors.
+
+Python validates embedded inputs; external JSON is assumed to use that same
+records contract. Handle fetch/parse failures here, not schema validation.
 """
