@@ -77,6 +77,74 @@ def almanac() -> Almanac:
 
 
 class TestComputeTinysum:
+    def test_first_visit_coordinates(self, sample_visits):
+        visits = sample_visits.iloc[:6].copy()
+        visits["dayObs"] = [20250602, 20250601, 20250601, 20250602, 20250601, 20250603]
+        visits["observationStartMJD"] = [60828.2, 60827.2, 60827.1, 60828.1, 60827.1, np.nan]
+        visits["science_program"] = ["ENG-001"] * len(visits)
+        input_columns = ["fieldRA", "fieldDec", "altitude", "azimuth"]
+        output_columns = ["first_visit_ra", "first_visit_declination", "first_visit_alt", "first_visit_az"]
+        for offset, column in enumerate(input_columns):
+            visits[column] = np.arange(len(visits), dtype=float) + offset * 10
+        visits.index = [0] * len(visits)
+        original = visits.copy(deep=True)
+
+        baseline = compute_tinysum(visits, science_programs=SCIENCE_PROGRAMS)
+        result = compute_tinysum(
+            visits, science_programs=SCIENCE_PROGRAMS, include_first_visit_coordinates=True
+        )
+        assert set(result.columns) - set(baseline.columns) == set(output_columns)
+        pd.testing.assert_frame_equal(result[baseline.columns], baseline)
+        pd.testing.assert_frame_equal(visits, original)
+        np.testing.assert_array_equal(result.loc[20250601, output_columns], [2, 12, 22, 32])
+        np.testing.assert_array_equal(result.loc[20250602, output_columns], [3, 13, 23, 33])
+        assert result.loc[20250603, output_columns].isna().all()
+        assert all(pd.api.types.is_float_dtype(result[column]) for column in output_columns)
+
+    @pytest.mark.parametrize("start_time", [None, np.nan, np.inf, -np.inf, pd.NA])
+    def test_first_visit_missing_times(self, sample_visits, start_time):
+        visits = sample_visits.copy()
+        if start_time is not None:
+            visits["observationStartMJD"] = pd.Series(start_time, index=visits.index, dtype="Float64")
+            # A non-finite time must not displace the first finite time.
+            visits.loc[1, "observationStartMJD"] = 60827.1
+        visits["fieldRA"] = np.arange(len(visits), dtype=float)
+        result = compute_tinysum(visits, include_first_visit_coordinates=True)
+        if start_time is None:
+            assert result.filter(like="first_visit_").isna().all().all()
+        else:
+            assert result.loc[20250601, "first_visit_ra"] == 1
+            assert result.loc[20250602].filter(like="first_visit_").isna().all()
+
+    @pytest.mark.parametrize("missing_value", [np.nan, np.inf, -np.inf, pd.NA])
+    def test_first_visit_missing_coordinates(self, sample_visits, missing_value):
+        visits = sample_visits.copy()
+        visits["observationStartMJD"] = np.arange(len(visits), dtype=float)
+        visits["fieldRA"] = pd.Series(123.45, index=visits.index, dtype="Float64")
+        visits.loc[0, "fieldRA"] = missing_value
+        visits["fieldDec"] = -45.67
+        visits["altitude"] = np.nan
+        result = compute_tinysum(visits, include_first_visit_coordinates=True)
+        assert pd.isna(result.loc[20250601, "first_visit_ra"])
+        assert result.loc[20250602, "first_visit_ra"] == 123.45
+        assert (result["first_visit_declination"] == -45.67).all()
+        assert result[["first_visit_alt", "first_visit_az"]].isna().all().all()
+
+    def test_first_visit_empty_input(self, sample_visits):
+        result = compute_tinysum(sample_visits.iloc[:0], include_first_visit_coordinates=True)
+        assert result.empty
+        assert len(result.filter(like="first_visit_").columns) == 4
+
+    def test_first_visit_object_nulls(self, sample_visits):
+        visits = sample_visits.copy()
+        visits["observationStartMJD"] = None
+        visits["fieldRA"] = pd.NA
+        result = compute_tinysum(visits, include_first_visit_coordinates=True)
+        assert result.filter(like="first_visit_").isna().all().all()
+        visits.loc[0, "observationStartMJD"] = 60827.1
+        result = compute_tinysum(visits, include_first_visit_coordinates=True)
+        assert result.filter(like="first_visit_").isna().all().all()
+
     def test_one_row_per_night(self, sample_visits):
         result = compute_tinysum(sample_visits)
         assert len(result) == 2
