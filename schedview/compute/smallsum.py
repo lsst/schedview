@@ -158,6 +158,7 @@ def compute_tinysum(
     eff_time_column: str = "eff_time_median",
     exp_time_column: str = "exp_time",
     all_science: bool = False,
+    include_first_visit_coordinates: bool = False,
 ) -> pd.DataFrame:
     """Create a one-row-per-night summary DataFrame from visits.
 
@@ -192,11 +193,22 @@ def compute_tinysum(
         its ``science_program``, so the science counts equal the totals.
         Defaults to ``False``.  Pass ``True`` for prenight-simulation
         visits, which contain only science visits.
+    include_first_visit_coordinates : `bool`, optional
+        Append the first visit's coordinates in degrees. Defaults to
+        ``False``. Select the earliest finite ``observationStartMJD`` per
+        night from all visits, breaking ties by input row order. Copy
+        ``fieldRA``, ``fieldDec``, ``altitude``, and ``azimuth`` from that
+        row without conversion. Missing columns or non-finite values
+        yield missing coordinates; later visits do not fill them.
 
     Returns
     -------
     tinysum : `pandas.DataFrame`
         DataFrame indexed by ``dayObs`` with one row per night.
+        When ``include_first_visit_coordinates`` is enabled, also contains
+        ``first_visit_ra``, ``first_visit_declination``, ``first_visit_alt``,
+        and ``first_visit_az`` in degrees. All four are missing for nights
+        without a finite start time or if the start-time column is absent.
     """
     basic_stats = (
         visits.groupby("dayObs", as_index=True)
@@ -299,6 +311,31 @@ def compute_tinysum(
         tinysum["night_hours"] = night_hours
         tinysum["visits/hour"] = tinysum["Total"] / tinysum["night_hours"]
         tinysum["teff/night duration"] = tinysum["total eff_time"] / (tinysum["night_hours"] * 60 * 60)
+
+    if include_first_visit_coordinates:
+        coordinate_columns = {
+            "fieldRA": "first_visit_ra",
+            "fieldDec": "first_visit_declination",
+            "altitude": "first_visit_alt",
+            "azimuth": "first_visit_az",
+        }
+        first_visits = visits.iloc[:0]
+        if "observationStartMJD" in visits.columns:
+            start_times = pd.to_numeric(visits["observationStartMJD"])
+            # Stable sorting and whole-row selection preserve ties and nulls.
+            first_visits = (
+                visits.loc[np.isfinite(start_times).fillna(False)]
+                .sort_values("observationStartMJD", kind="stable")
+                .drop_duplicates("dayObs")
+            )
+        coordinates = (
+            first_visits.set_index("dayObs")
+            .reindex(columns=coordinate_columns)
+            .apply(pd.to_numeric)
+            .astype(float)
+        )
+        coordinates = coordinates.where(np.isfinite(coordinates)).rename(columns=coordinate_columns)
+        tinysum = tinysum.join(coordinates)
 
     return tinysum
 

@@ -25,7 +25,7 @@ Science targets: {targets}
 
 RSS_PRENIGHT_DESC_FORMAT = """
 Simulated (science) visits: {total};
-Median FWHM: {fwhm};
+{first_visit}Median FWHM: {fwhm};
 Mean visit rate: {visit_rate} visits/hour;
 Total eff_time / total exp_time: {mean_norm_teff};
 Total eff_time / total night time: {teff_rate};
@@ -217,7 +217,8 @@ def _format_summary_desc(
         The local calendar date of the night start.
     desc_format: `str` or `None`
         Format for the description field. None defaults
-        to ``RSS_DESC_FORMAT``.
+        to ``RSS_DESC_FORMAT``. Prenight templates may include
+        ``{first_visit}`` for an optional degree-valued coordinate line.
 
     Returns
     -------
@@ -247,6 +248,26 @@ def _format_summary_desc(
     if desc_format is None:
         desc_format = RSS_DESC_FORMAT
 
+    first_visit = ""
+    if report == "prenight":
+        coordinate_labels = {
+            "first_visit_ra": "RA",
+            "first_visit_declination": "declination",
+            "first_visit_alt": "alt",
+            "first_visit_az": "az",
+        }
+        parts = []
+        has_coordinates = False
+        for column, label in coordinate_labels.items():
+            value = row.get(column, np.nan)
+            if not pd.isna(value) and np.isfinite(value):
+                parts.append(f"{label}={value:.2f} deg")
+                has_coordinates = True
+            else:
+                parts.append(f"{label}=unavailable")
+        if has_coordinates:
+            first_visit = "First simulated visit: " + ", ".join(parts) + ";\n"
+
     return desc_format.format(
         report=report,
         instrument=instrument,
@@ -258,6 +279,7 @@ def _format_summary_desc(
         mean_norm_teff=mean_norm_teff_str,
         teff_rate=teff_rate,
         targets=tinysum.loc[dayobs, "science targets"],
+        first_visit=first_visit,
     )
 
 
@@ -318,6 +340,11 @@ def make_report_rss_feed(
         ``compute_tinysum``, so the visits should be supplied **unmodified**.
         All prenight visits are counted as science visits (the simulator only
         simulates science visits), so the science counts equal the totals.
+        First-visit coordinates are copied in degrees from ``fieldRA``,
+        ``fieldDec``, ``altitude``, and ``azimuth`` on the earliest finite
+        ``observationStartMJD`` row per night. Equal-time ties use input
+        row order. Missing coordinates are labeled unavailable; the line
+        is omitted when all four coordinates are missing.
         If the supplied visits contain no visits for a given night, that
         night's ``prenight`` description is left completely blank.
         Defaults to ``None``, in which case prenight descriptions are blank.
@@ -341,6 +368,7 @@ def make_report_rss_feed(
             eff_time_column="t_eff",
             exp_time_column="visitExposureTime",
             all_science=True,
+            include_first_visit_coordinates=True,
         )
         if prenight_visits is not None
         else None
