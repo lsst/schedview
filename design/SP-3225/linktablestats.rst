@@ -2,6 +2,14 @@
 Design: Per-night statistics in ``schedview.reports``
 ============================================================
 
+.. note::
+
+   The prenight RSS description and first-visit coordinate contract in
+   this design are superseded by LSST-78. See
+   ``design/lsst-78/design.org`` for the current specification, including
+   the ``first_visit`` template placeholder. Other report and link-table
+   behavior described here remains applicable.
+
 Overview
 --------
 

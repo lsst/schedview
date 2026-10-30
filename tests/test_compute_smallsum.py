@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -83,7 +85,7 @@ class TestComputeTinysum:
         visits["observationStartMJD"] = [60828.2, 60827.2, 60827.1, 60828.1, 60827.1, np.nan]
         visits["science_program"] = ["ENG-001"] * len(visits)
         input_columns = ["fieldRA", "fieldDec", "altitude", "azimuth"]
-        output_columns = ["first_visit_ra", "first_visit_declination", "first_visit_alt", "first_visit_az"]
+        output_columns = ["first_visit_ra", "first_visit_decl", "first_visit_alt", "first_visit_az"]
         for offset, column in enumerate(input_columns):
             visits[column] = np.arange(len(visits), dtype=float) + offset * 10
         visits.index = [0] * len(visits)
@@ -100,6 +102,21 @@ class TestComputeTinysum:
         np.testing.assert_array_equal(result.loc[20250602, output_columns], [3, 13, 23, 33])
         assert result.loc[20250603, output_columns].isna().all()
         assert all(pd.api.types.is_float_dtype(result[column]) for column in output_columns)
+
+    @pytest.mark.parametrize("dtype", [object, "string"])
+    def test_first_visit_numeric_string_times(self, sample_visits, dtype):
+        visits = sample_visits.iloc[:4].copy()
+        visits["observationStartMJD"] = pd.Series(["10", "9", "100", "9.0"], dtype=dtype)
+        output_columns = ["first_visit_ra", "first_visit_decl", "first_visit_alt", "first_visit_az"]
+        for offset, column in enumerate(["fieldRA", "fieldDec", "altitude", "azimuth"]):
+            visits[column] = np.arange(len(visits), dtype=float) + offset * 10
+        visits.index = [0] * len(visits)
+        original = visits.copy(deep=True)
+
+        result = compute_tinysum(visits, include_first_visit_coordinates=True)
+
+        np.testing.assert_array_equal(result.loc[20250601, output_columns], [1, 11, 21, 31])
+        pd.testing.assert_frame_equal(visits, original)
 
     @pytest.mark.parametrize("start_time", [None, np.nan, np.inf, -np.inf, pd.NA])
     def test_first_visit_missing_times(self, sample_visits, start_time):
@@ -127,7 +144,7 @@ class TestComputeTinysum:
         result = compute_tinysum(visits, include_first_visit_coordinates=True)
         assert pd.isna(result.loc[20250601, "first_visit_ra"])
         assert result.loc[20250602, "first_visit_ra"] == 123.45
-        assert (result["first_visit_declination"] == -45.67).all()
+        assert (result["first_visit_decl"] == -45.67).all()
         assert result[["first_visit_alt", "first_visit_az"]].isna().all().all()
 
     def test_first_visit_empty_input(self, sample_visits):
@@ -144,6 +161,113 @@ class TestComputeTinysum:
         visits.loc[0, "observationStartMJD"] = 60827.1
         result = compute_tinysum(visits, include_first_visit_coordinates=True)
         assert result.filter(like="first_visit_").isna().all().all()
+
+    def test_first_visit_invalid_times(self, sample_visits, recwarn):
+        visits = sample_visits.iloc[:6].copy()
+        visits["dayObs"] = [20250601] * 4 + [20250602] * 2
+        visits["observationStartMJD"] = ["bad", "invalid", "10", "9", "bad", "invalid"]
+        visits["fieldRA"] = np.arange(len(visits), dtype=float)
+        original = visits.copy(deep=True)
+        baseline = compute_tinysum(visits)
+        assert not recwarn
+
+        result = compute_tinysum(visits, include_first_visit_coordinates=True)
+
+        assert len(recwarn) == 1
+        assert recwarn[0].category is UserWarning
+        assert "Unparseable observationStartMJD" in str(recwarn[0].message)
+        assert result.loc[20250601, "first_visit_ra"] == 3
+        assert result.loc[20250602].filter(like="first_visit_").isna().all()
+        pd.testing.assert_frame_equal(result[baseline.columns], baseline)
+        pd.testing.assert_frame_equal(visits, original)
+
+    @pytest.mark.parametrize(
+        "invalid_time",
+        [
+            True,
+            False,
+            np.bool_(True),
+            date(2025, 6, 1),
+            datetime(2025, 6, 1),
+            pd.Timestamp("2025-06-01", tz="UTC"),
+            np.datetime64("2025-06-01"),
+        ],
+    )
+    def test_first_visit_unsupported_times(self, sample_visits, recwarn, invalid_time):
+        visits = sample_visits.iloc[:3].copy()
+        visits["observationStartMJD"] = pd.Series([invalid_time, invalid_time, 60827.1], dtype=object)
+        visits["fieldRA"] = [1.0, 2.0, 3.0]
+
+        result = compute_tinysum(visits, include_first_visit_coordinates=True)
+
+        assert result.loc[20250601, "first_visit_ra"] == 3
+        assert len(recwarn) == 1
+        assert recwarn[0].category is UserWarning
+        assert "Boolean or datetime observationStartMJD" in str(recwarn[0].message)
+
+    @pytest.mark.parametrize("dtype", [bool, "boolean", "datetime64[ns]", "datetime64[ns, UTC]"])
+    def test_first_visit_unsupported_time_dtypes(self, sample_visits, recwarn, dtype):
+        visits = sample_visits.iloc[:3].copy()
+        values = [True, False, True] if dtype in (bool, "boolean") else ["2025-06-01"] * 3
+        visits["observationStartMJD"] = pd.Series(values, dtype=dtype)
+        visits["fieldRA"] = [1.0, 2.0, 3.0]
+
+        result = compute_tinysum(visits, include_first_visit_coordinates=True)
+
+        assert result.filter(like="first_visit_").isna().all().all()
+        assert len(recwarn) == 1
+        assert "Boolean or datetime observationStartMJD" in str(recwarn[0].message)
+
+    def test_first_visit_invalid_coordinates(self, sample_visits, recwarn):
+        visits = sample_visits.iloc[:4].copy()
+        visits["dayObs"] = [20250601, 20250601, 20250602, 20250602]
+        visits["observationStartMJD"] = [1.0, 2.0, 1.0, 2.0]
+        visits["fieldRA"] = ["bad", "123", "invalid", "234"]
+        visits["fieldDec"] = ["-45.67", "0", "-34.56", "0"]
+        visits["altitude"] = ["invalid", "60", "bad", "70"]
+        visits["azimuth"] = [210.0, 0.0, 220.0, 0.0]
+        original = visits.copy(deep=True)
+
+        result = compute_tinysum(visits, include_first_visit_coordinates=True)
+
+        assert result[["first_visit_ra", "first_visit_alt"]].isna().all().all()
+        np.testing.assert_array_equal(result["first_visit_decl"], [-45.67, -34.56])
+        np.testing.assert_array_equal(result["first_visit_az"], [210.0, 220.0])
+        assert len(recwarn) == 1
+        assert recwarn[0].category is UserWarning
+        assert "fieldRA, altitude" in str(recwarn[0].message)
+        pd.testing.assert_frame_equal(visits, original)
+
+    def test_first_visit_invalid_later_coordinates(self, sample_visits, recwarn):
+        visits = sample_visits.iloc[:2].copy()
+        visits["observationStartMJD"] = [1.0, 2.0]
+        visits["fieldRA"] = [123.0, "invalid"]
+
+        result = compute_tinysum(visits, include_first_visit_coordinates=True)
+
+        assert result.loc[20250601, "first_visit_ra"] == 123
+        assert not recwarn
+
+    def test_first_visit_missing_times_do_not_warn(self, sample_visits, recwarn):
+        visits = sample_visits.iloc[:6].copy()
+        visits["observationStartMJD"] = pd.Series(
+            [None, pd.NA, pd.NaT, np.nan, np.inf, -np.inf], dtype=object
+        )
+
+        result = compute_tinysum(visits, include_first_visit_coordinates=True)
+
+        assert result.filter(like="first_visit_").isna().all().all()
+        assert not recwarn
+
+    def test_first_visit_warning_categories(self, sample_visits, recwarn):
+        visits = sample_visits.iloc[:5].copy()
+        visits["observationStartMJD"] = ["bad", "invalid", True, False, 60827.1]
+        visits["fieldRA"] = "invalid"
+
+        compute_tinysum(visits, include_first_visit_coordinates=True)
+
+        assert len(recwarn) == 3
+        assert all(warning.category is UserWarning for warning in recwarn)
 
     def test_one_row_per_night(self, sample_visits):
         result = compute_tinysum(sample_visits)

@@ -252,7 +252,7 @@ def _format_summary_desc(
     if report == "prenight":
         coordinate_labels = {
             "first_visit_ra": "RA",
-            "first_visit_declination": "declination",
+            "first_visit_decl": "decl",
             "first_visit_alt": "alt",
             "first_visit_az": "az",
         }
@@ -261,6 +261,8 @@ def _format_summary_desc(
         for column, label in coordinate_labels.items():
             value = row.get(column, np.nan)
             if not pd.isna(value) and np.isfinite(value):
+                if column in ("first_visit_ra", "first_visit_az"):
+                    value = round(value % 360, 2) % 360
                 parts.append(f"{label}={value:.2f} deg")
                 has_coordinates = True
             else:

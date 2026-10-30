@@ -196,12 +196,10 @@ class TestReports(unittest.TestCase):
         assert root.findtext("channel/description") == baseline.findtext("channel/description")
         expected_lines = {
             "2025-06-20": (
-                "First simulated visit: RA=123.46 deg, declination=-45.68 deg, "
-                "alt=60.12 deg, az=210.35 deg;"
+                "First simulated visit: RA=123.46 deg, decl=-45.68 deg, " "alt=60.12 deg, az=210.35 deg;"
             ),
             "2025-06-21": (
-                "First simulated visit: RA=234.57 deg, declination=-34.57 deg, "
-                "alt=70.12 deg, az=220.35 deg;"
+                "First simulated visit: RA=234.57 deg, decl=-34.57 deg, " "alt=70.12 deg, az=220.35 deg;"
             ),
         }
         for base_item, item, repeat_item, changed_item in zip(
@@ -230,6 +228,47 @@ class TestReports(unittest.TestCase):
         ) == schedview.reports.make_report_link_table(
             reports, visits=observed.drop(columns=["fieldRA", "fieldDec", "altitude", "azimuth"])
         )
+
+    def test_prenight_coordinate_wrapping(self):
+        summary = pd.DataFrame(
+            {
+                "Total": [1],
+                "science": [1],
+                "median FWHM": [1.0],
+                "visits/hour": [1.0],
+                "total eff_time/total exp_time": [1.0],
+                "teff/night duration": [1.0],
+                "science targets": ["COSMOS"],
+                "first_visit_decl": [-45.67],
+                "first_visit_alt": [60.12],
+            },
+            index=[20250620],
+        )
+        for value, expected in [
+            (359.996, "0.00"),
+            (360.0, "0.00"),
+            (721.234, "1.23"),
+            (-1.234, "358.77"),
+            (-0.004, "0.00"),
+            (123.456, "123.46"),
+        ]:
+            with self.subTest(value=value):
+                summary["first_visit_ra"] = value
+                summary["first_visit_az"] = value
+                original = summary.copy(deep=True)
+                description = schedview.reports._format_summary_desc(
+                    summary,
+                    20250620,
+                    "prenight",
+                    "lsstcam",
+                    None,
+                    schedview.reports.RSS_PRENIGHT_DESC_FORMAT,
+                )
+                assert (
+                    f"First simulated visit: RA={expected} deg, decl=-45.67 deg, "
+                    f"alt=60.12 deg, az={expected} deg;"
+                ) in description.splitlines()
+                pd.testing.assert_frame_equal(summary, original)
 
     def test_prenight_missing_first_visit_coordinates(self):
         visits = pd.DataFrame(
@@ -266,7 +305,7 @@ class TestReports(unittest.TestCase):
                         assert "First simulated visit:" not in description
                     else:
                         assert (
-                            "First simulated visit: RA=unavailable, declination=-45.67 deg, "
+                            "First simulated visit: RA=unavailable, decl=-45.67 deg, "
                             "alt=unavailable, az=unavailable;"
                         ) in description.splitlines()
 

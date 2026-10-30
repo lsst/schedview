@@ -9,7 +9,8 @@ This module provides two functions:
 
 __all__ = ["compute_tinysum", "compute_smallsum", "format_band_breakdown"]
 
-from datetime import timedelta
+import warnings
+from datetime import date, timedelta
 
 import numpy as np
 import pandas as pd
@@ -194,20 +195,26 @@ def compute_tinysum(
         Defaults to ``False``.  Pass ``True`` for prenight-simulation
         visits, which contain only science visits.
     include_first_visit_coordinates : `bool`, optional
-        Append the first visit's coordinates in degrees. Defaults to
+        Append the first visit's coordinates in their input units. Defaults to
         ``False``. Select the earliest finite ``observationStartMJD`` per
         night from all visits, breaking ties by input row order. Copy
         ``fieldRA``, ``fieldDec``, ``altitude``, and ``azimuth`` from that
-        row without conversion. Missing columns or non-finite values
-        yield missing coordinates; later visits do not fill them.
+        row without unit conversion. These columns are in degrees in
+        OpSim and prenight-simulation output. Missing columns or non-finite
+        values yield missing coordinates; later visits do not fill them.
+        Unparseable values are treated as missing. Boolean and datetime
+        start times are excluded from selection. Issue a `UserWarning`
+        once per invalid-value category per call, not once per row.
+        Excluded rows still contribute to the existing summary statistics.
 
     Returns
     -------
     tinysum : `pandas.DataFrame`
         DataFrame indexed by ``dayObs`` with one row per night.
         When ``include_first_visit_coordinates`` is enabled, also contains
-        ``first_visit_ra``, ``first_visit_declination``, ``first_visit_alt``,
-        and ``first_visit_az`` in degrees. All four are missing for nights
+        ``first_visit_ra``, ``first_visit_decl``, ``first_visit_alt``,
+        and ``first_visit_az`` in the input coordinate units (degrees for
+        OpSim and prenight-simulation output). All four are missing for nights
         without a finite start time or if the start-time column is absent.
     """
     basic_stats = (
@@ -315,25 +322,47 @@ def compute_tinysum(
     if include_first_visit_coordinates:
         coordinate_columns = {
             "fieldRA": "first_visit_ra",
-            "fieldDec": "first_visit_declination",
+            "fieldDec": "first_visit_decl",
             "altitude": "first_visit_alt",
             "azimuth": "first_visit_az",
         }
         first_visits = visits.iloc[:0]
         if "observationStartMJD" in visits.columns:
-            start_times = pd.to_numeric(visits["observationStartMJD"])
-            # Stable sorting and whole-row selection preserve ties and nulls.
-            first_visits = (
-                visits.loc[np.isfinite(start_times).fillna(False)]
-                .sort_values("observationStartMJD", kind="stable")
-                .drop_duplicates("dayObs")
+            raw_times = visits["observationStartMJD"]
+            unsupported = raw_times.map(
+                lambda value: isinstance(value, (bool, np.bool_, date, np.datetime64)) and not pd.isna(value)
             )
-        coordinates = (
-            first_visits.set_index("dayObs")
-            .reindex(columns=coordinate_columns)
-            .apply(pd.to_numeric)
-            .astype(float)
-        )
+            if unsupported.any():
+                warnings.warn(
+                    "Boolean or datetime observationStartMJD values are excluded "
+                    "from first-visit selection.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+            raw_times = raw_times.astype(object).mask(unsupported)
+            start_times = pd.to_numeric(raw_times, errors="coerce")
+            if (raw_times.notna() & start_times.isna()).any():
+                warnings.warn(
+                    "Unparseable observationStartMJD values are treated as missing "
+                    "and excluded from first-visit selection.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+            finite = np.isfinite(start_times).fillna(False).to_numpy(dtype=bool)
+            order = np.argsort(start_times[finite].to_numpy(), kind="stable")
+            # Stable sorting and whole-row selection preserve ties and nulls.
+            first_visits = visits.loc[finite].iloc[order].drop_duplicates("dayObs")
+        raw_coordinates = first_visits.set_index("dayObs").reindex(columns=coordinate_columns)
+        coordinates = raw_coordinates.apply(pd.to_numeric, errors="coerce").astype(float)
+        invalid_columns = raw_coordinates.notna() & coordinates.isna()
+        if invalid_columns.any().any():
+            columns = ", ".join(invalid_columns.columns[invalid_columns.any()])
+            warnings.warn(
+                f"Unparseable first-visit coordinates in {columns} are treated as missing; "
+                "later visits do not fill them.",
+                UserWarning,
+                stacklevel=2,
+            )
         coordinates = coordinates.where(np.isfinite(coordinates)).rename(columns=coordinate_columns)
         tinysum = tinysum.join(coordinates)
 
