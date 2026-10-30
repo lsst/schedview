@@ -329,8 +329,13 @@ def compute_tinysum(
         first_visits = visits.iloc[:0]
         if "observationStartMJD" in visits.columns:
             raw_times = visits["observationStartMJD"]
-            unsupported = raw_times.map(
-                lambda value: isinstance(value, (bool, np.bool_, date, np.datetime64)) and not pd.isna(value)
+            unsupported = pd.Series(
+                [
+                    isinstance(value, (bool, np.bool_, date, np.datetime64)) and not pd.isna(value)
+                    for value in raw_times
+                ],
+                index=raw_times.index,
+                dtype=bool,
             )
             if unsupported.any():
                 warnings.warn(
