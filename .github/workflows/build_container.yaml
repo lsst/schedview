@@ -14,8 +14,8 @@ jobs:
       packages: write
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: conda-incubator/setup-miniconda@v3
+      - uses: actions/checkout@v7
+      - uses: conda-incubator/setup-miniconda@v4
         with:
           python-version: "3.12"
           auto-update-conda: true
@@ -36,7 +36,7 @@ jobs:
 
       - name: Access rubin-sched-data cache
         id: cache-rs
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         env:
           cache-name: cached-rubin-sched-data
         with:
