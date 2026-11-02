@@ -11,10 +11,10 @@ jobs:
   make-cache:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install conda
-        uses: conda-incubator/setup-miniconda@v3
+        uses: conda-incubator/setup-miniconda@v4
         with:
           auto-update-conda: true
           python-version: "3.12"
@@ -33,7 +33,7 @@ jobs:
 
       - name: Access rubin-sched-data cache
         id: cache-rs
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         env:
           cache-name: cached-rubin-sched-data
         with:
