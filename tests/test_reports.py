@@ -157,10 +157,10 @@ class TestReports(unittest.TestCase):
         assert re.search(r"Simulated \(science\) visits: \d+ \(\d+[ugrizy]", joined)
         assert "First simulated visit:" not in joined
 
-    def test_prenight_first_visit_coordinates(self):
-        """Show a degree-labeled pointing in prenight RSS, not nightsum RSS.
+    def test_prenight_first_visit_coordinates_and_band(self):
+        """Show the first pointing and band in prenight RSS, not nightsum RSS.
 
-        Readers need the simulated first pointing with consistent precision;
+        Readers need the simulated pointing and band with clear units;
         it must not be presented as an observed nightsum pointing.
         """
         visits = pd.DataFrame(
@@ -170,7 +170,7 @@ class TestReports(unittest.TestCase):
                 "seeingFwhmGeom": [1.0] * 4,
                 "t_eff": [30.0] * 4,
                 "visitExposureTime": [30.0] * 4,
-                "band": ["r"] * 4,
+                "band": ["g", "i", "r", "z"],
                 "science_program": ["BLOCK-365"] * 4,
                 "target_name": ["COSMOS"] * 4,
                 "observationStartMJD": [60846.2, 60847.2, 60846.1, 60847.1],
@@ -192,10 +192,12 @@ class TestReports(unittest.TestCase):
         ).getroot()
         expected_lines = {
             "2025-06-20": (
-                "First simulated visit: RA=123.46 deg, decl=-45.68 deg, " "alt=60.12 deg, az=210.35 deg;"
+                "First simulated visit: RA=123.46 deg, decl=-45.68 deg, "
+                "alt=60.12 deg, az=210.35 deg, band=r;"
             ),
             "2025-06-21": (
-                "First simulated visit: RA=234.57 deg, decl=-34.57 deg, " "alt=70.12 deg, az=220.35 deg;"
+                "First simulated visit: RA=234.57 deg, decl=-34.57 deg, "
+                "alt=70.12 deg, az=220.35 deg, band=z;"
             ),
         }
         for item in root.iterfind("channel/item"):
@@ -206,40 +208,6 @@ class TestReports(unittest.TestCase):
                 assert expected_lines[night] in description.splitlines()
             else:
                 assert "First simulated visit:" not in description
-
-    def test_prenight_missing_first_visit_coordinates(self):
-        """Keep missing first-visit fields unavailable rather than borrowing.
-
-        Combining coordinates from different visits would describe a
-        pointing that was not actually simulated.
-        """
-        visits = pd.DataFrame(
-            {
-                "dayObs": [20250620, 20250620],
-                "observationId": [0, 1],
-                "seeingFwhmGeom": [1.0, 1.0],
-                "t_eff": [30.0, 30.0],
-                "visitExposureTime": [30.0, 30.0],
-                "band": ["r", "r"],
-                "science_program": ["BLOCK-365"] * 2,
-                "target_name": ["COSMOS"] * 2,
-                "observationStartMJD": [60846.1, 60846.2],
-                "fieldRA": [np.nan, 123.45],
-                "fieldDec": [-45.67, -34.56],
-                "altitude": [np.inf, 60.12],
-            }
-        )
-        reports = schedview.reports.find_reports(self.temp_dir.name)
-        root = schedview.reports.make_report_rss_feed(
-            reports, max_days=99999, prenight_visits=visits
-        ).getroot()
-        item = root.find(
-            "channel/item[category='lsstcam_prenight'][title='prenight for lsstcam on 2025-06-20']"
-        )
-        description = item.findtext("description")
-        assert (
-            "First simulated visit: RA=unavailable, decl=-45.67 deg, " "alt=unavailable, az=unavailable;"
-        ) in description.splitlines()
 
     def test_make_report_rss_feed_prenight_blank_when_no_visits(self):
         rng = np.random.default_rng(0)

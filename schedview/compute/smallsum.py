@@ -194,11 +194,13 @@ def compute_tinysum(
         Defaults to ``False``.  Pass ``True`` for prenight-simulation
         visits, which contain only science visits.
     include_first_visit_coordinates : `bool`, optional
-        Append coordinates from the earliest finite ``observationStartMJD``
-        per night, breaking ties by input row order. Defaults to ``False``.
+        Append coordinates and band from the earliest finite
+        ``observationStartMJD`` per night, breaking ties by input row order.
+        Defaults to ``False``.
         Copy ``fieldRA``, ``fieldDec``, ``altitude``, and ``azimuth`` from
         that same row without unit conversion (degrees in simulation
-        output). Supplied times and coordinates must be numeric. Missing
+        output), and copy the ``band`` label from that row.
+        Supplied times and coordinates must be numeric. Missing
         columns yield missing values; later visits do not fill them.
 
     Returns
@@ -208,8 +210,9 @@ def compute_tinysum(
         When ``include_first_visit_coordinates`` is enabled, also contains
         ``first_visit_ra``, ``first_visit_decl``, ``first_visit_alt``,
         and ``first_visit_az`` in the input coordinate units (degrees for
-        OpSim and prenight-simulation output). All four are missing for nights
-        without a finite start time or if the start-time column is absent.
+        OpSim and prenight-simulation output), plus ``first_visit_band``.
+        All five are missing for nights without a finite start time or if
+        the start-time column is absent.
     """
     basic_stats = (
         visits.groupby("dayObs", as_index=True)
@@ -314,26 +317,27 @@ def compute_tinysum(
         tinysum["teff/night duration"] = tinysum["total eff_time"] / (tinysum["night_hours"] * 60 * 60)
 
     if include_first_visit_coordinates:
-        coordinate_columns = {
+        first_visit_columns = {
             "fieldRA": "first_visit_ra",
             "fieldDec": "first_visit_decl",
             "altitude": "first_visit_alt",
             "azimuth": "first_visit_az",
+            "band": "first_visit_band",
         }
         first_visits = visits.iloc[:0]
         if "observationStartMJD" in visits.columns:
-            # Select whole rows so missing coordinates never mix visits.
+            # Select whole rows so missing fields never mix visits.
             first_visits = (
                 visits.loc[np.isfinite(visits["observationStartMJD"])]
                 .sort_values("observationStartMJD", kind="stable")
                 .drop_duplicates("dayObs")
             )
-        coordinates = (
+        first_visit_summary = (
             first_visits.set_index("dayObs")
-            .reindex(columns=coordinate_columns)
-            .rename(columns=coordinate_columns)
+            .reindex(columns=first_visit_columns)
+            .rename(columns=first_visit_columns)
         )
-        tinysum = tinysum.join(coordinates)
+        tinysum = tinysum.join(first_visit_summary)
 
     return tinysum
 

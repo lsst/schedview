@@ -218,9 +218,10 @@ def _format_summary_desc(
     desc_format: `str` or `None`
         Format for the description field. None defaults
         to ``RSS_DESC_FORMAT``. Prenight templates may include
-        ``{first_visit}`` for an optional degree-valued coordinate line.
-        Missing or non-finite coordinates are labeled unavailable; the
-        line is omitted when no finite coordinates are present.
+        ``{first_visit}`` for an optional coordinate and band line.
+        Coordinates use degrees. Missing or non-finite coordinates and
+        missing bands are labeled unavailable; the line is omitted when
+        all five fields are unavailable.
 
     Returns
     -------
@@ -269,7 +270,10 @@ def _format_summary_desc(
                 has_coordinates = True
             else:
                 parts.append(f"{label}=unavailable")
-        if has_coordinates:
+        band = row.get("first_visit_band", np.nan)
+        has_band = not pd.isna(band)
+        parts.append(f"band={band}" if has_band else "band=unavailable")
+        if has_coordinates or has_band:
             first_visit = "First simulated visit: " + ", ".join(parts) + ";\n"
 
     return desc_format.format(
@@ -348,8 +352,9 @@ def make_report_rss_feed(
         ``fieldDec``, ``altitude``, and ``azimuth`` on the earliest finite
         ``observationStartMJD`` row per night. Equal-time ties use input
         row order. Supplied times and coordinates must be numeric.
-        Missing or non-finite coordinates are labeled unavailable; the
-        line is omitted when all four coordinates are unavailable.
+        Band is copied from the same row's ``band`` label. Missing or
+        non-finite coordinates and missing bands are labeled unavailable;
+        the line is omitted when all five fields are unavailable.
         If the supplied visits contain no visits for a given night, that
         night's ``prenight`` description is left completely blank.
         Defaults to ``None``, in which case prenight descriptions are blank.
