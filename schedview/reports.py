@@ -219,6 +219,8 @@ def _format_summary_desc(
         Format for the description field. None defaults
         to ``RSS_DESC_FORMAT``. Prenight templates may include
         ``{first_visit}`` for an optional degree-valued coordinate line.
+        Missing or non-finite coordinates are labeled unavailable; the
+        line is omitted when no finite coordinates are present.
 
     Returns
     -------
@@ -345,8 +347,9 @@ def make_report_rss_feed(
         First-visit coordinates are copied in degrees from ``fieldRA``,
         ``fieldDec``, ``altitude``, and ``azimuth`` on the earliest finite
         ``observationStartMJD`` row per night. Equal-time ties use input
-        row order. Missing coordinates are labeled unavailable; the line
-        is omitted when all four coordinates are missing.
+        row order. Supplied times and coordinates must be numeric.
+        Missing or non-finite coordinates are labeled unavailable; the
+        line is omitted when all four coordinates are unavailable.
         If the supplied visits contain no visits for a given night, that
         night's ``prenight`` description is left completely blank.
         Defaults to ``None``, in which case prenight descriptions are blank.

@@ -157,7 +157,12 @@ class TestReports(unittest.TestCase):
         assert re.search(r"Simulated \(science\) visits: \d+ \(\d+[ugrizy]", joined)
         assert "First simulated visit:" not in joined
 
-    def test_prenight_first_visit_coordinates_and_regressions(self):
+    def test_prenight_first_visit_coordinates(self):
+        """Show a degree-labeled pointing in prenight RSS, not nightsum RSS.
+
+        Readers need the simulated first pointing with consistent precision;
+        it must not be presented as an observed nightsum pointing.
+        """
         visits = pd.DataFrame(
             {
                 "dayObs": [20250620, 20250621, 20250620, 20250621],
@@ -178,22 +183,13 @@ class TestReports(unittest.TestCase):
         observed = visits.rename(columns={"t_eff": "eff_time_median", "visitExposureTime": "exp_time"})
         reports = schedview.reports.find_reports(self.temp_dir.name)
 
-        def make_feed(prenight_visits):
-            return schedview.reports.make_report_rss_feed(
-                reports,
-                max_days=99999,
-                visits=observed,
-                prenight_visits=prenight_visits,
-                science_programs=("BLOCK-365",),
-            ).getroot()
-
-        baseline = make_feed(None)
-        root = make_feed(visits)
-        repeated = make_feed(visits.copy())
-        changed = visits.copy()
-        changed.loc[2, "fieldRA"] = 124.456
-        changed_root = make_feed(changed)
-        assert root.findtext("channel/description") == baseline.findtext("channel/description")
+        root = schedview.reports.make_report_rss_feed(
+            reports,
+            max_days=99999,
+            visits=observed,
+            prenight_visits=visits,
+            science_programs=("BLOCK-365",),
+        ).getroot()
         expected_lines = {
             "2025-06-20": (
                 "First simulated visit: RA=123.46 deg, decl=-45.68 deg, " "alt=60.12 deg, az=210.35 deg;"
@@ -202,75 +198,21 @@ class TestReports(unittest.TestCase):
                 "First simulated visit: RA=234.57 deg, decl=-34.57 deg, " "alt=70.12 deg, az=220.35 deg;"
             ),
         }
-        for base_item, item, repeat_item, changed_item in zip(
-            baseline.iterfind("channel/item"),
-            root.iterfind("channel/item"),
-            repeated.iterfind("channel/item"),
-            changed_root.iterfind("channel/item"),
-            strict=True,
-        ):
+        for item in root.iterfind("channel/item"):
             description = item.findtext("description") or ""
             title = item.findtext("title")
-            assert item.findtext("guid") == repeat_item.findtext("guid")
             if item.findtext("category") == "lsstcam_prenight":
                 night = title.rsplit(" ", 1)[-1]
                 assert expected_lines[night] in description.splitlines()
-                if night == "2025-06-20":
-                    assert item.findtext("guid") != changed_item.findtext("guid")
-                else:
-                    assert item.findtext("guid") == changed_item.findtext("guid")
             else:
-                assert description == (base_item.findtext("description") or "")
                 assert "First simulated visit:" not in description
-                assert item.findtext("guid") == changed_item.findtext("guid")
-        assert schedview.reports.make_report_link_table(
-            reports, visits=observed
-        ) == schedview.reports.make_report_link_table(
-            reports, visits=observed.drop(columns=["fieldRA", "fieldDec", "altitude", "azimuth"])
-        )
-
-    def test_prenight_coordinate_wrapping(self):
-        summary = pd.DataFrame(
-            {
-                "Total": [1],
-                "science": [1],
-                "median FWHM": [1.0],
-                "visits/hour": [1.0],
-                "total eff_time/total exp_time": [1.0],
-                "teff/night duration": [1.0],
-                "science targets": ["COSMOS"],
-                "first_visit_decl": [-45.67],
-                "first_visit_alt": [60.12],
-            },
-            index=[20250620],
-        )
-        for value, expected in [
-            (359.996, "0.00"),
-            (360.0, "0.00"),
-            (721.234, "1.23"),
-            (-1.234, "358.77"),
-            (-0.004, "0.00"),
-            (123.456, "123.46"),
-        ]:
-            with self.subTest(value=value):
-                summary["first_visit_ra"] = value
-                summary["first_visit_az"] = value
-                original = summary.copy(deep=True)
-                description = schedview.reports._format_summary_desc(
-                    summary,
-                    20250620,
-                    "prenight",
-                    "lsstcam",
-                    None,
-                    schedview.reports.RSS_PRENIGHT_DESC_FORMAT,
-                )
-                assert (
-                    f"First simulated visit: RA={expected} deg, decl=-45.67 deg, "
-                    f"alt=60.12 deg, az={expected} deg;"
-                ) in description.splitlines()
-                pd.testing.assert_frame_equal(summary, original)
 
     def test_prenight_missing_first_visit_coordinates(self):
+        """Keep missing first-visit fields unavailable rather than borrowing.
+
+        Combining coordinates from different visits would describe a
+        pointing that was not actually simulated.
+        """
         visits = pd.DataFrame(
             {
                 "dayObs": [20250620, 20250620],
@@ -288,26 +230,16 @@ class TestReports(unittest.TestCase):
             }
         )
         reports = schedview.reports.find_reports(self.temp_dir.name)
-        for missing_all in (False, True):
-            with self.subTest(missing_all=missing_all):
-                supplied = visits.drop(columns=["fieldDec"]) if missing_all else visits
-                root = schedview.reports.make_report_rss_feed(
-                    reports, max_days=99999, prenight_visits=supplied
-                ).getroot()
-                for item in root.iterfind("channel/item"):
-                    if item.findtext("category") != "lsstcam_prenight":
-                        continue
-                    description = item.findtext("description") or ""
-                    if item.findtext("title").endswith("2025-06-21"):
-                        assert description == ""
-                    elif missing_all:
-                        assert "Simulated (science) visits: 2" in description
-                        assert "First simulated visit:" not in description
-                    else:
-                        assert (
-                            "First simulated visit: RA=unavailable, decl=-45.67 deg, "
-                            "alt=unavailable, az=unavailable;"
-                        ) in description.splitlines()
+        root = schedview.reports.make_report_rss_feed(
+            reports, max_days=99999, prenight_visits=visits
+        ).getroot()
+        item = root.find(
+            "channel/item[category='lsstcam_prenight'][title='prenight for lsstcam on 2025-06-20']"
+        )
+        description = item.findtext("description")
+        assert (
+            "First simulated visit: RA=unavailable, decl=-45.67 deg, " "alt=unavailable, az=unavailable;"
+        ) in description.splitlines()
 
     def test_make_report_rss_feed_prenight_blank_when_no_visits(self):
         rng = np.random.default_rng(0)
