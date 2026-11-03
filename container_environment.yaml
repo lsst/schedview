@@ -4,6 +4,7 @@ channels:
 dependencies:
  - holoviews
  - hvplot
+ - click
  - colorcet
  - numpy
  - pandas
