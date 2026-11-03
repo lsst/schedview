@@ -269,10 +269,10 @@ def _format_summary_desc(
                 parts.append(f"{label}={value:.2f} deg")
                 has_coordinates = True
             else:
-                parts.append(f"{label}=unavailable")
+                parts.append(f"no {label}")
         band = row.get("first_visit_band", np.nan)
         has_band = not pd.isna(band)
-        parts.append(f"band={band}" if has_band else "band=unavailable")
+        parts.append(f"band={band}" if has_band else "no band")
         if has_coordinates or has_band:
             first_visit = "First simulated visit: " + ", ".join(parts) + ";\n"
 
