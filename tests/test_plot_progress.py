@@ -1,5 +1,6 @@
 """Synthetic model and real-browser checks for standalone progress plots."""
 
+import os
 import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
@@ -193,13 +194,14 @@ def test_document_startup_registration_is_idempotent_and_generic(monkeypatch):
 
 @pytest.fixture(scope="module")
 def browser():
-    """Skip explicitly when the optional browser executable is unavailable."""
-    playwright = pytest.importorskip("playwright.sync_api")
-    with playwright.sync_playwright() as runtime:
-        try:
-            instance = runtime.chromium.launch()
-        except playwright.Error as error:
-            pytest.skip(f"Chromium unavailable; run playwright install chromium: {error}")
+    """Run browser checks only when ENABLE_PLAYWRIGHT_TESTS is enabled."""
+    if os.environ.get("ENABLE_PLAYWRIGHT_TESTS", "false").lower() in ("", "0", "f", "false"):
+        pytest.skip("Playwright tests disabled; set ENABLE_PLAYWRIGHT_TESTS=1 to enable")
+
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as runtime:
+        instance = runtime.chromium.launch()
         yield instance
         instance.close()
 

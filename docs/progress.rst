@@ -35,12 +35,12 @@ Load one DataFrame and pass it directly to the plot function:
    from schedview.plot.progress import make_summary_progress_plot
 
    output_notebook()
-   summary_df = load_summary_metrics("data/resultsDb_sqlite.db")
+   summary_df = load_summary_metrics("/path/to/resultsDb_sqlite.db")
    show(make_summary_progress_plot(summary_df))
 
-The database path is relative to the notebook's working directory. In the
-LSST-35 workspace, the representative input is ``data/resultsDb_sqlite.db``
-at workspace root, or ``../data/resultsDb_sqlite.db`` from ``schedview/``.
+Replace the example path with your MAF results database. Relative paths resolve
+against the notebook's working directory. No particular workspace layout or
+bundled representative database is required.
 
 Filtered copies are valid inputs; retain all required columns and consistent
 derived values. There is no second, separately maintained selector DataFrame:
@@ -409,20 +409,17 @@ Verification Snapshot
 ---------------------
 
 Local checks were executed on 2026-10-27. These results establish tested behavior,
-not USDF execution or human acceptance. Full commands, timestamps, output, and
-exit status for resumed work are saved in the workspace's ignored
-``schedview/.pytest_cache/progress-verification/`` directory; preserve it during
-crash recovery. The root ``ai/implementation_plan.org`` records recovery points.
+not USDF execution or human acceptance. The representative input used for these
+historical checks is not a library fixture or a required bundled database.
 
 * Environment: Python 3.14.4, aarch64, pandas 3.1.0, Bokeh 3.10.1 (confirmed
   current on PyPI), ``OPENBLAS_CORETYPE=ARMV8``, and reused sample artifacts.
 * The results below describe the historical implementation. On 2026-10-28,
   review follow-up removed the custom scale and extreme-value browser cases;
-  notebook-bundle coverage now uses ordinary scalars. Current follow-up results
-  are recorded in the workspace's ``ai/implementation_plan.org``.
-* Installed JSON-export command smoke check against the representative
-  ``data/resultsDb_sqlite.db`` succeeded and produced 1736 records. This count
-  describes that sample, not a schema requirement.
+  notebook-bundle coverage now uses ordinary scalars.
+* Installed JSON-export command smoke check against the then-current
+  representative database succeeded and produced 1736 records. This count
+  describes that historical sample, not a schema requirement or current input.
 * Library regression run excluding ``tests/test_plot_progress.py`` completed
   with 303 passed, 32 skipped, 2 failed, and 1146 warnings in 372.70 seconds,
   with 71 percent coverage. ``tests/test_examples.py::TestExamples::test_surveyrewards``
