@@ -63,7 +63,7 @@ def frame(database):
 
 def test_sources_bands_and_original_labels(database):
     rows = [
-        {"run_name": f"{source}_20240229", "metric_info_label": f"{source}_{band}"}
+        {"run_name": f"{source}_20280229", "metric_info_label": f"{source}_{band}"}
         for source in ("chimera", "consdb", "baseline")
         for band in ("u", "g", "r", "i", "z", "y", "all")
     ]

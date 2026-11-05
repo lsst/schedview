@@ -30,10 +30,10 @@ def summary_database(tmp_path):
         )
         for index, (run, value) in enumerate(
             [
-                ("chimera_20240229", 1.234567890123456),
-                ("consdb_20240301", None),
-                ("baseline_20240302", float("inf")),
-                ("baseline_20240303", float("-inf")),
+                ("chimera_20280229", 1.234567890123456),
+                ("consdb_20280301", None),
+                ("baseline_20280302", float("inf")),
+                ("baseline_20280303", float("-inf")),
             ],
             start=1,
         ):
@@ -71,18 +71,18 @@ def test_data_records_dates_nulls_precision_and_copy(summary_database, tmp_path,
     assert isinstance(output, list)
     assert len(output) == 4
     by_run = {row["run_name"]: row for row in output}
-    finite = by_run["chimera_20240229"]
+    finite = by_run["chimera_20280229"]
     assert finite["summary_value"] == pytest.approx(1.234567890123456, rel=1e-15)
-    assert finite["date"] == 1709164800000
-    assert finite["dayobs"] == 20240229
+    assert finite["date"] == 1835395200000
+    assert finite["dayobs"] == 20280229
     assert isinstance(finite["metric_id"], int)
     assert isinstance(finite["stat_id"], int)
     assert finite["metric_info_label"] is None
     assert finite["sql_constraint"] is None
     assert finite["extra_text"] == "literal NaN Infinity -Infinity"
-    assert all(by_run[run]["summary_value"] is None for run in by_run if run != "chimera_20240229")
-    assert np.isposinf(records.loc[records.run_name == "baseline_20240302", "summary_value"].iloc[0])
-    assert np.isneginf(records.loc[records.run_name == "baseline_20240303", "summary_value"].iloc[0])
+    assert all(by_run[run]["summary_value"] is None for run in by_run if run != "chimera_20280229")
+    assert np.isposinf(records.loc[records.run_name == "baseline_20280302", "summary_value"].iloc[0])
+    assert np.isneginf(records.loc[records.run_name == "baseline_20280303", "summary_value"].iloc[0])
 
 
 def test_data_validation_failure_writes_nothing(summary_database, tmp_path, monkeypatch):
@@ -172,8 +172,8 @@ def test_database_html_embeds_data_without_json(summary_database, tmp_path):
     result = CliRunner().invoke(app.make_summary_progress_plot_cli, [str(summary_database), str(output)])
     assert result.exit_code == 0, result.output
     html = output.read_text()
-    assert "chimera_20240229" in html
-    assert "baseline_20240303" in html
+    assert "chimera_20280229" in html
+    assert "baseline_20280303" in html
     assert "cdn.bokeh.org" in html
     assert not list(tmp_path.glob("*.json"))
 
@@ -322,5 +322,5 @@ def test_installed_commands_generate_reports(summary_database, tmp_path):
         assert result.returncode == 0, result.stderr
         assert destination.exists()
     assert isinstance(json.loads(data_path.read_text()), list)
-    assert "chimera_20240229" in page_path.read_text()
+    assert "chimera_20280229" in page_path.read_text()
     assert not (tmp_path / "installed_data.json").exists()
