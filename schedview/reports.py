@@ -217,11 +217,7 @@ def _format_summary_desc(
         The local calendar date of the night start.
     desc_format: `str` or `None`
         Format for the description field. None defaults
-        to ``RSS_DESC_FORMAT``. Prenight templates may include
-        ``{first_visit}`` for an optional coordinate and band line.
-        Coordinates use degrees. Missing or non-finite coordinates and
-        missing bands are labeled unavailable; the line is omitted when
-        all five fields are unavailable.
+        to ``RSS_DESC_FORMAT``.
 
     Returns
     -------
@@ -326,37 +322,9 @@ def make_report_rss_feed(
         used to populate the ``<description>`` of ``lsstcam`` ``prenight``
         items.  No schedview helper fetches these; the caller is responsible
         for selecting and reading the appropriate simulation, e.g. via
-        ``rubin_sim.sim_archive``::
-
-            from rubin_sim.sim_archive.prenightindex import (
-                get_prenight_index, select_latest_prenight_sim)
-            from rubin_sim.sim_archive import vseqarchive
-            from schedview.collect.visits import NIGHT_STACKERS
-
-            sims = get_prenight_index(day_obs, telescope="simonyi")
-            sim = select_latest_prenight_sim(sims)
-            prenight_visits = vseqarchive.get_visits(
-                sim["visitseq_url"],
-                query=f"floor(observationStartMJD-0.5)=={day_obs_mjd}",
-                stackers=NIGHT_STACKERS,
-            )
-
+        ``rubin_sim.sim_archive``.
         (See ``schedview.collect.multisim.read_multiple_prenights`` for a
-        working example of this sequence.)  These simulation visits carry the
-        columns ``t_eff`` and ``visitExposureTime`` rather than
-        ``eff_time_median``/``exp_time``; those names are passed through to
-        ``compute_tinysum``, so the visits should be supplied **unmodified**.
-        All prenight visits are counted as science visits (the simulator only
-        simulates science visits), so the science counts equal the totals.
-        First-visit coordinates are copied in degrees from ``fieldRA``,
-        ``fieldDec``, ``altitude``, and ``azimuth`` on the earliest finite
-        ``observationStartMJD`` row per night. Equal-time ties use input
-        row order. Supplied times and coordinates must be numeric.
-        Band is copied from the same row's ``band`` label. Missing or
-        non-finite coordinates and missing bands are labeled unavailable;
-        the line is omitted when all five fields are unavailable.
-        If the supplied visits contain no visits for a given night, that
-        night's ``prenight`` description is left completely blank.
+        working example of this sequence.)
         Defaults to ``None``, in which case prenight descriptions are blank.
 
 

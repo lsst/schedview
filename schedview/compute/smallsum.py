@@ -197,22 +197,11 @@ def compute_tinysum(
         Append coordinates and band from the earliest finite
         ``observationStartMJD`` per night, breaking ties by input row order.
         Defaults to ``False``.
-        Copy ``fieldRA``, ``fieldDec``, ``altitude``, and ``azimuth`` from
-        that same row without unit conversion (degrees in simulation
-        output), and copy the ``band`` label from that row.
-        Supplied times and coordinates must be numeric. Missing
-        columns yield missing values; later visits do not fill them.
 
     Returns
     -------
     tinysum : `pandas.DataFrame`
         DataFrame indexed by ``dayObs`` with one row per night.
-        When ``include_first_visit_coordinates`` is enabled, also contains
-        ``first_visit_ra``, ``first_visit_decl``, ``first_visit_alt``,
-        and ``first_visit_az`` in the input coordinate units (degrees for
-        OpSim and prenight-simulation output), plus ``first_visit_band``.
-        All five are missing for nights without a finite start time or if
-        the start-time column is absent.
     """
     basic_stats = (
         visits.groupby("dayObs", as_index=True)
