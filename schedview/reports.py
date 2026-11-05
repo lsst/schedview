@@ -25,7 +25,7 @@ Science targets: {targets}
 
 RSS_PRENIGHT_DESC_FORMAT = """
 Simulated (science) visits: {total};
-Median FWHM: {fwhm};
+{first_visit}Median FWHM: {fwhm};
 Mean visit rate: {visit_rate} visits/hour;
 Total eff_time / total exp_time: {mean_norm_teff};
 Total eff_time / total night time: {teff_rate};
@@ -247,6 +247,31 @@ def _format_summary_desc(
     if desc_format is None:
         desc_format = RSS_DESC_FORMAT
 
+    first_visit = ""
+    if report == "prenight":
+        coordinate_labels = {
+            "first_visit_ra": "RA",
+            "first_visit_decl": "decl",
+            "first_visit_alt": "alt",
+            "first_visit_az": "az",
+        }
+        parts = []
+        has_coordinates = False
+        for column, label in coordinate_labels.items():
+            value = row.get(column, np.nan)
+            if not pd.isna(value) and np.isfinite(value):
+                if column in ("first_visit_ra", "first_visit_az"):
+                    value = round(value % 360, 2) % 360
+                parts.append(f"{label}={value:.2f} deg")
+                has_coordinates = True
+            else:
+                parts.append(f"no {label}")
+        band = row.get("first_visit_band", np.nan)
+        has_band = not pd.isna(band)
+        parts.append(f"band={band}" if has_band else "no band")
+        if has_coordinates or has_band:
+            first_visit = "First simulated visit: " + ", ".join(parts) + ";\n"
+
     return desc_format.format(
         report=report,
         instrument=instrument,
@@ -258,6 +283,7 @@ def _format_summary_desc(
         mean_norm_teff=mean_norm_teff_str,
         teff_rate=teff_rate,
         targets=tinysum.loc[dayobs, "science targets"],
+        first_visit=first_visit,
     )
 
 
@@ -296,30 +322,9 @@ def make_report_rss_feed(
         used to populate the ``<description>`` of ``lsstcam`` ``prenight``
         items.  No schedview helper fetches these; the caller is responsible
         for selecting and reading the appropriate simulation, e.g. via
-        ``rubin_sim.sim_archive``::
-
-            from rubin_sim.sim_archive.prenightindex import (
-                get_prenight_index, select_latest_prenight_sim)
-            from rubin_sim.sim_archive import vseqarchive
-            from schedview.collect.visits import NIGHT_STACKERS
-
-            sims = get_prenight_index(day_obs, telescope="simonyi")
-            sim = select_latest_prenight_sim(sims)
-            prenight_visits = vseqarchive.get_visits(
-                sim["visitseq_url"],
-                query=f"floor(observationStartMJD-0.5)=={day_obs_mjd}",
-                stackers=NIGHT_STACKERS,
-            )
-
+        ``rubin_sim.sim_archive``.
         (See ``schedview.collect.multisim.read_multiple_prenights`` for a
-        working example of this sequence.)  These simulation visits carry the
-        columns ``t_eff`` and ``visitExposureTime`` rather than
-        ``eff_time_median``/``exp_time``; those names are passed through to
-        ``compute_tinysum``, so the visits should be supplied **unmodified**.
-        All prenight visits are counted as science visits (the simulator only
-        simulates science visits), so the science counts equal the totals.
-        If the supplied visits contain no visits for a given night, that
-        night's ``prenight`` description is left completely blank.
+        working example of this sequence.)
         Defaults to ``None``, in which case prenight descriptions are blank.
 
 
@@ -341,6 +346,7 @@ def make_report_rss_feed(
             eff_time_column="t_eff",
             exp_time_column="visitExposureTime",
             all_science=True,
+            include_first_visit_coordinates=True,
         )
         if prenight_visits is not None
         else None

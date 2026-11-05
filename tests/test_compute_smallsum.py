@@ -77,6 +77,30 @@ def almanac() -> Almanac:
 
 
 class TestComputeTinysum:
+    def test_first_visit_coordinates_and_band(self, sample_visits):
+        """Select the earliest pointing and band without changing statistics.
+
+        Simulation input need not be sorted, but the briefing must describe
+        the first visit rather than whichever row happens to appear first.
+        """
+        visits = sample_visits.iloc[:4].copy()
+        visits["dayObs"] = [20250602, 20250601, 20250601, 20250602]
+        visits["observationStartMJD"] = [60828.2, 60827.2, 60827.1, 60828.1]
+        visits["band"] = ["g", "i", "r", "z"]
+        input_columns = ["fieldRA", "fieldDec", "altitude", "azimuth"]
+        output_columns = ["first_visit_ra", "first_visit_decl", "first_visit_alt", "first_visit_az"]
+        for offset, column in enumerate(input_columns):
+            visits[column] = np.arange(len(visits), dtype=float) + offset * 10
+        baseline = compute_tinysum(visits, science_programs=SCIENCE_PROGRAMS)
+        result = compute_tinysum(
+            visits, science_programs=SCIENCE_PROGRAMS, include_first_visit_coordinates=True
+        )
+        pd.testing.assert_frame_equal(result[baseline.columns], baseline)
+        np.testing.assert_array_equal(result.loc[20250601, output_columns], [2, 12, 22, 32])
+        np.testing.assert_array_equal(result.loc[20250602, output_columns], [3, 13, 23, 33])
+        assert result.loc[20250601, "first_visit_band"] == "r"
+        assert result.loc[20250602, "first_visit_band"] == "z"
+
     def test_one_row_per_night(self, sample_visits):
         result = compute_tinysum(sample_visits)
         assert len(result) == 2

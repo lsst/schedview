@@ -2,6 +2,7 @@ setuptools_scm
 astropy-base>=5.3
 bokeh>=3.1.1
 colorcet
+click
 healpy
 holoviews
 hvplot

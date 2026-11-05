@@ -155,6 +155,59 @@ class TestReports(unittest.TestCase):
         # using the distinct prenight format (no separate "Science visits"
         # line since all prenight visits are science).
         assert re.search(r"Simulated \(science\) visits: \d+ \(\d+[ugrizy]", joined)
+        assert "First simulated visit:" not in joined
+
+    def test_prenight_first_visit_coordinates_and_band(self):
+        """Show the first pointing and band in prenight RSS, not nightsum RSS.
+
+        Readers need the simulated pointing and band with clear units;
+        it must not be presented as an observed nightsum pointing.
+        """
+        visits = pd.DataFrame(
+            {
+                "dayObs": [20250620, 20250621, 20250620, 20250621],
+                "observationId": [0, 1, 2, 3],
+                "seeingFwhmGeom": [1.0] * 4,
+                "t_eff": [30.0] * 4,
+                "visitExposureTime": [30.0] * 4,
+                "band": ["g", "i", "r", "z"],
+                "science_program": ["BLOCK-365"] * 4,
+                "target_name": ["COSMOS"] * 4,
+                "observationStartMJD": [60846.2, 60847.2, 60846.1, 60847.1],
+                "fieldRA": [1.0, 2.0, 123.456, 234.567],
+                "fieldDec": [1.0, 2.0, -45.678, -34.567],
+                "altitude": [1.0, 2.0, 60.123, 70.123],
+                "azimuth": [1.0, 2.0, 210.3456, 220.3456],
+            }
+        )
+        observed = visits.rename(columns={"t_eff": "eff_time_median", "visitExposureTime": "exp_time"})
+        reports = schedview.reports.find_reports(self.temp_dir.name)
+
+        root = schedview.reports.make_report_rss_feed(
+            reports,
+            max_days=99999,
+            visits=observed,
+            prenight_visits=visits,
+            science_programs=("BLOCK-365",),
+        ).getroot()
+        expected_lines = {
+            "2025-06-20": (
+                "First simulated visit: RA=123.46 deg, decl=-45.68 deg, "
+                "alt=60.12 deg, az=210.35 deg, band=r;"
+            ),
+            "2025-06-21": (
+                "First simulated visit: RA=234.57 deg, decl=-34.57 deg, "
+                "alt=70.12 deg, az=220.35 deg, band=z;"
+            ),
+        }
+        for item in root.iterfind("channel/item"):
+            description = item.findtext("description") or ""
+            title = item.findtext("title")
+            if item.findtext("category") == "lsstcam_prenight":
+                night = title.rsplit(" ", 1)[-1]
+                assert expected_lines[night] in description.splitlines()
+            else:
+                assert "First simulated visit:" not in description
 
     def test_make_report_rss_feed_prenight_blank_when_no_visits(self):
         rng = np.random.default_rng(0)

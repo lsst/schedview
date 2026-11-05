@@ -158,6 +158,7 @@ def compute_tinysum(
     eff_time_column: str = "eff_time_median",
     exp_time_column: str = "exp_time",
     all_science: bool = False,
+    include_first_visit_coordinates: bool = False,
 ) -> pd.DataFrame:
     """Create a one-row-per-night summary DataFrame from visits.
 
@@ -192,6 +193,10 @@ def compute_tinysum(
         its ``science_program``, so the science counts equal the totals.
         Defaults to ``False``.  Pass ``True`` for prenight-simulation
         visits, which contain only science visits.
+    include_first_visit_coordinates : `bool`, optional
+        Append coordinates and band from the earliest finite
+        ``observationStartMJD`` per night, breaking ties by input row order.
+        Defaults to ``False``.
 
     Returns
     -------
@@ -299,6 +304,29 @@ def compute_tinysum(
         tinysum["night_hours"] = night_hours
         tinysum["visits/hour"] = tinysum["Total"] / tinysum["night_hours"]
         tinysum["teff/night duration"] = tinysum["total eff_time"] / (tinysum["night_hours"] * 60 * 60)
+
+    if include_first_visit_coordinates:
+        first_visit_columns = {
+            "fieldRA": "first_visit_ra",
+            "fieldDec": "first_visit_decl",
+            "altitude": "first_visit_alt",
+            "azimuth": "first_visit_az",
+            "band": "first_visit_band",
+        }
+        first_visits = visits.iloc[:0]
+        if "observationStartMJD" in visits.columns:
+            # Select whole rows so missing fields never mix visits.
+            first_visits = (
+                visits.loc[np.isfinite(visits["observationStartMJD"])]
+                .sort_values("observationStartMJD", kind="stable")
+                .drop_duplicates("dayObs")
+            )
+        first_visit_summary = (
+            first_visits.set_index("dayObs")
+            .reindex(columns=first_visit_columns)
+            .rename(columns=first_visit_columns)
+        )
+        tinysum = tinysum.join(first_visit_summary)
 
     return tinysum
 
