@@ -375,12 +375,12 @@ Visible points keep isolated dates interpretable.
    * - ``consdb``
      - 1
      - 1.0
-    * - ``chimera``
-      - 3
-      - 0.6
-    * - ``baseline``
-      - 5
-      - 0.3
+   * - ``chimera``
+     - 3
+     - 0.6
+   * - ``baseline``
+     - 5
+     - 0.3
 
 Band colors come from ``schedview.plot.colors.make_band_cmap`` with all six
 bands followed by ``all``, so ``all`` uses the helper's next assigned color.
