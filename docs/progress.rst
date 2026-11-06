@@ -15,13 +15,6 @@ The collection, plotting, and reporting stages live in
 environment with the latest current Bokeh release. Standalone plots use browser
 callbacks and do not require a Bokeh server.
 
-.. note::
-
-   The manual checks below are an acceptance checklist, not a passed-test
-   report. USDF execution, visual/browser checks, and human review remain
-   pending until an actual environment, procedure, and result are recorded.
-   Historical prototype output does not establish acceptance.
-
 Notebook API
 ------------
 
@@ -82,12 +75,14 @@ Collected ``metric_id``, ``stat_id``, and ``dayobs`` columns use ``int64``;
 NaN and signed infinities preserved. These dtypes also apply to empty results.
 Conversion follows validation and duplicate comparison; original labels and
 constraints retain their strings or SQL NULL values.
-``validate_summary_metrics(summary_metrics) -> None`` validates without
+``validate_summary_metrics(summary_metrics, *, allow_duplicates=False) -> None`` validates without
 mutating, sorting, or removing duplicates. It accepts filtered copies with
 arbitrary indices and harmless extra columns, and rejects duplicate records
 in caller-created frames, even if their values agree. Empty frames must still
 contain every required column. Plotting validates DataFrame inputs; reporting
 validates again before JSON export.
+Use ``allow_duplicates=True`` only to validate equal reruns before deduplication;
+conflicting measurements remain invalid, and the function never removes rows.
 
 Installed Commands
 ------------------
@@ -404,137 +399,3 @@ between selection changes. Empty inputs or selections with no finite values
 show no-data status and appropriate empty or disabled controls. Loading,
 no-data, selection-limit, and source-specific error status are visible near
 the plot rather than only in the browser console.
-
-Verification Snapshot
----------------------
-
-Local checks were executed on 2026-10-27. These results establish tested behavior,
-not USDF execution or human acceptance. The representative input used for these
-historical checks is not a library fixture or a required bundled database.
-
-* Environment: Python 3.14.4, aarch64, pandas 3.1.0, Bokeh 3.10.1 (confirmed
-  current on PyPI), ``OPENBLAS_CORETYPE=ARMV8``, and reused sample artifacts.
-* The results below describe the historical implementation. On 2026-10-28,
-  review follow-up removed the custom scale and extreme-value browser cases;
-  notebook-bundle coverage now uses ordinary scalars.
-* Installed JSON-export command smoke check against the then-current
-  representative database succeeded and produced 1736 records. This count
-  describes that historical sample, not a schema requirement or current input.
-* Library regression run excluding ``tests/test_plot_progress.py`` completed
-  with 303 passed, 32 skipped, 2 failed, and 1146 warnings in 372.70 seconds,
-  with 71 percent coverage. ``tests/test_examples.py::TestExamples::test_surveyrewards``
-  failed on an empty minimum array in ``schedview/plot/rewards.py``;
-  ``tests/test_scheduler.py::TestSchedulerDisplay::test_scheduler_display``
-  failed because the reused ``CoreScheduler`` pickle lacked
-  ``flush_for_new_too``. This was not a full-suite or plotting pass.
-* Final combined progress tests completed with 125 passed, zero skips,
-  51 warnings, and exit 0 in 37.67 seconds during memory-bounded recovery.
-  The check and its children were capped at 3 GiB with swap disabled; BLAS/OpenMP
-  threads were limited to one. This includes installed commands,
-  external-JSON overwrite protection, empty exports, finite-value precision,
-  and supported date endpoints.
-* The expanded plot verification completed with 20 passed, zero skips, and
-  exit 0 in 21.36 seconds (16 Chromium cases). Browser checks cover formatter
-  output in Honolulu/Tokyo, wheel zoom/Reset/resize retention, canvas gaps and
-  irregular connections, all band colors, distinct same-band labels, actual
-  extreme-value glyph positions, concurrent-startup single-fetch behavior,
-  embedded/external plot isolation, and actual notebook resource/content
-  embedding with the custom scale. This is local notebook-bundle testing,
-  not execution in the USDF portal.
-* The actual Sphinx/Documenteer HTML build emitted progress/API/index pages.
-  A strict full-project build failed on six existing warnings outside the new
-  progress documentation; progress sections had no normal build warnings.
-  RST, three Python examples, four shell examples, and installed CLI help checks
-  passed. These checks omitted notebook display calls and do not constitute
-  human visual acceptance.
-
-The interrupted full regression has no final result. Memory-bounded retries
-stalled in collection and were terminated or timed out, without a complete
-coverage report. An isolated ``tests/test_compute_maf.py`` run timed out while
-its fixture loaded the entire baseline simulation through ``pandas.read_sql``;
-maximum reported RSS was 2619616 KiB. These are regression resource blockers,
-not progress-test failures. Future expensive checks must run serially with
-process-tree memory limits and timeouts; do not increase the cap or regenerate
-simulation artifacts automatically. Black, Ruff, and source-isort passed again;
-isort excluded the ignored cache containing the isolated documentation environment.
-No result above completes a pending manual check.
-
-Manual Acceptance Checklist
----------------------------
-
-All entries below are **pending / unchecked**. Run with the latest current
-Bokeh release and small synthetic edge-case fixtures where appropriate;
-unrelated full-night simulations are not required. For each entry, record
-the date, environment (USDF portal/node or local), Python/Bokeh versions,
-browser and timezone where relevant, fixture/input and exact procedure,
-observed result, and any failure or blocker. Model inspection alone does not
-verify JavaScript interaction. Automated results supplied separately do not
-substitute for unperformed USDF or human checks.
-
-1. **Pending, USDF portal notebook:** Run the one-DataFrame notebook example
-   and verify an interactive plot; also plot a filtered ``SummaryMetrics`` copy.
-2. **Pending, USDF development/batch node:** Run both installed commands with
-   their documented two positional arguments and open the generated page.
-3. **Pending, browser/human:** Verify database-backed HTML embeds metric data
-   and works without companion JSON. Bokeh resources need not be inline or
-   usable offline.
-4. **Pending, HTTP(S)/browser:** Serve an external-data page; verify relative
-   JSON resolves against the page URL and same-origin or permitted CORS access.
-5. **Pending, HTTP(S)/browser:** Replace external JSON with changed values and
-   added metrics, sources, labels, summaries, and dates. Verify the open page
-   stays unchanged until reload, then rebuilds all options, series, and ranges
-   without generating new HTML.
-6. **Pending, browser:** Check first-sorted-metric initialization and all
-   downstream selections within the cap. Check metric/source/label/summary
-   cascade, union semantics, retention of valid selections, and fallback.
-7. **Pending, browser:** Intentionally clear a multi-selection. Verify no data
-   is plotted, a visible no-data message appears, and selection stays empty.
-8. **Pending, browser:** Supply more summaries than dash styles. Verify every
-   option remains available, the simultaneous cap and visible limit message
-   work, options can be replaced, styles stay stable while selected, and freed
-   slots are reused.
-9. **Pending, visual/browser:** Verify source-separated lines and distinct
-   original labels sharing a band within one source. Check width/alpha ordering,
-   all six band colors, the helper's next color for ``all``, and summary dashes.
-10. **Pending, data/human:** Check case-sensitive standard labels and matching
-    source prefixes. Absent, unrecognized, case-variant, and mismatched labels
-    must map to ``all`` without losing original text or changing source.
-11. **Pending, visual/browser:** Verify prototype-style visible points, all
-    five hover fields, and three legends outside the axes without click-to-hide.
-12. **Pending, browser:** Change selections; check selected finite-data limits,
-    padded single-date/constant-value ranges, automatic calendar ticks, and
-    Reset to current limits. Manual zoom must persist only between changes.
-13. **Pending, visual/browser:** Check irregular snapshots stay connected,
-    explicit null/non-finite measurements create gaps, and missing dates are
-    not synthesized.
-14. **Pending, notebook/browser/timezones:** Verify the same ``dayobs`` calendar
-    label at nominal midnight with different host and browser timezones.
-15. **Pending, visual/browser:** Verify chimera-only and consdb/baseline-only
-    inputs produce separate views without targets or a constant final-baseline
-    reference.
-16. **Pending, data/human:** Verify unsupported run names, including nulls,
-    suffixes, case variants, and near misses, are excluded with a count.
-    Exact-format impossible dates must fail naming the run and date.
-17. **Pending, data/human:** Verify identical duplicates retain highest
-    ``stat_id``. Finite disagreements and different missing/signed-infinity
-    categories must fail; matching missing/NaN or same-signed infinity must
-    collapse before serialization.
-18. **Pending, data/human:** Changing slicer or SQL constraint across dates
-    in a logical sequence must fail. Invalid caller-created DataFrames must
-    fail validation before plotting or JSON writing.
-19. **Pending, JSON/human:** Check records-oriented JSON, convenient Bokeh
-    date interpretation, null serialization of non-finite values, and tolerance
-    of harmless extra fields.
-20. **Pending, browser:** Check empty inputs and selections with no finite
-    values show visible no-data status and appropriate empty/disabled controls.
-21. **Pending, errors/browser:** Test unreadable databases, missing required
-    fields, and failed external fetches. Check contextual Python errors,
-    nonzero CLI exits, visible source-specific browser status, and that failed
-    loads are never presented as refreshed.
-
-Final human acceptance is also **pending**: confirm that every workbook
-requirement has automated or human verification, record actual automated test
-results, report successful human checks in the workbook, verify documentation
-agrees with the final implementation, and obtain human review of the diff from
-main before a merge request. No automated, USDF, or human acceptance pass is
-asserted by this guide.

@@ -4,6 +4,7 @@ import os
 import sqlite3
 import time
 import warnings
+from contextlib import closing
 
 import numpy as np
 import pandas as pd
@@ -21,7 +22,7 @@ from schedview.collect.progress import (
 def database(tmp_path):
     def create(rows=()):
         path = tmp_path / "results ?#.db"
-        with sqlite3.connect(path) as connection:
+        with closing(sqlite3.connect(path)) as connection, connection:
             connection.executescript(
                 "CREATE TABLE metrics (metric_id INTEGER PRIMARY KEY, run_name VARCHAR, "
                 "metric_name VARCHAR, slicer_name VARCHAR, sql_constraint VARCHAR, "
@@ -102,7 +103,7 @@ def test_exclusion_counts_joined_rows_and_skips_other_validation(database):
     path = database(
         [{}] + [{"run_name": name, "metric_name": None, "slicer_name": None} for name in bad_names]
     )
-    with sqlite3.connect(path) as connection:
+    with closing(sqlite3.connect(path)) as connection, connection:
         connection.execute("INSERT INTO summarystats VALUES (100, 2, NULL, 'not numeric')")
     with pytest.warns(UserWarning, match="excluded 8 joined summary records"):
         result = load_summary_metrics(path)
@@ -176,7 +177,7 @@ def test_invalid_sqlite_file(tmp_path):
 )
 def test_missing_schema(tmp_path, schema):
     path = tmp_path / "missing-schema.db"
-    with sqlite3.connect(path) as connection:
+    with closing(sqlite3.connect(path)) as connection, connection:
         connection.executescript(schema)
     with pytest.raises(ValueError, match="missing required columns") as error:
         load_summary_metrics(path)
@@ -187,7 +188,7 @@ def test_missing_schema(tmp_path, schema):
 
 def test_missing_summary_column(database):
     path = database()
-    with sqlite3.connect(path) as connection:
+    with closing(sqlite3.connect(path)) as connection, connection:
         connection.execute("ALTER TABLE summarystats DROP COLUMN summary_value")
     with pytest.raises(ValueError, match="summarystats.*summary_value"):
         load_summary_metrics(path)
@@ -384,12 +385,18 @@ def test_validator_accepts_gaps_without_mutation_or_warning(frame, value):
 
 
 def test_validator_duplicates_conflicts_and_invariants(frame):
+    duplicates = pd.concat([frame, frame.iloc[[0]]])
     with pytest.raises(ValueError, match="duplicate summary record"):
-        validate_summary_metrics(pd.concat([frame, frame.iloc[[0]]]))
+        validate_summary_metrics(duplicates)
+    original = duplicates.copy(deep=True)
+    assert validate_summary_metrics(duplicates, allow_duplicates=True) is None
+    pd.testing.assert_frame_equal(duplicates, original)
     conflict = frame.iloc[[0]].copy()
     conflict["summary_value"] = 2
     with pytest.raises(ValueError, match="conflicting summary_value"):
         validate_summary_metrics(pd.concat([frame, conflict]))
+    with pytest.raises(ValueError, match="conflicting summary_value"):
+        validate_summary_metrics(pd.concat([frame, conflict]), allow_duplicates=True)
     frame.loc[1, "slicer_name"] = "different"
     with pytest.raises(ValueError, match="multiple slicer_name"):
         validate_summary_metrics(frame)

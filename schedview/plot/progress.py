@@ -4,7 +4,6 @@ import json
 import warnings
 from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Any
 
 import bokeh.core.enums
 import bokeh.io
@@ -18,10 +17,8 @@ from bokeh.events import DocumentReady
 from schedview.collect.progress import SummaryMetrics, validate_summary_metrics
 from schedview.plot.colors import make_band_cmap
 
-__all__ = ["make_metric_line_plots", "make_summary_progress_plot"]
+__all__ = ["SOURCE_STYLES", "make_metric_line_plots", "make_summary_progress_plot"]
 
-SNAPSHOT_SCALAR_METRIC_FIGURE_NAME = "snapshot_scalar_metric_figure"
-EXTRAPOLATED_SCALAR_METRIC_FIGURE_NAME = "extrapolated_scalar_metric_figure"
 SOURCE_STYLES: dict[str, tuple[int, float]] = {
     "consdb": (1, 1.0),
     "chimera": (3, 0.6),
@@ -30,13 +27,14 @@ SOURCE_STYLES: dict[str, tuple[int, float]] = {
 """Source -> (width in pixels, alpha), shared by lines and legend swatches."""
 
 _PROGRESS_STARTUP = "schedview-progress-startup"
+"""Tag/name linking each plot's status model to the document dispatcher."""
 
 _PROGRESS_DOCUMENT_READY = """
 export default function(args, document) {
     const visited = new Set();
     for (const root of document.roots()) {
         for (const model of root.references()) {
-            if (visited.has(model) || !model.tags.includes("schedview-progress-startup")) continue;
+            if (visited.has(model) || !model.tags.includes("__STARTUP_TAG__")) continue;
             visited.add(model);
             for (const callback of model.js_event_callbacks.document_ready ?? []) {
                 // Start every plot independently, without waiting for another fetch.
@@ -45,225 +43,110 @@ export default function(args, document) {
         }
     }
 }
-"""
+""".replace("__STARTUP_TAG__", _PROGRESS_STARTUP)
 
 
-def make_metric_line_plots(
-    metric_name: str,
-    metric_values: pd.DataFrame,
-    snapshot_line_kwargs: Mapping = MappingProxyType({"color": "black"}),
-    snapshot_scatter_kwargs: Mapping = MappingProxyType({"color": "black"}),
-    baseline_line_kwargs: Mapping = MappingProxyType({"color": "lightgreen", "width": 5}),
-    baseline_ray_kwargs: Mapping = MappingProxyType({"color": "lightgreen", "width": 5}),
-    chimera_line_kwargs: Mapping = MappingProxyType({"color": "black"}),
-    chimera_scatter_kwargs: Mapping = MappingProxyType({"color": "black"}),
-) -> bokeh.layouts.Row:
-    """Create the existing paired snapshot/extrapolated scalar metric plots.
-
-    This older API takes computed baseline/snapshot/chimera columns, not MAF
-    summary records. The interactive summary API does not use its baseline ray.
-    """
-    # Keep the older computed-column API separate from summary records.
-    metric_values_ds = bokeh.models.ColumnDataSource(metric_values)
-    metric_at_date_fig = bokeh.plotting.figure(
-        title=f"{metric_name} at date",
-        x_axis_label="Date",
-        y_axis_label="Metric value",
-        x_axis_type="datetime",
-        name=SNAPSHOT_SCALAR_METRIC_FIGURE_NAME,
-    )
-    metric_at_date_fig.line(x="date", y="baseline", source=metric_values_ds, **baseline_line_kwargs)
-    metric_at_date_fig.line(x="date", y="snapshot", source=metric_values_ds, **snapshot_line_kwargs)
-    metric_at_date_fig.scatter(x="date", y="snapshot", source=metric_values_ds, **snapshot_scatter_kwargs)
-
-    # The reference ray belongs to the older API, not the summary plot.
-    baseline_final_depth = metric_values.loc[metric_values.index.max(), "baseline"]
-    chimera_metric_fig = bokeh.plotting.figure(
-        title=f"{metric_name} extrapolated from date to end with baseline",
-        x_axis_label="Date",
-        y_axis_label="Metric value",
-        x_axis_type="datetime",
-        name=EXTRAPOLATED_SCALAR_METRIC_FIGURE_NAME,
-    )
-    chimera_metric_fig.ray(
-        x=metric_values["date"].min(), y=baseline_final_depth, length=0, angle=0, **baseline_ray_kwargs
-    )
-    chimera_metric_fig.line(x="date", y="chimera", source=metric_values_ds, **chimera_line_kwargs)
-    chimera_metric_fig.scatter(x="date", y="chimera", source=metric_values_ds, **chimera_scatter_kwargs)
-    return bokeh.layouts.row(metric_at_date_fig, chimera_metric_fig)
-
-
-def make_summary_progress_plot(summary_metrics: SummaryMetrics | str) -> bokeh.models.UIElement:
-    """Create a standalone interactive plot of scalar MAF summary records.
-
-    Parameters
-    ----------
-    summary_metrics : pandas.DataFrame or str
-        Validated summary records, including filtered copies, or a JSON URL.
-        URLs are fetched once on page load and resolved against the page URL.
-        External pages must be HTTP(S)-served with same-origin or CORS access.
-
-    Returns
-    -------
-    bokeh.models.UIElement
-        Four cascading selectors, status, figure, and three informational
-        legends. Embedded records require no companion data file or server.
-    """
-    records: list[dict[str, Any]] | None
-    """JSON-compatible rows with epoch-ms dates; None means browser fetch."""
-    url: str | None
-    """Unchanged external URL, or None for embedded records."""
-
-    # Share a browser update path. Never read an external URL in Python or
-    # embed a generation-time selector catalog that can become stale.
-    if isinstance(summary_metrics, str):
-        records, url = None, summary_metrics
-    else:
-        validate_summary_metrics(summary_metrics)
-        clean = summary_metrics.copy()
-        missing_count = int(clean["summary_value"].isna().sum())
-        nonfinite_count = int(clean["summary_value"].isin([np.inf, -np.inf]).sum())
-        if missing_count or nonfinite_count:
-            warnings.warn(
-                f"Plotting {missing_count + nonfinite_count} missing/non-finite summary measurements "
-                f"as gaps ({missing_count} missing, {nonfinite_count} non-finite)",
-                UserWarning,
-                stacklevel=2,
-            )
-        clean["summary_value"] = clean["summary_value"].replace([np.inf, -np.inf], np.nan)
-        records = json.loads(
-            clean.to_json(orient="records", date_format="epoch", date_unit="ms", double_precision=15)
-        )
-        url = None
-
-    # Start empty: only loaded records determine valid selector options.
-    metric = bokeh.models.Select(title="Metric", options=[], value="", name="progress_metric")
-    source = bokeh.models.MultiSelect(title="Source", options=[], value=[], name="progress_source")
-    label = bokeh.models.MultiSelect(title="Metric info label", options=[], value=[], name="progress_label")
-    summary = bokeh.models.MultiSelect(title="Summary metric", options=[], value=[], name="progress_summary")
-    status = bokeh.models.Div(text="Loading summary metrics...", name="progress_status")
-
-    # One multi_line source fits a variable number of sequences. Finite points
-    # preserve isolated measurements and supply original hover data.
-    lines = bokeh.models.ColumnDataSource(
-        dict(xs=[], ys=[], color=[], width=[], alpha=[], dash=[]), name="progress_lines"
-    )
-    points = bokeh.models.ColumnDataSource(
-        dict(
-            date=[],
-            summary_value=[],
-            run_name=[],
-            metric_name=[],
-            metric_info_label=[],
-            summary_metric=[],
-            color=[],
-        ),
-        name="progress_points",
-    )
-
-    # Explicit ranges let selections update visible and Reset bounds together.
-    plot = bokeh.plotting.figure(
-        height=440,
-        sizing_mode="stretch_width",
-        x_axis_type="datetime",
-        x_axis_label="Observing date",
-        y_axis_label="Summary value",
-        tools="pan,wheel_zoom,box_zoom,reset,save",
-        x_range=bokeh.models.Range1d(0, 86400000),
-        y_range=bokeh.models.Range1d(0, 1),
-        name="summary_progress_figure",
-    )
-    plot.multi_line(
-        xs="xs",
-        ys="ys",
-        source=lines,
-        line_color="color",
-        line_width="width",
-        line_alpha="alpha",
-        line_dash="dash",
-    )
-    scatter = plot.scatter(
-        x="date",
-        y="summary_value",
-        source=points,
-        color="color",
-        size=8,
-        alpha=0.6,
-        hover_color="black",
-        hover_alpha=1.0,
-    )
-
-    # Hover targets measurements, not interpolated line positions.
-    plot.add_tools(
-        bokeh.models.HoverTool(
-            renderers=[scatter],
-            tooltips=[
-                ("Run", "@run_name"),
-                ("Metric", "@metric_name"),
-                ("Label", "@metric_info_label"),
-                ("Summary", "@summary_metric"),
-                ("Value", "@summary_value"),
-            ],
-        )
-    )
-    plot.xaxis.formatter = bokeh.models.DatetimeTickFormatter(days="%Y-%m-%d", months="%Y-%m", years="%Y")
-
-    # Informational HTML legends never introduce reference data.
-    legends = [bokeh.models.Div(name=f"progress_{kind}_legend") for kind in ("source", "band", "summary")]
-    cmap = make_band_cmap(bands=("u", "g", "r", "i", "z", "y", "all"))["transform"]
-    colors = dict(zip(cmap.factors, cmap.palette))
-
-    # Explicit model/policy arguments keep separate plots isolated.
-    callback = bokeh.models.CustomJS(
-        args=dict(
-            metric=metric,
-            source=source,
-            label=label,
-            summary=summary,
-            status=status,
-            lines=lines,
-            points=points,
-            plot=plot,
-            legends=legends,
-            records=records,
-            url=url,
-            colors=colors,
-            styles=SOURCE_STYLES,
-            dashes=list(bokeh.core.enums.LineDash),
-        ),
-        code=_PROGRESS_CALLBACK,
-    )
-    for control in (metric, source, label, summary):
-        control.js_on_change("value", callback)
-
-    # Notebook embedding copies curdoc callbacks into temporary documents.
-    # A single generic dispatcher must discover only that output's models;
-    # capturing each plot in document callback args would leak other outputs.
-    status.tags.append(_PROGRESS_STARTUP)
-    status.js_on_event(DocumentReady, callback)
-    document = bokeh.io.curdoc()
-    if not any(
-        existing.name == _PROGRESS_STARTUP
-        for existing in document.callbacks.js_event_callbacks.get(DocumentReady.event_name, [])
-    ):
-        document.js_on_event(
-            DocumentReady, bokeh.models.CustomJS(name=_PROGRESS_STARTUP, code=_PROGRESS_DOCUMENT_READY)
-        )
-    return bokeh.layouts.column(
-        bokeh.layouts.row(metric, source, label, summary, sizing_mode="stretch_width"),
-        status,
-        plot,
-        *legends,
-        sizing_mode="stretch_width",
-    )
-
-
+# Browser-side load/update transaction, shared by document startup and all
+# four selector controls.
+#
+# What this string is
+# -------------------
+# JavaScript source for the Bokeh CustomJS callback built in
+# make_summary_progress_plot below. Python never executes it: Bokeh embeds
+# the text in the generated page or notebook output, and the browser runs it.
+# It is written as a JavaScript module whose default export is an async
+# function. Bokeh calls that function with two positional arguments:
+#
+#   args     An object (dict-like, attribute access) holding everything
+#            passed to CustomJS(args=...): the four selector models, the
+#            status Div, the two ColumnDataSources, the figure, the legend
+#            Divs, the embedded records (or null), the external JSON URL (or
+#            null), and the band-color, source-style, and named-dash tables.
+#            The `const {...} = args` line at the top of the function unpacks
+#            these into local names.
+#   changed  The object that triggered the call: the selector whose value
+#            changed, or the document itself at startup. Tests such as
+#            `changed === metric` tell the cascade which upstream control
+#            moved.
+#
+# Assigning to a property of a browser-side model (`lines.data = ...`,
+# `status.text = ...`, `metric.options = ...`) redraws the affected widget or
+# glyph immediately. No Python process is involved after page generation, so
+# the same code works in a static HTML page and in a notebook output cell
+# without re-running the cell.
+#
+# How state survives between calls
+# --------------------------------
+# Every invocation starts with fresh local variables, as a Python function
+# call would. Anything that must persist (loaded records, the started/busy
+# flags, the last settled selection, and the summary -> dash-slot
+# assignments) is stored as an ad hoc attribute on the status model,
+# `status._progress_state`. JavaScript objects accept new attributes freely,
+# like instances of a plain Python class. The model is used instead of a
+# module-level variable because Bokeh may compile this module more than once
+# per page, and because several independent plots can share one page; each
+# plot has its own status model.
+#
+# Why the busy flag and selection key exist
+# -----------------------------------------
+# `await fetch(...)` suspends this function and returns control to the
+# browser until the response arrives, much like `await` in asyncio. Events
+# that fire in the meantime, including change events caused by this
+# function's own assignments to selector values, call the function again.
+# Therefore the function claims startup and disables the controls before the
+# first await, the busy flag rejects re-entrant updates, and the remembered
+# selection key ignores callbacks that carry no real change (which would
+# otherwise reset manual zoom or undo an intentional empty selection).
+#
+# High-level pseudocode (the helper functions precede the exported function):
+#
+#     get or create this plot's persistent state
+#     if selection already handled or update in progress: return
+#     mark update in progress
+#     try:
+#         on first invocation:
+#             disable controls
+#             load embedded records or await one external JSON fetch
+#         cascade options: metric -> source -> label -> summary
+#             derive each option list from records matching upstream choices
+#             retain valid choices; fall back only at startup/upstream change
+#             preserve an explicitly cleared control as an empty selection
+#         enforce summary count cap and allocate stable dash slots
+#             Mean requires solid; Median requires dashed
+#         filter records by all selections and group into separate sequences
+#             key = (metric, canonical label, summary, source)
+#         sort each sequence by date and build fresh column-oriented data
+#             lines: arrays per sequence, with NaN at explicit measurement gaps
+#             points: finite measurements only, including original hover fields
+#         replace line/point data; fit visible and Reset ranges to finite data
+#         update title, informational legends, and count/gap/limit status
+#     except error:
+#         clear displayed data/legends, disable controls, show visible failure
+#     finally:
+#         remember the settled selection and release the busy flag
+#
+# Data layout: `records` is a list of row objects, one per summary record,
+# with `date` as epoch milliseconds. A Bokeh ColumnDataSource instead needs an
+# object of equally sized columns, so the function regroups rows into columns
+# on every update. External JSON is fetched once per page load, not on each
+# selection change; the user must reload the page to see a replaced file.
+#
+# Python validates embedded inputs; external JSON is assumed to use that same
+# records contract. Handle fetch/parse failures here, not schema validation.
 _PROGRESS_CALLBACK: str = r"""
 // Null and empty labels share a logical identity, but original hover text stays
 // untouched. JSON keys prevent real label text from colliding with a sentinel.
 const canonical = value => value == null || value === "" ? "" : value;
 const labelKey = value => JSON.stringify(canonical(value));
 const sorted = values => [...new Set(values)].sort();
+
+// Column layouts of the two data sources; a fresh copy is needed per update.
+const emptyLines = () => ({xs: [], ys: [], color: [], width: [], alpha: [], dash: []});
+const emptyPoints = () => ({date: [], summary_value: [], run_name: [], metric_name: [],
+                            metric_info_label: [], summary_metric: [], color: []});
+
+// SVG stroke-dasharray for each Bokeh named LineDash.
+const dashArrays = {solid: "", dashed: "3 2", dotted: "2 1", dotdash: "2 4 6 4", dashdot: "6 4 2 4"};
 
 // Labels and external URLs are data, never trusted HTML in status/legend markup.
 const escape = value => String(value).replace(/[&<>"']/g, c =>
@@ -326,8 +209,10 @@ export default async function(args, changed) {
         cascade(source, sorted(rows.map(row => row.visit_source)), changed === metric);
         rows = rows.filter(row => source.value.includes(row.visit_source));
 
-        // Label option values are JSON identities. Quoted display text distinguishes
-        // a literal '(no label)' string from the null/empty-label presentation.
+        // Labels do not use cascade(): option values are JSON identities with
+        // separate display text, and no selection cap applies. Quoted display
+        // text distinguishes a literal '(no label)' string from the null/empty
+        // label presentation.
         const labels = sorted(rows.map(row => labelKey(row.metric_info_label)));
         const validLabels = label.value.filter(value => labels.includes(value));
         label.options = labels.map(key => [key, JSON.parse(key) === "" ? "(no label)" : key]);
@@ -384,9 +269,8 @@ export default async function(args, changed) {
         // multi_line columns contain one array/style per sequence; point columns
         // contain one scalar per finite measurement. NaN breaks a line at an
         // explicit gap without inventing missing dates or interpolated points.
-        const lineData = {xs: [], ys: [], color: [], width: [], alpha: [], dash: []};
-        const pointData = {date: [], summary_value: [], run_name: [], metric_name: [],
-                           metric_info_label: [], summary_metric: [], color: []};
+        const lineData = emptyLines();
+        const pointData = emptyPoints();
         const finite = row => row.summary_value !== null && Number.isFinite(row.summary_value);
         for (const group of groups.values()) {
             group.sort((a, b) => a.date - b.date);
@@ -435,8 +319,7 @@ export default async function(args, changed) {
         const swatch = (text, color, width = 2, alpha = 1, dash = "solid") =>
             `<span style="display:inline-block;margin-right:18px"><svg width="38" height="14">` +
             `<line x1="0" y1="7" x2="38" y2="7" stroke="${color}" stroke-width="${width}" ` +
-            `opacity="${alpha}" stroke-dasharray="${({solid:"", dashed:"3 2", dotted:"2 1",
-            dotdash:"2 4 6 4", dashdot:"6 4 2 4"})[dash] ?? ""}"/></svg> ${escape(text)}</span>`;
+            `opacity="${alpha}" stroke-dasharray="${dashArrays[dash] ?? ""}"/></svg> ${escape(text)}</span>`;
         legends[0].text = "<b>Source</b> " + sorted(rows.map(row => row.visit_source))
             .map(name => swatch(name, "black", ...styles[name])).join("");
         legends[1].text = "<b>Band</b> " + sorted(rows.map(row => row.band))
@@ -457,9 +340,8 @@ export default async function(args, changed) {
             (url !== null ? ` Source: ${escape(url)}` : "");
     } catch (error) {
         // A failed load must not look like a successful plot of stale records.
-        lines.data = {xs: [], ys: [], color: [], width: [], alpha: [], dash: []};
-        points.data = {date: [], summary_value: [], run_name: [], metric_name: [],
-                       metric_info_label: [], summary_metric: [], color: []};
+        lines.data = emptyLines();
+        points.data = emptyPoints();
         for (const legend of legends) legend.text = "";
         status.text = `Failed to load ${escape(url ?? "embedded records")}: ${escape(error.message)}`;
         for (const control of [metric, source, label, summary]) control.disabled = true;
@@ -471,8 +353,232 @@ export default async function(args, changed) {
     }
 }
 """
-"""Plot-local load/update transaction shared by startup and selectors.
 
-Python validates embedded inputs; external JSON is assumed to use that same
-records contract. Handle fetch/parse failures here, not schema validation.
-"""
+
+def make_summary_progress_plot(summary_metrics: SummaryMetrics | str) -> bokeh.models.UIElement:
+    """Create a standalone interactive plot of scalar MAF summary records.
+
+    Parameters
+    ----------
+    summary_metrics : pandas.DataFrame or str
+        Validated summary records, including filtered copies, or a JSON URL.
+        URLs are fetched once on page load and resolved against the page URL.
+        External pages must be HTTP(S)-served with same-origin or CORS access.
+
+    Returns
+    -------
+    bokeh.models.UIElement
+        Four cascading selectors, status, figure, and three informational
+        legends. Embedded records require no companion data file or server.
+    """
+    # Prepare the data source. ``records`` holds JSON-compatible rows with
+    # epoch-ms dates, or None when the browser fetches ``url``; ``url`` is the
+    # unchanged external URL, or None for embedded records. Share a browser
+    # update path. Never read an external URL in Python or
+    # embed a generation-time selector catalog that can become stale.
+    if isinstance(summary_metrics, str):
+        records, url = None, summary_metrics
+    else:
+        validate_summary_metrics(summary_metrics)
+
+        # Report gaps, then normalize non-finite values to missing (JSON null).
+        clean = summary_metrics.copy()
+        missing_count = int(clean["summary_value"].isna().sum())
+        nonfinite_count = int(clean["summary_value"].isin([np.inf, -np.inf]).sum())
+        if missing_count or nonfinite_count:
+            warnings.warn(
+                f"Plotting {missing_count + nonfinite_count} missing/non-finite summary measurements "
+                f"as gaps ({missing_count} missing, {nonfinite_count} non-finite)",
+                UserWarning,
+                stacklevel=2,
+            )
+        clean["summary_value"] = clean["summary_value"].replace([np.inf, -np.inf], np.nan)
+        records = json.loads(
+            clean.to_json(orient="records", date_format="epoch", date_unit="ms", double_precision=15)
+        )
+        url = None
+
+    # Selector controls and status. Start empty: only loaded records determine
+    # valid selector options.
+    metric_select = bokeh.models.Select(title="Metric", options=[], value="", name="progress_metric")
+    source_select = bokeh.models.MultiSelect(title="Source", options=[], value=[], name="progress_source")
+    label_select = bokeh.models.MultiSelect(
+        title="Metric info label", options=[], value=[], name="progress_label"
+    )
+    summary_select = bokeh.models.MultiSelect(
+        title="Summary metric", options=[], value=[], name="progress_summary"
+    )
+    status = bokeh.models.Div(text="Loading summary metrics...", name="progress_status")
+
+    # Data sources. One multi_line source fits a variable number of
+    # sequences. Finite points
+    # preserve isolated measurements and supply original hover data.
+    line_source = bokeh.models.ColumnDataSource(
+        dict(xs=[], ys=[], color=[], width=[], alpha=[], dash=[]), name="progress_lines"
+    )
+    point_source = bokeh.models.ColumnDataSource(
+        dict(
+            date=[],
+            summary_value=[],
+            run_name=[],
+            metric_name=[],
+            metric_info_label=[],
+            summary_metric=[],
+            color=[],
+        ),
+        name="progress_points",
+    )
+
+    # Figure and its renderers. Explicit ranges let selections update visible
+    # and Reset bounds together.
+    plot = bokeh.plotting.figure(
+        height=440,
+        sizing_mode="stretch_width",
+        x_axis_type="datetime",
+        x_axis_label="Observing date",
+        y_axis_label="Summary value",
+        tools="pan,wheel_zoom,box_zoom,reset,save",
+        x_range=bokeh.models.Range1d(0, 86400000),
+        y_range=bokeh.models.Range1d(0, 1),
+        name="summary_progress_figure",
+    )
+    plot.multi_line(
+        xs="xs",
+        ys="ys",
+        source=line_source,
+        line_color="color",
+        line_width="width",
+        line_alpha="alpha",
+        line_dash="dash",
+    )
+    scatter = plot.scatter(
+        x="date",
+        y="summary_value",
+        source=point_source,
+        color="color",
+        size=8,
+        alpha=0.6,
+        hover_color="black",
+        hover_alpha=1.0,
+    )
+
+    # Hover tool and axis formatting. Hover targets measurements, not
+    # interpolated line positions.
+    plot.add_tools(
+        bokeh.models.HoverTool(
+            renderers=[scatter],
+            tooltips=[
+                ("Run", "@run_name"),
+                ("Metric", "@metric_name"),
+                ("Label", "@metric_info_label"),
+                ("Summary", "@summary_metric"),
+                ("Value", "@summary_value"),
+            ],
+        )
+    )
+    plot.xaxis.formatter = bokeh.models.DatetimeTickFormatter(days="%Y-%m-%d", months="%Y-%m", years="%Y")
+
+    # Legend containers. Informational HTML legends never introduce reference
+    # data.
+    legends = [bokeh.models.Div(name=f"progress_{kind}_legend") for kind in ("source", "band", "summary")]
+    band_cmap = make_band_cmap(bands=("u", "g", "r", "i", "z", "y", "all"))["transform"]
+    colors = dict(zip(band_cmap.factors, band_cmap.palette))
+
+    # Wire the browser callback. Explicit model/policy arguments keep separate
+    # plots isolated.
+    callback = bokeh.models.CustomJS(
+        args=dict(
+            metric=metric_select,
+            source=source_select,
+            label=label_select,
+            summary=summary_select,
+            status=status,
+            lines=line_source,
+            points=point_source,
+            plot=plot,
+            legends=legends,
+            records=records,
+            url=url,
+            colors=colors,
+            styles=SOURCE_STYLES,
+            dashes=list(bokeh.core.enums.LineDash),
+        ),
+        code=_PROGRESS_CALLBACK,
+    )
+    for control in (metric_select, source_select, label_select, summary_select):
+        control.js_on_change("value", callback)
+
+    # Start loading on document ready. Notebook embedding copies curdoc
+    # callbacks into temporary documents.
+    # A single generic dispatcher must discover only that output's models;
+    # capturing each plot in document callback args would leak other outputs.
+    status.tags.append(_PROGRESS_STARTUP)
+    status.js_on_event(DocumentReady, callback)
+    document = bokeh.io.curdoc()
+    if not any(
+        existing.name == _PROGRESS_STARTUP
+        for existing in document.callbacks.js_event_callbacks.get(DocumentReady.event_name, [])
+    ):
+        document.js_on_event(
+            DocumentReady, bokeh.models.CustomJS(name=_PROGRESS_STARTUP, code=_PROGRESS_DOCUMENT_READY)
+        )
+    return bokeh.layouts.column(
+        bokeh.layouts.row(
+            metric_select, source_select, label_select, summary_select, sizing_mode="stretch_width"
+        ),
+        status,
+        plot,
+        *legends,
+        sizing_mode="stretch_width",
+    )
+
+
+# Older paired-plot API, retained for existing callers; it is unrelated to
+# the interactive summary plot above.
+SNAPSHOT_SCALAR_METRIC_FIGURE_NAME = "snapshot_scalar_metric_figure"
+EXTRAPOLATED_SCALAR_METRIC_FIGURE_NAME = "extrapolated_scalar_metric_figure"
+
+
+def make_metric_line_plots(
+    metric_name: str,
+    metric_values: pd.DataFrame,
+    snapshot_line_kwargs: Mapping = MappingProxyType({"color": "black"}),
+    snapshot_scatter_kwargs: Mapping = MappingProxyType({"color": "black"}),
+    baseline_line_kwargs: Mapping = MappingProxyType({"color": "lightgreen", "width": 5}),
+    baseline_ray_kwargs: Mapping = MappingProxyType({"color": "lightgreen", "width": 5}),
+    chimera_line_kwargs: Mapping = MappingProxyType({"color": "black"}),
+    chimera_scatter_kwargs: Mapping = MappingProxyType({"color": "black"}),
+) -> bokeh.layouts.Row:
+    """Create the existing paired snapshot/extrapolated scalar metric plots.
+
+    This older API takes computed baseline/snapshot/chimera columns, not MAF
+    summary records. The interactive summary API does not use its baseline ray.
+    """
+    # Keep the older computed-column API separate from summary records.
+    metric_values_ds = bokeh.models.ColumnDataSource(metric_values)
+    metric_at_date_fig = bokeh.plotting.figure(
+        title=f"{metric_name} at date",
+        x_axis_label="Date",
+        y_axis_label="Metric value",
+        x_axis_type="datetime",
+        name=SNAPSHOT_SCALAR_METRIC_FIGURE_NAME,
+    )
+    metric_at_date_fig.line(x="date", y="baseline", source=metric_values_ds, **baseline_line_kwargs)
+    metric_at_date_fig.line(x="date", y="snapshot", source=metric_values_ds, **snapshot_line_kwargs)
+    metric_at_date_fig.scatter(x="date", y="snapshot", source=metric_values_ds, **snapshot_scatter_kwargs)
+
+    # The reference ray belongs to the older API, not the summary plot.
+    baseline_final_depth = metric_values.loc[metric_values.index.max(), "baseline"]
+    chimera_metric_fig = bokeh.plotting.figure(
+        title=f"{metric_name} extrapolated from date to end with baseline",
+        x_axis_label="Date",
+        y_axis_label="Metric value",
+        x_axis_type="datetime",
+        name=EXTRAPOLATED_SCALAR_METRIC_FIGURE_NAME,
+    )
+    chimera_metric_fig.ray(
+        x=metric_values["date"].min(), y=baseline_final_depth, length=0, angle=0, **baseline_ray_kwargs
+    )
+    chimera_metric_fig.line(x="date", y="chimera", source=metric_values_ds, **chimera_line_kwargs)
+    chimera_metric_fig.scatter(x="date", y="chimera", source=metric_values_ds, **chimera_scatter_kwargs)
+    return bokeh.layouts.row(metric_at_date_fig, chimera_metric_fig)

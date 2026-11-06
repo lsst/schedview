@@ -51,26 +51,51 @@ SUMMARY_COLUMNS: tuple[str, ...] = (
     "date",
 )
 
-_RUN_PATTERN: re.Pattern[str] = re.compile(r"(chimera|consdb|baseline)_([0-9]{8})")
-_BANDS: frozenset[str] = frozenset(("u", "g", "r", "i", "z", "y", "all"))
+_SUPPORTED_RUN_NAME_PATTERN: re.Pattern[str] = re.compile(r"(chimera|consdb|baseline)_([0-9]{8})")
+_VALID_BANDS: frozenset[str] = frozenset(("u", "g", "r", "i", "z", "y", "all"))
+
+_SEQUENCE_FIELDS: tuple[str, ...] = ("metric_name", "summary_metric", "metric_info_label")
+"""Fields identifying one plotted sequence across dates and sources."""
+_RECORD_FIELDS: tuple[str, ...] = ("run_name", "metric_name", "metric_info_label", "summary_metric")
+"""Fields identifying one logical record; duplicates share these values."""
+
+_REQUIRED_DB_COLUMNS: dict[str, tuple[str, ...]] = {
+    "metrics": (
+        "metric_id",
+        "run_name",
+        "metric_name",
+        "slicer_name",
+        "sql_constraint",
+        "metric_info_label",
+    ),
+    "summarystats": ("stat_id", "metric_id", "summary_name", "summary_value"),
+}
+"""Columns the MAF results database must provide, by table."""
 
 
-def _missing(value: object) -> bool:
-    """Test scalar missingness without accepting arrays as null values."""
+def _is_missing_scalar(value: object) -> bool:
+    """Test whether a scalar is None/NaN/NaT; arrays are never missing."""
     if isinstance(value, (complex, np.complexfloating)):
         return False
     result = pd.isna(value)
     return isinstance(result, (bool, np.bool_)) and bool(result)
 
 
-def _logical(value: object) -> object:
-    """Canonicalize keys without rewriting original labels or constraints."""
-    return None if _missing(value) or value == "" else value
+def _grouping_key_value(value: object) -> object:
+    """Map null and empty strings to None so they group together.
+
+    Used only to build comparison keys; the original label or constraint
+    is never rewritten.
+    """
+    return None if _is_missing_scalar(value) or value == "" else value
 
 
-def _run_fields(run_name: object) -> tuple[str, int, pd.Timestamp]:
-    """Derive source, YYYYMMDD, and calendar midnight from an exact run."""
-    match = _RUN_PATTERN.fullmatch(run_name) if isinstance(run_name, str) else None
+def _parse_run_name(run_name: object) -> tuple[str, int, pd.Timestamp]:
+    """Split a run name into (source, YYYYMMDD integer, calendar midnight).
+
+    Raise ``ValueError`` for an unsupported name or impossible date.
+    """
+    match = _SUPPORTED_RUN_NAME_PATTERN.fullmatch(run_name) if isinstance(run_name, str) else None
     if match is None:
         raise ValueError(f"Invalid run_name {run_name!r}: expected <chimera|consdb|baseline>_YYYYMMDD")
     source, date_text = match.groups()
@@ -82,17 +107,29 @@ def _run_fields(run_name: object) -> tuple[str, int, pd.Timestamp]:
     return source, int(date_text), date
 
 
-def _band(label: object, source: str) -> str:
-    """Use exact source-prefixed bands; arbitrary labels mean all-band data."""
+def _band_from_label(label: object, source: str) -> str:
+    """Return the band named by a ``<source>_<band>`` label, else ``"all"``.
+
+    Only a label whose prefix matches the run's source exactly, with a known
+    band suffix, names a band; absent or unrecognized labels mean all bands.
+    """
     if isinstance(label, str) and label.startswith(f"{source}_"):
         candidate = label[len(source) + 1 :]
-        if candidate in _BANDS:
+        if candidate in _VALID_BANDS:
             return candidate
     return "all"
 
 
-def _validate_summary_metrics(summary_metrics: SummaryMetrics, *, allow_duplicates: bool = False) -> None:
-    """Allow equal reruns only before collection deduplication."""
+def validate_summary_metrics(summary_metrics: SummaryMetrics, *, allow_duplicates: bool = False) -> None:
+    """Validate records without mutating, sorting, or deduplicating the frame.
+
+    Raise ``TypeError`` for a non-DataFrame and contextual ``ValueError`` for
+    missing columns, invalid value types/derived fields, sequence invariants,
+    duplicate records, or conflicting scalar values. Missing measurements and
+    non-finite real values are valid gaps; this function issues no warnings.
+    Set ``allow_duplicates=True`` to permit equal reruns before collection
+    deduplication. Conflicting scalar values are rejected in either mode.
+    """
     # Check structure first so row access cannot obscure a missing column.
     if not isinstance(summary_metrics, pd.DataFrame):
         raise TypeError("SummaryMetrics must be a pandas DataFrame")
@@ -102,9 +139,9 @@ def _validate_summary_metrics(summary_metrics: SummaryMetrics, *, allow_duplicat
     if not summary_metrics.columns.is_unique:
         raise ValueError("SummaryMetrics column names must be unique")
 
-    sequences: dict[tuple[object, ...], tuple[object, object]] = {}
+    slicer_and_constraint_by_sequence: dict[tuple[object, ...], tuple[object, object]] = {}
     """Logical sequence -> slicer/constraint, independent of run/source."""
-    records: dict[tuple[object, ...], object] = {}
+    value_by_record: dict[tuple[object, ...], object] = {}
     """Logical run/sequence -> original scalar, including gaps/infinities."""
 
     for position, row in enumerate(summary_metrics.loc[:, SUMMARY_COLUMNS].itertuples(index=False)):
@@ -120,63 +157,58 @@ def _validate_summary_metrics(summary_metrics: SummaryMetrics, *, allow_duplicat
                 raise ValueError(f"{context}: {field} must be a string")
         for field in ("sql_constraint", "metric_info_label"):
             value = getattr(row, field)
-            if not isinstance(value, str) and not _missing(value):
+            if not isinstance(value, str) and not _is_missing_scalar(value):
                 raise ValueError(f"{context}: {field} must be a string or null")
-        value = row.summary_value
-        if isinstance(value, (bool, np.bool_)) or (not isinstance(value, Real) and not _missing(value)):
+        summary_value = row.summary_value
+        if isinstance(summary_value, (bool, np.bool_)) or (
+            not isinstance(summary_value, Real) and not _is_missing_scalar(summary_value)
+        ):
             raise ValueError(f"{context}: summary_value must be a real scalar or missing")
 
         # Re-derive rather than trust caller-provided source, band, and date.
-        source, dayobs, date = _run_fields(row.run_name)
+        source, dayobs, date = _parse_run_name(row.run_name)
         for field, expected in (
             ("visit_source", source),
             ("dayobs", dayobs),
-            ("band", _band(row.metric_info_label, source)),
+            ("band", _band_from_label(row.metric_info_label, source)),
         ):
             if getattr(row, field) != expected:
                 raise ValueError(f"{context}: {field} must equal {expected!r}")
-        if not isinstance(row.date, (datetime, pd.Timestamp, np.datetime64)) or _missing(row.date):
+        if not isinstance(row.date, (datetime, pd.Timestamp, np.datetime64)) or _is_missing_scalar(row.date):
             raise ValueError(f"{context}: date must be a timezone-naive pandas calendar midnight")
         actual_date = pd.Timestamp(row.date)
         if actual_date.tzinfo is not None or actual_date != date:
             raise ValueError(f"{context}: date must be timezone-naive calendar midnight {date}")
 
         # Mixing slicers or constraints would imply a misleading sequence.
-        sequence = tuple(
-            _logical(getattr(row, field)) for field in ("metric_name", "summary_metric", "metric_info_label")
+        sequence = tuple(_grouping_key_value(getattr(row, field)) for field in _SEQUENCE_FIELDS)
+        slicer_and_constraint = (
+            _grouping_key_value(row.slicer_name),
+            _grouping_key_value(row.sql_constraint),
         )
-        invariant = (_logical(row.slicer_name), _logical(row.sql_constraint))
-        if sequence in sequences and sequences[sequence] != invariant:
+        known = slicer_and_constraint_by_sequence.setdefault(sequence, slicer_and_constraint)
+        if known != slicer_and_constraint:
             raise ValueError(
                 f"{context}: sequence {sequence!r} has multiple slicer_name or sql_constraint values"
             )
-        sequences[sequence] = invariant
 
-        # A newer stat_id must not hide a conflicting rerun.
+        # A newer stat_id must not hide a conflicting rerun. Missing matches
+        # missing; otherwise values must be exactly equal (so equal infinities
+        # match and finite values never match approximately).
         record = (row.run_name, *sequence)
-        if record in records:
-            previous = records[record]
-            equal = (_missing(previous) and _missing(value)) or (
-                not _missing(previous) and not _missing(value) and previous == value
-            )
-            if not equal:
+        if record in value_by_record:
+            previous = value_by_record[record]
+            if _is_missing_scalar(previous) or _is_missing_scalar(summary_value):
+                values_match = _is_missing_scalar(previous) and _is_missing_scalar(summary_value)
+            else:
+                values_match = previous == summary_value
+            if not values_match:
                 raise ValueError(
-                    f"{context}: conflicting summary_value for {record!r}: {previous!r} vs {value!r}"
+                    f"{context}: conflicting summary_value for {record!r}: {previous!r} vs {summary_value!r}"
                 )
             if not allow_duplicates:
                 raise ValueError(f"{context}: duplicate summary record {record!r}")
-        records[record] = value
-
-
-def validate_summary_metrics(summary_metrics: SummaryMetrics) -> None:
-    """Validate records without mutating, sorting, or deduplicating the frame.
-
-    Raise ``TypeError`` for a non-DataFrame and contextual ``ValueError`` for
-    missing columns, invalid value types/derived fields, sequence invariants,
-    duplicate records, or conflicting scalar values. Missing measurements and
-    non-finite real values are valid gaps; this helper issues no warnings.
-    """
-    _validate_summary_metrics(summary_metrics)
+        value_by_record[record] = summary_value
 
 
 def load_summary_metrics(db_path: str | Path) -> SummaryMetrics:
@@ -194,21 +226,12 @@ def load_summary_metrics(db_path: str | Path) -> SummaryMetrics:
     """
     path = Path(db_path).expanduser().resolve()
 
-    # Fail on absent schema before the join; read-only mode cannot create a DB.
-    required: dict[str, tuple[str, ...]] = {
-        "metrics": (
-            "metric_id",
-            "run_name",
-            "metric_name",
-            "slicer_name",
-            "sql_constraint",
-            "metric_info_label",
-        ),
-        "summarystats": ("stat_id", "metric_id", "summary_name", "summary_value"),
-    }
+    # Read every metrics/summarystats join row, read-only so no DB is created.
+    # Fail on absent schema before the join. Values stay objects so SQL NULL
+    # labels are not replaced by inferred string dtypes.
     try:
         with closing(sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)) as connection:
-            for table, columns in required.items():
+            for table, columns in _REQUIRED_DB_COLUMNS.items():
                 actual = {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
                 missing = set(columns) - actual
                 if missing:
@@ -223,51 +246,52 @@ def load_summary_metrics(db_path: str | Path) -> SummaryMetrics:
                 "ORDER BY m.run_name, m.metric_name, m.metric_info_label, "
                 "ss.summary_name, ss.stat_id, m.metric_id"
             )
-            # Avoid inferred string dtypes replacing original SQL NULL labels.
             frame = pd.DataFrame(
                 cursor.fetchall(), columns=[item[0] for item in cursor.description], dtype=object
             )
     except (sqlite3.Error, pd.errors.DatabaseError, OSError) as exc:
         raise ValueError(f"Cannot read summary metrics database {path}: {exc}") from exc
 
-    # Count exclusions without validating unrelated runs' other fields.
-    supported = frame.run_name.map(
-        lambda name: isinstance(name, str) and _RUN_PATTERN.fullmatch(name) is not None
-    )
-    excluded = int((~supported).sum())
+    # Keep only supported run names, counting exclusions without validating
+    # unrelated runs' other fields.
+    is_supported = frame.run_name.map(
+        lambda name: isinstance(name, str) and _SUPPORTED_RUN_NAME_PATTERN.fullmatch(name) is not None
+    ).astype(bool)
+    excluded = int((~is_supported).sum())
     if excluded:
         warnings.warn(
             f"Database {path}: excluded {excluded} joined summary records with unsupported run_name",
             UserWarning,
             stacklevel=2,
         )
-    frame = frame.loc[supported].copy()
+    frame = frame.loc[is_supported].copy()
 
     try:
-        # Derive dates after run filtering. Milliseconds match the browser
-        # contract without requiring pandas nanosecond storage.
-        fields = [_run_fields(name) for name in frame.run_name]
-        frame["visit_source"] = [values[0] for values in fields]
-        frame["dayobs"] = pd.Series([values[1] for values in fields], index=frame.index, dtype="int64")
-        frame["date"] = pd.Series([values[2] for values in fields], index=frame.index, dtype="datetime64[ms]")
+        # Derive source, dayobs, date, and band. Milliseconds match the
+        # browser contract without requiring pandas nanosecond storage.
+        parsed = [_parse_run_name(name) for name in frame.run_name]
+        frame["visit_source"] = [source for source, _, _ in parsed]
+        frame["dayobs"] = pd.Series([dayobs for _, dayobs, _ in parsed], index=frame.index, dtype="int64")
+        frame["date"] = pd.Series([date for _, _, date in parsed], index=frame.index, dtype="datetime64[ms]")
         frame["band"] = [
-            _band(label, source) for label, source in zip(frame.metric_info_label, frame.visit_source)
+            _band_from_label(label, source)
+            for label, source in zip(frame.metric_info_label, frame.visit_source)
         ]
         frame = frame.loc[:, SUMMARY_COLUMNS]
 
         # Validate all reruns before retaining the highest-stat provenance.
-        _validate_summary_metrics(frame, allow_duplicates=True)
-        retained: dict[tuple[object, ...], int] = {}
-        """Logical record -> row position, not the DataFrame index."""
+        validate_summary_metrics(frame, allow_duplicates=True)
+
+        # Collapse reruns of each logical record to the highest stat_id,
+        # keeping row order. Positions are row positions, not DataFrame index.
+        position_by_record: dict[tuple[object, ...], int] = {}
         for position, row in enumerate(frame.itertuples(index=False)):
-            key = tuple(
-                _logical(getattr(row, field))
-                for field in ("run_name", "metric_name", "metric_info_label", "summary_metric")
-            )
-            previous = retained.get(key)
+            record = tuple(_grouping_key_value(getattr(row, field)) for field in _RECORD_FIELDS)
+            previous = position_by_record.get(record)
             if previous is None or row.stat_id > frame.iloc[previous].stat_id:
-                retained[key] = position
-        frame = frame.iloc[sorted(retained.values())].reset_index(drop=True)
+                position_by_record[record] = position
+        frame = frame.iloc[sorted(position_by_record.values())].reset_index(drop=True)
+
         # Cast only validated, deduplicated values; preserve exact ID ordering
         # and duplicate comparisons before normalizing SQL NULL scalars to NaN.
         frame = frame.astype({"metric_id": "int64", "stat_id": "int64", "summary_value": "float64"})
@@ -275,9 +299,12 @@ def load_summary_metrics(db_path: str | Path) -> SummaryMetrics:
     except ValueError as exc:
         raise ValueError(f"Database {path}: {exc}") from exc
 
-    # Preserve gaps here; plotting/export decides how to encode them.
-    missing_count = sum(_missing(value) for value in frame.summary_value)
-    nonfinite_count = sum(not _missing(value) and not np.isfinite(value) for value in frame.summary_value)
+    # Preserve gaps here (plotting/export decides how to encode them), but
+    # report their counts.
+    missing_count = sum(_is_missing_scalar(value) for value in frame.summary_value)
+    nonfinite_count = sum(
+        not _is_missing_scalar(value) and not np.isfinite(value) for value in frame.summary_value
+    )
     if missing_count or nonfinite_count:
         warnings.warn(
             f"Database {path}: retained {missing_count + nonfinite_count} "

@@ -17,6 +17,7 @@ from bokeh.embed.notebook import notebook_content
 from bokeh.events import DocumentReady
 from bokeh.resources import INLINE
 
+import schedview.plot.progress as progress_module
 from schedview.collect.progress import SUMMARY_COLUMNS
 from schedview.plot.colors import make_band_cmap
 from schedview.plot.progress import SOURCE_STYLES, make_metric_line_plots, make_summary_progress_plot
@@ -56,6 +57,22 @@ def records(*specifications):
 
 def model(layout, name):
     return layout.select_one({"name": name})
+
+
+def test_public_exports_include_source_styles():
+    assert set(progress_module.__all__) == {
+        "SOURCE_STYLES",
+        "make_metric_line_plots",
+        "make_summary_progress_plot",
+    }
+    for name in progress_module.__all__:
+        assert hasattr(progress_module, name)
+
+
+def test_document_ready_script_uses_startup_tag_constant():
+    script = progress_module._PROGRESS_DOCUMENT_READY
+    assert progress_module._PROGRESS_STARTUP in script
+    assert "__STARTUP_TAG__" not in script
 
 
 def test_models_validation_serialization_and_layout(monkeypatch):
@@ -593,6 +610,14 @@ def test_browser_empty_and_two_independent_plots(browser, served, external):
         page.close()
 
 
+def wait_for_pending_request(page, pending, timeout_ms=5000):
+    """Wait for the routed fetch; the status text precedes the request."""
+    waited = 0
+    while not pending and waited < timeout_ms:
+        page.wait_for_timeout(50)
+        waited += 50
+
+
 def test_browser_external_loading_and_network_rejection(browser, served):
     content, _, origin = served
     content["/pages/plot.html"] = file_html(make_summary_progress_plot("./data.json"), INLINE)
@@ -611,6 +636,7 @@ def test_browser_external_loading_and_network_rejection(browser, served):
         }""")
         assert all(current[name]["disabled"] for name in ("metric", "source", "label", "summary"))
         assert current["points"]["date"] == []
+        wait_for_pending_request(page, pending)
         assert len(pending) == 1
         pending.pop().fulfill(status=200, content_type="application/json", body=json_records(records({})))
         page.wait_for_function("""() => Bokeh.documents[0].get_model_by_name('progress_status')
@@ -619,6 +645,7 @@ def test_browser_external_loading_and_network_rejection(browser, served):
         page.reload()
         page.wait_for_function("""() => Bokeh.documents[0].get_model_by_name('progress_status')
             .text === 'Loading ./data.json...'""")
+        wait_for_pending_request(page, pending)
         assert len(pending) == 1
         pending.pop().abort("failed")
         page.wait_for_function("""() => Bokeh.documents[0].get_model_by_name('progress_status')
@@ -662,6 +689,7 @@ def test_browser_startup_concurrent_compilation_fetches_once(browser, served):
             .text === 'Loading ./data.json...'""")
         assert page.evaluate("""() => Bokeh.documents[0].get_model_by_name('progress_status')
             ._compile_count""") >= 8
+        wait_for_pending_request(page, pending)
         assert len(pending) == 1
         pending.pop().fulfill(status=200, content_type="application/json", body=json_records(records({})))
         wait_updated(page)
