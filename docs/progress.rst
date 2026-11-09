@@ -13,7 +13,8 @@ The collection, plotting, and reporting stages live in
 ``schedview.collect.progress``, ``schedview.plot.progress``, and
 ``schedview.app.progress_explore``, respectively. Use an installed ``schedview``
 environment with the latest current Bokeh release. Standalone plots use browser
-callbacks and do not require a Bokeh server.
+callbacks and do not require a Bokeh server. See :doc:`progress_callback` for
+how the browser callback works.
 
 Notebook API
 ------------

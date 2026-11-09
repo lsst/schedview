@@ -14,6 +14,7 @@ Contents
    installation
    usage
    progress
+   progress_callback
    prenight_sim_generation
    tutorials
    architecture
