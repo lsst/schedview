@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from bokeh.events import DocumentReady
 
-from schedview.collect.progress import SummaryMetrics, validate_summary_metrics
+from schedview.collect.progress import SummaryMetrics, _validate_reference_sim_tag, validate_summary_metrics
 from schedview.plot.colors import make_band_cmap
 
 __all__ = ["SOURCE_STYLES", "make_metric_line_plots", "make_summary_progress_plot"]
@@ -24,7 +24,7 @@ SOURCE_STYLES: dict[str, tuple[int, float]] = {
     "chimera": (3, 0.6),
     "baseline": (5, 0.3),
 }
-"""Source -> (width in pixels, alpha), shared by lines and legend swatches."""
+"""Default source -> (width, alpha); plots snapshot their reference tag."""
 
 _PROGRESS_STARTUP = "schedview-progress-startup"
 """Tag/name linking each plot's status model to the document dispatcher."""
@@ -662,7 +662,9 @@ export default async function(args, changed) {
 """
 
 
-def make_summary_progress_plot(summary_metrics: SummaryMetrics | str) -> bokeh.models.UIElement:
+def make_summary_progress_plot(
+    summary_metrics: SummaryMetrics | str, *, reference_sim_tag: str = "baseline"
+) -> bokeh.models.UIElement:
     """Create a standalone interactive plot of scalar MAF summary records.
 
     Parameters
@@ -671,6 +673,11 @@ def make_summary_progress_plot(summary_metrics: SummaryMetrics | str) -> bokeh.m
         Validated summary records, including filtered copies, or a JSON URL.
         URLs are fetched once on page load and resolved against the page URL.
         External pages must be HTTP(S)-served with same-origin or CORS access.
+    reference_sim_tag : str, optional
+        One literal, case-sensitive reference prefix, default ``"baseline"``.
+        An alternate replaces baseline. Pass the same tag to collection and
+        external JSON export. Each plot snapshots its own reference style.
+        Empty/non-string and reserved consdb/chimera tags raise ``ValueError``.
 
     Returns
     -------
@@ -678,6 +685,12 @@ def make_summary_progress_plot(summary_metrics: SummaryMetrics | str) -> bokeh.m
         Four cascading selectors, status, figure, and three informational
         legends. Embedded records require no companion data file or server.
     """
+    _validate_reference_sim_tag(reference_sim_tag)
+    styles = {
+        "consdb": SOURCE_STYLES["consdb"],
+        "chimera": SOURCE_STYLES["chimera"],
+        reference_sim_tag: SOURCE_STYLES["baseline"],
+    }
     # Prepare the data source. ``records`` holds JSON-compatible rows with
     # epoch-ms dates, or None when the browser fetches ``url``; ``url`` is the
     # unchanged external URL, or None for embedded records. Share a browser
@@ -686,7 +699,7 @@ def make_summary_progress_plot(summary_metrics: SummaryMetrics | str) -> bokeh.m
     if isinstance(summary_metrics, str):
         records, url = None, summary_metrics
     else:
-        validate_summary_metrics(summary_metrics)
+        validate_summary_metrics(summary_metrics, reference_sim_tag=reference_sim_tag)
 
         # Report gaps, then normalize non-finite values to missing (JSON null).
         clean = summary_metrics.copy()
@@ -807,7 +820,7 @@ def make_summary_progress_plot(summary_metrics: SummaryMetrics | str) -> bokeh.m
             records=records,
             url=url,
             colors=colors,
-            styles=SOURCE_STYLES,
+            styles=styles,
             dashes=list(bokeh.core.enums.LineDash),
         ),
         code=_PROGRESS_CALLBACK,

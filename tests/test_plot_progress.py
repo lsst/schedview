@@ -71,9 +71,9 @@ metric_name, visit_source, band, summary_metric,       date, summary_value
     return records(*specifications.to_dict(orient="records"))
 
 
-def json_records(frame):
+def json_records(frame, *, reference_sim_tag="baseline"):
     """Publish validated records in the external-data contract."""
-    validate_summary_metrics(frame)
+    validate_summary_metrics(frame, reference_sim_tag=reference_sim_tag)
     return frame.to_json(orient="records", date_format="epoch", date_unit="ms", double_precision=15)
 
 
@@ -89,6 +89,19 @@ class TestProgressPlotPage(unittest.TestCase):
             make_summary_progress_plot(valid_frame.drop(columns="band"))
         layout = make_summary_progress_plot(valid_frame)
         self.assertIsInstance(layout, bokeh.models.UIElement)
+
+        comparison = records({"visit_source": "comparison"})
+        layout = make_summary_progress_plot(comparison, reference_sim_tag="comparison")
+        self.assertIn("comparison_20260101", file_html(layout, INLINE))
+        with self.assertRaisesRegex(ValueError, "Invalid run_name"):
+            make_summary_progress_plot(comparison)
+        with self.assertRaisesRegex(ValueError, "baseline_20260101"):
+            make_summary_progress_plot(records({"visit_source": "baseline"}), reference_sim_tag="comparison")
+        for tag in ("", None, 42, "consdb", "chimera"):
+            for source in (records(), "./data.json"):
+                with self.subTest(reference_sim_tag=tag, input=type(source).__name__):
+                    with self.assertRaisesRegex(ValueError, "reference_sim_tag"):
+                        make_summary_progress_plot(source, reference_sim_tag=tag)
 
     def test_plot_constructs_and_serializes(self):
         # Intent: The user wants to export a page containing measured records.
@@ -459,11 +472,26 @@ class TestProgressPlotStory(unittest.TestCase):
         # Intent: The user wants the currently published measurements.
         # Action: They open a page referencing a sibling JSON file.
         # Response: Coverage value 1 loads from the page-relative URL.
-        self.publish("/pages/data.json", json_records(records({})))
-        self.publish("/pages/plot.html", file_html(make_summary_progress_plot("./data.json"), INLINE))
+        self.publish(
+            "/pages/data.json",
+            json_records(records({"visit_source": "comparison"}), reference_sim_tag="comparison"),
+        )
+        self.publish(
+            "/pages/plot.html",
+            file_html(make_summary_progress_plot("./data.json", reference_sim_tag="comparison"), INLINE),
+        )
         self.page.goto(self.origin + "/pages/plot.html")
         self.wait_values([1])
         self.status("Source: ./data.json")
+        self.assertEqual(self.selected(self.source), ["comparison"])
+        self.assertEqual(self.selected(self.label), [json.dumps("comparison_g")])
+        self.assertEqual(self.data()["run_name"], ["comparison_20260101"])
+        self.assertEqual(self.data("lines")["width"], [5])
+        self.assertEqual(self.data("lines")["alpha"], [0.3])
+        self.assertCountEqual(self.legend_entries(), ["comparison", "g", "Mean"])
+        stroke = self.page.locator("svg").filter(has=self.page.locator("line")).first.locator("line")
+        self.assertEqual(stroke.get_attribute("stroke-width"), "5")
+        self.assertEqual(stroke.get_attribute("opacity"), "0.3")
         self.assertEqual(self.request_count("/pages/data.json"), 1)
         self.assertEqual(self.request_count("/data.json"), 0)
 
@@ -472,7 +500,13 @@ class TestProgressPlotStory(unittest.TestCase):
         # Response: The open page still uses value 1 without fetching again.
         self.publish(
             "/pages/data.json",
-            json_records(records({"summary_value": 42}, {"metric_name": "Visits", "summary_value": 7})),
+            json_records(
+                records(
+                    {"visit_source": "comparison", "summary_value": 42},
+                    {"metric_name": "Visits", "summary_value": 7},
+                ),
+                reference_sim_tag="comparison",
+            ),
         )
         self.summary.select_option([])
         self.wait_values([])
@@ -487,6 +521,9 @@ class TestProgressPlotStory(unittest.TestCase):
         # Response: Coverage is 42 and Visits appears, using one new fetch.
         self.page.reload()
         self.wait_values([42])
+        self.assertEqual(self.selected(self.source), ["comparison"])
+        self.assertEqual(self.data("lines")["width"], [5])
+        self.assertEqual(self.data("lines")["alpha"], [0.3])
         self.assertEqual(self.options(self.metric), ["Coverage", "Visits"])
         self.status("Source: ./data.json")
         self.assertEqual(self.request_count("/pages/data.json"), 2)
@@ -514,18 +551,30 @@ class TestProgressPlotStory(unittest.TestCase):
         # Action: They open one output, then the other in a second page.
         # Response: Each loads only its own measurement.
         bundle = bundle_for_objs_and_resources(None, INLINE).scripts(tag=True)
-        for index in range(2):
-            layout = make_summary_progress_plot(f"./data{index}.json")
+        for index, tag in enumerate(("baseline", "comparison")):
+            layout = make_summary_progress_plot(f"./data{index}.json", reference_sim_tag=tag)
             script, div, _ = notebook_content(layout)
-            self.publish(f"/pages/data{index}.json", json_records(records({"summary_value": index + 1})))
+            self.publish(
+                f"/pages/data{index}.json",
+                json_records(
+                    records({"visit_source": tag, "summary_value": index + 1}), reference_sim_tag=tag
+                ),
+            )
             self.publish(f"/pages/output{index}.html", bundle + div + f"<script>{script}</script>")
         self.page.goto(self.origin + "/pages/output0.html")
         self.wait_values([1])
+        self.assertEqual(self.selected(self.source), ["baseline"])
+        self.assertEqual(self.data("lines")["width"], [5])
+        self.assertEqual(self.data("lines")["alpha"], [0.3])
         self.assertEqual(self.request_count("/pages/data0.json"), 1)
         self.assertEqual(self.request_count("/pages/data1.json"), 0)
         other = self.new_page()
         other.goto(self.origin + "/pages/output1.html")
         self.wait_values([2], page=other)
+        self.assertEqual(self.selected(other.locator("select").nth(1)), ["comparison"])
+        self.assertEqual(self.data(page=other)["run_name"], ["comparison_20260101"])
+        self.assertEqual(self.data("lines", page=other)["width"], [5])
+        self.assertEqual(self.data("lines", page=other)["alpha"], [0.3])
         self.assertEqual(self.request_count("/pages/data1.json"), 1)
 
         # Intent: The user wants to adjust the notebook comparisons separately.

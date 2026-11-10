@@ -6,7 +6,8 @@ integer ``metric_id`` and ``stat_id`` retain database provenance; ``run_name``,
 (the last aliases ``summary_name``). ``sql_constraint`` and
 ``metric_info_label`` retain original strings or nulls. ``summary_value`` is a
 real scalar or missing, including signed infinities. Derived ``visit_source``
-is chimera, consdb, or baseline, ``dayobs`` is integer YYYYMMDD, ``band`` is
+is chimera, consdb, or the configured reference tag (baseline by default),
+``dayobs`` is integer YYYYMMDD, ``band`` is
 u/g/r/i/z/y/all, and ``date`` is timezone-naive pandas calendar midnight, not
 the physical UTC-12 beginning of the observing night.
 
@@ -51,7 +52,6 @@ SUMMARY_COLUMNS: tuple[str, ...] = (
     "date",
 )
 
-_SUPPORTED_RUN_NAME_PATTERN: re.Pattern[str] = re.compile(r"(chimera|consdb|baseline)_([0-9]{8})")
 _VALID_BANDS: frozenset[str] = frozenset(("u", "g", "r", "i", "z", "y", "all"))
 
 _SEQUENCE_FIELDS: tuple[str, ...] = ("metric_name", "summary_metric", "metric_info_label")
@@ -90,14 +90,27 @@ def _grouping_key_value(value: object) -> object:
     return None if _is_missing_scalar(value) or value == "" else value
 
 
-def _parse_run_name(run_name: object) -> tuple[str, int, pd.Timestamp]:
+def _validate_reference_sim_tag(reference_sim_tag: str) -> None:
+    """Require one literal reference prefix, not consdb or chimera."""
+    if (
+        not isinstance(reference_sim_tag, str)
+        or not reference_sim_tag
+        or reference_sim_tag in ("consdb", "chimera")
+    ):
+        raise ValueError(
+            f"Invalid reference_sim_tag {reference_sim_tag!r}: "
+            "must be a nonempty string other than 'consdb' or 'chimera'"
+        )
+
+
+def _parse_run_name(run_name: object, pattern: re.Pattern[str]) -> tuple[str, int, pd.Timestamp]:
     """Split a run name into (source, YYYYMMDD integer, calendar midnight).
 
     Raise ``ValueError`` for an unsupported name or impossible date.
     """
-    match = _SUPPORTED_RUN_NAME_PATTERN.fullmatch(run_name) if isinstance(run_name, str) else None
+    match = pattern.fullmatch(run_name) if isinstance(run_name, str) else None
     if match is None:
-        raise ValueError(f"Invalid run_name {run_name!r}: expected <chimera|consdb|baseline>_YYYYMMDD")
+        raise ValueError(f"Invalid run_name {run_name!r}: expected full match of {pattern.pattern!r}")
     source, date_text = match.groups()
     try:
         # The date label is not the physical UTC-12 start of the night.
@@ -120,7 +133,9 @@ def _band_from_label(label: object, source: str) -> str:
     return "all"
 
 
-def validate_summary_metrics(summary_metrics: SummaryMetrics, *, allow_duplicates: bool = False) -> None:
+def validate_summary_metrics(
+    summary_metrics: SummaryMetrics, *, reference_sim_tag: str = "baseline", allow_duplicates: bool = False
+) -> None:
     """Validate records without mutating, sorting, or deduplicating the frame.
 
     Raise ``TypeError`` for a non-DataFrame and contextual ``ValueError`` for
@@ -129,7 +144,14 @@ def validate_summary_metrics(summary_metrics: SummaryMetrics, *, allow_duplicate
     non-finite real values are valid gaps; this function issues no warnings.
     Set ``allow_duplicates=True`` to permit equal reruns before collection
     deduplication. Conflicting scalar values are rejected in either mode.
+
+    ``reference_sim_tag`` is a literal, case-sensitive source prefix, default
+    ``"baseline"``. An alternate replaces baseline; pass the same tag used for
+    collection, plotting, and export. Empty/non-string and reserved
+    consdb/chimera tags raise ``ValueError``, including for empty frames.
     """
+    _validate_reference_sim_tag(reference_sim_tag)
+    pattern = re.compile(rf"(chimera|consdb|{re.escape(reference_sim_tag)})_([0-9]{{8}})")
     # Check structure first so row access cannot obscure a missing column.
     if not isinstance(summary_metrics, pd.DataFrame):
         raise TypeError("SummaryMetrics must be a pandas DataFrame")
@@ -166,7 +188,7 @@ def validate_summary_metrics(summary_metrics: SummaryMetrics, *, allow_duplicate
             raise ValueError(f"{context}: summary_value must be a real scalar or missing")
 
         # Re-derive rather than trust caller-provided source, band, and date.
-        source, dayobs, date = _parse_run_name(row.run_name)
+        source, dayobs, date = _parse_run_name(row.run_name, pattern)
         for field, expected in (
             ("visit_source", source),
             ("dayobs", dayobs),
@@ -211,7 +233,7 @@ def validate_summary_metrics(summary_metrics: SummaryMetrics, *, allow_duplicate
         value_by_record[record] = summary_value
 
 
-def load_summary_metrics(db_path: str | Path) -> SummaryMetrics:
+def load_summary_metrics(db_path: str | Path, *, reference_sim_tag: str = "baseline") -> SummaryMetrics:
     """Read a MAF SQLite database, returning deterministic validated records.
 
     The database is opened read-only and never created. Only exact supported
@@ -223,7 +245,14 @@ def load_summary_metrics(db_path: str | Path) -> SummaryMetrics:
     are preserved and counted in a warning, not converted to zero or JSON null.
     Returned numeric columns use int64 for metric_id, stat_id, and dayobs, and
     float64 for summary_value (SQL NULL becomes NaN), including empty results.
+
+    ``reference_sim_tag`` selects the one literal, case-sensitive reference
+    source prefix, default ``"baseline"``. An alternate replaces baseline;
+    baseline runs are then excluded without date or record validation. Original
+    source names and labels are retained. Invalid tags raise ``ValueError``.
     """
+    _validate_reference_sim_tag(reference_sim_tag)
+    pattern = re.compile(rf"(chimera|consdb|{re.escape(reference_sim_tag)})_([0-9]{{8}})")
     path = Path(db_path).expanduser().resolve()
 
     # Read every metrics/summarystats join row, read-only so no DB is created.
@@ -255,7 +284,7 @@ def load_summary_metrics(db_path: str | Path) -> SummaryMetrics:
     # Keep only supported run names, counting exclusions without validating
     # unrelated runs' other fields.
     is_supported = frame.run_name.map(
-        lambda name: isinstance(name, str) and _SUPPORTED_RUN_NAME_PATTERN.fullmatch(name) is not None
+        lambda name: isinstance(name, str) and pattern.fullmatch(name) is not None
     ).astype(bool)
     excluded = int((~is_supported).sum())
     if excluded:
@@ -269,7 +298,7 @@ def load_summary_metrics(db_path: str | Path) -> SummaryMetrics:
     try:
         # Derive source, dayobs, date, and band. Milliseconds match the
         # browser contract without requiring pandas nanosecond storage.
-        parsed = [_parse_run_name(name) for name in frame.run_name]
+        parsed = [_parse_run_name(name, pattern) for name in frame.run_name]
         frame["visit_source"] = [source for source, _, _ in parsed]
         frame["dayobs"] = pd.Series([dayobs for _, dayobs, _ in parsed], index=frame.index, dtype="int64")
         frame["date"] = pd.Series([date for _, _, date in parsed], index=frame.index, dtype="datetime64[ms]")
@@ -280,7 +309,7 @@ def load_summary_metrics(db_path: str | Path) -> SummaryMetrics:
         frame = frame.loc[:, SUMMARY_COLUMNS]
 
         # Validate all reruns before retaining the highest-stat provenance.
-        validate_summary_metrics(frame, allow_duplicates=True)
+        validate_summary_metrics(frame, reference_sim_tag=reference_sim_tag, allow_duplicates=True)
 
         # Collapse reruns of each logical record to the highest stat_id,
         # keeping row order. Positions are row positions, not DataFrame index.
@@ -295,7 +324,7 @@ def load_summary_metrics(db_path: str | Path) -> SummaryMetrics:
         # Cast only validated, deduplicated values; preserve exact ID ordering
         # and duplicate comparisons before normalizing SQL NULL scalars to NaN.
         frame = frame.astype({"metric_id": "int64", "stat_id": "int64", "summary_value": "float64"})
-        validate_summary_metrics(frame)
+        validate_summary_metrics(frame, reference_sim_tag=reference_sim_tag)
     except ValueError as exc:
         raise ValueError(f"Database {path}: {exc}") from exc
 

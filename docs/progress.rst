@@ -3,7 +3,8 @@ Summary Progress
 
 Plot scalar MAF summary metrics against observing-night dates, either in a
 notebook or in a standalone HTML page. Inputs may contain snapshot measurements
-from completed visits (``consdb``), baseline snapshots (``baseline``), chimera
+from completed visits (``consdb``), reference-simulation snapshots (``baseline``
+by default), chimera
 extrapolations (``chimera``), or a combination. A chimera combines completed
 visits up to a transition night with baseline simulation visits thereafter.
 Only supplied records are plotted: this interface adds neither target values
@@ -36,6 +37,27 @@ Replace the example path with your MAF results database. Relative paths resolve
 against the notebook's working directory. No particular workspace layout or
 bundled representative database is required.
 
+To compare against a different simulation, pass the same explicit tag through
+collection, validation, and plotting:
+
+.. code-block:: python
+
+   from schedview.collect.progress import validate_summary_metrics
+
+   comparison_df = load_summary_metrics(
+       "/path/to/resultsDb_sqlite.db", reference_sim_tag="comparison"
+   )
+   validate_summary_metrics(comparison_df, reference_sim_tag="comparison")
+   show(make_summary_progress_plot(comparison_df, reference_sim_tag="comparison"))
+
+The keyword-only ``reference_sim_tag="baseline"`` selects exactly one reference.
+An alternate replaces baseline, rather than adding an alias. Tags are literal,
+case-sensitive, nonempty strings, distinct from the reserved ``consdb`` and
+``chimera`` names. Actual source names remain in records, selectors, and legends;
+reference styling follows the role. There is no mutable module-level setting,
+automatic inference, or support for multiple reference simulations. Each plot
+snapshots its configuration, so independent notebook plots can use different tags.
+
 Filtered copies are valid inputs; retain all required columns and consistent
 derived values. There is no second, separately maintained selector DataFrame:
 
@@ -58,7 +80,7 @@ Restrict the supplied records to obtain the separate views:
    show(make_summary_progress_plot(chimera_df))
    show(make_summary_progress_plot(snapshot_df))
 
-``make_summary_progress_plot(summary_metrics)`` returns a
+``make_summary_progress_plot(summary_metrics, *, reference_sim_tag="baseline")`` returns a
 ``bokeh.models.UIElement`` with selectors, status, figure, and legends.
 A DataFrame embeds its records. A string is always an external JSON URL in
 the Python API, even if it looks like a local database path. It is not read
@@ -67,7 +89,7 @@ fetches from the browser's page context; notebook deployments must make that
 URL accessible from the notebook page, not merely from the kernel filesystem.
 
 ``SummaryMetrics`` is a type alias for ``pandas.DataFrame``, not a wrapper.
-``load_summary_metrics(db_path: str | Path) -> SummaryMetrics`` opens a MAF
+``load_summary_metrics(db_path, *, reference_sim_tag="baseline") -> SummaryMetrics`` opens a MAF
 SQLite results database read-only, joins ``metrics`` and ``summarystats`` on
 ``metric_id``, derives source/band/date fields, removes identical reruns,
 validates, and returns deterministically ordered records.
@@ -76,7 +98,8 @@ Collected ``metric_id``, ``stat_id``, and ``dayobs`` columns use ``int64``;
 NaN and signed infinities preserved. These dtypes also apply to empty results.
 Conversion follows validation and duplicate comparison; original labels and
 constraints retain their strings or SQL NULL values.
-``validate_summary_metrics(summary_metrics, *, allow_duplicates=False) -> None`` validates without
+``validate_summary_metrics(summary_metrics, *, reference_sim_tag="baseline", allow_duplicates=False) -> None``
+validates without
 mutating, sorting, or removing duplicates. It accepts filtered copies with
 arbitrary indices and harmless extra columns, and rejects duplicate records
 in caller-created frames, even if their values agree. Empty frames must still
@@ -90,6 +113,9 @@ Installed Commands
 
 Both commands take two positional arguments. Activate the installed environment
 before running them, or use ``uv run --no-sync`` in the configured workspace.
+Both accept ``--reference-sim-tag TAG`` (default ``baseline``). Use the same tag
+for JSON export and embedded or external HTML generation. Invalid tags produce
+contextual errors, including for empty data or external URLs.
 
 Embedded HTML
 ~~~~~~~~~~~~~
@@ -119,6 +145,19 @@ After the database changes, replace only the JSON:
 .. code-block:: sh
 
    make_summary_progress_data resultsDb.db /path/to/served/pages/progress_summary_data.json
+
+For an alternate reference, include its tag on both initial commands and every
+subsequent JSON export:
+
+.. code-block:: sh
+
+   make_summary_progress_data --reference-sim-tag comparison resultsDb.db /path/to/served/pages/data.json
+   make_summary_progress_plot --reference-sim-tag comparison "./data.json" /path/to/served/pages/figure.html
+
+External JSON must use the reference tag configured in its HTML. JSON-only
+updates may add records from ``consdb``, ``chimera``, and that reference tag;
+changing the reference tag requires regenerating HTML. No configuration metadata
+is added to the bare records array, and JavaScript does not validate tag agreement.
 
 Serve the HTML and JSON over HTTP(S). ``./progress_summary_data.json`` resolves
 relative to the served page URL, not the shell's working directory or Python's
@@ -230,7 +269,7 @@ Required DataFrame and JSON fields are:
      - Measurement; missing and non-finite values are gaps, never zero.
    * - ``visit_source``
      - String
-     - ``consdb``, ``baseline``, or ``chimera``, derived from ``run_name``.
+     - ``consdb``, ``chimera``, or the configured reference tag, derived from ``run_name``.
    * - ``dayobs``
      - Integer / number
      - ``YYYYMMDD`` snapshot cutoff or chimera transition-night label.
@@ -245,7 +284,9 @@ Run and Label Grammars
 ~~~~~~~~~~~~~~~~~~~~~~
 
 Supported run names match exactly and case-sensitively
-``^(chimera|consdb|baseline)_[0-9]{8}$`` with no suffix. Collection excludes
+``<source>_YYYYMMDD`` with exactly eight ASCII digits and no suffix. The source
+is ``chimera``, ``consdb``, or the literal configured ``reference_sim_tag``
+(``baseline`` by default). Collection excludes
 unsupported names, including nulls, case variants, suffixes, and near misses,
 and issues a warning counting excluded joined summary records. It does not
 validate their other fields. An exact-format run with an impossible calendar
@@ -253,9 +294,12 @@ date is fatal and identifies the offending run and date: ``chimera_2026023``
 is excluded, whereas ``chimera_20260230`` fails. Caller-created DataFrames
 must contain supported, valid run names rather than expecting the plot to
 filter them.
+With an alternate reference tag, baseline runs are unsupported and excluded
+without validating their dates or other fields. Caller-created baseline frames
+instead fail validation under that tag, even if loaded with default settings.
 
 A standard label matches exactly and case-sensitively
-``<chimera|consdb|baseline>_<u|g|r|i|z|y|all>`` and its source prefix must agree
+``<source>_<u|g|r|i|z|y|all>`` using one of the supported source prefixes, and it must agree
 with the run. Otherwise ``band`` is ``all``. For example, ``chimera_g`` on a
 chimera run maps to ``g``; ``Chimera_g``, ``chimera_G``, ``consdb_g`` on a
 chimera run, unknown labels, and absent labels map to ``all``. The original
@@ -374,7 +418,7 @@ Visible points keep isolated dates interpretable.
    * - ``chimera``
      - 3
      - 0.6
-   * - ``baseline``
+   * - Configured reference tag (default ``baseline``)
      - 5
      - 0.3
 

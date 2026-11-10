@@ -34,18 +34,25 @@ def _check_output_path(input_path: str | Path, output_path: str) -> None:
 @click.command(name="make_summary_progress_data")
 @click.argument("db_path", type=click.Path(exists=True, dir_okay=False, readable=True))
 @click.argument("json_path", type=click.Path(dir_okay=False))
-def make_summary_progress_data(db_path: str, json_path: str) -> None:
+@click.option(
+    "--reference-sim-tag",
+    default="baseline",
+    show_default=True,
+    help="Single reference source prefix; an alternate replaces baseline.",
+)
+def make_summary_progress_data(db_path: str, json_path: str, reference_sim_tag: str) -> None:
     """Write validated summary records from DB_PATH to JSON_PATH.
 
     Dates are calendar midnight in epoch milliseconds. Missing and nonfinite
     measurements become JSON null; finite scalars use pandas' maximum supported
     precision (15 decimal places). No selector catalog or envelope is written.
+    Use the same tag when generating HTML and replacing external JSON.
     """
     try:
         # Protect provenance before reading; enforce the export boundary.
         _check_output_path(db_path, json_path)
-        summary_metrics = load_summary_metrics(db_path)
-        validate_summary_metrics(summary_metrics)
+        summary_metrics = load_summary_metrics(db_path, reference_sim_tag=reference_sim_tag)
+        validate_summary_metrics(summary_metrics, reference_sim_tag=reference_sim_tag)
 
         # Normalize a copy after duplicate comparison, where signed infinities
         # and missing values still differ. Pandas writes JSON null.
@@ -72,7 +79,15 @@ def make_summary_progress_data(db_path: str, json_path: str) -> None:
 @click.option(
     "--title", "-t", default="Summary Progress Explorer", show_default=True, help="HTML page title."
 )
-def make_summary_progress_plot_cli(summary_metrics: str, page_path: str, input_kind: str, title: str) -> None:
+@click.option(
+    "--reference-sim-tag",
+    default="baseline",
+    show_default=True,
+    help="Single reference source prefix; external JSON must use the same tag.",
+)
+def make_summary_progress_plot_cli(
+    summary_metrics: str, page_path: str, input_kind: str, title: str, reference_sim_tag: str
+) -> None:
     """Write a standalone progress page to PAGE_PATH from SUMMARY_METRICS.
 
     SUMMARY_METRICS is a local SQLite database or external JSON URL. URLs are
@@ -80,6 +95,7 @@ def make_summary_progress_plot_cli(summary_metrics: str, page_path: str, input_k
     collisions are checked to avoid overwriting page-relative JSON inputs.
     Relative URLs resolve against the served page, not the current directory.
     Database input embeds records and does not create a companion JSON file.
+    An alternate reference tag replaces baseline. Regenerate HTML to change it.
     """
     try:
         # Classify before filesystem access; external data must remain
@@ -102,8 +118,12 @@ def make_summary_progress_plot_cli(summary_metrics: str, page_path: str, input_k
                 _check_output_path(Path(page_path).parent / unquote(parsed.path), page_path)
 
         # Plot construction owns neither output files nor report assembly.
-        records: SummaryMetrics | str = summary_metrics if is_url else load_summary_metrics(summary_metrics)
-        plot = make_summary_progress_plot(records)
+        records: SummaryMetrics | str = (
+            summary_metrics
+            if is_url
+            else load_summary_metrics(summary_metrics, reference_sim_tag=reference_sim_tag)
+        )
+        plot = make_summary_progress_plot(records, reference_sim_tag=reference_sim_tag)
         Path(page_path).write_text(file_html(plot, CDN, title=title), encoding="utf-8")
     except (OSError, ValueError, TypeError, sqlite3.Error) as error:
         raise click.ClickException(

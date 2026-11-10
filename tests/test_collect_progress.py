@@ -94,6 +94,45 @@ class TestCollectProgress(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "conflicting summary_value"):
             load_summary_metrics(conflicting)
 
+    def test_alternate_reference_replaces_baseline_and_keeps_literal_identity(self):
+        """Keep one comparison's identity and reject baseline frames."""
+        for tag in ("comparison", "ref.v1_+"):
+            with self.subTest(reference_sim_tag=tag):
+                path = self.database(
+                    {"run_name": f"{tag}_20280229", "metric_info_label": f"{tag}_r"},
+                    {"run_name": "consdb_20280301", "metric_info_label": f"{tag}_r"},
+                    {"run_name": "chimera_20280301", "metric_info_label": "chimera_g"},
+                    {"run_name": "baseline_20260230", "metric_name": None},
+                    {"run_name": "baseline_20280301", "metric_info_label": "baseline_r"},
+                    {"run_name": f"{tag.upper()}_20280301", "metric_name": None},
+                    name=f"{tag}.db",
+                )
+                with self.assertWarnsRegex(UserWarning, "excluded 3"):
+                    frame = load_summary_metrics(path, reference_sim_tag=tag)
+                by_source = frame.set_index("visit_source")
+                self.assertCountEqual(by_source.index, [tag, "chimera", "consdb"])
+                self.assertEqual(by_source.loc[tag, "run_name"], f"{tag}_20280229")
+                self.assertEqual(by_source.loc[tag, "metric_info_label"], f"{tag}_r")
+                self.assertEqual(by_source.loc[tag, "date"], pd.Timestamp("2028-02-29"))
+                self.assertEqual(by_source.band.to_dict(), {tag: "r", "chimera": "g", "consdb": "all"})
+                original = frame.copy(deep=True)
+                validate_summary_metrics(frame, reference_sim_tag=tag)
+                validate_summary_metrics(frame.iloc[[0]], reference_sim_tag=tag)
+                validate_summary_metrics(
+                    pd.concat([frame, frame]), reference_sim_tag=tag, allow_duplicates=True
+                )
+                pd.testing.assert_frame_equal(frame, original)
+                with self.assertRaisesRegex(ValueError, "Invalid run_name"):
+                    validate_summary_metrics(frame)
+
+        baseline = load_summary_metrics(
+            self.database(
+                {"run_name": "baseline_20280301", "metric_info_label": "baseline_r"}, name="baseline.db"
+            )
+        )
+        with self.assertRaisesRegex(ValueError, "baseline_20280301"):
+            validate_summary_metrics(baseline, reference_sim_tag="comparison")
+
     def test_validate_filtered_records_and_equal_duplicates_without_mutating(self):
         """Accept caller metadata and require opt-in for equal duplicates."""
         frame = load_summary_metrics(self.database({}, {"run_name": "chimera_20260301"}))
@@ -131,6 +170,14 @@ class TestCollectProgress(unittest.TestCase):
         invalid = self.database({"run_name": run})
         with self.assertRaisesRegex(ValueError, run):
             load_summary_metrics(invalid)
+
+        empty = load_summary_metrics(self.database(name="empty.db"))
+        for tag in ("", None, 42, "consdb", "chimera"):
+            with self.subTest(reference_sim_tag=tag):
+                with self.assertRaisesRegex(ValueError, "reference_sim_tag"):
+                    load_summary_metrics(invalid, reference_sim_tag=tag)
+                with self.assertRaisesRegex(ValueError, "reference_sim_tag"):
+                    validate_summary_metrics(empty, reference_sim_tag=tag)
 
 
 if __name__ == "__main__":
