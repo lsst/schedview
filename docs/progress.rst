@@ -375,8 +375,14 @@ Interaction and Appearance
 --------------------------
 
 Controls appear above the plot in this order: single metric, multiple sources,
-multiple original metric-info labels, multiple summary metrics. Bands are
-selected indirectly through labels; there is no separate band selector.
+multiple metric-info labels or bands, multiple summary metrics. When every label
+matching the selected metric and sources is exactly ``<source>_<band>`` and agrees
+with its record's source, the third control is titled **Band**. Available bands
+appear in the order ``all``, ``u``, ``g``, ``r``, ``i``, ``z``, ``y``, omitting
+absent bands. Selecting a band selects every corresponding label across the
+selected sources; ``all`` means the literal ``<source>_all`` labels, not all bands.
+Any absent, custom, case-variant, or source-mismatched label keeps the control in
+original-label mode. Empty upstream results leave an empty, disabled label control.
 Initially the first sorted metric is selected, followed by all available
 downstream values within the summary-style cap.
 
@@ -384,8 +390,11 @@ Options cascade from metric to source to label to summary. Each downstream
 list is the union of values in records matching all upstream selections, not
 an intersection across sources or labels. Valid prior selections are retained;
 if none survive an upstream change, all available options are selected in
-sorted order within the cap. Intentionally clearing a multi-selection means
-show nothing, with visible no-data status, not an automatic reset to all.
+sorted order within the cap (bands use the order above). When the third control
+changes mode, surviving standard-label selections translate to their bands, or
+selected bands translate to all matching standard labels. Intentionally clearing
+a multi-selection means show nothing, with visible no-data status, not an
+automatic reset to all.
 Missing/empty labels have a readable no-label option; nonempty labels are quoted
 in the selector so literal text resembling the no-label option is distinguishable.
 Hover retains the original label.

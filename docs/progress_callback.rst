@@ -215,7 +215,8 @@ the first statement of the callback unpacks them into local names.
      - Mapping of band to color from ``schedview.plot.colors.make_band_cmap``.
    * - ``styles``
      - Mapping of ``visit_source`` to ``[line width, alpha]``
-       (``SOURCE_STYLES``).
+       snapshotted for this plot: consdb and chimera use ``SOURCE_STYLES``;
+       the configured reference tag uses the default baseline's style.
    * - ``dashes``
      - List of Bokeh's named ``LineDash`` styles. Its length is also the
        maximum number of summary metrics that can be selected at once.
@@ -254,6 +255,11 @@ much like instances of a plain Python class.
        priority when the user exceeds the selection cap.
    * - ``selection``
      - JSON string of all four selector values after the last update.
+   * - ``bandMode``
+     - Whether the third control used band options in the last update.
+   * - ``labelRows``
+     - Records matching Metric and Source in the last update, before label
+       or summary filtering; used to translate label selections into bands.
 
 The state is stored on the model, rather than in a module-level JavaScript
 variable, for two reasons. BokehJS may compile the callback module more than
@@ -320,7 +326,7 @@ section comments in the source.
        G{"Selection unchanged<br/>since last update,<br/>or busy?"} -- yes --> R["return"]
        G -- no --> B["busy = true"]
        B --> S1["1. First call only:<br/>disable controls, then load<br/>embedded records or await fetch"]
-       S1 --> S2["2. Cascade selector options<br/>metric to source to label to summary"]
+       S1 --> S2["2. Cascade selector options<br/>metric to source to label/band to summary"]
        S2 --> S3["3. Enforce summary<br/>selection cap"]
        S3 --> S4["4. Assign dash-style<br/>slots to summaries"]
        S4 --> S5["5. Group selected records<br/>into line sequences"]
@@ -349,16 +355,18 @@ generated.
 Step 2: Cascade selector options
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The selectors form a cascade. Each one's options are the sorted, distinct
-values found in records matching all selections *upstream* of it. A working
-list, ``rows``, is narrowed after each control:
+The selectors form a cascade. Each one's options are distinct values found in
+records matching all selections *upstream* of it. Metric, source, original
+label, and summary options are sorted; band options use the fixed order
+``all``, ``u``, ``g``, ``r``, ``i``, ``z``, ``y``, skipping absent bands.
+A working list, ``rows``, is narrowed after each control:
 
 .. mermaid::
 
    flowchart LR
        D["all records"] -- "metric_name equals<br/>metric.value" --> M["rows"]
        M -- "options for source;<br/>keep visit_source<br/>in source.value" --> SO["rows"]
-       SO -- "options for label;<br/>keep label key<br/>in label.value" --> L["rows"]
+       SO -- "choose label or band mode;<br/>keep label key or band<br/>in label.value" --> L["rows"]
        L -- "options for summary;<br/>after cap and slots, keep<br/>summary_metric in summary.value" --> SU["rows to plot"]
 
 Because each list is derived from records matching the union of upstream
@@ -376,9 +384,27 @@ Whether a control's selection is changed depends on why the callback ran:
 
 The metric selector is single-valued and is set to the first sorted metric
 only at startup. Source and summary use the shared ``cascade`` helper, which
-also sets ``options`` and disables a control with no options. The label
-control is handled separately because its option values are not displayed
-directly:
+also sets ``options`` and disables a control with no options. The third control,
+still named ``label`` in the callback, is handled separately because it can
+switch between original-label and band options.
+
+Before filtering by that control or by summary, the callback examines every
+record matching Metric and Source. The local ``standardLabel(row)`` helper
+requires a supported ``row.band`` and exact, case-sensitive equality between
+``row.metric_info_label`` and ``row.visit_source + "_" + row.band``. This uses
+the actual source, including an alternate reference tag; a fallback
+``band="all"`` alone does not make a custom label standard.
+
+If there is at least one matching record and every label is standard, the
+control's title becomes **Band**. Each option is a ``[band, band]`` pair,
+and ``label.value`` holds plain band strings such as ``"g"``. Selecting a
+band retains every record with that band across the selected sources.
+``all`` means the literal ``<source>_all`` labels, not all available bands.
+
+If any matching label is absent, custom, case-variant, or source-mismatched,
+the title remains **Metric info label** and options retain original-label
+identities. Empty upstream results also use label mode, with an empty,
+disabled control. In original-label mode:
 
 * Null and empty labels are the same logical label (``canonical`` maps both
   to ``""``).
@@ -388,6 +414,25 @@ directly:
 * Options are ``[value, display text]`` pairs. The empty label is displayed as
   ``(no label)``; other labels are displayed with their quotes, so a literal
   label ``(no label)`` remains distinguishable.
+
+When the mode changes, selections are translated before the usual
+retain-or-fallback reconciliation:
+
+* From labels to bands, the callback finds selected standard labels in the
+  previous ``state.labelRows`` and retains their bands if still available.
+* From bands to labels, it selects all standard labels in the new upstream
+  rows corresponding to the previously selected bands.
+
+After reconciliation, ``state.bandMode`` and ``state.labelRows`` are updated,
+and ``rows`` is filtered using either ``row.band`` or
+``labelKey(row.metric_info_label)``. Clearing the third control itself remains
+an empty selection; upstream changes use the normal fallback if no choices
+survive. Every metric/source change reevaluates the mode, as does the first
+load of embedded records or current external JSON after page reload.
+
+This changes only selection: original labels remain in hover fields and in
+the sequence keys used in step 5. For example, selecting ``g`` can show both
+``consdb_g`` and ``comparison_g`` without merging their lines.
 
 Step 3: Enforce the summary selection cap
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -515,3 +560,9 @@ Playwright browser tests in ``tests/test_plot_progress.py``, which run only
 when ``ENABLE_PLAYWRIGHT_TESTS=1`` is set (see :doc:`playwright_testing`).
 After changing ``_PROGRESS_CALLBACK``, run those browser tests, not only the
 default test suite.
+
+``test_user_selects_bands_across_sources_and_returns_to_original_labels``
+covers ordered band choices, cross-source selection, literal ``all``, clearing,
+separate series, and translation in both directions. The main exploration story
+checks absent bands and empty upstream controls; the external-data story checks
+mode reevaluation after replacing JSON and reloading the page.

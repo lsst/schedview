@@ -289,10 +289,8 @@ class TestProgressPlotStory(unittest.TestCase):
         self.assertEqual(self.options(self.metric), ["Coverage", "Visits"])
         self.assertEqual(self.selected(self.metric), ["Coverage"])
         self.assertEqual(self.selected(self.source), ["baseline", "chimera", "consdb"])
-        self.assertEqual(
-            self.selected(self.label),
-            [json.dumps(label) for label in ["baseline_g", "chimera_g", "consdb_g", "consdb_r"]],
-        )
+        self.assertEqual(self.selected(self.label), ["g", "r"])
+        self.assertTrue(self.page.get_by_text("Band", exact=True).first.is_visible())
         self.assertEqual(self.selected(self.summary), ["Mean", "Median"])
         for control in (self.metric, self.source, self.label, self.summary):
             self.assertTrue(control.is_enabled())
@@ -302,15 +300,15 @@ class TestProgressPlotStory(unittest.TestCase):
         self.assertEqual(self.page.get_by_text("Failed to load", exact=False).count(), 0)
 
         # Intent: The user wants observed g-band progress, not simulations.
-        # Action: They select consdb, then retain only the consdb_g label.
+        # Action: They select consdb, then retain only the g band.
         # Response: Options cascade; matching Mean and Median series remain.
         self.source.select_option(["consdb"])
         self.wait_values([10, 20, 30, 9, 18, 27, 5])
-        labels = [json.dumps(label) for label in ["consdb_g", "consdb_r"]]
+        labels = ["g", "r"]
         self.assertEqual(self.options(self.label), labels)
         self.assertEqual(self.selected(self.label), labels)
         self.assertEqual(self.options(self.summary), ["Mean", "Median"])
-        self.label.select_option([json.dumps("consdb_g")])
+        self.label.select_option(["g"])
         self.wait_values([10, 20, 30, 9, 18, 27])
         points = self.data()
         identities = list(
@@ -375,7 +373,7 @@ class TestProgressPlotStory(unittest.TestCase):
         self.wait_values([7])
         for control, expected in (
             (self.source, ["consdb"]),
-            (self.label, [json.dumps("consdb_r")]),
+            (self.label, ["r"]),
             (self.summary, ["Total"]),
         ):
             self.assertEqual(self.options(control), expected)
@@ -399,7 +397,7 @@ class TestProgressPlotStory(unittest.TestCase):
             self.assertTrue(control.is_disabled())
         self.source.select_option(["consdb"])
         self.wait_values([7])
-        self.assertEqual(self.selected(self.label), [json.dumps("consdb_r")])
+        self.assertEqual(self.selected(self.label), ["r"])
         self.assertEqual(self.selected(self.summary), ["Total"])
         visits_ranges = self.assert_padded_ranges()
         self.assertNotEqual(visits_ranges, coverage_ranges)
@@ -435,6 +433,71 @@ class TestProgressPlotStory(unittest.TestCase):
             self.assertAlmostEqual(actual, expected, delta=0.001)
         self.assertNotEqual(self.ranges(), coverage_ranges)
         self.wait_values([7])
+
+    def test_user_selects_bands_across_sources_and_returns_to_original_labels(self):
+        # Intent: The user has band labels and a custom simulation label.
+        # Action: They open the comparison, then remove the custom source.
+        # Response: Labels become ordered bands for the remaining sources.
+        frame = records(
+            *[
+                dict(band=band, summary_value=index + 1)
+                for index, band in enumerate(["y", "z", "i", "r", "g", "u", "all"])
+            ],
+            dict(visit_source="comparison", band="g", summary_value=20),
+            dict(visit_source="chimera", metric_info_label="custom", band="all", summary_value=30),
+            dict(metric_name="Special", metric_info_label="consdb_G", band="all", summary_value=40),
+            dict(metric_name="Special", metric_info_label=None, band="all", summary_value=50),
+            dict(metric_name="Special", metric_info_label="comparison_g", band="all", summary_value=60),
+        )
+        self.publish(
+            "/pages/plot.html",
+            file_html(make_summary_progress_plot(frame, reference_sim_tag="comparison"), INLINE),
+        )
+        self.page.goto(self.origin + "/pages/plot.html")
+        self.wait_values([1, 2, 3, 4, 5, 6, 7, 20, 30])
+        self.assertTrue(self.page.get_by_text("Metric info label", exact=True).is_visible())
+        self.label.select_option([json.dumps("consdb_g"), json.dumps("comparison_g")])
+        self.wait_values([5, 20])
+        self.source.select_option(["consdb", "comparison"])
+        self.wait_values([5, 20])
+        self.assertTrue(self.page.get_by_text("Band", exact=True).first.is_visible())
+        self.assertEqual(self.options(self.label), ["all", "u", "g", "r", "i", "z", "y"])
+        self.assertEqual(self.selected(self.label), ["g"])
+        self.assertCountEqual(self.data()["metric_info_label"], ["consdb_g", "comparison_g"])
+        self.assertEqual(len(self.data("lines")["xs"]), 2)
+
+        # Intent: The user wants to toggle every source's g band together.
+        # Action: They deselect g, select all, and then restore g.
+        # Response: Clearing stays empty; all means the literal all-band label.
+        self.label.select_option([])
+        self.wait_values([])
+        self.status("No finite data")
+        self.assertEqual(self.selected(self.label), [])
+        self.label.select_option(["all"])
+        self.wait_values([7])
+        self.assertEqual(self.data()["metric_info_label"], ["consdb_all"])
+        self.label.select_option(["g"])
+        self.wait_values([5, 20])
+
+        # Intent: The user wants their custom simulation and label metric.
+        # Action: They add chimera, select custom, and switch metrics and back.
+        # Response: Bands translate to labels; nonstandard labels never become
+        # bands, including case variants, nulls and wrong sources.
+        self.source.select_option(["consdb", "comparison", "chimera"])
+        self.wait_values([5, 20])
+        self.assertTrue(self.page.get_by_text("Metric info label", exact=True).is_visible())
+        self.assertCountEqual(self.selected(self.label), [json.dumps("consdb_g"), json.dumps("comparison_g")])
+        self.label.select_option([json.dumps("custom")])
+        self.wait_values([30])
+        self.metric.select_option("Special")
+        self.wait_values([40, 50, 60])
+        self.assertEqual(
+            self.options(self.label), [json.dumps(value) for value in ["", "comparison_g", "consdb_G"]]
+        )
+        self.assertTrue(self.page.get_by_text("Metric info label", exact=True).is_visible())
+        self.metric.select_option("Coverage")
+        self.wait_values([1, 2, 3, 4, 5, 6, 7])
+        self.assertEqual(self.options(self.label), ["all", "u", "g", "r", "i", "z", "y"])
 
     def test_user_replaces_a_summary_at_the_selection_limit(self):
         capacity = len(bokeh.core.enums.LineDash)
@@ -484,7 +547,7 @@ class TestProgressPlotStory(unittest.TestCase):
         self.wait_values([1])
         self.status("Source: ./data.json")
         self.assertEqual(self.selected(self.source), ["comparison"])
-        self.assertEqual(self.selected(self.label), [json.dumps("comparison_g")])
+        self.assertEqual(self.selected(self.label), ["g"])
         self.assertEqual(self.data()["run_name"], ["comparison_20260101"])
         self.assertEqual(self.data("lines")["width"], [5])
         self.assertEqual(self.data("lines")["alpha"], [0.3])
@@ -502,7 +565,12 @@ class TestProgressPlotStory(unittest.TestCase):
             "/pages/data.json",
             json_records(
                 records(
-                    {"visit_source": "comparison", "summary_value": 42},
+                    {
+                        "visit_source": "comparison",
+                        "metric_info_label": "review",
+                        "band": "all",
+                        "summary_value": 42,
+                    },
                     {"metric_name": "Visits", "summary_value": 7},
                 ),
                 reference_sim_tag="comparison",
@@ -522,6 +590,8 @@ class TestProgressPlotStory(unittest.TestCase):
         self.page.reload()
         self.wait_values([42])
         self.assertEqual(self.selected(self.source), ["comparison"])
+        self.assertEqual(self.selected(self.label), [json.dumps("review")])
+        self.assertTrue(self.page.get_by_text("Metric info label", exact=True).is_visible())
         self.assertEqual(self.data("lines")["width"], [5])
         self.assertEqual(self.data("lines")["alpha"], [0.3])
         self.assertEqual(self.options(self.metric), ["Coverage", "Visits"])

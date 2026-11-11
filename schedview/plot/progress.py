@@ -262,6 +262,7 @@ export default async function(args, changed) {
     //   slots              Map: summary name -> index into `dashes`
     //   previousSummaries  summary selection after the last update
     //   selection          selectionKey() string after the last update
+    //   bandMode, labelRows previous label mode and upstream rows for translation
     if (status._progress_state == null) {
         status._progress_state = {
             data: null,
@@ -270,6 +271,8 @@ export default async function(args, changed) {
             slots: new Map(),
             previousSummaries: [],
             selection: null,
+            bandMode: false,
+            labelRows: [],
         };
     }
     const state = status._progress_state;
@@ -373,28 +376,50 @@ export default async function(args, changed) {
         cascade(source, sourceOptions, changed === metric);
         rows = rows.filter(row => source.value.includes(row.visit_source));
 
-        // Label.
-        // Labels do not use cascade(): option values are JSON identities with
-        // separate display text, and no selection cap applies. Quoted display
-        // text distinguishes a literal '(no label)' string from the null/empty
-        // label presentation.
+        // Use bands only when every upstream label is an exact source/band label.
+        // Original labels still identify separate series and supply hover text.
+        const bandOrder = ["all", "u", "g", "r", "i", "z", "y"];
+        function standardLabel(row) {
+            return bandOrder.includes(row.band) &&
+                row.metric_info_label === `${row.visit_source}_${row.band}`;
+        }
+        const bandMode = rows.length > 0 && rows.every(standardLabel);
         const labels = sorted(rows.map(row => labelKey(row.metric_info_label)));
-        const validLabels = label.value.filter(value => labels.includes(value));
+        const labelOptions = bandMode ?
+            bandOrder.filter(band => rows.some(row => row.band === band)) : labels;
+        let previousLabels = label.value;
+        if (bandMode !== state.bandMode) {
+            // Translate surviving choices when the same control changes meaning.
+            if (bandMode) {
+                previousLabels = sorted(state.labelRows.filter(row => standardLabel(row) &&
+                    label.value.includes(labelKey(row.metric_info_label))).map(row => row.band));
+            } else {
+                previousLabels = sorted(rows.filter(row => standardLabel(row) &&
+                    label.value.includes(row.band)).map(row => labelKey(row.metric_info_label)));
+            }
+        }
+        const validLabels = previousLabels.filter(value => labelOptions.includes(value));
+        label.title = bandMode ? "Band" : "Metric info label";
         // Bokeh accepts each option as a [value, displayed text] pair.
-        label.options = labels.map(key => {
+        // Quoted labels distinguish literal '(no label)' text from null/empty.
+        label.options = labelOptions.map(key => {
+            if (bandMode) return [key, key];
             const isEmptyLabel = JSON.parse(key) === "";
             const displayText = isEmptyLabel ? "(no label)" : key;
             return [key, displayText];
         });
-        label.disabled = labels.length === 0;
+        label.disabled = labelOptions.length === 0;
         if (initial || changed === metric || changed === source) {
             if (validLabels.length > 0) {
                 label.value = validLabels;
             } else {
-                label.value = labels;
+                label.value = labelOptions;
             }
         }
-        rows = rows.filter(row => label.value.includes(labelKey(row.metric_info_label)));
+        state.bandMode = bandMode;
+        state.labelRows = rows;
+        rows = rows.filter(row =>
+            label.value.includes(bandMode ? row.band : labelKey(row.metric_info_label)));
 
         // Summary: any automatic selection is capped at the number of dash styles.
         const summaryOptions = sorted(rows.map(row => row.summary_metric));
@@ -684,6 +709,8 @@ def make_summary_progress_plot(
     bokeh.models.UIElement
         Four cascading selectors, status, figure, and three informational
         legends. Embedded records require no companion data file or server.
+        The label selector becomes a band selector when all labels matching
+        the selected metric and sources are exact source/band labels.
     """
     _validate_reference_sim_tag(reference_sim_tag)
     styles = {
