@@ -122,13 +122,21 @@ Embedded HTML
 
 .. code-block:: sh
 
-   make_summary_progress_plot resultsDb.db /path/to/served/pages/progress_summary.html
+   make_summary_progress_plot resultsDb.db /path/to/served/pages/summary_progress_figure.html
 
 The local SQLite database is read at page-generation time. Metric data are
 embedded in the HTML; no companion JSON is created or required. Self-contained
 here means embedded metric data, not completely offline operation: Bokeh
 resources use the CDN and need not be inlined. Regenerate the HTML to update
 embedded records.
+
+To use the handwritten wrapper, first copy ``pages/progress_summary.html``
+from a schedview source checkout into the target web-host directory. That is
+the canonical wrapper, not an output of the plotting command; these instructions
+do not assume it is included in an installed wheel. Generate
+``summary_progress_figure.html`` in the same directory, matching its iframe
+target. Routine plot updates replace only the figure, not the wrapper. Recopy
+the wrapper only when it changes. Wrapper CSS does not style the iframe contents.
 
 External JSON and Reload
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -138,16 +146,18 @@ Generate a data file independently, then a page that refers to it:
 .. code-block:: sh
 
    make_summary_progress_data resultsDb.db /path/to/served/pages/progress_summary_data.json
-   make_summary_progress_plot "./progress_summary_data.json" /path/to/served/pages/progress_summary.html
+   make_summary_progress_plot "./progress_summary_data.json" /path/to/served/pages/summary_progress_figure.html
 
-After the database changes, replace only the JSON:
+After the database changes, replace only the JSON; neither the figure HTML nor
+the wrapper needs to be replaced:
 
 .. code-block:: sh
 
    make_summary_progress_data resultsDb.db /path/to/served/pages/progress_summary_data.json
 
 For an alternate reference, include its tag on both initial commands and every
-subsequent JSON export:
+subsequent JSON export. This standalone example uses ``figure.html``; when using
+the wrapper, retain its ``summary_progress_figure.html`` target instead:
 
 .. code-block:: sh
 
@@ -161,7 +171,9 @@ is added to the bare records array, and JavaScript does not validate tag agreeme
 
 Serve the HTML and JSON over HTTP(S). ``./progress_summary_data.json`` resolves
 relative to the served page URL, not the shell's working directory or Python's
-filesystem. For a page at ``https://example.org/reports/progress_summary.html``,
+filesystem. When using the wrapper, JSON resolves against the iframe's figure
+page, not the wrapper page. For a figure at
+``https://example.org/reports/summary_progress_figure.html``,
 it refers to ``https://example.org/reports/progress_summary_data.json``.
 A root-relative URL such as ``/data/progress.json`` resolves at the page's origin.
 Cross-origin JSON needs appropriate CORS permission from the data host.

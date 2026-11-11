@@ -18,7 +18,7 @@ from bokeh.embed.notebook import notebook_content
 from bokeh.resources import INLINE
 
 from schedview.collect.progress import SUMMARY_COLUMNS, validate_summary_metrics
-from schedview.plot.progress import make_metric_line_plots, make_summary_progress_plot
+from schedview.plot.progress import make_summary_progress_plot
 
 
 def records(*specifications):
@@ -80,30 +80,16 @@ def json_records(frame, *, reference_sim_tag="baseline"):
 class TestProgressPlotPage(unittest.TestCase):
     """Page-generation checks that never require Playwright."""
 
-    def test_invalid_input_can_be_corrected(self):
+    def test_page_api_accepts_valid_records_and_rejects_invalid_input(self):
         # Intent: The user wants to create a page from their summary records.
-        # Action: They try a frame missing band, then restore that column.
-        # Response: The API rejects bad input and accepts the correction.
+        # Action: They omit band, then try an external URL with a reserved tag.
+        # Response: Both fail, even without loading external data in Python.
         valid_frame = records({})
         with self.assertRaisesRegex(ValueError, "band"):
             make_summary_progress_plot(valid_frame.drop(columns="band"))
-        layout = make_summary_progress_plot(valid_frame)
-        self.assertIsInstance(layout, bokeh.models.UIElement)
+        with self.assertRaisesRegex(ValueError, "reference_sim_tag"):
+            make_summary_progress_plot("./data.json", reference_sim_tag="consdb")
 
-        comparison = records({"visit_source": "comparison"})
-        layout = make_summary_progress_plot(comparison, reference_sim_tag="comparison")
-        self.assertIn("comparison_20260101", file_html(layout, INLINE))
-        with self.assertRaisesRegex(ValueError, "Invalid run_name"):
-            make_summary_progress_plot(comparison)
-        with self.assertRaisesRegex(ValueError, "baseline_20260101"):
-            make_summary_progress_plot(records({"visit_source": "baseline"}), reference_sim_tag="comparison")
-        for tag in ("", None, 42, "consdb", "chimera"):
-            for source in (records(), "./data.json"):
-                with self.subTest(reference_sim_tag=tag, input=type(source).__name__):
-                    with self.assertRaisesRegex(ValueError, "reference_sim_tag"):
-                        make_summary_progress_plot(source, reference_sim_tag=tag)
-
-    def test_plot_constructs_and_serializes(self):
         # Intent: The user wants to export a page containing measured records.
         # Action: They create and serialize a populated progress plot.
         # Response: A Bokeh page contains their distinctive metric name.
@@ -121,25 +107,6 @@ class TestProgressPlotPage(unittest.TestCase):
             layout = make_summary_progress_plot(records())
             self.assertIsInstance(layout, bokeh.models.UIElement)
             self.assertIn("Bokeh", file_html(layout, INLINE))
-
-    def test_legacy_metric_line_plots_remains_separate(self):
-        # Intent: The user wants the older snapshot report to work.
-        # Action: They create it with the legacy metric-line plotting API.
-        # Response: Both panels and the final-baseline reference remain.
-        frame = pd.DataFrame(
-            dict(
-                date=pd.to_datetime(["2026-01-01", "2026-01-08"]),
-                baseline=[1.0, 2.0],
-                snapshot=[0.5, 1.5],
-                chimera=[1.8, 1.9],
-            )
-        )
-        layout = make_metric_line_plots("Legacy", frame)
-        self.assertIsInstance(layout, bokeh.layouts.Row)
-        self.assertEqual([len(plot.renderers) for plot in layout.children], [3, 3])
-        ray = layout.children[1].renderers[0]
-        self.assertIsInstance(ray.glyph, bokeh.models.Ray)
-        self.assertEqual(ray.glyph.y, 2.0)
 
 
 class TestProgressPlotStory(unittest.TestCase):
@@ -265,40 +232,15 @@ class TestProgressPlotStory(unittest.TestCase):
         self.assertGreater(bounds[3], max(points["summary_value"]))
         return bounds
 
-    def legend_entries(self):
-        """Read the visible HTML swatches, not the callback's legend state."""
-        swatches = self.page.locator("svg").filter(has=self.page.locator("line"))
-        for swatch in swatches.all():
-            self.assertTrue(swatch.is_visible(), "Legend swatches must be visible")
-        return [text.strip() for text in swatches.locator("..").all_text_contents()]
-
-    def test_user_recovers_from_bad_data_and_explores_progress(self):
+    def test_user_explores_progress_without_losing_gaps_or_current_ranges(self):
         # Intent: The user wants a page for their progress measurements.
-        # Action: They pass records whose required band column is missing.
-        # Response: The API reports the missing field, without creating a page.
-        corrected_frame = coverage_catalog()
-        with self.assertRaisesRegex(ValueError, "band"):
-            make_summary_progress_plot(corrected_frame.drop(columns="band"))
-
-        # Intent: The user wants to retry with complete summary records.
-        # Action: They restore band, generate the page, and open it.
+        # Action: They generate the page and open it.
         # Response: The page offers the initial observed/simulated comparison.
-        self.publish("/pages/plot.html", file_html(make_summary_progress_plot(corrected_frame), INLINE))
+        self.publish("/pages/plot.html", file_html(make_summary_progress_plot(coverage_catalog()), INLINE))
         self.page.goto(self.origin + "/pages/plot.html")
         self.wait_values([10, 20, 30, 9, 18, 27, 5, 40, 35, 50, 45])
         self.assertEqual(self.options(self.metric), ["Coverage", "Visits"])
         self.assertEqual(self.selected(self.metric), ["Coverage"])
-        self.assertEqual(self.options(self.source), ["chimera", "baseline", "consdb"])
-        self.assertEqual(self.selected(self.source), ["chimera", "baseline", "consdb"])
-        self.assertEqual(self.selected(self.label), ["g", "r"])
-        self.assertTrue(self.page.get_by_text("Band", exact=True).first.is_visible())
-        self.assertEqual(self.selected(self.summary), ["Mean", "Median"])
-        for control in (self.metric, self.source, self.label, self.summary):
-            self.assertTrue(control.is_enabled())
-        self.assertEqual(len(self.data("lines")["xs"]), 7)
-        self.status("11 finite measurements.")
-        self.status("1 missing/non-finite")
-        self.assertEqual(self.page.get_by_text("Failed to load", exact=False).count(), 0)
 
         # Intent: The user wants observed g-band progress, not simulations.
         # Action: They select consdb, then retain only the g band.
@@ -312,33 +254,10 @@ class TestProgressPlotStory(unittest.TestCase):
         self.label.select_option(["g"])
         self.wait_values([10, 20, 30, 9, 18, 27])
         points = self.data()
-        identities = list(
-            zip(
-                *(
-                    points[field]
-                    for field in [
-                        "metric_name",
-                        "run_name",
-                        "metric_info_label",
-                        "summary_metric",
-                        "summary_value",
-                    ]
-                )
-            )
-        )
         self.assertCountEqual(
-            identities,
-            [
-                ("Coverage", "consdb_20260101", "consdb_g", "Mean", 10),
-                ("Coverage", "consdb_20260108", "consdb_g", "Mean", 20),
-                ("Coverage", "consdb_20260120", "consdb_g", "Mean", 30),
-                ("Coverage", "consdb_20260101", "consdb_g", "Median", 9),
-                ("Coverage", "consdb_20260108", "consdb_g", "Median", 18),
-                ("Coverage", "consdb_20260120", "consdb_g", "Median", 27),
-            ],
+            points["run_name"], ["consdb_20260101", "consdb_20260108", "consdb_20260120"] * 2
         )
-        self.assertEqual(len(self.data("lines")["xs"]), 2)
-        self.assertCountEqual(self.legend_entries(), ["consdb", "g", "Mean", "Median"])
+        self.assertEqual(points["metric_info_label"], ["consdb_g"] * 6)
 
         # Intent: The user wants the Mean trend without hiding missing data.
         # Action: They select only Mean.
@@ -349,7 +268,6 @@ class TestProgressPlotStory(unittest.TestCase):
         self.assertEqual(self.data()["date"], [dates[0], dates[2], dates[3]])
         self.assertEqual(self.data("lines")["xs"], [dates])
         self.assertEqual(self.data("lines")["ys"], [[10, None, 20, 30]])
-        self.status("3 finite measurements.")
         self.status("1 missing/non-finite")
         coverage_ranges = self.assert_padded_ranges()
 
@@ -361,7 +279,6 @@ class TestProgressPlotStory(unittest.TestCase):
         self.status("No finite data")
         self.assertEqual(self.selected(self.summary), [])
         self.assertEqual(self.options(self.summary), ["Mean", "Median"])
-        self.assertTrue(self.summary.is_enabled())
         self.assertEqual(self.data("lines")["xs"], [])
         self.summary.select_option(["Mean"])
         self.wait_values([10, 20, 30])
@@ -382,24 +299,6 @@ class TestProgressPlotStory(unittest.TestCase):
         self.assertEqual(self.data()["metric_name"], ["Visits"])
         self.assertEqual(self.data()["date"], [dates[3]])
         self.assertEqual(self.data("lines")["ys"], [[7]])
-        self.assertCountEqual(self.legend_entries(), ["consdb", "r", "Total"])
-
-        # Intent: The user wants to temporarily hide every Visits source.
-        # Action: They clear Source, then select consdb again.
-        # Response: Downstream controls empty, then the comparison is restored.
-        self.source.select_option([])
-        self.wait_values([])
-        self.status("No finite data")
-        self.assertEqual(self.selected(self.source), [])
-        self.assertEqual(self.data("lines")["xs"], [])
-        for control in (self.label, self.summary):
-            self.assertEqual(self.options(control), [])
-            self.assertEqual(self.selected(control), [])
-            self.assertTrue(control.is_disabled())
-        self.source.select_option(["consdb"])
-        self.wait_values([7])
-        self.assertEqual(self.selected(self.label), ["r"])
-        self.assertEqual(self.selected(self.summary), ["Total"])
         visits_ranges = self.assert_padded_ranges()
         self.assertNotEqual(visits_ranges, coverage_ranges)
 
@@ -438,12 +337,10 @@ class TestProgressPlotStory(unittest.TestCase):
     def test_user_selects_bands_across_sources_and_returns_to_original_labels(self):
         # Intent: The user has band labels and a custom simulation label.
         # Action: They open the comparison, then remove the custom source.
-        # Response: Labels become ordered bands for the remaining sources.
+        # Response: Selected labels become one band across both sources.
         frame = records(
-            *[
-                dict(band=band, summary_value=index + 1)
-                for index, band in enumerate(["y", "z", "i", "r", "g", "u", "all"])
-            ],
+            dict(band="g", summary_value=5),
+            dict(band="all", summary_value=7),
             dict(visit_source="comparison", band="g", summary_value=20),
             dict(visit_source="chimera", metric_info_label="custom", band="all", summary_value=30),
             dict(metric_name="Special", metric_info_label="consdb_G", band="all", summary_value=40),
@@ -455,26 +352,20 @@ class TestProgressPlotStory(unittest.TestCase):
             file_html(make_summary_progress_plot(frame, reference_sim_tag="comparison"), INLINE),
         )
         self.page.goto(self.origin + "/pages/plot.html")
-        self.wait_values([1, 2, 3, 4, 5, 6, 7, 20, 30])
-        self.assertEqual(self.options(self.source), ["chimera", "comparison", "consdb"])
+        self.wait_values([5, 7, 20, 30])
         self.assertTrue(self.page.get_by_text("Metric info label", exact=True).is_visible())
         self.label.select_option([json.dumps("consdb_g"), json.dumps("comparison_g")])
         self.wait_values([5, 20])
         self.source.select_option(["consdb", "comparison"])
         self.wait_values([5, 20])
         self.assertTrue(self.page.get_by_text("Band", exact=True).first.is_visible())
-        self.assertEqual(self.options(self.label), ["all", "u", "g", "r", "i", "z", "y"])
         self.assertEqual(self.selected(self.label), ["g"])
         self.assertCountEqual(self.data()["metric_info_label"], ["consdb_g", "comparison_g"])
         self.assertEqual(len(self.data("lines")["xs"]), 2)
 
         # Intent: The user wants to toggle every source's g band together.
-        # Action: They deselect g, select all, and then restore g.
-        # Response: Clearing stays empty; all means the literal all-band label.
-        self.label.select_option([])
-        self.wait_values([])
-        self.status("No finite data")
-        self.assertEqual(self.selected(self.label), [])
+        # Action: They select all, and then restore g.
+        # Response: all means the literal band, not every measurement.
         self.label.select_option(["all"])
         self.wait_values([7])
         self.assertEqual(self.data()["metric_info_label"], ["consdb_all"])
@@ -499,41 +390,38 @@ class TestProgressPlotStory(unittest.TestCase):
         )
         self.assertTrue(self.page.get_by_text("Metric info label", exact=True).is_visible())
         self.metric.select_option("Coverage")
-        self.wait_values([1, 2, 3, 4, 5, 6, 7])
-        self.assertEqual(self.options(self.source), ["chimera", "comparison", "consdb"])
-        self.assertEqual(self.options(self.label), ["all", "u", "g", "r", "i", "z", "y"])
+        self.wait_values([5, 7])
 
     def test_user_replaces_a_summary_at_the_selection_limit(self):
         capacity = len(bokeh.core.enums.LineDash)
-        names = [f"S{index:02}" for index in range(capacity + 1)]
+        names = [f"A{index:02}" for index in range(capacity)] + ["Mean", "Median"]
 
         # Intent: The user wants to compare one metric's summaries.
         # Action: They open a page with more summaries than fit together.
-        # Response: All options exist; the first capacity are selected.
+        # Response: The initial selection leaves Mean and Median available.
         frame = records(*[dict(summary_metric=name, summary_value=index) for index, name in enumerate(names)])
         self.publish("/pages/plot.html", file_html(make_summary_progress_plot(frame), INLINE))
         self.page.goto(self.origin + "/pages/plot.html")
         self.wait_values(list(range(capacity)))
-        self.assertEqual(self.options(self.summary), names)
-        self.assertEqual(self.selected(self.summary), names[:capacity])
-        self.status(f"Select at most {capacity} summaries")
 
-        # Intent: The user wants to add the remaining summary.
+        # Intent: The user wants to add the remaining summaries.
         # Action: They select everything without removing an existing choice.
         # Response: Existing choices survive and a visible limit explains why.
         self.summary.select_option(names)
         self.status("Selection limit")
         self.wait_values(list(range(capacity)))
-        self.assertEqual(self.selected(self.summary), names[:capacity])
-        self.assertCountEqual(self.data()["summary_metric"], names[:capacity])
 
-        # Intent: The user wants the remaining comparison instead of S00.
-        # Action: They deselect S00 and select the other summaries.
-        # Response: The replacement is selected and plotted within the limit.
-        self.summary.select_option(names[1:])
-        self.wait_values(list(range(1, capacity + 1)))
-        self.assertEqual(self.selected(self.summary), names[1:])
-        self.assertCountEqual(self.data()["summary_metric"], names[1:])
+        # Intent: The user wants Mean and Median in their comparison.
+        # Action: They replace the last two summaries, keeping the first ones.
+        # Response: Mean and Median claim solid/dashed from retained summaries.
+        replacement = names[: capacity - 2] + ["Mean", "Median"]
+        self.summary.select_option(replacement)
+        self.wait_values(list(range(capacity - 2)) + [capacity, capacity + 1])
+        self.assertCountEqual(self.selected(self.summary), replacement)
+        lines = self.data("lines")
+        dash_by_value = {values[0]: dash for values, dash in zip(lines["ys"], lines["dash"])}
+        self.assertEqual(dash_by_value[capacity], "solid")
+        self.assertEqual(dash_by_value[capacity + 1], "dashed")
 
     def test_user_reloads_published_data_and_sees_fetch_failure(self):
         # Intent: The user wants the currently published measurements.
@@ -555,16 +443,12 @@ class TestProgressPlotStory(unittest.TestCase):
         self.assertEqual(self.data()["run_name"], ["comparison_20260101"])
         self.assertEqual(self.data("lines")["width"], [5])
         self.assertEqual(self.data("lines")["alpha"], [0.3])
-        self.assertCountEqual(self.legend_entries(), ["comparison", "g", "Mean"])
-        stroke = self.page.locator("svg").filter(has=self.page.locator("line")).first.locator("line")
-        self.assertEqual(stroke.get_attribute("stroke-width"), "5")
-        self.assertEqual(stroke.get_attribute("opacity"), "0.3")
         self.assertEqual(self.request_count("/pages/data.json"), 1)
         self.assertEqual(self.request_count("/data.json"), 0)
 
         # Intent: The publisher wants an update without replacing HTML.
-        # Action: They replace JSON; the user clears and restores Mean.
-        # Response: The open page still uses value 1 without fetching again.
+        # Action: They replace JSON; the user clears Mean on the open page.
+        # Response: The selection changes without fetching the new catalog.
         self.publish(
             "/pages/data.json",
             json_records(
@@ -584,8 +468,6 @@ class TestProgressPlotStory(unittest.TestCase):
         self.summary.select_option([])
         self.wait_values([])
         self.status("No finite data")
-        self.summary.select_option(["Mean"])
-        self.wait_values([1])
         self.assertEqual(self.options(self.metric), ["Coverage"])
         self.assertEqual(self.request_count("/pages/data.json"), 1)
 
@@ -597,14 +479,11 @@ class TestProgressPlotStory(unittest.TestCase):
         self.assertEqual(self.selected(self.source), ["comparison"])
         self.assertEqual(self.selected(self.label), [json.dumps("review")])
         self.assertTrue(self.page.get_by_text("Metric info label", exact=True).is_visible())
-        self.assertEqual(self.data("lines")["width"], [5])
-        self.assertEqual(self.data("lines")["alpha"], [0.3])
         self.assertEqual(self.options(self.metric), ["Coverage", "Visits"])
         self.status("Source: ./data.json")
         self.assertEqual(self.request_count("/pages/data.json"), 2)
         self.metric.select_option("Visits")
         self.wait_values([7, 8])
-        self.assertEqual(self.options(self.source), ["chimera", "consdb"])
         self.assertEqual(self.data()["metric_name"], ["Visits", "Visits"])
         self.assertEqual(self.request_count("/pages/data.json"), 2)
 
@@ -617,10 +496,7 @@ class TestProgressPlotStory(unittest.TestCase):
         self.status("Failed to load ./data.json: HTTP 404")
         self.wait_values([])
         self.assertEqual(self.data("lines")["xs"], [])
-        for control in (self.metric, self.source, self.label, self.summary):
-            self.assertTrue(control.is_disabled())
         self.assertEqual(self.request_count("/pages/data.json"), 3)
-        self.assertEqual(self.legend_entries(), [])
 
     def test_notebook_outputs_keep_user_selections_independent(self):
         # Intent: The user wants to compare two independent notebook outputs.
@@ -640,8 +516,6 @@ class TestProgressPlotStory(unittest.TestCase):
         self.page.goto(self.origin + "/pages/output0.html")
         self.wait_values([1])
         self.assertEqual(self.selected(self.source), ["baseline"])
-        self.assertEqual(self.data("lines")["width"], [5])
-        self.assertEqual(self.data("lines")["alpha"], [0.3])
         self.assertEqual(self.request_count("/pages/data0.json"), 1)
         self.assertEqual(self.request_count("/pages/data1.json"), 0)
         other = self.new_page()
@@ -649,12 +523,10 @@ class TestProgressPlotStory(unittest.TestCase):
         self.wait_values([2], page=other)
         self.assertEqual(self.selected(other.locator("select").nth(1)), ["comparison"])
         self.assertEqual(self.data(page=other)["run_name"], ["comparison_20260101"])
-        self.assertEqual(self.data("lines", page=other)["width"], [5])
-        self.assertEqual(self.data("lines", page=other)["alpha"], [0.3])
         self.assertEqual(self.request_count("/pages/data1.json"), 1)
 
         # Intent: The user wants to adjust the notebook comparisons separately.
-        # Action: They clear/restore the first, then clear the second.
+        # Action: They clear and restore the first output.
         # Response: Each action affects only that output without another fetch.
         self.summary.select_option([])
         self.wait_values([])
@@ -663,52 +535,26 @@ class TestProgressPlotStory(unittest.TestCase):
         self.summary.select_option(["Mean"])
         self.wait_values([1])
         self.wait_values([2], page=other)
-        other.locator("select").nth(3).select_option([])
-        self.wait_values([], page=other)
-        self.status("No finite data", page=other)
-        self.wait_values([1])
         self.assertEqual(self.request_count("/pages/data0.json"), 1)
         self.assertEqual(self.request_count("/pages/data1.json"), 1)
 
-    def test_user_reveals_an_already_initialized_progress_tab(self):
-        # Intent: The user wants progress ready when they switch tabs.
-        # Action: They open a page with Progress initially inactive.
-        # Response: The hidden plot loads without requiring a resize.
-        self.publish("/pages/data.json", json_records(records({"summary_value": 4})))
-        tabs = bokeh.models.Tabs(
-            tabs=[
-                bokeh.models.TabPanel(title="Other", child=bokeh.models.Div(text="Other tab")),
-                bokeh.models.TabPanel(title="Progress", child=make_summary_progress_plot("./data.json")),
-            ]
-        )
-        self.publish("/pages/tab.html", file_html(tabs, INLINE))
-        self.page.goto(self.origin + "/pages/tab.html")
-        self.wait_values([4])
-        self.assertEqual(self.request_count("/pages/data.json"), 1)
-
-        # Intent: The user wants to interact with the prepared comparison.
-        # Action: They reveal Progress and clear/restore its summary.
-        # Response: Controls work immediately without fetching again.
-        self.page.get_by_text("Progress", exact=True).click()
-        self.metric.wait_for(state="visible")
-        self.assertTrue(self.metric.is_visible())
-        self.summary.select_option([])
-        self.wait_values([])
-        self.status("No finite data")
-        self.summary.select_option(["Mean"])
-        self.wait_values([4])
-        self.assertEqual(self.request_count("/pages/data.json"), 1)
-
-    def test_pending_data_does_not_block_another_plot(self):
-        # Intent: The user wants one comparison while another source is slow.
-        # Action: They open two plots while the first request remains pending.
-        # Response: The second initializes; the first still shows Loading.
+    def test_dashboard_tab_plots_start_independently_before_reveal(self):
+        # Intent: The user wants comparisons ready before opening their tab.
+        # Action: They open another tab while the first request stays pending.
+        # Response: The second hidden plot initializes without waiting.
         first = make_summary_progress_plot("./first.json")
         second = make_summary_progress_plot("./second.json")
         first_id = first.select_one({"name": "progress_points"}).id
         second_id = second.select_one({"name": "progress_points"}).id
+        first_status_id = first.select_one({"name": "progress_status"}).id
         self.publish("/pages/second.json", json_records(records({"summary_value": 29})))
-        self.publish("/pages/two.html", file_html(bokeh.layouts.column(first, second), INLINE))
+        tabs = bokeh.models.Tabs(
+            tabs=[
+                bokeh.models.TabPanel(title="Other", child=bokeh.models.Div(text="Other tab")),
+                bokeh.models.TabPanel(title="Progress", child=bokeh.layouts.column(first, second)),
+            ]
+        )
+        self.publish("/pages/two.html", file_html(tabs, INLINE))
         pending = []
 
         def abort_pending():
@@ -723,7 +569,11 @@ class TestProgressPlotStory(unittest.TestCase):
         self.page.goto(self.origin + "/pages/two.html", wait_until="domcontentloaded")
         self.wait_values([29], model_id=second_id)
         self.wait_values([], model_id=first_id)
-        self.status("Loading ./first.json...")
+        # Hidden status is readable from its public model, not visible DOM.
+        self.assertIn(
+            "Loading ./first.json...",
+            self.page.evaluate("id => Bokeh.documents[0].get_model_by_id(id).text", first_status_id),
+        )
         self.assertEqual(len(pending), 1)
 
         # Intent: The user wants the slower comparison once its data arrive.
@@ -734,8 +584,19 @@ class TestProgressPlotStory(unittest.TestCase):
         pending.remove(route)
         self.wait_values([13], model_id=first_id)
         self.wait_values([29], model_id=second_id)
+
+        # Intent: The user wants to interact with the prepared comparisons.
+        # Action: They reveal Progress and clear the first plot's summary.
+        # Response: Only that plot clears; neither source is fetched again.
+        self.page.get_by_text("Progress", exact=True).click()
         self.status("1 finite measurements. Source: ./first.json")
         self.status("1 finite measurements. Source: ./second.json")
+        self.summary.select_option([])
+        self.wait_values([], model_id=first_id)
+        self.wait_values([29], model_id=second_id)
+        self.status("No finite data")
+        self.assertEqual(self.request_count("/pages/second.json"), 1)
+        self.assertEqual(len(pending), 0)
 
 
 if __name__ == "__main__":

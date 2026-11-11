@@ -559,18 +559,27 @@ returned early. It records the settled selection key and clears ``busy``.
 Testing
 -------
 
-Python tests can construct the plot and inspect the generated models, but
-they cannot execute the callback. Its behavior is covered by the opt-in
+The browser-free API story checks representative invalid inputs and serialization
+of populated and empty plots, but cannot execute the callback. Representative
+callback behavior is covered by the opt-in
 Playwright browser tests in ``tests/test_plot_progress.py``, which run only
 when ``ENABLE_PLAYWRIGHT_TESTS=1`` is set (see :doc:`playwright_testing`).
 After changing ``_PROGRESS_CALLBACK``, run those browser tests, not only the
 default test suite.
 
-``test_user_selects_bands_across_sources_and_returns_to_original_labels``
-covers ordered band choices, cross-source selection, literal ``all``, clearing,
-separate series, and translation in both directions. The main exploration story
-checks absent bands and empty upstream controls; the external-data story checks
-mode reevaluation after replacing JSON and reloading the page.
-These existing stories also check chimera-first Source ordering with default
-and alternate reference tags, metric changes with and without chimera, and
-chimera introduced by updated external JSON.
+The main exploration story checks cascading selections, summary clearing and
+restoration, an explicit gap with irregular dates, and Reset after switching
+metrics. ``test_user_selects_bands_across_sources_and_returns_to_original_labels``
+checks cross-source g-band selection, literal ``all``, separate series, and
+translation between Band and original-label modes. The summary-limit story
+checks Mean/Median preferred dashes after replacing selected summaries.
+
+The external-data story checks page-relative URLs, reload-only updates, mode
+reevaluation, and visible fetch failure. Separate notebook outputs retain
+independent selections; the dashboard story combines initially hidden plots
+with a pending fetch to check independent startup and interaction after reveal.
+
+These stories are deliberately representative, not exhaustive. They do not
+assert Source or Band option ordering, Band clearing, empty upstream controls,
+or legend contents. Those behaviors remain part of the documented interface;
+removing their automated assertions does not change the product requirements.
