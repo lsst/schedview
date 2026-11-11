@@ -356,9 +356,14 @@ Step 2: Cascade selector options
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The selectors form a cascade. Each one's options are distinct values found in
-records matching all selections *upstream* of it. Metric, source, original
-label, and summary options are sorted; band options use the fixed order
+records matching all selections *upstream* of it. Metric, original-label,
+and summary options are sorted. Source options put ``chimera`` first when
+available, followed by the other available sources in sorted order. Band
+options use the fixed order
 ``all``, ``u``, ``g``, ``r``, ``i``, ``z``, ``y``, skipping absent bands.
+The shared embedded/external cascade applies source ordering on initial load,
+metric changes, and external-data reloads without adding absent sources or
+changing retained selections.
 A working list, ``rows``, is narrowed after each control:
 
 .. mermaid::
@@ -566,3 +571,6 @@ covers ordered band choices, cross-source selection, literal ``all``, clearing,
 separate series, and translation in both directions. The main exploration story
 checks absent bands and empty upstream controls; the external-data story checks
 mode reevaluation after replacing JSON and reloading the page.
+These existing stories also check chimera-first Source ordering with default
+and alternate reference tags, metric changes with and without chimera, and
+chimera introduced by updated external JSON.

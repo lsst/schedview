@@ -371,8 +371,13 @@ export default async function(args, changed) {
             }
         }
 
-        // Source.
+        // Source: chimera first when available, then other sources in sorted order.
         const sourceOptions = sorted(rows.map(row => row.visit_source));
+        const chimeraIndex = sourceOptions.indexOf("chimera");
+        if (chimeraIndex > 0) {
+            sourceOptions.splice(chimeraIndex, 1);
+            sourceOptions.unshift("chimera");
+        }
         cascade(source, sourceOptions, changed === metric);
         rows = rows.filter(row => source.value.includes(row.visit_source));
 

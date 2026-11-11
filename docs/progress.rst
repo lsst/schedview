@@ -385,12 +385,14 @@ Any absent, custom, case-variant, or source-mismatched label keeps the control i
 original-label mode. Empty upstream results leave an empty, disabled label control.
 Initially the first sorted metric is selected, followed by all available
 downstream values within the summary-style cap.
+The Source selector always lists ``chimera`` first when available, followed by
+the other available sources in sorted order.
 
 Options cascade from metric to source to label to summary. Each downstream
 list is the union of values in records matching all upstream selections, not
 an intersection across sources or labels. Valid prior selections are retained;
 if none survive an upstream change, all available options are selected in
-sorted order within the cap (bands use the order above). When the third control
+option order within the cap (sources and bands use the orders above). When the third control
 changes mode, surviving standard-label selections translate to their bands, or
 selected bands translate to all matching standard labels. Intentionally clearing
 a multi-selection means show nothing, with visible no-data status, not an

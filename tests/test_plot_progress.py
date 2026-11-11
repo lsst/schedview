@@ -288,7 +288,8 @@ class TestProgressPlotStory(unittest.TestCase):
         self.wait_values([10, 20, 30, 9, 18, 27, 5, 40, 35, 50, 45])
         self.assertEqual(self.options(self.metric), ["Coverage", "Visits"])
         self.assertEqual(self.selected(self.metric), ["Coverage"])
-        self.assertEqual(self.selected(self.source), ["baseline", "chimera", "consdb"])
+        self.assertEqual(self.options(self.source), ["chimera", "baseline", "consdb"])
+        self.assertEqual(self.selected(self.source), ["chimera", "baseline", "consdb"])
         self.assertEqual(self.selected(self.label), ["g", "r"])
         self.assertTrue(self.page.get_by_text("Band", exact=True).first.is_visible())
         self.assertEqual(self.selected(self.summary), ["Mean", "Median"])
@@ -455,6 +456,7 @@ class TestProgressPlotStory(unittest.TestCase):
         )
         self.page.goto(self.origin + "/pages/plot.html")
         self.wait_values([1, 2, 3, 4, 5, 6, 7, 20, 30])
+        self.assertEqual(self.options(self.source), ["chimera", "comparison", "consdb"])
         self.assertTrue(self.page.get_by_text("Metric info label", exact=True).is_visible())
         self.label.select_option([json.dumps("consdb_g"), json.dumps("comparison_g")])
         self.wait_values([5, 20])
@@ -491,12 +493,14 @@ class TestProgressPlotStory(unittest.TestCase):
         self.wait_values([30])
         self.metric.select_option("Special")
         self.wait_values([40, 50, 60])
+        self.assertEqual(self.options(self.source), ["consdb"])
         self.assertEqual(
             self.options(self.label), [json.dumps(value) for value in ["", "comparison_g", "consdb_G"]]
         )
         self.assertTrue(self.page.get_by_text("Metric info label", exact=True).is_visible())
         self.metric.select_option("Coverage")
         self.wait_values([1, 2, 3, 4, 5, 6, 7])
+        self.assertEqual(self.options(self.source), ["chimera", "comparison", "consdb"])
         self.assertEqual(self.options(self.label), ["all", "u", "g", "r", "i", "z", "y"])
 
     def test_user_replaces_a_summary_at_the_selection_limit(self):
@@ -572,6 +576,7 @@ class TestProgressPlotStory(unittest.TestCase):
                         "summary_value": 42,
                     },
                     {"metric_name": "Visits", "summary_value": 7},
+                    {"metric_name": "Visits", "visit_source": "chimera", "summary_value": 8},
                 ),
                 reference_sim_tag="comparison",
             ),
@@ -598,8 +603,9 @@ class TestProgressPlotStory(unittest.TestCase):
         self.status("Source: ./data.json")
         self.assertEqual(self.request_count("/pages/data.json"), 2)
         self.metric.select_option("Visits")
-        self.wait_values([7])
-        self.assertEqual(self.data()["metric_name"], ["Visits"])
+        self.wait_values([7, 8])
+        self.assertEqual(self.options(self.source), ["chimera", "consdb"])
+        self.assertEqual(self.data()["metric_name"], ["Visits", "Visits"])
         self.assertEqual(self.request_count("/pages/data.json"), 2)
 
         # Intent: The user wants to return after the data file disappears.
