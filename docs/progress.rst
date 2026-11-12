@@ -130,6 +130,20 @@ here means embedded metric data, not completely offline operation: Bokeh
 resources use the CDN and need not be inlined. Regenerate the HTML to update
 embedded records.
 
+Add ``--development-version`` to display a prominent banner above the plot:
+
+.. code-block:: sh
+
+   make_summary_progress_plot --development-version resultsDb.db /path/to/served/pages/summary_progress_figure.html
+
+The banner states: "Development version: This plot is a development version that
+may be showing deprecated or dummy data. Bugs should be expected." It is off by
+default and works with both embedded database data and external JSON URLs. It is
+part of the generated figure HTML, so it also appears inside the wrapper's iframe
+and remains visible while external data load or fail. Regenerate the HTML to add
+or remove it; JSON-only replacement does not change it. The option does not change
+records, the page title, the notebook API, or the handwritten wrapper.
+
 To use the handwritten wrapper, first copy ``pages/progress_summary.html``
 from a schedview source checkout into the target web-host directory. That is
 the canonical wrapper, not an output of the plotting command; these instructions

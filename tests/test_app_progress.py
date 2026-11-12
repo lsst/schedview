@@ -69,6 +69,27 @@ def test_input_kind_decides_between_embedded_and_external_data(summary_database,
     assert result.exit_code == 0, result.output
     assert "./endpoint" in output.read_text()
 
+    # Development warnings are opt-in HTML for either input, not plot data.
+    for source, options in [
+        (str(tmp_path / "results.json"), ["--input-kind", "database"]),
+        ("./data.json", []),
+    ]:
+        result = runner.invoke(app.make_summary_progress_plot_cli, [source, str(output), *options])
+        assert result.exit_code == 0, result.output
+        assert 'id="development-version-banner"' not in output.read_text()
+        result = runner.invoke(
+            app.make_summary_progress_plot_cli,
+            [source, str(output), *options, "--development-version", "--title", "Development report"],
+        )
+        assert result.exit_code == 0, result.output
+        html = output.read_text()
+        assert "<title>Development report</title>" in html
+        assert '<aside id="development-version-banner" role="note"' in html
+        assert "<strong>Development version</strong>" in html
+        assert "may be showing deprecated or dummy data. Bugs should be expected." in html
+        assert html.index('id="development-version-banner"') < html.index("data-root-id=")
+        assert ("chimera_20280229" if options else "./data.json") in html
+
 
 def test_alternate_reference_flows_through_data_and_both_html_inputs(summary_database, tmp_path):
     with closing(sqlite3.connect(summary_database)) as connection, connection:

@@ -85,8 +85,18 @@ def make_summary_progress_data(db_path: str, json_path: str, reference_sim_tag: 
     show_default=True,
     help="Single reference source prefix; external JSON must use the same tag.",
 )
+@click.option(
+    "--development-version",
+    is_flag=True,
+    help="Show a development-version banner warning of deprecated or dummy data and expected bugs.",
+)
 def make_summary_progress_plot_cli(
-    summary_metrics: str, page_path: str, input_kind: str, title: str, reference_sim_tag: str
+    summary_metrics: str,
+    page_path: str,
+    input_kind: str,
+    title: str,
+    reference_sim_tag: str,
+    development_version: bool,
 ) -> None:
     """Write a standalone progress page to PAGE_PATH from SUMMARY_METRICS.
 
@@ -96,6 +106,7 @@ def make_summary_progress_plot_cli(
     Relative URLs resolve against the served page, not the current directory.
     Database input embeds records and does not create a companion JSON file.
     An alternate reference tag replaces baseline. Regenerate HTML to change it.
+    The optional development banner belongs to HTML, not the data or wrapper.
     """
     try:
         # Classify before filesystem access; external data must remain
@@ -124,7 +135,25 @@ def make_summary_progress_plot_cli(
             else load_summary_metrics(summary_metrics, reference_sim_tag=reference_sim_tag)
         )
         plot = make_summary_progress_plot(records, reference_sim_tag=reference_sim_tag)
-        Path(page_path).write_text(file_html(plot, CDN, title=title), encoding="utf-8")
+        page = file_html(
+            plot,
+            CDN,
+            title=title,
+            template="""{% block contents %}
+{% if development_version %}
+<aside id="development-version-banner" role="note"
+       style="box-sizing: border-box; padding: 12px 16px; margin: 0 0 16px;
+              border: 2px solid #9a6700; background: #fff8c5; color: #533f03;
+              font: 16px/1.5 sans-serif; overflow-wrap: anywhere;">
+  <strong>Development version</strong>: This plot is a development version that
+  may be showing deprecated or dummy data. Bugs should be expected.
+</aside>
+{% endif %}
+{{ super() }}
+{% endblock %}""",
+            template_variables={"development_version": development_version},
+        )
+        Path(page_path).write_text(page, encoding="utf-8")
     except (OSError, ValueError, TypeError, sqlite3.Error) as error:
         raise click.ClickException(
             f"Cannot create {page_path!r} from {summary_metrics!r}: {error}"
