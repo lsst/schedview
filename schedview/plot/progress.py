@@ -21,10 +21,10 @@ __all__ = ["SOURCE_STYLES", "make_metric_line_plots", "make_summary_progress_plo
 
 SOURCE_STYLES: dict[str, tuple[int, float]] = {
     "consdb": (1, 1.0),
-    "chimera": (3, 0.6),
-    "baseline": (5, 0.3),
+    "chimera": (3, 0.3333333333333333),
+    "baseline": (5, 0.2),
 }
-"""Default source -> (width, alpha); plots snapshot their reference tag."""
+"""Default source -> (width, alpha), initially inverse-width; tune constants by eye."""
 
 _PROGRESS_STARTUP = "schedview-progress-startup"
 """Tag/name linking each plot's status model to the document dispatcher."""

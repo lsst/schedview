@@ -442,7 +442,7 @@ class TestProgressPlotStory(unittest.TestCase):
         self.assertEqual(self.selected(self.label), ["g"])
         self.assertEqual(self.data()["run_name"], ["comparison_20260101"])
         self.assertEqual(self.data("lines")["width"], [5])
-        self.assertEqual(self.data("lines")["alpha"], [0.3])
+        self.assertEqual(self.data("lines")["alpha"], [0.2])
         self.assertEqual(self.request_count("/pages/data.json"), 1)
         self.assertEqual(self.request_count("/data.json"), 0)
 

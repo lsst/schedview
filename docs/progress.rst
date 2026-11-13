@@ -454,10 +454,14 @@ Visible points keep isolated dates interpretable.
      - 1.0
    * - ``chimera``
      - 3
-     - 0.6
+     - approximately 0.333
    * - Configured reference tag (default ``baseline``)
      - 5
-     - 0.3
+     - 0.2
+
+Default line alpha is inversely proportional to width as a starting point for
+similar visual impact. These are fixed constants in ``SOURCE_STYLES``, not a
+dynamic calculation, and can be adjusted by eye.
 
 Band colors come from ``schedview.plot.colors.make_band_cmap`` with all six
 bands followed by ``all``, so ``all`` uses the helper's next assigned color.
